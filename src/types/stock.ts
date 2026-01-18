@@ -2,11 +2,26 @@ export interface Product {
   id: string;
   code: string;
   name: string;
+  category: string;
   total_colis: number;
   description: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export const PRODUCT_CATEGORIES = [
+  'Camas',
+  'Móveis',
+  'Roupeiros',
+  'Cadeiras',
+  'Mesas',
+  'Sofás',
+  'Colchões',
+  'Estantes',
+  'Geral'
+] as const;
+
+export type ProductCategory = typeof PRODUCT_CATEGORIES[number];
 
 export interface CountingSession {
   id: string;

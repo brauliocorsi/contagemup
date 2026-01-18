@@ -20,7 +20,7 @@ export function ProductsView() {
     product.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleCreateProduct = async (product: { code: string; name: string; total_colis: number; description: string | null }) => {
+  const handleCreateProduct = async (product: { code: string; name: string; category: string; total_colis: number; description: string | null }) => {
     const result = await createProduct(product);
     return !!result;
   };
@@ -81,6 +81,7 @@ export function ProductsView() {
                   <TableRow>
                     <TableHead>Código</TableHead>
                     <TableHead>Nome</TableHead>
+                    <TableHead>Categoria</TableHead>
                     <TableHead>Colis</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -91,6 +92,9 @@ export function ProductsView() {
                     <TableRow key={product.id}>
                       <TableCell className="font-mono">{product.code}</TableCell>
                       <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{product.category}</Badge>
+                      </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{product.total_colis} colis</Badge>
                       </TableCell>
