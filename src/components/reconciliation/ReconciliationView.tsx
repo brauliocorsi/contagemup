@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, 
-  ArrowUpDown, Search, Eye, CheckCheck, X, Scale, FileQuestion
+  ArrowUpDown, Search, Eye, CheckCheck, X, Scale, FileQuestion, Download
 } from 'lucide-react';
 import { CSVImportRow, ReconciliationItem } from '@/types/reconciliation';
 import { cn } from '@/lib/utils';
@@ -432,9 +432,19 @@ export function ReconciliationView() {
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              O CSV deve conter colunas: código, nome (opcional), quantidade
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">
+                O CSV deve conter colunas: código, nome (opcional), quantidade
+              </p>
+              <a 
+                href="/templates/template_conciliacao.csv" 
+                download="template_conciliacao.csv"
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                <Download className="h-3 w-3" />
+                Baixar template
+              </a>
+            </div>
           </div>
 
           {/* Preview CSV data */}
