@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Package, ClipboardList, History, BarChart3, Tags } from 'lucide-react';
+import { Package, ClipboardList, History, BarChart3, Tags, Scale } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -12,6 +12,7 @@ const tabs = [
   { id: 'products', label: 'Produtos', icon: Package },
   { id: 'categories', label: 'Categorias', icon: Tags },
   { id: 'sessions', label: 'Sessões', icon: History },
+  { id: 'reconciliation', label: 'Conciliação', icon: Scale },
   { id: 'reports', label: 'Relatórios', icon: BarChart3 },
 ];
 
