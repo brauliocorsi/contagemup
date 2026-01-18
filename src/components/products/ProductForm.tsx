@@ -6,13 +6,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Loader2 } from 'lucide-react';
-import { PRODUCT_CATEGORIES } from '@/types/stock';
+import { useCategories } from '@/hooks/useCategories';
 
 interface ProductFormProps {
   onSubmit: (product: { code: string; name: string; category: string; total_colis: number; description: string | null }) => Promise<boolean>;
 }
 
 export function ProductForm({ onSubmit }: ProductFormProps) {
+  const { categories, loading: categoriesLoading } = useCategories();
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [code, setCode] = useState('');
@@ -84,13 +85,13 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="category">Categoria *</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={category} onValueChange={setCategory} disabled={categoriesLoading}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PRODUCT_CATEGORIES.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
