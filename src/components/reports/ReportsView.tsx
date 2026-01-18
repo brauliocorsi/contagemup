@@ -68,10 +68,10 @@ export function ReportsView() {
   }, [productsWithCounts, filterCategory]);
 
   const exportToCSV = () => {
-    if (productsWithCounts.length === 0) return;
+    if (filteredProducts.length === 0) return;
 
     const headers = ['Código', 'Nome', 'Categoria', 'Total Colis', 'Sets Completos', 'Unidades', 'Status', 'Colis Faltantes'];
-    const rows = productsWithCounts.map(p => [
+    const rows = filteredProducts.map(p => [
       p.code,
       p.name,
       p.category,
@@ -83,7 +83,7 @@ export function ReportsView() {
     ]);
 
     // Calculate totals
-    const totalUnits = productsWithCounts.filter(p => p.status === 'complete').length;
+    const totalUnits = filteredProducts.filter(p => p.status === 'complete').length;
     const totalRow = ['', 'TOTAL', '', '', '', totalUnits, '', ''];
 
     const csv = [headers, ...rows, totalRow].map(row => row.join(';')).join('\n');
@@ -91,7 +91,8 @@ export function ReportsView() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `relatorio_${new Date().toISOString().split('T')[0]}.csv`;
+    const categorySuffix = filterCategory !== 'all' ? `_${filterCategory}` : '';
+    a.download = `relatorio${categorySuffix}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
