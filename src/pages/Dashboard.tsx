@@ -6,6 +6,7 @@ import { ProductsView } from '@/components/products/ProductsView';
 import { CategoriesView } from '@/components/categories/CategoriesView';
 import { SessionsView } from '@/components/sessions/SessionsView';
 import { ReportsView } from '@/components/reports/ReportsView';
+import { ReconciliationView } from '@/components/reconciliation/ReconciliationView';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('counting');
@@ -19,6 +20,7 @@ export default function Dashboard() {
         {activeTab === 'products' && <ProductsView />}
         {activeTab === 'categories' && <CategoriesView />}
         {activeTab === 'sessions' && <SessionsView />}
+        {activeTab === 'reconciliation' && <ReconciliationView />}
         {activeTab === 'reports' && <ReportsView />}
       </main>
     </div>

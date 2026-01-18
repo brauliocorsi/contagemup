@@ -176,6 +176,105 @@ export type Database = {
         }
         Relationships: []
       }
+      reconciliation_items: {
+        Row: {
+          counted_quantity: number
+          created_at: string
+          difference: number | null
+          expected_quantity: number
+          id: string
+          notes: string | null
+          product_code: string
+          product_id: string | null
+          product_name: string
+          reconciliation_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          counted_quantity?: number
+          created_at?: string
+          difference?: number | null
+          expected_quantity?: number
+          id?: string
+          notes?: string | null
+          product_code: string
+          product_id?: string | null
+          product_name: string
+          reconciliation_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          counted_quantity?: number
+          created_at?: string
+          difference?: number | null
+          expected_quantity?: number
+          id?: string
+          notes?: string | null
+          product_code?: string
+          product_id?: string | null
+          product_name?: string
+          reconciliation_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reconciliations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          session_id: string
+          status: string
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          session_id: string
+          status?: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          session_id?: string
+          status?: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
