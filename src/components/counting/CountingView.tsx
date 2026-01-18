@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PRODUCT_CATEGORIES } from '@/types/stock';
 
 export function CountingView() {
   const { products, loading: productsLoading } = useProducts();
@@ -19,6 +20,7 @@ export function CountingView() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [newSessionName, setNewSessionName] = useState('');
   const [isCreatingSession, setIsCreatingSession] = useState(false);
 
@@ -51,9 +53,19 @@ export function CountingView() {
         filterStatus === 'all' ||
         product.status === filterStatus;
 
-      return matchesSearch && matchesFilter;
+      const matchesCategory = 
+        selectedCategory === 'all' ||
+        product.category === selectedCategory;
+
+      return matchesSearch && matchesFilter && matchesCategory;
     });
-  }, [productsWithCounts, searchTerm, filterStatus]);
+  }, [productsWithCounts, searchTerm, filterStatus, selectedCategory]);
+
+  // Get unique categories from products
+  const availableCategories = useMemo(() => {
+    const categories = [...new Set(products.map(p => p.category))];
+    return categories.sort();
+  }, [products]);
 
   const incompleteProducts = filteredProducts.filter(p => p.status === 'incomplete');
   const completeProducts = filteredProducts.filter(p => p.status === 'complete');
@@ -166,13 +178,25 @@ export function CountingView() {
             className="pl-10"
           />
         </div>
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-full sm:w-48">
+            <Tags className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas categorias</SelectItem>
+            {availableCategories.map(cat => (
+              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-full sm:w-48">
             <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Filtrar" />
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Todos status</SelectItem>
             <SelectItem value="incomplete">Incompletos</SelectItem>
             <SelectItem value="complete">Completos</SelectItem>
             <SelectItem value="excess">Excesso</SelectItem>

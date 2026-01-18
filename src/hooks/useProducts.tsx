@@ -90,13 +90,14 @@ export function useProducts() {
     return true;
   };
 
-  const importProducts = async (productsData: Array<{ code: string; name: string; total_colis: number; description?: string }>) => {
+  const importProducts = async (productsData: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string }>) => {
     const { error } = await supabase
       .from('products')
       .upsert(
         productsData.map(p => ({
           code: p.code,
           name: p.name,
+          category: p.category || 'Geral',
           total_colis: p.total_colis,
           description: p.description || null
         })),
