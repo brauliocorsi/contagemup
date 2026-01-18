@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags } from 'lucide-react';
+import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -15,6 +15,7 @@ export function ReportsView() {
   const { products, loading: productsLoading } = useProducts();
   const { sessions, loading: sessionsLoading } = useSessions();
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
   
   const { getProductWithCounts, loading: countingLoading } = useCounting(selectedSessionId || null);
 
@@ -56,6 +57,15 @@ export function ReportsView() {
       };
     }).sort((a, b) => a.category.localeCompare(b.category));
   }, [productsWithCounts]);
+
+  const availableCategories = useMemo(() => {
+    return [...new Set(productsWithCounts.map(p => p.category))].sort();
+  }, [productsWithCounts]);
+
+  const filteredProducts = useMemo(() => {
+    if (filterCategory === 'all') return productsWithCounts;
+    return productsWithCounts.filter(p => p.category === filterCategory);
+  }, [productsWithCounts, filterCategory]);
 
   const exportToCSV = () => {
     if (productsWithCounts.length === 0) return;
@@ -236,8 +246,24 @@ export function ReportsView() {
 
           {/* Products table */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-base">Detalhes por Produto</CardTitle>
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filtrar categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas ({productsWithCounts.length})</SelectItem>
+                    {availableCategories.map(cat => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat} ({productsWithCounts.filter(p => p.category === cat).length})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -255,7 +281,7 @@ export function ReportsView() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {productsWithCounts.map(product => (
+                    {filteredProducts.map(product => (
                       <TableRow key={product.id} className={product.status === 'incomplete' ? 'bg-red-50' : ''}>
                         <TableCell className="font-mono">{product.code}</TableCell>
                         <TableCell className="font-medium">{product.name}</TableCell>
