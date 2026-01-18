@@ -193,18 +193,20 @@ export function useCounting(sessionId: string | null) {
     }
 
     // Determine status
+    // - 'complete': All colis have same quantity (no partial product in progress)
+    // - 'incomplete': Some colis have more than others (partial product in progress)
+    // - 'not_counted': Nothing counted yet
     let status: ProductWithCounts['status'] = 'not_counted';
     const totalCounted = quantities.reduce((sum, q) => sum + q, 0);
     
     if (totalCounted === 0) {
       status = 'not_counted';
-    } else if (hasPartialProduct && missingForNextComplete.length > 0) {
-      // Has some colis but not all for another complete set
-      status = completeSets > 0 ? 'incomplete' : 'incomplete';
-    } else if (completeSets > 0 && !hasPartialProduct) {
+    } else if (hasPartialProduct) {
+      // Has some colis with different quantities - partial product in progress
+      status = 'incomplete';
+    } else if (completeSets > 0) {
+      // All colis have same quantity > 0
       status = 'complete';
-    } else if (excessColis.length > 0) {
-      status = 'excess';
     }
 
     return {
