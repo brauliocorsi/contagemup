@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header';
 import { Navigation } from '@/components/layout/Navigation';
 import { CountingView } from '@/components/counting/CountingView';
 import { ProductsView } from '@/components/products/ProductsView';
+import { CategoriesView } from '@/components/categories/CategoriesView';
 import { SessionsView } from '@/components/sessions/SessionsView';
 import { ReportsView } from '@/components/reports/ReportsView';
 
@@ -16,6 +17,7 @@ export default function Dashboard() {
       <main className="container py-4">
         {activeTab === 'counting' && <CountingView />}
         {activeTab === 'products' && <ProductsView />}
+        {activeTab === 'categories' && <CategoriesView />}
         {activeTab === 'sessions' && <SessionsView />}
         {activeTab === 'reports' && <ReportsView />}
       </main>

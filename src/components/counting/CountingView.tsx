@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useCounting } from '@/hooks/useCounting';
 import { useSessions } from '@/hooks/useSessions';
+import { useCategories } from '@/hooks/useCategories';
 import { ProductCard } from './ProductCard';
 import { CountingSummary } from './CountingSummary';
 import { Input } from '@/components/ui/input';
@@ -12,11 +13,11 @@ import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags } from '
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PRODUCT_CATEGORIES } from '@/types/stock';
 
 export function CountingView() {
   const { products, loading: productsLoading } = useProducts();
   const { sessions, loading: sessionsLoading, createSession } = useSessions();
+  const { categories, loading: categoriesLoading } = useCategories();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -30,11 +31,10 @@ export function CountingView() {
 
   const activeSessions = sessions.filter(s => s.status === 'active');
 
-  // Get unique categories from products
+  // Use categories from database
   const availableCategories = useMemo(() => {
-    const categories = [...new Set(products.map(p => p.category))];
-    return categories.sort();
-  }, [products]);
+    return categories.map(c => c.name).sort();
+  }, [categories]);
 
   const handleCreateSession = async () => {
     if (!newSessionName.trim()) return;
@@ -82,7 +82,7 @@ export function CountingView() {
   const completeProducts = filteredProducts.filter(p => p.status === 'complete');
   const otherProducts = filteredProducts.filter(p => p.status !== 'incomplete' && p.status !== 'complete');
 
-  if (productsLoading || sessionsLoading) {
+  if (productsLoading || sessionsLoading || categoriesLoading) {
     return (
       <div className="space-y-4 p-4">
         <Skeleton className="h-20 w-full" />
