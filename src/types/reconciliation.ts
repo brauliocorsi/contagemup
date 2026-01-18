@@ -31,3 +31,15 @@ export interface CSVImportRow {
   name?: string;
   quantity: number;
 }
+
+export interface CSVValidationError {
+  line: number;
+  content: string;
+  errors: string[];
+}
+
+export interface CSVParseResult {
+  rows: CSVImportRow[];
+  errors: CSVValidationError[];
+  headerError: string | null;
+}
