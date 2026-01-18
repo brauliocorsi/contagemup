@@ -26,6 +26,7 @@ export type ProductCategory = typeof PRODUCT_CATEGORIES[number];
 export interface CountingSession {
   id: string;
   name: string;
+  category: string;
   status: 'active' | 'completed' | 'cancelled';
   created_by: string | null;
   created_at: string;

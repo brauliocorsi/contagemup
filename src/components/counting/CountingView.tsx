@@ -22,19 +22,29 @@ export function CountingView() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [newSessionName, setNewSessionName] = useState('');
+  const [newSessionCategory, setNewSessionCategory] = useState('Todas');
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const { incrementCount, decrementCount, getProductWithCounts, loading: countingLoading } = useCounting(selectedSessionId);
 
   const activeSessions = sessions.filter(s => s.status === 'active');
 
+  // Get unique categories from products
+  const availableCategories = useMemo(() => {
+    const categories = [...new Set(products.map(p => p.category))];
+    return categories.sort();
+  }, [products]);
+
   const handleCreateSession = async () => {
     if (!newSessionName.trim()) return;
     setIsCreatingSession(true);
-    const session = await createSession(newSessionName);
+    const session = await createSession(newSessionName, newSessionCategory);
     if (session) {
       setSelectedSessionId(session.id);
       setNewSessionName('');
+      setNewSessionCategory('Todas');
+      setDialogOpen(false);
     }
     setIsCreatingSession(false);
   };
@@ -43,8 +53,19 @@ export function CountingView() {
     return products.map(p => getProductWithCounts(p));
   }, [products, getProductWithCounts]);
 
+  // Get current session
+  const currentSession = sessions.find(s => s.id === selectedSessionId);
+
+  // Filter products based on session category first
+  const sessionFilteredProducts = useMemo(() => {
+    if (!currentSession || currentSession.category === 'Todas') {
+      return productsWithCounts;
+    }
+    return productsWithCounts.filter(p => p.category === currentSession.category);
+  }, [productsWithCounts, currentSession]);
+
   const filteredProducts = useMemo(() => {
-    return productsWithCounts.filter(product => {
+    return sessionFilteredProducts.filter(product => {
       const matchesSearch = 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code.toLowerCase().includes(searchTerm.toLowerCase());
@@ -53,19 +74,9 @@ export function CountingView() {
         filterStatus === 'all' ||
         product.status === filterStatus;
 
-      const matchesCategory = 
-        selectedCategory === 'all' ||
-        product.category === selectedCategory;
-
-      return matchesSearch && matchesFilter && matchesCategory;
+      return matchesSearch && matchesFilter;
     });
-  }, [productsWithCounts, searchTerm, filterStatus, selectedCategory]);
-
-  // Get unique categories from products
-  const availableCategories = useMemo(() => {
-    const categories = [...new Set(products.map(p => p.category))];
-    return categories.sort();
-  }, [products]);
+  }, [sessionFilteredProducts, searchTerm, filterStatus]);
 
   const incompleteProducts = filteredProducts.filter(p => p.status === 'incomplete');
   const completeProducts = filteredProducts.filter(p => p.status === 'complete');
@@ -103,14 +114,14 @@ export function CountingView() {
                 <SelectContent>
                   {activeSessions.map(session => (
                     <SelectItem key={session.id} value={session.id}>
-                      {session.name}
+                      {session.name} {session.category !== 'Todas' && `(${session.category})`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
 
-            <Dialog>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
@@ -133,6 +144,23 @@ export function CountingView() {
                       onChange={(e) => setNewSessionName(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Categoria de produtos</Label>
+                    <Select value={newSessionCategory} onValueChange={setNewSessionCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Todas">Todas as categorias</SelectItem>
+                        {availableCategories.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Apenas produtos desta categoria serão mostrados na sessão
+                    </p>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button onClick={handleCreateSession} disabled={!newSessionName.trim() || isCreatingSession}>
@@ -147,16 +175,23 @@ export function CountingView() {
     );
   }
 
-  const currentSession = sessions.find(s => s.id === selectedSessionId);
 
   return (
     <div className="p-4 space-y-4">
       {/* Session header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold">{currentSession?.name}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">{currentSession?.name}</h2>
+            {currentSession?.category !== 'Todas' && (
+              <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                <Tags className="h-3 w-3 mr-1" />
+                {currentSession?.category}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
-            Sessão ativa • {products.length} produtos
+            Sessão ativa • {sessionFilteredProducts.length} produtos
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setSelectedSessionId(null)}>
@@ -165,7 +200,7 @@ export function CountingView() {
       </div>
 
       {/* Summary */}
-      <CountingSummary products={productsWithCounts} />
+      <CountingSummary products={sessionFilteredProducts} />
 
       {/* Search and filters */}
       <div className="flex flex-col sm:flex-row gap-2">
@@ -178,18 +213,6 @@ export function CountingView() {
             className="pl-10"
           />
         </div>
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-full sm:w-48">
-            <Tags className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Categoria" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas categorias</SelectItem>
-            {availableCategories.map(cat => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-full sm:w-48">
             <Filter className="h-4 w-4 mr-2" />
