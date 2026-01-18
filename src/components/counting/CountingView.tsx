@@ -69,18 +69,23 @@ export function CountingView() {
       const matchesSearch = 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesFilter = 
+
+      const isCompleteEnough = product.completeSets > 0;
+      const isPending = product.hasPartialProduct;
+
+      const matchesFilter =
         filterStatus === 'all' ||
-        product.status === filterStatus;
+        (filterStatus === 'complete' && isCompleteEnough) ||
+        (filterStatus === 'incomplete' && isPending) ||
+        (filterStatus !== 'complete' && filterStatus !== 'incomplete' && product.status === filterStatus);
 
       return matchesSearch && matchesFilter;
     });
   }, [sessionFilteredProducts, searchTerm, filterStatus]);
 
-  const incompleteProducts = filteredProducts.filter(p => p.status === 'incomplete');
-  const completeProducts = filteredProducts.filter(p => p.status === 'complete');
-  const otherProducts = filteredProducts.filter(p => p.status !== 'incomplete' && p.status !== 'complete');
+  const incompleteProducts = filteredProducts.filter(p => p.hasPartialProduct);
+  const completeProducts = filteredProducts.filter(p => p.completeSets > 0);
+  const otherProducts = filteredProducts.filter(p => !p.hasPartialProduct && p.completeSets === 0);
 
   if (productsLoading || sessionsLoading || categoriesLoading) {
     return (

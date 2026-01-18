@@ -27,14 +27,14 @@ export function ReportsView() {
   }, [products, selectedSessionId, getProductWithCounts]);
 
   const stats = useMemo(() => {
-    const complete = productsWithCounts.filter(p => p.status === 'complete');
-    const incomplete = productsWithCounts.filter(p => p.status === 'incomplete');
+    const withAnyComplete = productsWithCounts.filter(p => p.completeSets > 0);
+    const withPending = productsWithCounts.filter(p => p.hasPartialProduct);
     const totalSets = productsWithCounts.reduce((sum, p) => sum + p.completeSets, 0);
-    
+
     return {
       totalProducts: productsWithCounts.length,
-      complete: complete.length,
-      incomplete: incomplete.length,
+      complete: withAnyComplete.length,
+      incomplete: withPending.length,
       totalSets
     };
   }, [productsWithCounts]);
@@ -43,8 +43,8 @@ export function ReportsView() {
     const categories = [...new Set(productsWithCounts.map(p => p.category))];
     return categories.map(category => {
       const categoryProducts = productsWithCounts.filter(p => p.category === category);
-      const complete = categoryProducts.filter(p => p.status === 'complete').length;
-      const incomplete = categoryProducts.filter(p => p.status === 'incomplete').length;
+      const complete = categoryProducts.filter(p => p.completeSets > 0).length;
+      const incomplete = categoryProducts.filter(p => p.hasPartialProduct).length;
       const totalSets = categoryProducts.reduce((sum, p) => sum + p.completeSets, 0);
       
       return {
@@ -71,19 +71,30 @@ export function ReportsView() {
     if (filteredProducts.length === 0) return;
 
     const headers = ['Código', 'Nome', 'Categoria', 'Total Colis', 'Sets Completos', 'Unidades', 'Status', 'Colis Faltantes'];
-    const rows = filteredProducts.map(p => [
-      p.code,
-      p.name,
-      p.category,
-      p.total_colis,
-      p.completeSets,
-      p.status === 'complete' ? 1 : 0,
-      p.status === 'complete' ? 'Completo' : p.status === 'incomplete' ? 'Incompleto' : p.status,
-      p.incompleteColis.map(c => `Colis ${c.colis_number}`).join(', ') || '-'
-    ]);
+    const rows = filteredProducts.map(p => {
+      const unidades = p.completeSets;
+      const statusLabel = p.completeSets > 0
+        ? (p.hasPartialProduct ? 'Completo + pendente' : 'Completo')
+        : (p.status === 'not_counted' ? 'Não contado' : 'Incompleto');
+
+      const faltantes = p.hasPartialProduct
+        ? (p.missingForNextComplete.map(c => `Coli ${c.colis_number} (-${c.missing})`).join(', ') || '-')
+        : '-';
+
+      return [
+        p.code,
+        p.name,
+        p.category,
+        p.total_colis,
+        p.completeSets,
+        unidades,
+        statusLabel,
+        faltantes
+      ];
+    });
 
     // Calculate totals
-    const totalUnits = filteredProducts.filter(p => p.status === 'complete').length;
+    const totalUnits = filteredProducts.reduce((sum, p) => sum + p.completeSets, 0);
     const totalRow = ['', 'TOTAL', '', '', '', totalUnits, '', ''];
 
     const csv = [headers, ...rows, totalRow].map(row => row.join(';')).join('\n');
@@ -283,7 +294,7 @@ export function ReportsView() {
                   </TableHeader>
                   <TableBody>
                     {filteredProducts.map(product => (
-                      <TableRow key={product.id} className={product.status === 'incomplete' ? 'bg-red-50' : ''}>
+                      <TableRow key={product.id} className={product.hasPartialProduct ? 'bg-red-50' : ''}>
                         <TableCell className="font-mono">{product.code}</TableCell>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>
@@ -291,26 +302,24 @@ export function ReportsView() {
                         </TableCell>
                         <TableCell>{product.total_colis}</TableCell>
                         <TableCell className="font-bold">{product.completeSets}</TableCell>
-                        <TableCell className="font-bold text-primary">
-                          {product.status === 'complete' ? 1 : 0}
-                        </TableCell>
+                        <TableCell className="font-bold text-primary">{product.completeSets}</TableCell>
                         <TableCell>
-                          {product.status === 'complete' && (
+                          {product.completeSets > 0 && !product.hasPartialProduct && (
                             <Badge className="bg-green-100 text-green-800">Completo</Badge>
                           )}
-                          {product.status === 'incomplete' && (
-                            <Badge variant="destructive">Incompleto</Badge>
+                          {product.completeSets > 0 && product.hasPartialProduct && (
+                            <Badge className="bg-yellow-100 text-yellow-800">Completo + pendente</Badge>
                           )}
-                          {product.status === 'excess' && (
-                            <Badge className="bg-yellow-100 text-yellow-800">Excesso</Badge>
+                          {product.completeSets === 0 && product.status !== 'not_counted' && (
+                            <Badge variant="destructive">Incompleto</Badge>
                           )}
                           {product.status === 'not_counted' && (
                             <Badge variant="secondary">Não contado</Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-red-600">
-                          {product.incompleteColis.length > 0 
-                            ? product.incompleteColis.map(c => `Colis ${c.colis_number}`).join(', ')
+                          {product.hasPartialProduct && product.missingForNextComplete.length > 0
+                            ? product.missingForNextComplete.map(c => `Coli ${c.colis_number} (-${c.missing})`).join(', ')
                             : '-'
                           }
                         </TableCell>
