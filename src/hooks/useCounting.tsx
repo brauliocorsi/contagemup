@@ -202,6 +202,55 @@ export function useCounting(sessionId: string | null) {
     return true;
   };
 
+  const updatePalletNumber = async (productId: string, palletNumber: string) => {
+    if (!sessionId || !user) return false;
+
+    // Update pallet number for all colis of this product in this session
+    const productCounts = counts.filter(c => c.product_id === productId);
+    
+    if (productCounts.length === 0) {
+      // Create a count entry for colis 1 with quantity 0 just to store pallet number
+      const { error } = await supabase
+        .from('counts')
+        .insert({
+          session_id: sessionId,
+          product_id: productId,
+          colis_number: 1,
+          quantity: 0,
+          pallet_number: palletNumber,
+          counted_by: user.id
+        });
+
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível guardar o número da palete',
+          variant: 'destructive'
+        });
+        return false;
+      }
+    } else {
+      // Update all existing counts for this product with the pallet number
+      const { error } = await supabase
+        .from('counts')
+        .update({ pallet_number: palletNumber })
+        .eq('session_id', sessionId)
+        .eq('product_id', productId);
+
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível atualizar o número da palete',
+          variant: 'destructive'
+        });
+        return false;
+      }
+    }
+
+    await fetchCounts();
+    return true;
+  };
+
   const getProductWithCounts = useCallback((product: Product): ProductWithCounts => {
     const productCounts = counts.filter(c => c.product_id === product.id);
     
@@ -212,8 +261,9 @@ export function useCounting(sessionId: string | null) {
       colisQuantities[i] = count?.quantity || 0;
     }
 
-    // Get location from any count (they should all have the same location)
+    // Get location and pallet from any count (they should all have the same values)
     const location = productCounts.find(c => c.location)?.location || null;
+    const palletNumber = productCounts.find(c => c.pallet_number)?.pallet_number || null;
 
     // Calculate complete sets (minimum across all colis)
     const quantities = Object.values(colisQuantities);
@@ -270,6 +320,7 @@ export function useCounting(sessionId: string | null) {
       missingForNextComplete,
       hasPartialProduct,
       location,
+      palletNumber,
       status
     };
   }, [counts]);
@@ -282,6 +333,7 @@ export function useCounting(sessionId: string | null) {
     incrementCount,
     decrementCount,
     updateLocation,
+    updatePalletNumber,
     getProductWithCounts,
     refetch: fetchCounts
   };
