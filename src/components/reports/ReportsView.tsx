@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function ReportsView() {
@@ -35,6 +36,25 @@ export function ReportsView() {
       incomplete: incomplete.length,
       totalSets
     };
+  }, [productsWithCounts]);
+
+  const categoryStats = useMemo(() => {
+    const categories = [...new Set(productsWithCounts.map(p => p.category))];
+    return categories.map(category => {
+      const categoryProducts = productsWithCounts.filter(p => p.category === category);
+      const complete = categoryProducts.filter(p => p.status === 'complete').length;
+      const incomplete = categoryProducts.filter(p => p.status === 'incomplete').length;
+      const totalSets = categoryProducts.reduce((sum, p) => sum + p.completeSets, 0);
+      
+      return {
+        category,
+        total: categoryProducts.length,
+        complete,
+        incomplete,
+        totalSets,
+        percentage: categoryProducts.length > 0 ? Math.round((complete / categoryProducts.length) * 100) : 0
+      };
+    }).sort((a, b) => a.category.localeCompare(b.category));
   }, [productsWithCounts]);
 
   const exportToCSV = () => {
@@ -178,6 +198,41 @@ export function ReportsView() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Category Stats */}
+          {categoryStats.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Tags className="h-4 w-4" />
+                  Estatísticas por Categoria
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {categoryStats.map(cat => (
+                    <div key={cat.category} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{cat.category}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {cat.total} produtos
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-green-600">{cat.complete} completos</span>
+                          <span className="text-red-600">{cat.incomplete} incompletos</span>
+                          <span className="text-blue-600">{cat.totalSets} sets</span>
+                          <span className="font-bold">{cat.percentage}%</span>
+                        </div>
+                      </div>
+                      <Progress value={cat.percentage} className="h-2" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Products table */}
           <Card>
