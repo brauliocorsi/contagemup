@@ -75,6 +75,7 @@ export type Database = {
           counted_by: string | null
           id: string
           location: string | null
+          pallet_number: string | null
           product_id: string
           quantity: number
           session_id: string
@@ -86,6 +87,7 @@ export type Database = {
           counted_by?: string | null
           id?: string
           location?: string | null
+          pallet_number?: string | null
           product_id: string
           quantity?: number
           session_id: string
@@ -97,6 +99,7 @@ export type Database = {
           counted_by?: string | null
           id?: string
           location?: string | null
+          pallet_number?: string | null
           product_id?: string
           quantity?: number
           session_id?: string

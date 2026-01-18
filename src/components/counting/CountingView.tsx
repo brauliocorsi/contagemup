@@ -27,7 +27,7 @@ export function CountingView() {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { incrementCount, decrementCount, updateLocation, getProductWithCounts, loading: countingLoading } = useCounting(selectedSessionId);
+  const { incrementCount, decrementCount, updateLocation, updatePalletNumber, getProductWithCounts, loading: countingLoading } = useCounting(selectedSessionId);
 
   const activeSessions = sessions.filter(s => s.status === 'active');
 
@@ -259,6 +259,7 @@ export function CountingView() {
                 onIncrement={incrementCount}
                 onDecrement={decrementCount}
                 onLocationChange={updateLocation}
+                onPalletChange={updatePalletNumber}
               />
             ))}
           </div>
@@ -279,6 +280,7 @@ export function CountingView() {
                   onIncrement={incrementCount}
                   onDecrement={decrementCount}
                   onLocationChange={updateLocation}
+                  onPalletChange={updatePalletNumber}
                 />
               ))}
             </div>
@@ -300,6 +302,7 @@ export function CountingView() {
                   onIncrement={incrementCount}
                   onDecrement={decrementCount}
                   onLocationChange={updateLocation}
+                  onPalletChange={updatePalletNumber}
                 />
               ))}
             </div>

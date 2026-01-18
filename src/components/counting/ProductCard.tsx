@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin } from 'lucide-react';
+import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
@@ -12,11 +12,14 @@ interface ProductCardProps {
   onIncrement: (productId: string, colisNumber: number) => void;
   onDecrement: (productId: string, colisNumber: number) => void;
   onLocationChange?: (productId: string, location: string) => void;
+  onPalletChange?: (productId: string, palletNumber: string) => void;
 }
 
-export function ProductCard({ product, onIncrement, onDecrement, onLocationChange }: ProductCardProps) {
+export function ProductCard({ product, onIncrement, onDecrement, onLocationChange, onPalletChange }: ProductCardProps) {
   const [localLocation, setLocalLocation] = useState(product.location || '');
   const [isEditingLocation, setIsEditingLocation] = useState(false);
+  const [localPallet, setLocalPallet] = useState(product.palletNumber || '');
+  const [isEditingPallet, setIsEditingPallet] = useState(false);
 
   const getStatusIcon = () => {
     if (product.completeSets > 0) {
@@ -67,6 +70,19 @@ export function ProductCard({ product, onIncrement, onDecrement, onLocationChang
   const handleLocationKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleLocationBlur();
+    }
+  };
+
+  const handlePalletBlur = () => {
+    setIsEditingPallet(false);
+    if (localPallet !== (product.palletNumber || '') && onPalletChange) {
+      onPalletChange(product.id, localPallet);
+    }
+  };
+
+  const handlePalletKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handlePalletBlur();
     }
   };
 
@@ -128,6 +144,34 @@ export function ProductCard({ product, onIncrement, onDecrement, onLocationChang
               )}
             >
               {product.location || 'Adicionar localização...'}
+            </button>
+          )}
+        </div>
+
+        {/* Pallet number field */}
+        <div className="mt-2 flex items-center gap-2">
+          <Box className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          {isEditingPallet ? (
+            <Input
+              value={localPallet}
+              onChange={(e) => setLocalPallet(e.target.value)}
+              onBlur={handlePalletBlur}
+              onKeyDown={handlePalletKeyDown}
+              placeholder="Nº da palete"
+              className="h-8 text-sm"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={() => setIsEditingPallet(true)}
+              className={cn(
+                "flex-1 text-left text-sm px-2 py-1 rounded border border-dashed",
+                product.palletNumber 
+                  ? "border-primary/30 bg-primary/5 text-foreground" 
+                  : "border-muted-foreground/30 text-muted-foreground hover:border-primary/50"
+              )}
+            >
+              {product.palletNumber || 'Nº palete...'}
             </button>
           )}
         </div>
