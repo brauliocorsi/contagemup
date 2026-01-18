@@ -5,19 +5,19 @@ import { Upload, FileSpreadsheet, Loader2, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ImportProductsProps {
-  onImport: (products: Array<{ code: string; name: string; total_colis: number; description?: string }>) => Promise<boolean>;
+  onImport: (products: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string }>) => Promise<boolean>;
 }
 
 export function ImportProducts({ onImport }: ImportProductsProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [preview, setPreview] = useState<Array<{ code: string; name: string; total_colis: number; description?: string }>>([]);
+  const [preview, setPreview] = useState<Array<{ code: string; name: string; category: string; total_colis: number; description?: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const parseCSV = (text: string) => {
     const lines = text.split('\n').filter(line => line.trim());
-    const products: Array<{ code: string; name: string; total_colis: number; description?: string }> = [];
+    const products: Array<{ code: string; name: string; category: string; total_colis: number; description?: string }> = [];
 
     // Skip header line
     for (let i = 1; i < lines.length; i++) {
@@ -26,8 +26,9 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
         products.push({
           code: values[0],
           name: values[1],
-          total_colis: parseInt(values[2]) || 1,
-          description: values[3] || undefined
+          category: values[2] || 'Geral',
+          total_colis: parseInt(values[3]) || 1,
+          description: values[4] || undefined
         });
       }
     }
@@ -74,8 +75,8 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
   };
 
   const downloadTemplate = () => {
-    const template = 'codigo;nome;colis;descricao\nCAMA001;Cama Oslo Queen;3;Cama de casal\nMESA001;Mesa de Jantar;1;Mesa 6 lugares';
-    const blob = new Blob([template], { type: 'text/csv' });
+    const template = 'codigo;nome;categoria;colis;descricao\nCAMA001;Cama Oslo Queen;Camas;3;Cama de casal\nMESA001;Mesa de Jantar;Mesas;1;Mesa 6 lugares\nROUP001;Roupeiro Oslo;Roupeiros;4;Roupeiro 3 portas';
+    const blob = new Blob(['\ufeff' + template], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -117,7 +118,7 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
               </Button>
             </label>
             <p className="text-sm text-muted-foreground mt-2">
-              Formato: codigo;nome;colis;descricao
+              Formato: codigo;nome;categoria;colis;descricao
             </p>
           </div>
 
@@ -133,6 +134,7 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
                   <tr>
                     <th className="text-left p-2">Código</th>
                     <th className="text-left p-2">Nome</th>
+                    <th className="text-left p-2">Categoria</th>
                     <th className="text-left p-2">Colis</th>
                     <th className="text-left p-2">Descrição</th>
                   </tr>
@@ -142,6 +144,7 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
                     <tr key={i} className="border-t">
                       <td className="p-2">{product.code}</td>
                       <td className="p-2">{product.name}</td>
+                      <td className="p-2">{product.category}</td>
                       <td className="p-2">{product.total_colis}</td>
                       <td className="p-2 text-muted-foreground">{product.description || '-'}</td>
                     </tr>
