@@ -39,6 +39,7 @@ export interface Count {
   product_id: string;
   colis_number: number;
   quantity: number;
+  location: string | null;
   counted_by: string | null;
   counted_at: string;
   updated_at: string;
@@ -51,6 +52,7 @@ export interface ProductWithCounts extends Product {
   excessColis: { colis_number: number; excess: number }[];
   missingForNextComplete: { colis_number: number; missing: number }[];
   hasPartialProduct: boolean;
+  location: string | null;
   status: 'complete' | 'incomplete' | 'excess' | 'not_counted';
 }
 

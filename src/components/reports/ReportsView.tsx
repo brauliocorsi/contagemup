@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter } from 'lucide-react';
+import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter, MapPin } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -70,7 +70,7 @@ export function ReportsView() {
   const exportToCSV = () => {
     if (filteredProducts.length === 0) return;
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Total Colis', 'Sets Completos', 'Unidades', 'Status', 'Colis Faltantes'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Total Colis', 'Sets Completos', 'Unidades', 'Status', 'Colis Faltantes'];
     const rows = filteredProducts.map(p => {
       const unidades = p.completeSets;
       const statusLabel = p.completeSets > 0
@@ -85,6 +85,7 @@ export function ReportsView() {
         p.code,
         p.name,
         p.category,
+        p.location || '-',
         p.total_colis,
         p.completeSets,
         unidades,
@@ -95,7 +96,7 @@ export function ReportsView() {
 
     // Calculate totals
     const totalUnits = filteredProducts.reduce((sum, p) => sum + p.completeSets, 0);
-    const totalRow = ['', 'TOTAL', '', '', '', totalUnits, '', ''];
+    const totalRow = ['', 'TOTAL', '', '', '', '', totalUnits, '', ''];
 
     const csv = [headers, ...rows, totalRow].map(row => row.join(';')).join('\n');
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
@@ -285,6 +286,7 @@ export function ReportsView() {
                       <TableHead>Código</TableHead>
                       <TableHead>Nome</TableHead>
                       <TableHead>Categoria</TableHead>
+                      <TableHead>Localização</TableHead>
                       <TableHead>Total Colis</TableHead>
                       <TableHead>Sets Completos</TableHead>
                       <TableHead>Unidades</TableHead>
@@ -299,6 +301,16 @@ export function ReportsView() {
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{product.category}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {product.location ? (
+                            <span className="flex items-center gap-1 text-sm">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              {product.location}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell>{product.total_colis}</TableCell>
                         <TableCell className="font-bold">{product.completeSets}</TableCell>
