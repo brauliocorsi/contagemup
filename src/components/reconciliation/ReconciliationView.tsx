@@ -17,7 +17,7 @@ import {
   Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, 
   ArrowUpDown, Search, Eye, CheckCheck, X, Scale, FileQuestion, Download
 } from 'lucide-react';
-import { CSVImportRow, ReconciliationItem } from '@/types/reconciliation';
+import { CSVImportRow, ReconciliationItem, CSVValidationError } from '@/types/reconciliation';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -38,6 +38,8 @@ export function ReconciliationView() {
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [reconciliationName, setReconciliationName] = useState('');
   const [csvData, setCsvData] = useState<CSVImportRow[]>([]);
+  const [csvErrors, setCsvErrors] = useState<CSVValidationError[]>([]);
+  const [csvHeaderError, setCsvHeaderError] = useState<string | null>(null);
   const [csvFileName, setCsvFileName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,14 +72,16 @@ export function ReconciliationView() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target?.result as string;
-      const parsed = parseCSV(content);
-      setCsvData(parsed);
+      const result = parseCSV(content);
+      setCsvData(result.rows);
+      setCsvErrors(result.errors);
+      setCsvHeaderError(result.headerError);
     };
     reader.readAsText(file);
   };
 
   const handleCreateReconciliation = async () => {
-    if (!selectedSessionId || !reconciliationName.trim() || csvData.length === 0) return;
+    if (!selectedSessionId || !reconciliationName.trim() || csvData.length === 0 || csvErrors.length > 0) return;
 
     setIsCreating(true);
     await createReconciliation(selectedSessionId, reconciliationName, csvData, productsWithCounts);
@@ -85,6 +89,8 @@ export function ReconciliationView() {
     
     // Reset form
     setCsvData([]);
+    setCsvErrors([]);
+    setCsvHeaderError(null);
     setCsvFileName('');
     setReconciliationName('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -447,12 +453,67 @@ export function ReconciliationView() {
             </div>
           </div>
 
+          {/* Header error */}
+          {csvHeaderError && (
+            <div className="p-4 rounded-lg bg-red-50 border border-red-200">
+              <div className="flex items-center gap-2 text-red-800">
+                <XCircle className="h-5 w-5" />
+                <span className="font-medium">Erro no cabeçalho do ficheiro</span>
+              </div>
+              <p className="text-sm text-red-700 mt-1">{csvHeaderError}</p>
+            </div>
+          )}
+
+          {/* CSV validation errors */}
+          {csvErrors.length > 0 && (
+            <div className="border border-red-200 rounded-lg overflow-hidden">
+              <div className="bg-red-50 px-4 py-2 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <span className="text-sm font-medium text-red-800">
+                  {csvErrors.length} linha{csvErrors.length > 1 ? 's' : ''} com erros
+                </span>
+              </div>
+              <div className="max-h-48 overflow-y-auto bg-white">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">Linha</TableHead>
+                      <TableHead>Conteúdo</TableHead>
+                      <TableHead>Erros</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {csvErrors.map((err, idx) => (
+                      <TableRow key={idx} className="bg-red-50/50">
+                        <TableCell className="font-mono text-red-700">{err.line}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground max-w-[200px] truncate">
+                          {err.content}
+                        </TableCell>
+                        <TableCell className="text-red-700 text-sm">
+                          {err.errors.join('; ')}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="bg-red-50 px-4 py-2 text-xs text-red-700">
+                Corrija os erros no ficheiro CSV e carregue novamente
+              </div>
+            </div>
+          )}
+
           {/* Preview CSV data */}
-          {csvData.length > 0 && (
+          {csvData.length > 0 && !csvHeaderError && (
             <div className="border rounded-lg overflow-hidden">
               <div className="bg-muted px-4 py-2 flex items-center gap-2">
                 <FileSpreadsheet className="h-4 w-4" />
-                <span className="text-sm font-medium">Pré-visualização ({csvData.length} linhas)</span>
+                <span className="text-sm font-medium">Pré-visualização ({csvData.length} linhas válidas)</span>
+                {csvErrors.length > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {csvErrors.length} com erros
+                  </Badge>
+                )}
               </div>
               <div className="max-h-48 overflow-y-auto">
                 <Table>
@@ -486,7 +547,7 @@ export function ReconciliationView() {
 
           <Button 
             onClick={handleCreateReconciliation}
-            disabled={!selectedSessionId || !reconciliationName.trim() || csvData.length === 0 || isCreating}
+            disabled={!selectedSessionId || !reconciliationName.trim() || csvData.length === 0 || csvErrors.length > 0 || !!csvHeaderError || isCreating}
           >
             {isCreating ? 'A criar...' : 'Criar Conciliação'}
           </Button>

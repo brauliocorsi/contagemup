@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Reconciliation, ReconciliationItem, CSVImportRow } from '@/types/reconciliation';
+import { Reconciliation, ReconciliationItem, CSVImportRow, CSVParseResult, CSVValidationError } from '@/types/reconciliation';
 import { ProductWithCounts } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
@@ -215,27 +215,72 @@ export function useReconciliation() {
     return true;
   };
 
-  const parseCSV = (content: string): CSVImportRow[] => {
+  const parseCSV = (content: string): CSVParseResult => {
+    const result: CSVParseResult = {
+      rows: [],
+      errors: [],
+      headerError: null
+    };
+
     const lines = content.trim().split('\n');
-    if (lines.length < 2) return [];
+    if (lines.length < 2) {
+      result.headerError = 'O ficheiro está vazio ou não contém dados';
+      return result;
+    }
 
     const header = lines[0].toLowerCase().split(/[;,\t]/);
     const codeIndex = header.findIndex(h => h.includes('codigo') || h.includes('code') || h.includes('código'));
     const nameIndex = header.findIndex(h => h.includes('nome') || h.includes('name') || h.includes('produto'));
     const qtyIndex = header.findIndex(h => h.includes('quantidade') || h.includes('qty') || h.includes('qtd') || h.includes('quantity') || h.includes('stock'));
 
-    if (codeIndex === -1 || qtyIndex === -1) {
-      return [];
+    if (codeIndex === -1) {
+      result.headerError = 'Coluna de código não encontrada. Use: "Codigo", "Code" ou "Código"';
+      return result;
     }
 
-    const rows: CSVImportRow[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(/[;,\t]/);
-      const code = values[codeIndex]?.trim();
-      const quantity = parseInt(values[qtyIndex]?.trim() || '0', 10);
+    if (qtyIndex === -1) {
+      result.headerError = 'Coluna de quantidade não encontrada. Use: "Quantidade", "Qty", "Qtd" ou "Stock"';
+      return result;
+    }
 
-      if (code && !isNaN(quantity)) {
-        rows.push({
+    const seenCodes = new Set<string>();
+
+    for (let i = 1; i < lines.length; i++) {
+      const lineContent = lines[i].trim();
+      if (!lineContent) continue; // Skip empty lines
+
+      const values = lineContent.split(/[;,\t]/);
+      const lineErrors: string[] = [];
+
+      const code = values[codeIndex]?.trim();
+      const quantityStr = values[qtyIndex]?.trim();
+      const quantity = parseInt(quantityStr || '', 10);
+
+      // Validate code
+      if (!code) {
+        lineErrors.push('Código em falta');
+      } else if (seenCodes.has(code.toLowerCase())) {
+        lineErrors.push(`Código duplicado: "${code}"`);
+      }
+
+      // Validate quantity
+      if (!quantityStr) {
+        lineErrors.push('Quantidade em falta');
+      } else if (isNaN(quantity)) {
+        lineErrors.push(`Quantidade inválida: "${quantityStr}"`);
+      } else if (quantity < 0) {
+        lineErrors.push('Quantidade não pode ser negativa');
+      }
+
+      if (lineErrors.length > 0) {
+        result.errors.push({
+          line: i + 1,
+          content: lineContent.substring(0, 80) + (lineContent.length > 80 ? '...' : ''),
+          errors: lineErrors
+        });
+      } else if (code) {
+        seenCodes.add(code.toLowerCase());
+        result.rows.push({
           code,
           name: nameIndex !== -1 ? values[nameIndex]?.trim() : undefined,
           quantity
@@ -243,7 +288,7 @@ export function useReconciliation() {
       }
     }
 
-    return rows;
+    return result;
   };
 
   return {
