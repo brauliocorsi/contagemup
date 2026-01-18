@@ -1,17 +1,23 @@
+import { useState } from 'react';
 import { ProductWithCounts } from '@/types/stock';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Minus, Package, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
   product: ProductWithCounts;
   onIncrement: (productId: string, colisNumber: number) => void;
   onDecrement: (productId: string, colisNumber: number) => void;
+  onLocationChange?: (productId: string, location: string) => void;
 }
 
-export function ProductCard({ product, onIncrement, onDecrement }: ProductCardProps) {
+export function ProductCard({ product, onIncrement, onDecrement, onLocationChange }: ProductCardProps) {
+  const [localLocation, setLocalLocation] = useState(product.location || '');
+  const [isEditingLocation, setIsEditingLocation] = useState(false);
+
   const getStatusIcon = () => {
     if (product.completeSets > 0) {
       return <CheckCircle2 className="h-5 w-5 text-green-600" />;
@@ -51,6 +57,19 @@ export function ProductCard({ product, onIncrement, onDecrement }: ProductCardPr
     return `Falta: ${missingItems}`;
   };
 
+  const handleLocationBlur = () => {
+    setIsEditingLocation(false);
+    if (localLocation !== (product.location || '') && onLocationChange) {
+      onLocationChange(product.id, localLocation);
+    }
+  };
+
+  const handleLocationKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleLocationBlur();
+    }
+  };
+
   return (
     <Card className={cn(
       'transition-all',
@@ -83,6 +102,34 @@ export function ProductCard({ product, onIncrement, onDecrement }: ProductCardPr
               <Badge variant="secondary">Não contado</Badge>
             )}
           </div>
+        </div>
+        
+        {/* Location field */}
+        <div className="mt-2 flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          {isEditingLocation ? (
+            <Input
+              value={localLocation}
+              onChange={(e) => setLocalLocation(e.target.value)}
+              onBlur={handleLocationBlur}
+              onKeyDown={handleLocationKeyDown}
+              placeholder="Onde está este produto?"
+              className="h-8 text-sm"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={() => setIsEditingLocation(true)}
+              className={cn(
+                "flex-1 text-left text-sm px-2 py-1 rounded border border-dashed",
+                product.location 
+                  ? "border-primary/30 bg-primary/5 text-foreground" 
+                  : "border-muted-foreground/30 text-muted-foreground hover:border-primary/50"
+              )}
+            >
+              {product.location || 'Adicionar localização...'}
+            </button>
+          )}
         </div>
         
         {/* Summary line showing complete + what's missing */}
