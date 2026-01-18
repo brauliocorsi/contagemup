@@ -40,18 +40,23 @@ export function ReportsView() {
   const exportToCSV = () => {
     if (productsWithCounts.length === 0) return;
 
-    const headers = ['Código', 'Nome', 'Total Colis', 'Sets Completos', 'Status', 'Colis Faltantes'];
+    const headers = ['Código', 'Nome', 'Total Colis', 'Sets Completos', 'Unidades', 'Status', 'Colis Faltantes'];
     const rows = productsWithCounts.map(p => [
       p.code,
       p.name,
       p.total_colis,
       p.completeSets,
+      p.status === 'complete' ? 1 : 0, // Produto completo = 1 unidade
       p.status === 'complete' ? 'Completo' : p.status === 'incomplete' ? 'Incompleto' : p.status,
       p.incompleteColis.map(c => `Colis ${c.colis_number}`).join(', ') || '-'
     ]);
 
-    const csv = [headers, ...rows].map(row => row.join(';')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    // Calculate totals
+    const totalUnits = productsWithCounts.filter(p => p.status === 'complete').length;
+    const totalRow = ['', 'TOTAL', '', '', totalUnits, '', ''];
+
+    const csv = [headers, ...rows, totalRow].map(row => row.join(';')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }); // BOM for Excel
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
