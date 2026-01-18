@@ -65,6 +65,7 @@ export function ProductCard({ product, onIncrement, onDecrement }: ProductCardPr
             <div>
               <CardTitle className="text-base">{product.name}</CardTitle>
               <p className="text-sm text-muted-foreground">{product.code}</p>
+              <Badge variant="outline" className="mt-1 text-xs">{product.category}</Badge>
             </div>
           </div>
           {getStatusBadge()}

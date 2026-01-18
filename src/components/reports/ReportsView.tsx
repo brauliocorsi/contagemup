@@ -40,23 +40,24 @@ export function ReportsView() {
   const exportToCSV = () => {
     if (productsWithCounts.length === 0) return;
 
-    const headers = ['Código', 'Nome', 'Total Colis', 'Sets Completos', 'Unidades', 'Status', 'Colis Faltantes'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Total Colis', 'Sets Completos', 'Unidades', 'Status', 'Colis Faltantes'];
     const rows = productsWithCounts.map(p => [
       p.code,
       p.name,
+      p.category,
       p.total_colis,
       p.completeSets,
-      p.status === 'complete' ? 1 : 0, // Produto completo = 1 unidade
+      p.status === 'complete' ? 1 : 0,
       p.status === 'complete' ? 'Completo' : p.status === 'incomplete' ? 'Incompleto' : p.status,
       p.incompleteColis.map(c => `Colis ${c.colis_number}`).join(', ') || '-'
     ]);
 
     // Calculate totals
     const totalUnits = productsWithCounts.filter(p => p.status === 'complete').length;
-    const totalRow = ['', 'TOTAL', '', '', totalUnits, '', ''];
+    const totalRow = ['', 'TOTAL', '', '', '', totalUnits, '', ''];
 
     const csv = [headers, ...rows, totalRow].map(row => row.join(';')).join('\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }); // BOM for Excel
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -190,8 +191,10 @@ export function ReportsView() {
                     <TableRow>
                       <TableHead>Código</TableHead>
                       <TableHead>Nome</TableHead>
+                      <TableHead>Categoria</TableHead>
                       <TableHead>Total Colis</TableHead>
                       <TableHead>Sets Completos</TableHead>
+                      <TableHead>Unidades</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Colis Faltantes</TableHead>
                     </TableRow>
@@ -201,8 +204,14 @@ export function ReportsView() {
                       <TableRow key={product.id} className={product.status === 'incomplete' ? 'bg-red-50' : ''}>
                         <TableCell className="font-mono">{product.code}</TableCell>
                         <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{product.category}</Badge>
+                        </TableCell>
                         <TableCell>{product.total_colis}</TableCell>
                         <TableCell className="font-bold">{product.completeSets}</TableCell>
+                        <TableCell className="font-bold text-primary">
+                          {product.status === 'complete' ? 1 : 0}
+                        </TableCell>
                         <TableCell>
                           {product.status === 'complete' && (
                             <Badge className="bg-green-100 text-green-800">Completo</Badge>
