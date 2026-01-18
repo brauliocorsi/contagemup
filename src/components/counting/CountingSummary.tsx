@@ -8,12 +8,12 @@ interface CountingSummaryProps {
 
 export function CountingSummary({ products }: CountingSummaryProps) {
   const totalProducts = products.length;
-  const complete = products.filter(p => p.status === 'complete').length;
-  const incomplete = products.filter(p => p.status === 'incomplete').length;
-  const excess = products.filter(p => p.status === 'excess').length;
+  const complete = products.filter(p => p.status === 'complete' && !p.hasPartialProduct).length;
+  const withPartial = products.filter(p => p.hasPartialProduct).length;
   const notCounted = products.filter(p => p.status === 'not_counted').length;
 
   const totalCompleteSets = products.reduce((sum, p) => sum + p.completeSets, 0);
+  const totalPartialProducts = products.filter(p => p.hasPartialProduct).length;
 
   const stats = [
     {
@@ -23,20 +23,20 @@ export function CountingSummary({ products }: CountingSummaryProps) {
       color: 'text-primary bg-primary/10'
     },
     {
-      label: 'Completos',
+      label: 'Sets Completos',
+      value: totalCompleteSets,
+      icon: CheckCircle2,
+      color: 'text-green-600 bg-green-100'
+    },
+    {
+      label: 'Produtos 100% OK',
       value: complete,
       icon: CheckCircle2,
       color: 'text-green-600 bg-green-100'
     },
     {
-      label: 'Incompletos',
-      value: incomplete,
-      icon: AlertCircle,
-      color: 'text-red-600 bg-red-100'
-    },
-    {
-      label: 'Excesso',
-      value: excess,
+      label: 'Com Pendências',
+      value: withPartial,
       icon: AlertTriangle,
       color: 'text-yellow-600 bg-yellow-100'
     },
@@ -45,12 +45,6 @@ export function CountingSummary({ products }: CountingSummaryProps) {
       value: notCounted,
       icon: ClipboardList,
       color: 'text-muted-foreground bg-muted'
-    },
-    {
-      label: 'Sets Completos',
-      value: totalCompleteSets,
-      icon: CheckCircle2,
-      color: 'text-blue-600 bg-blue-100'
     }
   ];
 
@@ -60,7 +54,7 @@ export function CountingSummary({ products }: CountingSummaryProps) {
         <CardTitle className="text-lg">Resumo da Contagem</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {stats.map((stat) => (
             <div
               key={stat.label}

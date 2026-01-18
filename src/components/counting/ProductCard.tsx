@@ -2,7 +2,7 @@ import { ProductWithCounts } from '@/types/stock';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Minus, Package, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, Package, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
@@ -13,29 +13,13 @@ interface ProductCardProps {
 
 export function ProductCard({ product, onIncrement, onDecrement }: ProductCardProps) {
   const getStatusIcon = () => {
-    switch (product.status) {
-      case 'complete':
-        return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-      case 'incomplete':
-        return <AlertCircle className="h-5 w-5 text-red-600" />;
-      case 'excess':
-        return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
-      default:
-        return <Package className="h-5 w-5 text-muted-foreground" />;
+    if (product.completeSets > 0) {
+      return <CheckCircle2 className="h-5 w-5 text-green-600" />;
     }
-  };
-
-  const getStatusBadge = () => {
-    switch (product.status) {
-      case 'complete':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">{product.completeSets} Completo(s)</Badge>;
-      case 'incomplete':
-        return <Badge variant="destructive">Incompleto</Badge>;
-      case 'excess':
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Excesso</Badge>;
-      default:
-        return <Badge variant="secondary">Não contado</Badge>;
+    if (product.hasPartialProduct) {
+      return <AlertCircle className="h-5 w-5 text-yellow-600" />;
     }
+    return <Package className="h-5 w-5 text-muted-foreground" />;
   };
 
   const getColisQuantity = (colisNumber: number) => {
@@ -43,20 +27,36 @@ export function ProductCard({ product, onIncrement, onDecrement }: ProductCardPr
     return count?.quantity || 0;
   };
 
-  const isColisIncomplete = (colisNumber: number) => {
-    return product.incompleteColis.some(c => c.colis_number === colisNumber);
+  const isColisMissing = (colisNumber: number) => {
+    return product.missingForNextComplete.some(c => c.colis_number === colisNumber);
+  };
+
+  const getMissingCount = (colisNumber: number) => {
+    const missing = product.missingForNextComplete.find(c => c.colis_number === colisNumber);
+    return missing?.missing || 0;
   };
 
   const isColisExcess = (colisNumber: number) => {
     return product.excessColis.some(c => c.colis_number === colisNumber);
   };
 
+  // Format missing colis for display
+  const getMissingDescription = () => {
+    if (product.missingForNextComplete.length === 0) return null;
+    
+    const missingItems = product.missingForNextComplete.map(c => 
+      `${c.missing}x Coli ${c.colis_number}`
+    ).join(', ');
+    
+    return `Falta: ${missingItems}`;
+  };
+
   return (
     <Card className={cn(
       'transition-all',
-      product.status === 'incomplete' && 'border-red-300 bg-red-50/50',
-      product.status === 'complete' && 'border-green-300 bg-green-50/50',
-      product.status === 'excess' && 'border-yellow-300 bg-yellow-50/50'
+      product.hasPartialProduct && 'border-yellow-300 bg-yellow-50/50',
+      !product.hasPartialProduct && product.completeSets > 0 && 'border-green-300 bg-green-50/50',
+      product.status === 'not_counted' && 'border-muted'
     )}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
@@ -68,19 +68,50 @@ export function ProductCard({ product, onIncrement, onDecrement }: ProductCardPr
               <Badge variant="outline" className="mt-1 text-xs">{product.category}</Badge>
             </div>
           </div>
-          {getStatusBadge()}
+          <div className="flex flex-col items-end gap-1">
+            {product.completeSets > 0 && (
+              <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                {product.completeSets} Completo{product.completeSets > 1 ? 's' : ''}
+              </Badge>
+            )}
+            {product.hasPartialProduct && (
+              <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                1 Incompleto
+              </Badge>
+            )}
+            {product.status === 'not_counted' && (
+              <Badge variant="secondary">Não contado</Badge>
+            )}
+          </div>
         </div>
-        {product.incompleteColis.length > 0 && (
-          <p className="text-sm text-red-600 mt-2">
-            Falta: Colis {product.incompleteColis.map(c => c.colis_number).join(', ')}
-          </p>
+        
+        {/* Summary line showing complete + what's missing */}
+        {(product.completeSets > 0 || product.hasPartialProduct) && (
+          <div className="mt-2 p-2 rounded-md bg-muted/50 text-sm">
+            <div className="flex items-center gap-2 flex-wrap">
+              {product.completeSets > 0 && (
+                <span className="text-green-700 font-medium">
+                  ✓ {product.completeSets} produto{product.completeSets > 1 ? 's' : ''} completo{product.completeSets > 1 ? 's' : ''}
+                </span>
+              )}
+              {product.hasPartialProduct && product.missingForNextComplete.length > 0 && (
+                <>
+                  {product.completeSets > 0 && <span className="text-muted-foreground">|</span>}
+                  <span className="text-yellow-700">
+                    Para +1: {getMissingDescription()}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
         )}
       </CardHeader>
       <CardContent>
         <div className="grid gap-2">
           {Array.from({ length: product.total_colis }, (_, i) => i + 1).map((colisNum) => {
             const quantity = getColisQuantity(colisNum);
-            const isIncomplete = isColisIncomplete(colisNum);
+            const isMissing = isColisMissing(colisNum);
+            const missingCount = getMissingCount(colisNum);
             const isExcess = isColisExcess(colisNum);
             
             return (
@@ -88,14 +119,26 @@ export function ProductCard({ product, onIncrement, onDecrement }: ProductCardPr
                 key={colisNum}
                 className={cn(
                   'flex items-center justify-between p-2 rounded-lg border',
-                  isIncomplete && 'border-red-300 bg-red-100',
-                  isExcess && 'border-yellow-300 bg-yellow-100',
-                  !isIncomplete && !isExcess && 'bg-muted/30'
+                  isMissing && 'border-yellow-300 bg-yellow-100',
+                  isExcess && !isMissing && 'border-green-300 bg-green-100',
+                  !isMissing && !isExcess && 'bg-muted/30'
                 )}
               >
-                <span className="font-medium text-sm">
-                  Colis {colisNum}/{product.total_colis}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-medium text-sm">
+                    Coli {colisNum}/{product.total_colis}
+                  </span>
+                  {isMissing && (
+                    <span className="text-xs text-yellow-700">
+                      Falta {missingCount} unidade{missingCount > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {isExcess && !isMissing && (
+                    <span className="text-xs text-green-700">
+                      OK
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
