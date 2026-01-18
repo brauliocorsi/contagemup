@@ -49,6 +49,8 @@ export interface ProductWithCounts extends Product {
   completeSets: number;
   incompleteColis: { colis_number: number; quantity: number }[];
   excessColis: { colis_number: number; excess: number }[];
+  missingForNextComplete: { colis_number: number; missing: number }[];
+  hasPartialProduct: boolean;
   status: 'complete' | 'incomplete' | 'excess' | 'not_counted';
 }
 

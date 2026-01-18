@@ -166,21 +166,29 @@ export function useCounting(sessionId: string | null) {
     // Calculate complete sets (minimum across all colis)
     const quantities = Object.values(colisQuantities);
     const completeSets = quantities.length > 0 ? Math.min(...quantities) : 0;
+    const maxQuantity = quantities.length > 0 ? Math.max(...quantities) : 0;
 
-    // Find incomplete colis (less than completeSets + 1)
+    // Find incomplete colis and what's missing for next complete
     const incompleteColis: { colis_number: number; quantity: number }[] = [];
     const excessColis: { colis_number: number; excess: number }[] = [];
+    const missingForNextComplete: { colis_number: number; missing: number }[] = [];
+
+    // Check if there's a partial product being formed (some colis have more than completeSets)
+    const hasPartialProduct = maxQuantity > completeSets;
 
     for (let i = 1; i <= product.total_colis; i++) {
       const qty = colisQuantities[i];
-      if (qty < completeSets + 1 && quantities.some(q => q > qty)) {
+      
+      // If this colis has less than max, it's incomplete for the partial product
+      if (qty < maxQuantity) {
         incompleteColis.push({ colis_number: i, quantity: qty });
+        // Calculate how many are missing to match the max (complete another product)
+        missingForNextComplete.push({ colis_number: i, missing: maxQuantity - qty });
       }
-      if (qty > completeSets) {
-        const minQty = Math.min(...quantities);
-        if (qty > minQty) {
-          excessColis.push({ colis_number: i, excess: qty - minQty });
-        }
+      
+      // If this colis has more than the minimum, it's in excess
+      if (qty > completeSets && qty === maxQuantity) {
+        excessColis.push({ colis_number: i, excess: qty - completeSets });
       }
     }
 
@@ -190,10 +198,13 @@ export function useCounting(sessionId: string | null) {
     
     if (totalCounted === 0) {
       status = 'not_counted';
-    } else if (incompleteColis.length > 0 || excessColis.length > 0) {
-      status = incompleteColis.length > 0 ? 'incomplete' : 'excess';
-    } else if (completeSets > 0) {
+    } else if (hasPartialProduct && missingForNextComplete.length > 0) {
+      // Has some colis but not all for another complete set
+      status = completeSets > 0 ? 'incomplete' : 'incomplete';
+    } else if (completeSets > 0 && !hasPartialProduct) {
       status = 'complete';
+    } else if (excessColis.length > 0) {
+      status = 'excess';
     }
 
     return {
@@ -202,6 +213,8 @@ export function useCounting(sessionId: string | null) {
       completeSets,
       incompleteColis,
       excessColis,
+      missingForNextComplete,
+      hasPartialProduct,
       status
     };
   }, [counts]);
