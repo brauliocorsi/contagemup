@@ -2,7 +2,7 @@ import { useSessions } from '@/hooks/useSessions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { History, CheckCircle2, XCircle, Clock, Play } from 'lucide-react';
+import { History, CheckCircle2, XCircle, Clock, Tags } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
@@ -60,9 +60,15 @@ export function SessionsView() {
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h3 className="font-medium">{session.name}</h3>
                       {getStatusBadge(session.status)}
+                      {session.category && session.category !== 'Todas' && (
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <Tags className="h-3 w-3" />
+                          {session.category}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Criada em {format(new Date(session.created_at), "d 'de' MMMM 'às' HH:mm", { locale: pt })}

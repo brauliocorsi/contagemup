@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       counting_sessions: {
         Row: {
+          category: string
           completed_at: string | null
           created_at: string
           created_by: string | null
@@ -24,6 +25,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          category?: string
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
@@ -32,6 +34,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          category?: string
           completed_at?: string | null
           created_at?: string
           created_by?: string | null

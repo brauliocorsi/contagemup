@@ -29,12 +29,12 @@ export function useSessions() {
     setLoading(false);
   };
 
-  const createSession = async (name: string) => {
+  const createSession = async (name: string, category: string = 'Todas') => {
     if (!user) return null;
 
     const { data, error } = await supabase
       .from('counting_sessions')
-      .insert({ name, created_by: user.id })
+      .insert({ name, category, created_by: user.id })
       .select()
       .single();
 
