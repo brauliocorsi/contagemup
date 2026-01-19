@@ -9,7 +9,7 @@ import { Plus, Loader2, MapPin, Box } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 
 interface ProductFormProps {
-  onSubmit: (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null }) => Promise<boolean>;
+  onSubmit: (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null; min_stock?: number }) => Promise<boolean>;
 }
 
 export function ProductForm({ onSubmit }: ProductFormProps) {
@@ -23,6 +23,7 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [palletNumber, setPalletNumber] = useState('');
+  const [minStock, setMinStock] = useState(5);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +36,8 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
       total_colis: totalColis,
       description: description || null,
       location: location || null,
-      pallet_number: palletNumber || null
+      pallet_number: palletNumber || null,
+      min_stock: minStock
     });
 
     if (success) {
@@ -46,6 +48,7 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
       setDescription('');
       setLocation('');
       setPalletNumber('');
+      setMinStock(5);
       setOpen(false);
     }
     
@@ -115,6 +118,19 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
               />
               <p className="text-xs text-muted-foreground">
                 Quantas partes/colis compõem este produto
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="min-stock">Stock Mínimo</Label>
+              <Input
+                id="min-stock"
+                type="number"
+                min={0}
+                value={minStock}
+                onChange={(e) => setMinStock(Math.max(0, parseInt(e.target.value) || 0))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Alerta quando o stock ficar abaixo deste valor
               </p>
             </div>
             <div className="space-y-2">

@@ -8,6 +8,7 @@ export interface Product {
   location: string | null;
   pallet_number: string | null;
   current_stock: number;
+  min_stock: number;
   created_at: string;
   updated_at: string;
 }
