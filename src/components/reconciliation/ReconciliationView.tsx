@@ -801,7 +801,7 @@ export function ReconciliationView() {
       {/* Existing reconciliations */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Histórico de Conciliações</CardTitle>
+          <CardTitle className="text-base">Histórico de Separação</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {reconciliations.length === 0 ? (
