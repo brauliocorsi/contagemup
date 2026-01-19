@@ -36,6 +36,15 @@ export function CountingView() {
     return categories.map(c => c.name).sort();
   }, [categories]);
 
+  // Create a map of category name to colis_names for quick lookup
+  const categoryColisNamesMap = useMemo(() => {
+    const map: Record<string, Record<string, string> | null> = {};
+    categories.forEach(cat => {
+      map[cat.name] = cat.colis_names;
+    });
+    return map;
+  }, [categories]);
+
   const handleCreateSession = async () => {
     if (!newSessionName.trim()) return;
     setIsCreatingSession(true);
@@ -260,6 +269,7 @@ export function CountingView() {
                 onDecrement={decrementCount}
                 onLocationChange={updateLocation}
                 onPalletChange={updatePalletNumber}
+                colisNames={categoryColisNamesMap[product.category]}
               />
             ))}
           </div>
@@ -281,6 +291,7 @@ export function CountingView() {
                   onDecrement={decrementCount}
                   onLocationChange={updateLocation}
                   onPalletChange={updatePalletNumber}
+                  colisNames={categoryColisNamesMap[product.category]}
                 />
               ))}
             </div>
@@ -303,6 +314,7 @@ export function CountingView() {
                   onDecrement={decrementCount}
                   onLocationChange={updateLocation}
                   onPalletChange={updatePalletNumber}
+                  colisNames={categoryColisNamesMap[product.category]}
                 />
               ))}
             </div>

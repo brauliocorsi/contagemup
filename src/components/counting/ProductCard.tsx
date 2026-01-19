@@ -13,9 +13,10 @@ interface ProductCardProps {
   onDecrement: (productId: string, colisNumber: number) => void;
   onLocationChange?: (productId: string, location: string) => void;
   onPalletChange?: (productId: string, palletNumber: string) => void;
+  colisNames?: Record<string, string> | null;
 }
 
-export function ProductCard({ product, onIncrement, onDecrement, onLocationChange, onPalletChange }: ProductCardProps) {
+export function ProductCard({ product, onIncrement, onDecrement, onLocationChange, onPalletChange, colisNames }: ProductCardProps) {
   const [localLocation, setLocalLocation] = useState(product.location || '');
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [localPallet, setLocalPallet] = useState(product.palletNumber || '');
@@ -49,13 +50,21 @@ export function ProductCard({ product, onIncrement, onDecrement, onLocationChang
     return product.excessColis.some(c => c.colis_number === colisNumber);
   };
 
+  const getColisName = (colisNumber: number): string | null => {
+    if (!colisNames) return null;
+    return colisNames[colisNumber.toString()] || null;
+  };
+
   // Format missing colis for display
   const getMissingDescription = () => {
     if (product.missingForNextComplete.length === 0) return null;
     
-    const missingItems = product.missingForNextComplete.map(c => 
-      `${c.missing}x Coli ${c.colis_number}`
-    ).join(', ');
+    const missingItems = product.missingForNextComplete.map(c => {
+      const name = getColisName(c.colis_number);
+      return name 
+        ? `${c.missing}x ${name}` 
+        : `${c.missing}x Coli ${c.colis_number}`;
+    }).join(', ');
     
     return `Falta: ${missingItems}`;
   };
@@ -204,6 +213,7 @@ export function ProductCard({ product, onIncrement, onDecrement, onLocationChang
             const isMissing = isColisMissing(colisNum);
             const missingCount = getMissingCount(colisNum);
             const isExcess = isColisExcess(colisNum);
+            const colisName = getColisName(colisNum);
             
             return (
               <div
@@ -218,6 +228,11 @@ export function ProductCard({ product, onIncrement, onDecrement, onLocationChang
                 <div className="flex flex-col">
                   <span className="font-medium text-sm">
                     Coli {colisNum}/{product.total_colis}
+                    {colisName && (
+                      <span className="text-muted-foreground font-normal ml-1">
+                        - {colisName}
+                      </span>
+                    )}
                   </span>
                   {isMissing && (
                     <span className="text-xs text-yellow-700">

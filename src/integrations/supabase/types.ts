@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       categories: {
         Row: {
+          colis_names: Json | null
           created_at: string
           description: string | null
           id: string
@@ -23,6 +24,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          colis_names?: Json | null
           created_at?: string
           description?: string | null
           id?: string
@@ -30,6 +32,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          colis_names?: Json | null
           created_at?: string
           description?: string | null
           id?: string

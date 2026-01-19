@@ -1,13 +1,42 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Json } from '@/integrations/supabase/types';
 
 export interface Category {
   id: string;
   name: string;
   description: string | null;
+  colis_names: Record<string, string> | null;
   created_at: string;
   updated_at: string;
+}
+
+// Helper to safely convert Json to Record<string, string>
+function parseColisNames(json: Json | null): Record<string, string> | null {
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(json)) {
+    if (typeof value === 'string') {
+      result[key] = value;
+    }
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+// Helper to convert database row to Category
+function mapToCategory(row: {
+  id: string;
+  name: string;
+  description: string | null;
+  colis_names: Json | null;
+  created_at: string;
+  updated_at: string;
+}): Category {
+  return {
+    ...row,
+    colis_names: parseColisNames(row.colis_names)
+  };
 }
 
 export function useCategories() {
@@ -22,7 +51,7 @@ export function useCategories() {
         .order('name');
 
       if (error) throw error;
-      setCategories(data || []);
+      setCategories((data || []).map(mapToCategory));
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast.error('Erro ao carregar categorias');
@@ -35,11 +64,15 @@ export function useCategories() {
     fetchCategories();
   }, [fetchCategories]);
 
-  const createCategory = async (name: string, description?: string) => {
+  const createCategory = async (name: string, description?: string, colisNames?: Record<string, string> | null) => {
     try {
       const { data, error } = await supabase
         .from('categories')
-        .insert({ name: name.trim(), description: description?.trim() || null })
+        .insert({ 
+          name: name.trim(), 
+          description: description?.trim() || null,
+          colis_names: colisNames || null
+        })
         .select()
         .single();
 
@@ -51,9 +84,10 @@ export function useCategories() {
         throw error;
       }
 
-      setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      const mappedData = mapToCategory(data);
+      setCategories(prev => [...prev, mappedData].sort((a, b) => a.name.localeCompare(b.name)));
       toast.success('Categoria criada com sucesso');
-      return data;
+      return mappedData;
     } catch (error) {
       console.error('Error creating category:', error);
       toast.error('Erro ao criar categoria');
@@ -61,11 +95,15 @@ export function useCategories() {
     }
   };
 
-  const updateCategory = async (id: string, name: string, description?: string) => {
+  const updateCategory = async (id: string, name: string, description?: string, colisNames?: Record<string, string> | null) => {
     try {
       const { data, error } = await supabase
         .from('categories')
-        .update({ name: name.trim(), description: description?.trim() || null })
+        .update({ 
+          name: name.trim(), 
+          description: description?.trim() || null,
+          colis_names: colisNames !== undefined ? colisNames : null
+        })
         .eq('id', id)
         .select()
         .single();
@@ -78,8 +116,9 @@ export function useCategories() {
         throw error;
       }
 
+      const mappedData = mapToCategory(data);
       setCategories(prev => 
-        prev.map(c => c.id === id ? data : c).sort((a, b) => a.name.localeCompare(b.name))
+        prev.map(c => c.id === id ? mappedData : c).sort((a, b) => a.name.localeCompare(b.name))
       );
       toast.success('Categoria atualizada com sucesso');
       return true;
