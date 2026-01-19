@@ -13,6 +13,7 @@ import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags, MapPin,
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 export function CountingView() {
@@ -26,7 +27,8 @@ export function CountingView() {
   const [filterPallet, setFilterPallet] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionCategory, setNewSessionCategory] = useState('Todas');
+  const [newSessionCategories, setNewSessionCategories] = useState<string[]>([]);
+  const [allCategoriesSelected, setAllCategoriesSelected] = useState(true);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -48,14 +50,36 @@ export function CountingView() {
     return map;
   }, [categories]);
 
+  const handleToggleCategory = (categoryName: string) => {
+    setNewSessionCategories(prev => 
+      prev.includes(categoryName) 
+        ? prev.filter(c => c !== categoryName)
+        : [...prev, categoryName]
+    );
+  };
+
+  const handleToggleAllCategories = (checked: boolean) => {
+    setAllCategoriesSelected(checked);
+    if (checked) {
+      setNewSessionCategories([]);
+    }
+  };
+
   const handleCreateSession = async () => {
     if (!newSessionName.trim()) return;
     setIsCreatingSession(true);
-    const session = await createSession(newSessionName, newSessionCategory);
+    
+    // Build category string: "Todas" for all, or comma-separated for specific
+    const categoryValue = allCategoriesSelected 
+      ? 'Todas' 
+      : newSessionCategories.join(',');
+    
+    const session = await createSession(newSessionName, categoryValue);
     if (session) {
       setSelectedSessionId(session.id);
       setNewSessionName('');
-      setNewSessionCategory('Todas');
+      setNewSessionCategories([]);
+      setAllCategoriesSelected(true);
       setDialogOpen(false);
     }
     setIsCreatingSession(false);
@@ -85,12 +109,14 @@ export function CountingView() {
   // Get current session
   const currentSession = sessions.find(s => s.id === selectedSessionId);
 
-  // Filter products based on session category first
+  // Filter products based on session category/categories first
   const sessionFilteredProducts = useMemo(() => {
     if (!currentSession || currentSession.category === 'Todas') {
       return productsWithCounts;
     }
-    return productsWithCounts.filter(p => p.category === currentSession.category);
+    // Support multiple categories separated by comma
+    const sessionCategories = currentSession.category.split(',').map(c => c.trim());
+    return productsWithCounts.filter(p => sessionCategories.includes(p.category));
   }, [productsWithCounts, currentSession]);
 
   // Extract unique locations and pallets from products for filters
@@ -198,26 +224,65 @@ export function CountingView() {
                       onChange={(e) => setNewSessionName(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Categoria de produtos</Label>
-                    <Select value={newSessionCategory} onValueChange={setNewSessionCategory}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecionar categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Todas">Todas as categorias</SelectItem>
+                  <div className="space-y-3">
+                    <Label>Categorias de produtos</Label>
+                    
+                    <div className="flex items-center space-x-2 p-3 border rounded-lg bg-muted/50">
+                      <Checkbox 
+                        id="all-categories"
+                        checked={allCategoriesSelected}
+                        onCheckedChange={(checked) => handleToggleAllCategories(checked as boolean)}
+                      />
+                      <label htmlFor="all-categories" className="text-sm font-medium cursor-pointer">
+                        Todas as categorias
+                      </label>
+                    </div>
+                    
+                    {!allCategoriesSelected && (
+                      <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
                         {availableCategories.map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          <div key={cat} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`cat-${cat}`}
+                              checked={newSessionCategories.includes(cat)}
+                              onCheckedChange={() => handleToggleCategory(cat)}
+                            />
+                            <label htmlFor={`cat-${cat}`} className="text-sm cursor-pointer">
+                              {cat}
+                            </label>
+                          </div>
                         ))}
-                      </SelectContent>
-                    </Select>
+                        {availableCategories.length === 0 && (
+                          <p className="text-sm text-muted-foreground">Nenhuma categoria disponível</p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {!allCategoriesSelected && newSessionCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {newSessionCategories.map(cat => (
+                          <span key={cat} className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
                     <p className="text-xs text-muted-foreground">
-                      Apenas produtos desta categoria serão mostrados na sessão
+                      {allCategoriesSelected 
+                        ? 'Todos os produtos serão mostrados na sessão'
+                        : newSessionCategories.length > 0
+                          ? `Apenas produtos das categorias selecionadas (${newSessionCategories.length}) serão mostrados`
+                          : 'Selecione pelo menos uma categoria'
+                      }
                     </p>
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button onClick={handleCreateSession} disabled={!newSessionName.trim() || isCreatingSession}>
+                  <Button 
+                    onClick={handleCreateSession} 
+                    disabled={!newSessionName.trim() || isCreatingSession || (!allCategoriesSelected && newSessionCategories.length === 0)}
+                  >
                     Criar sessão
                   </Button>
                 </DialogFooter>
@@ -235,13 +300,17 @@ export function CountingView() {
       {/* Session header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-semibold">{currentSession?.name}</h2>
             {currentSession?.category !== 'Todas' && (
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                <Tags className="h-3 w-3 mr-1" />
-                {currentSession?.category}
-              </span>
+              <>
+                {currentSession?.category.split(',').map((cat, i) => (
+                  <span key={i} className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                    <Tags className="h-3 w-3 mr-1" />
+                    {cat.trim()}
+                  </span>
+                ))}
+              </>
             )}
           </div>
           <p className="text-sm text-muted-foreground">
