@@ -74,9 +74,8 @@ export function ProductsView() {
     
     if (status === 'out_of_stock') {
       return (
-        <Badge variant="destructive" className="gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-          Esgotado
+        <Badge variant="outline" className="gap-1 text-muted-foreground">
+          {stock} un.
         </Badge>
       );
     }
