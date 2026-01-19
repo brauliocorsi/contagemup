@@ -1,0 +1,176 @@
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, MapPin, Box } from 'lucide-react';
+import { useCategories } from '@/hooks/useCategories';
+import { Product } from '@/types/stock';
+
+interface ProductEditFormProps {
+  product: Product;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (id: string, updates: Partial<Product>) => Promise<boolean>;
+}
+
+export function ProductEditForm({ product, open, onOpenChange, onSubmit }: ProductEditFormProps) {
+  const { categories, loading: categoriesLoading } = useCategories();
+  const [isLoading, setIsLoading] = useState(false);
+  const [code, setCode] = useState(product.code);
+  const [name, setName] = useState(product.name);
+  const [category, setCategory] = useState(product.category);
+  const [totalColis, setTotalColis] = useState(product.total_colis);
+  const [description, setDescription] = useState(product.description || '');
+  const [location, setLocation] = useState(product.location || '');
+  const [palletNumber, setPalletNumber] = useState(product.pallet_number || '');
+
+  // Reset form when product changes
+  useEffect(() => {
+    setCode(product.code);
+    setName(product.name);
+    setCategory(product.category);
+    setTotalColis(product.total_colis);
+    setDescription(product.description || '');
+    setLocation(product.location || '');
+    setPalletNumber(product.pallet_number || '');
+  }, [product]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    const success = await onSubmit(product.id, {
+      code,
+      name,
+      category,
+      total_colis: totalColis,
+      description: description || null,
+      location: location || null,
+      pallet_number: palletNumber || null
+    });
+
+    if (success) {
+      onOpenChange(false);
+    }
+    
+    setIsLoading(false);
+  };
+
+  const handleColisChange = (value: string) => {
+    const num = parseInt(value) || 1;
+    setTotalColis(Math.max(1, Math.min(20, num)));
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Editar Produto</DialogTitle>
+            <DialogDescription>
+              Altere os dados do produto
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-code">Código *</Label>
+              <Input
+                id="edit-code"
+                placeholder="Ex: CAMA001"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Nome *</Label>
+              <Input
+                id="edit-name"
+                placeholder="Ex: Cama Oslo Queen"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-category">Categoria *</Label>
+              <Select value={category} onValueChange={setCategory} disabled={categoriesLoading}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-colis">Número de Colis *</Label>
+              <Input
+                id="edit-colis"
+                type="number"
+                min={1}
+                max={20}
+                value={totalColis}
+                onChange={(e) => handleColisChange(e.target.value)}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Quantas partes/colis compõem este produto (1-20)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Descrição</Label>
+              <Textarea
+                id="edit-description"
+                placeholder="Descrição opcional"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-location" className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  Localização
+                </Label>
+                <Input
+                  id="edit-location"
+                  placeholder="Ex: Armazém A - C3"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-pallet" className="flex items-center gap-1">
+                  <Box className="h-3 w-3" />
+                  Nº Palete
+                </Label>
+                <Input
+                  id="edit-pallet"
+                  placeholder="Ex: PAL-001"
+                  value={palletNumber}
+                  onChange={(e) => setPalletNumber(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isLoading || !code || !name}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Guardar alterações
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
