@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useSessions } from '@/hooks/useSessions';
 import { useCounting } from '@/hooks/useCounting';
+import { useCategories } from '@/hooks/useCategories';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,10 +15,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 export function ReportsView() {
   const { products, loading: productsLoading } = useProducts();
   const { sessions, loading: sessionsLoading } = useSessions();
+  const { categories, loading: categoriesLoading } = useCategories();
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   
   const { getProductWithCounts, loading: countingLoading } = useCounting(selectedSessionId || null);
+
+  // Create a map of category name to colis_names for quick lookup
+  const categoryColisNamesMap = useMemo(() => {
+    const map: Record<string, Record<string, string> | null> = {};
+    categories.forEach(cat => {
+      map[cat.name] = cat.colis_names;
+    });
+    return map;
+  }, [categories]);
 
   const completedSessions = sessions.filter(s => s.status === 'completed' || s.status === 'active');
 
@@ -67,6 +78,28 @@ export function ReportsView() {
     return productsWithCounts.filter(p => p.category === filterCategory);
   }, [productsWithCounts, filterCategory]);
 
+  // Helper to get colis name
+  const getColisName = (category: string, colisNumber: number): string | null => {
+    const colisNames = categoryColisNamesMap[category];
+    if (!colisNames) return null;
+    return colisNames[colisNumber.toString()] || null;
+  };
+
+  // Format missing colis with names
+  const formatMissingColis = (product: typeof productsWithCounts[0]) => {
+    if (!product.hasPartialProduct || product.missingForNextComplete.length === 0) {
+      return '-';
+    }
+    
+    return product.missingForNextComplete.map(c => {
+      const name = getColisName(product.category, c.colis_number);
+      if (name) {
+        return `${name} (-${c.missing})`;
+      }
+      return `Coli ${c.colis_number} (-${c.missing})`;
+    }).join(', ');
+  };
+
   const exportToCSV = () => {
     if (filteredProducts.length === 0) return;
 
@@ -77,9 +110,7 @@ export function ReportsView() {
         ? (p.hasPartialProduct ? 'Completo + pendente' : 'Completo')
         : (p.status === 'not_counted' ? 'Não contado' : 'Incompleto');
 
-      const faltantes = p.hasPartialProduct
-        ? (p.missingForNextComplete.map(c => `Coli ${c.colis_number} (-${c.missing})`).join(', ') || '-')
-        : '-';
+      const faltantes = formatMissingColis(p);
 
       return [
         p.code,
@@ -110,7 +141,7 @@ export function ReportsView() {
     URL.revokeObjectURL(url);
   };
 
-  const isLoading = productsLoading || sessionsLoading;
+  const isLoading = productsLoading || sessionsLoading || categoriesLoading;
 
   if (isLoading) {
     return (
@@ -342,10 +373,7 @@ export function ReportsView() {
                           )}
                         </TableCell>
                         <TableCell className="text-red-600">
-                          {product.hasPartialProduct && product.missingForNextComplete.length > 0
-                            ? product.missingForNextComplete.map(c => `Coli ${c.colis_number} (-${c.missing})`).join(', ')
-                            : '-'
-                          }
+                          {formatMissingColis(product)}
                         </TableCell>
                       </TableRow>
                     ))}
