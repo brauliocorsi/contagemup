@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { ProductForm } from './ProductForm';
+import { ProductEditForm } from './ProductEditForm';
 import { ImportProducts } from './ImportProducts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,11 +12,13 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Trash2, Edit, Package, MapPin, Box } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Product } from '@/types/stock';
 
 export function ProductsView() {
-  const { products, loading, createProduct, deleteProduct, importProducts } = useProducts();
+  const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
   const { categories, createCategory, refetch: refetchCategories } = useCategories();
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const existingCategoryNames = categories.map(c => c.name);
 
@@ -38,6 +41,10 @@ export function ProductsView() {
       return true;
     }
     return false;
+  };
+
+  const handleUpdateProduct = async (id: string, updates: Partial<Product>): Promise<boolean> => {
+    return await updateProduct(id, updates);
   };
 
   if (loading) {
@@ -139,27 +146,36 @@ export function ProductsView() {
                         {product.description || '-'}
                       </TableCell>
                       <TableCell className="text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Eliminar produto?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação não pode ser revertida. O produto "{product.name}" será permanentemente eliminado.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteProduct(product.id)}>
-                                Eliminar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => setEditingProduct(product)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Eliminar produto?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta ação não pode ser revertida. O produto "{product.name}" será permanentemente eliminado.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteProduct(product.id)}>
+                                  Eliminar
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -174,6 +190,16 @@ export function ProductsView() {
         <div className="text-center py-8 text-muted-foreground">
           <p>Nenhum produto encontrado para "{searchTerm}"</p>
         </div>
+      )}
+
+      {/* Edit Product Dialog */}
+      {editingProduct && (
+        <ProductEditForm
+          product={editingProduct}
+          open={!!editingProduct}
+          onOpenChange={(open) => !open && setEditingProduct(null)}
+          onSubmit={handleUpdateProduct}
+        />
       )}
     </div>
   );
