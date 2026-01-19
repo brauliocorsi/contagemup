@@ -132,7 +132,9 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          location: string | null
           name: string
+          pallet_number: string | null
           total_colis: number
           updated_at: string
         }
@@ -142,7 +144,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          location?: string | null
           name: string
+          pallet_number?: string | null
           total_colis?: number
           updated_at?: string
         }
@@ -152,7 +156,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          location?: string | null
           name?: string
+          pallet_number?: string | null
           total_colis?: number
           updated_at?: string
         }

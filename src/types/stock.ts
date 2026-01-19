@@ -5,6 +5,8 @@ export interface Product {
   category: string;
   total_colis: number;
   description: string | null;
+  location: string | null;
+  pallet_number: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Trash2, Edit, Package } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
@@ -17,10 +17,12 @@ export function ProductsView() {
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.code.toLowerCase().includes(searchTerm.toLowerCase())
+    product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.pallet_number?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleCreateProduct = async (product: { code: string; name: string; category: string; total_colis: number; description: string | null }) => {
+  const handleCreateProduct = async (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null }) => {
     const result = await createProduct(product);
     return !!result;
   };
@@ -54,7 +56,7 @@ export function ProductsView() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Pesquisar por nome ou código..."
+          placeholder="Pesquisar por nome, código, localização ou palete..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
@@ -83,6 +85,8 @@ export function ProductsView() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Categoria</TableHead>
                     <TableHead>Colis</TableHead>
+                    <TableHead>Localização</TableHead>
+                    <TableHead>Palete</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -97,6 +101,22 @@ export function ProductsView() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{product.total_colis} colis</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {product.location ? (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <MapPin className="h-3 w-3" />
+                            {product.location}
+                          </span>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {product.pallet_number ? (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Box className="h-3 w-3" />
+                            {product.pallet_number}
+                          </span>
+                        ) : '-'}
                       </TableCell>
                       <TableCell className="text-muted-foreground max-w-[200px] truncate">
                         {product.description || '-'}
