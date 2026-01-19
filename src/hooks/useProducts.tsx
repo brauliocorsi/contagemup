@@ -91,10 +91,19 @@ export function useProducts() {
   };
 
   const importProducts = async (productsData: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>) => {
+    // Remove duplicate codes - keep only the last occurrence of each code
+    const uniqueProductsMap = new Map<string, typeof productsData[0]>();
+    for (const product of productsData) {
+      uniqueProductsMap.set(product.code, product);
+    }
+    const uniqueProducts = Array.from(uniqueProductsMap.values());
+    
+    const duplicatesRemoved = productsData.length - uniqueProducts.length;
+    
     const { error } = await supabase
       .from('products')
       .upsert(
-        productsData.map(p => ({
+        uniqueProducts.map(p => ({
           code: p.code,
           name: p.name,
           category: p.category || 'Geral',
@@ -109,13 +118,17 @@ export function useProducts() {
     if (error) {
       toast({
         title: 'Erro',
-        description: 'Erro ao importar produtos',
+        description: `Erro ao importar produtos: ${error.message}`,
         variant: 'destructive'
       });
       return false;
     }
 
-    toast({ title: 'Sucesso', description: `${productsData.length} produtos importados` });
+    const message = duplicatesRemoved > 0 
+      ? `${uniqueProducts.length} produtos importados (${duplicatesRemoved} duplicados ignorados)`
+      : `${uniqueProducts.length} produtos importados`;
+    
+    toast({ title: 'Sucesso', description: message });
     await fetchProducts();
     return true;
   };
