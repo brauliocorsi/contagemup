@@ -102,6 +102,19 @@ export function CountingView() {
     toast.success("Coli removido do produto");
   };
 
+  const handleCodeChange = async (productId: string, newCode: string): Promise<boolean> => {
+    if (!newCode.trim()) {
+      toast.error("O código não pode estar vazio");
+      return false;
+    }
+    const success = await updateProduct(productId, { code: newCode });
+    if (success) {
+      await fetchProducts();
+      toast.success("Código do produto atualizado");
+    }
+    return success;
+  };
+
   const productsWithCounts = useMemo(() => {
     return products.map(p => getProductWithCounts(p));
   }, [products, getProductWithCounts]);
@@ -462,6 +475,7 @@ export function CountingView() {
                 onPalletChange={updatePalletNumber}
                 onAddColi={handleAddColi}
                 onRemoveColi={handleRemoveColi}
+                onCodeChange={handleCodeChange}
                 colisNames={categoryColisNamesMap[product.category]}
               />
             ))}
@@ -486,6 +500,7 @@ export function CountingView() {
                   onPalletChange={updatePalletNumber}
                   onAddColi={handleAddColi}
                   onRemoveColi={handleRemoveColi}
+                  onCodeChange={handleCodeChange}
                   colisNames={categoryColisNamesMap[product.category]}
                 />
               ))}
@@ -511,6 +526,7 @@ export function CountingView() {
                   onPalletChange={updatePalletNumber}
                   onAddColi={handleAddColi}
                   onRemoveColi={handleRemoveColi}
+                  onCodeChange={handleCodeChange}
                   colisNames={categoryColisNamesMap[product.category]}
                 />
               ))}
