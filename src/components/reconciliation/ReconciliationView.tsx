@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useSessions } from '@/hooks/useSessions';
 import { useCounting } from '@/hooks/useCounting';
-import { useReconciliation } from '@/hooks/useReconciliation';
+import { useReconciliation, ColumnMapping, FileParseResult } from '@/hooks/useReconciliation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, 
-  ArrowUpDown, Search, Eye, CheckCheck, X, Scale, FileQuestion, Download, Trash2
+  ArrowUpDown, Search, Eye, CheckCheck, X, Scale, FileQuestion, Download, Trash2,
+  MapPin, Package, Settings2
 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CSVImportRow, ReconciliationItem, CSVValidationError } from '@/types/reconciliation';
@@ -34,17 +35,25 @@ export function ReconciliationView() {
     validateReconciliation,
     cancelReconciliation,
     deleteReconciliation,
-    parseCSV 
+    parseCSV,
+    parseXLSX,
+    reParseWithMapping
   } = useReconciliation();
 
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [reconciliationName, setReconciliationName] = useState('');
-  const [csvData, setCsvData] = useState<CSVImportRow[]>([]);
-  const [csvErrors, setCsvErrors] = useState<CSVValidationError[]>([]);
-  const [csvHeaderError, setCsvHeaderError] = useState<string | null>(null);
-  const [csvFileName, setCsvFileName] = useState('');
+  const [fileData, setFileData] = useState<CSVImportRow[]>([]);
+  const [fileErrors, setFileErrors] = useState<CSVValidationError[]>([]);
+  const [fileHeaderError, setFileHeaderError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Column mapping state
+  const [showColumnMapping, setShowColumnMapping] = useState(false);
+  const [fileHeaders, setFileHeaders] = useState<string[]>([]);
+  const [rawFileData, setRawFileData] = useState<Record<string, unknown>[]>([]);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({ code: null, name: null, quantity: null });
 
   // View reconciliation details
   const [viewingReconciliation, setViewingReconciliation] = useState<string | null>(null);
@@ -54,6 +63,9 @@ export function ReconciliationView() {
   // Validation dialog
   const [validatingId, setValidatingId] = useState<string | null>(null);
   const [validationNotes, setValidationNotes] = useState('');
+
+  // Filter by status
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -70,31 +82,72 @@ export function ReconciliationView() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setCsvFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      const result = parseCSV(content);
-      setCsvData(result.rows);
-      setCsvErrors(result.errors);
-      setCsvHeaderError(result.headerError);
-    };
-    reader.readAsText(file);
+    setFileName(file.name);
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = e.target?.result as ArrayBuffer;
+        const result = parseXLSX(data);
+        applyParseResult(result);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        const result = parseCSV(content);
+        applyParseResult(result);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const applyParseResult = (result: FileParseResult) => {
+    setFileData(result.rows);
+    setFileErrors(result.errors);
+    setFileHeaderError(result.headerError);
+    setFileHeaders(result.headers);
+    setRawFileData(result.rawData);
+    setColumnMapping(result.detectedMapping);
+
+    // If auto-detection failed but we have data, show mapping UI
+    if (result.headerError && result.rawData.length > 0) {
+      setShowColumnMapping(true);
+    } else {
+      setShowColumnMapping(false);
+    }
+  };
+
+  const handleApplyMapping = () => {
+    const result = reParseWithMapping(rawFileData, columnMapping);
+    setFileData(result.rows);
+    setFileErrors(result.errors);
+    setFileHeaderError(result.headerError);
+    
+    if (!result.headerError) {
+      setShowColumnMapping(false);
+    }
   };
 
   const handleCreateReconciliation = async () => {
-    if (!selectedSessionId || !reconciliationName.trim() || csvData.length === 0 || csvErrors.length > 0) return;
+    if (!selectedSessionId || !reconciliationName.trim() || fileData.length === 0 || fileErrors.length > 0) return;
 
     setIsCreating(true);
-    await createReconciliation(selectedSessionId, reconciliationName, csvData, productsWithCounts);
+    await createReconciliation(selectedSessionId, reconciliationName, fileData, productsWithCounts);
     setIsCreating(false);
     
     // Reset form
-    setCsvData([]);
-    setCsvErrors([]);
-    setCsvHeaderError(null);
-    setCsvFileName('');
+    setFileData([]);
+    setFileErrors([]);
+    setFileHeaderError(null);
+    setFileName('');
     setReconciliationName('');
+    setFileHeaders([]);
+    setRawFileData([]);
+    setColumnMapping({ code: null, name: null, quantity: null });
+    setShowColumnMapping(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -154,10 +207,19 @@ export function ReconciliationView() {
 
   const currentReconciliation = reconciliations.find(r => r.id === viewingReconciliation);
 
-  const filteredItems = reconciliationItems.filter(item =>
-    item.product_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.product_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItems = useMemo(() => {
+    return reconciliationItems.filter(item => {
+      const matchesSearch = 
+        item.product_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.location && item.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.pallet_number && item.pallet_number.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [reconciliationItems, searchTerm, statusFilter]);
 
   const itemStats = useMemo(() => {
     return {
@@ -202,8 +264,8 @@ export function ReconciliationView() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('all')}>
+            <CardContent className={cn("p-4 flex items-center gap-3", statusFilter === 'all' && "ring-2 ring-primary rounded-lg")}>
               <Scale className="h-5 w-5 text-primary" />
               <div>
                 <p className="text-2xl font-bold">{itemStats.total}</p>
@@ -211,8 +273,8 @@ export function ReconciliationView() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('match')}>
+            <CardContent className={cn("p-4 flex items-center gap-3", statusFilter === 'match' && "ring-2 ring-green-600 rounded-lg")}>
               <CheckCircle2 className="h-5 w-5 text-green-600" />
               <div>
                 <p className="text-2xl font-bold">{itemStats.match}</p>
@@ -220,8 +282,8 @@ export function ReconciliationView() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('surplus')}>
+            <CardContent className={cn("p-4 flex items-center gap-3", statusFilter === 'surplus' && "ring-2 ring-blue-600 rounded-lg")}>
               <ArrowUpDown className="h-5 w-5 text-blue-600" />
               <div>
                 <p className="text-2xl font-bold">{itemStats.surplus}</p>
@@ -229,8 +291,8 @@ export function ReconciliationView() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('shortage')}>
+            <CardContent className={cn("p-4 flex items-center gap-3", statusFilter === 'shortage' && "ring-2 ring-red-600 rounded-lg")}>
               <AlertTriangle className="h-5 w-5 text-red-600" />
               <div>
                 <p className="text-2xl font-bold">{itemStats.shortage}</p>
@@ -238,8 +300,8 @@ export function ReconciliationView() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('not_found')}>
+            <CardContent className={cn("p-4 flex items-center gap-3", statusFilter === 'not_found' && "ring-2 ring-muted-foreground rounded-lg")}>
               <FileQuestion className="h-5 w-5 text-muted-foreground" />
               <div>
                 <p className="text-2xl font-bold">{itemStats.notFound}</p>
@@ -311,15 +373,23 @@ export function ReconciliationView() {
           </Card>
         )}
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Pesquisar por código ou nome..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        {/* Search and Filter */}
+        <div className="flex gap-4 items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Pesquisar por código, nome, localização ou palete..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {statusFilter !== 'all' && (
+            <Button variant="ghost" size="sm" onClick={() => setStatusFilter('all')}>
+              <X className="h-4 w-4 mr-1" />
+              Limpar filtro
+            </Button>
+          )}
         </div>
 
         {/* Items table */}
@@ -342,6 +412,18 @@ export function ReconciliationView() {
                       <TableHead className="text-right">Contado</TableHead>
                       <TableHead className="text-right">Diferença</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          Localização
+                        </div>
+                      </TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          Palete
+                        </div>
+                      </TableHead>
                       <TableHead>Notas</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -368,6 +450,26 @@ export function ReconciliationView() {
                           {item.difference > 0 ? '+' : ''}{item.difference}
                         </TableCell>
                         <TableCell>{getStatusBadge(item.status)}</TableCell>
+                        <TableCell>
+                          {item.location ? (
+                            <Badge variant="outline" className="font-normal">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {item.location}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item.pallet_number ? (
+                            <Badge variant="outline" className="font-normal">
+                              <Package className="h-3 w-3 mr-1" />
+                              {item.pallet_number}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                           {item.notes || '-'}
                         </TableCell>
@@ -461,7 +563,7 @@ export function ReconciliationView() {
           </div>
 
           <div className="space-y-2">
-            <Label>Ficheiro CSV</Label>
+            <Label>Ficheiro CSV ou Excel</Label>
             <div className="flex items-center gap-4">
               <Button
                 variant="outline"
@@ -469,24 +571,24 @@ export function ReconciliationView() {
                 disabled={!selectedSessionId}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                {csvFileName || 'Carregar CSV'}
+                {fileName || 'Carregar ficheiro'}
               </Button>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.txt"
+                accept=".csv,.txt,.xlsx,.xls"
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              {csvData.length > 0 && (
+              {fileData.length > 0 && (
                 <span className="text-sm text-muted-foreground">
-                  {csvData.length} produtos encontrados
+                  {fileData.length} produtos encontrados
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2">
               <p className="text-xs text-muted-foreground">
-                O CSV deve conter colunas: código, nome (opcional), quantidade
+                Suporta ficheiros CSV e Excel (XLSX, XLS). Colunas: código, nome (opcional), quantidade
               </p>
               <a 
                 href="/templates/template_conciliacao.csv" 
@@ -499,24 +601,120 @@ export function ReconciliationView() {
             </div>
           </div>
 
-          {/* Header error */}
-          {csvHeaderError && (
-            <div className="p-4 rounded-lg bg-red-50 border border-red-200">
-              <div className="flex items-center gap-2 text-red-800">
-                <XCircle className="h-5 w-5" />
-                <span className="font-medium">Erro no cabeçalho do ficheiro</span>
-              </div>
-              <p className="text-sm text-red-700 mt-1">{csvHeaderError}</p>
+          {/* Column mapping UI */}
+          {showColumnMapping && fileHeaders.length > 0 && (
+            <Card className="border-amber-200 bg-amber-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  Mapeamento de Colunas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Não foi possível detetar automaticamente as colunas. Por favor, mapeie-as manualmente:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Código do Produto *</Label>
+                    <Select 
+                      value={columnMapping.code || ''} 
+                      onValueChange={(v) => setColumnMapping(prev => ({ ...prev, code: v || null }))}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Selecionar coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fileHeaders.map(h => (
+                          <SelectItem key={h} value={h}>{h}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nome do Produto</Label>
+                    <Select 
+                      value={columnMapping.name || ''} 
+                      onValueChange={(v) => setColumnMapping(prev => ({ ...prev, name: v || null }))}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="(opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Nenhum</SelectItem>
+                        {fileHeaders.map(h => (
+                          <SelectItem key={h} value={h}>{h}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Quantidade *</Label>
+                    <Select 
+                      value={columnMapping.quantity || ''} 
+                      onValueChange={(v) => setColumnMapping(prev => ({ ...prev, quantity: v || null }))}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Selecionar coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fileHeaders.map(h => (
+                          <SelectItem key={h} value={h}>{h}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button size="sm" onClick={handleApplyMapping} disabled={!columnMapping.code || !columnMapping.quantity}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Aplicar Mapeamento
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Detected mapping info */}
+          {!showColumnMapping && columnMapping.code && fileData.length > 0 && (
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Código: <strong>{columnMapping.code}</strong>
+              </span>
+              {columnMapping.name && (
+                <span className="flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  Nome: <strong>{columnMapping.name}</strong>
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Quantidade: <strong>{columnMapping.quantity}</strong>
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => setShowColumnMapping(true)}>
+                <Settings2 className="h-4 w-4 mr-1" />
+                Alterar
+              </Button>
             </div>
           )}
 
-          {/* CSV validation errors */}
-          {csvErrors.length > 0 && (
+          {/* Header error */}
+          {fileHeaderError && !showColumnMapping && (
+            <div className="p-4 rounded-lg bg-red-50 border border-red-200">
+              <div className="flex items-center gap-2 text-red-800">
+                <XCircle className="h-5 w-5" />
+                <span className="font-medium">Erro no ficheiro</span>
+              </div>
+              <p className="text-sm text-red-700 mt-1">{fileHeaderError}</p>
+            </div>
+          )}
+
+          {/* File validation errors */}
+          {fileErrors.length > 0 && (
             <div className="border border-red-200 rounded-lg overflow-hidden">
               <div className="bg-red-50 px-4 py-2 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-red-600" />
                 <span className="text-sm font-medium text-red-800">
-                  {csvErrors.length} linha{csvErrors.length > 1 ? 's' : ''} com erros
+                  {fileErrors.length} linha{fileErrors.length > 1 ? 's' : ''} com erros
                 </span>
               </div>
               <div className="max-h-48 overflow-y-auto bg-white">
@@ -529,7 +727,7 @@ export function ReconciliationView() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {csvErrors.map((err, idx) => (
+                    {fileErrors.map((err, idx) => (
                       <TableRow key={idx} className="bg-red-50/50">
                         <TableCell className="font-mono text-red-700">{err.line}</TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground max-w-[200px] truncate">
@@ -544,20 +742,20 @@ export function ReconciliationView() {
                 </Table>
               </div>
               <div className="bg-red-50 px-4 py-2 text-xs text-red-700">
-                Corrija os erros no ficheiro CSV e carregue novamente
+                Corrija os erros no ficheiro e carregue novamente
               </div>
             </div>
           )}
 
-          {/* Preview CSV data */}
-          {csvData.length > 0 && !csvHeaderError && (
+          {/* Preview file data */}
+          {fileData.length > 0 && !fileHeaderError && (
             <div className="border rounded-lg overflow-hidden">
               <div className="bg-muted px-4 py-2 flex items-center gap-2">
                 <FileSpreadsheet className="h-4 w-4" />
-                <span className="text-sm font-medium">Pré-visualização ({csvData.length} linhas válidas)</span>
-                {csvErrors.length > 0 && (
+                <span className="text-sm font-medium">Pré-visualização ({fileData.length} linhas válidas)</span>
+                {fileErrors.length > 0 && (
                   <Badge variant="destructive" className="ml-2">
-                    {csvErrors.length} com erros
+                    {fileErrors.length} com erros
                   </Badge>
                 )}
               </div>
@@ -571,17 +769,17 @@ export function ReconciliationView() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {csvData.slice(0, 10).map((row, idx) => (
+                    {fileData.slice(0, 10).map((row, idx) => (
                       <TableRow key={idx}>
                         <TableCell className="font-mono">{row.code}</TableCell>
                         <TableCell>{row.name || '-'}</TableCell>
                         <TableCell className="text-right">{row.quantity}</TableCell>
                       </TableRow>
                     ))}
-                    {csvData.length > 10 && (
+                    {fileData.length > 10 && (
                       <TableRow>
                         <TableCell colSpan={3} className="text-center text-muted-foreground">
-                          ... e mais {csvData.length - 10} linhas
+                          ... e mais {fileData.length - 10} linhas
                         </TableCell>
                       </TableRow>
                     )}
@@ -593,7 +791,7 @@ export function ReconciliationView() {
 
           <Button 
             onClick={handleCreateReconciliation}
-            disabled={!selectedSessionId || !reconciliationName.trim() || csvData.length === 0 || csvErrors.length > 0 || !!csvHeaderError || isCreating}
+            disabled={!selectedSessionId || !reconciliationName.trim() || fileData.length === 0 || fileErrors.length > 0 || !!fileHeaderError || isCreating}
           >
             {isCreating ? 'A criar...' : 'Criar Conciliação'}
           </Button>

@@ -290,7 +290,9 @@ export type Database = {
           difference: number | null
           expected_quantity: number
           id: string
+          location: string | null
           notes: string | null
+          pallet_number: string | null
           product_code: string
           product_id: string | null
           product_name: string
@@ -304,7 +306,9 @@ export type Database = {
           difference?: number | null
           expected_quantity?: number
           id?: string
+          location?: string | null
           notes?: string | null
+          pallet_number?: string | null
           product_code: string
           product_id?: string | null
           product_name: string
@@ -318,7 +322,9 @@ export type Database = {
           difference?: number | null
           expected_quantity?: number
           id?: string
+          location?: string | null
           notes?: string | null
+          pallet_number?: string | null
           product_code?: string
           product_id?: string | null
           product_name?: string

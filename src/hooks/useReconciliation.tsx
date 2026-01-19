@@ -4,6 +4,29 @@ import { Reconciliation, ReconciliationItem, CSVImportRow, CSVParseResult, CSVVa
 import { ProductWithCounts } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
+import * as XLSX from 'xlsx';
+
+// Column aliases for auto-detection
+const COLUMN_ALIASES = {
+  code: ['codigo', 'code', 'código', 'cod', 'sku', 'ref', 'referencia', 'referência', 'product_code', 'productcode'],
+  name: ['nome', 'name', 'produto', 'product', 'description', 'descricao', 'descrição', 'designacao', 'designação'],
+  quantity: ['quantidade', 'quantity', 'qty', 'qtd', 'stock', 'qtde', 'quant', 'qnt', 'un', 'unidades']
+};
+
+export interface ColumnMapping {
+  code: string | null;
+  name: string | null;
+  quantity: string | null;
+}
+
+export interface FileParseResult {
+  rows: CSVImportRow[];
+  errors: CSVValidationError[];
+  headerError: string | null;
+  headers: string[];
+  detectedMapping: ColumnMapping;
+  rawData: Record<string, unknown>[];
+}
 
 export function useReconciliation() {
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
@@ -33,6 +56,212 @@ export function useReconciliation() {
   useEffect(() => {
     fetchReconciliations();
   }, [fetchReconciliations]);
+
+  const detectColumnMapping = (headers: string[]): ColumnMapping => {
+    const mapping: ColumnMapping = { code: null, name: null, quantity: null };
+    const normalizedHeaders = headers.map(h => h.toLowerCase().trim());
+
+    for (const [field, aliases] of Object.entries(COLUMN_ALIASES)) {
+      for (const alias of aliases) {
+        const index = normalizedHeaders.findIndex(h => h.includes(alias));
+        if (index !== -1 && mapping[field as keyof ColumnMapping] === null) {
+          mapping[field as keyof ColumnMapping] = headers[index];
+          break;
+        }
+      }
+    }
+
+    return mapping;
+  };
+
+  const parseFileWithMapping = (
+    rawData: Record<string, unknown>[],
+    mapping: ColumnMapping
+  ): { rows: CSVImportRow[]; errors: CSVValidationError[] } => {
+    const rows: CSVImportRow[] = [];
+    const errors: CSVValidationError[] = [];
+    const seenCodes = new Set<string>();
+
+    if (!mapping.code || !mapping.quantity) {
+      return { rows: [], errors: [] };
+    }
+
+    rawData.forEach((row, index) => {
+      const lineErrors: string[] = [];
+      const lineNumber = index + 2; // +2 because of header row and 1-based indexing
+
+      const code = String(row[mapping.code!] || '').trim();
+      const quantityStr = String(row[mapping.quantity!] || '').trim();
+      const quantity = parseInt(quantityStr, 10);
+      const name = mapping.name ? String(row[mapping.name] || '').trim() : undefined;
+
+      // Validate code
+      if (!code) {
+        lineErrors.push('Código em falta');
+      } else if (seenCodes.has(code.toLowerCase())) {
+        lineErrors.push(`Código duplicado: "${code}"`);
+      }
+
+      // Validate quantity
+      if (!quantityStr) {
+        lineErrors.push('Quantidade em falta');
+      } else if (isNaN(quantity)) {
+        lineErrors.push(`Quantidade inválida: "${quantityStr}"`);
+      } else if (quantity < 0) {
+        lineErrors.push('Quantidade não pode ser negativa');
+      }
+
+      if (lineErrors.length > 0) {
+        errors.push({
+          line: lineNumber,
+          content: JSON.stringify(row).substring(0, 80),
+          errors: lineErrors
+        });
+      } else if (code) {
+        seenCodes.add(code.toLowerCase());
+        rows.push({ code, name, quantity });
+      }
+    });
+
+    return { rows, errors };
+  };
+
+  const parseXLSX = (data: ArrayBuffer): FileParseResult => {
+    const result: FileParseResult = {
+      rows: [],
+      errors: [],
+      headerError: null,
+      headers: [],
+      detectedMapping: { code: null, name: null, quantity: null },
+      rawData: []
+    };
+
+    try {
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
+      
+      if (jsonData.length === 0) {
+        result.headerError = 'O ficheiro está vazio ou não contém dados';
+        return result;
+      }
+
+      // Get headers from the first row
+      const headers = Object.keys(jsonData[0] || {});
+      result.headers = headers;
+      result.rawData = jsonData;
+
+      // Detect column mapping
+      const detectedMapping = detectColumnMapping(headers);
+      result.detectedMapping = detectedMapping;
+
+      if (!detectedMapping.code) {
+        result.headerError = 'Coluna de código não detetada automaticamente. Por favor, mapeie as colunas manualmente.';
+        return result;
+      }
+
+      if (!detectedMapping.quantity) {
+        result.headerError = 'Coluna de quantidade não detetada automaticamente. Por favor, mapeie as colunas manualmente.';
+        return result;
+      }
+
+      const { rows, errors } = parseFileWithMapping(jsonData, detectedMapping);
+      result.rows = rows;
+      result.errors = errors;
+
+    } catch (err) {
+      console.error('Error parsing XLSX:', err);
+      result.headerError = 'Erro ao ler o ficheiro Excel. Verifique se o formato está correto.';
+    }
+
+    return result;
+  };
+
+  const parseCSV = (content: string): FileParseResult => {
+    const result: FileParseResult = {
+      rows: [],
+      errors: [],
+      headerError: null,
+      headers: [],
+      detectedMapping: { code: null, name: null, quantity: null },
+      rawData: []
+    };
+
+    const lines = content.trim().split('\n');
+    if (lines.length < 2) {
+      result.headerError = 'O ficheiro está vazio ou não contém dados';
+      return result;
+    }
+
+    // Parse header
+    const delimiter = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ',';
+    const headers = lines[0].split(delimiter).map(h => h.trim());
+    result.headers = headers;
+
+    // Convert CSV to JSON-like format
+    const rawData: Record<string, unknown>[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const lineContent = lines[i].trim();
+      if (!lineContent) continue;
+      
+      const values = lineContent.split(delimiter);
+      const row: Record<string, unknown> = {};
+      headers.forEach((header, idx) => {
+        row[header] = values[idx]?.trim() || '';
+      });
+      rawData.push(row);
+    }
+    result.rawData = rawData;
+
+    // Detect column mapping
+    const detectedMapping = detectColumnMapping(headers);
+    result.detectedMapping = detectedMapping;
+
+    if (!detectedMapping.code) {
+      result.headerError = 'Coluna de código não detetada automaticamente. Por favor, mapeie as colunas manualmente.';
+      return result;
+    }
+
+    if (!detectedMapping.quantity) {
+      result.headerError = 'Coluna de quantidade não detetada automaticamente. Por favor, mapeie as colunas manualmente.';
+      return result;
+    }
+
+    const { rows, errors } = parseFileWithMapping(rawData, detectedMapping);
+    result.rows = rows;
+    result.errors = errors;
+
+    return result;
+  };
+
+  const reParseWithMapping = (rawData: Record<string, unknown>[], mapping: ColumnMapping): FileParseResult => {
+    const result: FileParseResult = {
+      rows: [],
+      errors: [],
+      headerError: null,
+      headers: Object.keys(rawData[0] || {}),
+      detectedMapping: mapping,
+      rawData
+    };
+
+    if (!mapping.code) {
+      result.headerError = 'Por favor, selecione a coluna para o código do produto.';
+      return result;
+    }
+
+    if (!mapping.quantity) {
+      result.headerError = 'Por favor, selecione a coluna para a quantidade.';
+      return result;
+    }
+
+    const { rows, errors } = parseFileWithMapping(rawData, mapping);
+    result.rows = rows;
+    result.errors = errors;
+
+    return result;
+  };
 
   const createReconciliation = async (
     sessionId: string,
@@ -86,6 +315,10 @@ export function useReconciliation() {
         status = 'shortage';
       }
 
+      // Get location and pallet from product or its counts
+      const location = product?.location || null;
+      const palletNumber = product?.pallet_number || null;
+
       items.push({
         reconciliation_id: reconciliation.id,
         product_id: product?.id || null,
@@ -94,7 +327,9 @@ export function useReconciliation() {
         expected_quantity: expectedQuantity,
         counted_quantity: countedQuantity,
         status,
-        notes: null
+        notes: null,
+        location,
+        pallet_number: palletNumber
       });
     }
 
@@ -113,7 +348,9 @@ export function useReconciliation() {
           expected_quantity: 0,
           counted_quantity: product.completeSets,
           status: 'surplus',
-          notes: 'Produto não constava no ficheiro CSV'
+          notes: 'Produto não constava no ficheiro importado',
+          location: product.location || null,
+          pallet_number: product.pallet_number || null
         });
       }
     }
@@ -215,82 +452,6 @@ export function useReconciliation() {
     return true;
   };
 
-  const parseCSV = (content: string): CSVParseResult => {
-    const result: CSVParseResult = {
-      rows: [],
-      errors: [],
-      headerError: null
-    };
-
-    const lines = content.trim().split('\n');
-    if (lines.length < 2) {
-      result.headerError = 'O ficheiro está vazio ou não contém dados';
-      return result;
-    }
-
-    const header = lines[0].toLowerCase().split(/[;,\t]/);
-    const codeIndex = header.findIndex(h => h.includes('codigo') || h.includes('code') || h.includes('código'));
-    const nameIndex = header.findIndex(h => h.includes('nome') || h.includes('name') || h.includes('produto'));
-    const qtyIndex = header.findIndex(h => h.includes('quantidade') || h.includes('qty') || h.includes('qtd') || h.includes('quantity') || h.includes('stock'));
-
-    if (codeIndex === -1) {
-      result.headerError = 'Coluna de código não encontrada. Use: "Codigo", "Code" ou "Código"';
-      return result;
-    }
-
-    if (qtyIndex === -1) {
-      result.headerError = 'Coluna de quantidade não encontrada. Use: "Quantidade", "Qty", "Qtd" ou "Stock"';
-      return result;
-    }
-
-    const seenCodes = new Set<string>();
-
-    for (let i = 1; i < lines.length; i++) {
-      const lineContent = lines[i].trim();
-      if (!lineContent) continue; // Skip empty lines
-
-      const values = lineContent.split(/[;,\t]/);
-      const lineErrors: string[] = [];
-
-      const code = values[codeIndex]?.trim();
-      const quantityStr = values[qtyIndex]?.trim();
-      const quantity = parseInt(quantityStr || '', 10);
-
-      // Validate code
-      if (!code) {
-        lineErrors.push('Código em falta');
-      } else if (seenCodes.has(code.toLowerCase())) {
-        lineErrors.push(`Código duplicado: "${code}"`);
-      }
-
-      // Validate quantity
-      if (!quantityStr) {
-        lineErrors.push('Quantidade em falta');
-      } else if (isNaN(quantity)) {
-        lineErrors.push(`Quantidade inválida: "${quantityStr}"`);
-      } else if (quantity < 0) {
-        lineErrors.push('Quantidade não pode ser negativa');
-      }
-
-      if (lineErrors.length > 0) {
-        result.errors.push({
-          line: i + 1,
-          content: lineContent.substring(0, 80) + (lineContent.length > 80 ? '...' : ''),
-          errors: lineErrors
-        });
-      } else if (code) {
-        seenCodes.add(code.toLowerCase());
-        result.rows.push({
-          code,
-          name: nameIndex !== -1 ? values[nameIndex]?.trim() : undefined,
-          quantity
-        });
-      }
-    }
-
-    return result;
-  };
-
   const deleteReconciliation = async (reconciliationId: string): Promise<boolean> => {
     try {
       // 1. Delete all reconciliation items
@@ -345,6 +506,8 @@ export function useReconciliation() {
     cancelReconciliation,
     deleteReconciliation,
     parseCSV,
+    parseXLSX,
+    reParseWithMapping,
     refetch: fetchReconciliations
   };
 }
