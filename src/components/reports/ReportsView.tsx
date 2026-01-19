@@ -8,9 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter, MapPin, Box } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter, MapPin, Box, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { LocationStatsCard } from './LocationStatsCard';
+import { ProductDetailsDialog } from './ProductDetailsDialog';
 
 export function ReportsView() {
   const { products, loading: productsLoading } = useProducts();
@@ -18,6 +21,10 @@ export function ReportsView() {
   const { categories, loading: categoriesLoading } = useCategories();
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [categoryStatsOpen, setCategoryStatsOpen] = useState(true);
+  const [locationStatsOpen, setLocationStatsOpen] = useState(true);
+  const [selectedProductForDetails, setSelectedProductForDetails] = useState<any>(null);
+  const [productDetailsOpen, setProductDetailsOpen] = useState(false);
   
   const { getProductWithCounts, loading: countingLoading } = useCounting(selectedSessionId || null);
 
@@ -77,6 +84,45 @@ export function ReportsView() {
     if (filterCategory === 'all') return productsWithCounts;
     return productsWithCounts.filter(p => p.category === filterCategory);
   }, [productsWithCounts, filterCategory]);
+
+  // Location stats
+  const locationStats = useMemo(() => {
+    const locations = [...new Set(productsWithCounts.map(p => p.location || 'Sem localização'))];
+    return locations.map(location => {
+      const locationProducts = productsWithCounts.filter(p => 
+        (p.location || 'Sem localização') === location
+      );
+      const complete = locationProducts.filter(p => p.completeSets > 0 && !p.hasPartialProduct).length;
+      const incomplete = locationProducts.filter(p => p.hasPartialProduct || (p.completeSets === 0 && p.status !== 'not_counted')).length;
+      const totalSets = locationProducts.reduce((sum, p) => sum + p.completeSets, 0);
+      
+      return {
+        location,
+        products: locationProducts.map(p => ({
+          id: p.id,
+          code: p.code,
+          name: p.name,
+          category: p.category,
+          completeSets: p.completeSets,
+          hasPartialProduct: p.hasPartialProduct,
+          status: p.status
+        })),
+        total: locationProducts.length,
+        complete,
+        incomplete,
+        totalSets,
+        isComplete: complete === locationProducts.length && locationProducts.length > 0 && incomplete === 0
+      };
+    }).sort((a, b) => a.location.localeCompare(b.location));
+  }, [productsWithCounts]);
+
+  const handleProductDetailsClick = (productId: string) => {
+    const product = productsWithCounts.find(p => p.id === productId);
+    if (product) {
+      setSelectedProductForDetails(product);
+      setProductDetailsOpen(true);
+    }
+  };
 
   // Helper to get colis name
   const getColisName = (category: string, colisNumber: number): string | null => {
@@ -254,40 +300,89 @@ export function ReportsView() {
             </Card>
           </div>
 
-          {/* Category Stats */}
+          {/* Category Stats - Collapsible */}
           {categoryStats.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Tags className="h-4 w-4" />
-                  Estatísticas por Categoria
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {categoryStats.map(cat => (
-                    <div key={cat.category} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{cat.category}</Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {cat.total} produtos
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="text-green-600">{cat.complete} completos</span>
-                          <span className="text-red-600">{cat.incomplete} incompletos</span>
-                          <span className="text-blue-600">{cat.totalSets} sets</span>
-                          <span className="font-bold">{cat.percentage}%</span>
-                        </div>
-                      </div>
-                      <Progress value={cat.percentage} className="h-2" />
+            <Collapsible open={categoryStatsOpen} onOpenChange={setCategoryStatsOpen}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Tags className="h-4 w-4" />
+                        Estatísticas por Categoria
+                      </CardTitle>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        {categoryStatsOpen ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    <div className="space-y-4">
+                      {categoryStats.map(cat => (
+                        <div key={cat.category} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{cat.category}</Badge>
+                              <span className="text-sm text-muted-foreground">
+                                {cat.total} produtos
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <span className="text-green-600">{cat.complete} completos</span>
+                              <span className="text-red-600">{cat.incomplete} incompletos</span>
+                              <span className="text-blue-600">{cat.totalSets} sets</span>
+                              <span className="font-bold">{cat.percentage}%</span>
+                            </div>
+                          </div>
+                          <Progress value={cat.percentage} className="h-2" />
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           )}
+
+          {/* Location Stats - Collapsible */}
+          {locationStats.length > 0 && (
+            <Collapsible open={locationStatsOpen} onOpenChange={setLocationStatsOpen}>
+              <Card className="overflow-hidden">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Estatísticas por Localização
+                      </CardTitle>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        {locationStatsOpen ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    <LocationStatsCard 
+                      locationStats={locationStats} 
+                      onProductClick={handleProductDetailsClick}
+                    />
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          )}
+
 
           {/* Products table */}
           <Card>
@@ -325,6 +420,7 @@ export function ReportsView() {
                       <TableHead>Unidades</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Colis Faltantes</TableHead>
+                      <TableHead className="w-24">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -375,6 +471,20 @@ export function ReportsView() {
                         <TableCell className="text-red-600">
                           {formatMissingColis(product)}
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => {
+                              setSelectedProductForDetails(product);
+                              setProductDetailsOpen(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Ver
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -384,6 +494,13 @@ export function ReportsView() {
           </Card>
         </>
       )}
+
+      {/* Product Details Dialog */}
+      <ProductDetailsDialog
+        product={selectedProductForDetails}
+        open={productDetailsOpen}
+        onOpenChange={setProductDetailsOpen}
+      />
     </div>
   );
 }
