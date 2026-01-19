@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Upload, FileSpreadsheet, Loader2, Download, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import * as XLSX from 'xlsx';
 
 interface ImportProductsProps {
   onImport: (products: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>) => Promise<boolean>;
@@ -11,16 +12,18 @@ interface ImportProductsProps {
   onCreateCategory: (name: string) => Promise<boolean>;
 }
 
+type ProductRow = { code: string; name: string; category: string; total_colis: number; description?: string; location?: string; pallet_number?: string };
+
 export function ImportProducts({ onImport, existingCategories, onCreateCategory }: ImportProductsProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [preview, setPreview] = useState<Array<{ code: string; name: string; category: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>>([]);
+  const [preview, setPreview] = useState<ProductRow[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const parseCSV = (text: string) => {
+  const parseCSV = (text: string): ProductRow[] => {
     const lines = text.split('\n').filter(line => line.trim());
-    const products: Array<{ code: string; name: string; category: string; total_colis: number; description?: string; location?: string; pallet_number?: string }> = [];
+    const products: ProductRow[] = [];
 
     // Skip header line
     for (let i = 1; i < lines.length; i++) {
@@ -41,6 +44,47 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
     return products;
   };
 
+  const parseXLSX = (data: ArrayBuffer): ProductRow[] => {
+    const workbook = XLSX.read(data, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    
+    // Convert to JSON with header row
+    const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
+    
+    const products: ProductRow[] = [];
+    
+    for (const row of jsonData) {
+      // Try to map common column names (case-insensitive)
+      const getValue = (keys: string[]): string => {
+        for (const key of keys) {
+          const found = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase());
+          if (found && row[found] !== undefined && row[found] !== '') {
+            return String(row[found]).trim();
+          }
+        }
+        return '';
+      };
+      
+      const code = getValue(['codigo', 'código', 'code', 'sku', 'ref', 'referencia', 'referência']);
+      const name = getValue(['nome', 'name', 'produto', 'product', 'descricao_produto', 'descrição_produto']);
+      
+      if (code && name) {
+        products.push({
+          code,
+          name,
+          category: getValue(['categoria', 'category', 'cat', 'grupo', 'group']) || 'Geral',
+          total_colis: parseInt(getValue(['colis', 'total_colis', 'volumes', 'qtd_colis', 'quantidade_colis'])) || 1,
+          description: getValue(['descricao', 'descrição', 'description', 'obs', 'observacao', 'observação']) || undefined,
+          location: getValue(['localizacao', 'localização', 'location', 'local', 'armazem', 'armazém']) || undefined,
+          pallet_number: getValue(['palete', 'pallet', 'pallet_number', 'num_palete', 'número_palete']) || undefined
+        });
+      }
+    }
+    
+    return products;
+  };
+
   // Calculate new categories that will be created
   const newCategories = useMemo(() => {
     if (preview.length === 0) return [];
@@ -52,21 +96,49 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const products = parseCSV(text);
-      setPreview(products);
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
 
-      if (products.length === 0) {
-        toast({
-          title: 'Ficheiro vazio',
-          description: 'Não foram encontrados produtos no ficheiro',
-          variant: 'destructive'
-        });
-      }
-    };
-    reader.readAsText(file);
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = event.target?.result as ArrayBuffer;
+          const products = parseXLSX(data);
+          setPreview(products);
+
+          if (products.length === 0) {
+            toast({
+              title: 'Ficheiro vazio',
+              description: 'Não foram encontrados produtos no ficheiro. Verifique se as colunas têm os nomes corretos (codigo, nome, categoria, etc.)',
+              variant: 'destructive'
+            });
+          }
+        } catch (error) {
+          toast({
+            title: 'Erro ao ler ficheiro',
+            description: 'Não foi possível processar o ficheiro Excel',
+            variant: 'destructive'
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        const products = parseCSV(text);
+        setPreview(products);
+
+        if (products.length === 0) {
+          toast({
+            title: 'Ficheiro vazio',
+            description: 'Não foram encontrados produtos no ficheiro',
+            variant: 'destructive'
+          });
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
   const handleImport = async () => {
@@ -119,14 +191,14 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
       <DialogTrigger asChild>
         <Button variant="outline">
           <Upload className="h-4 w-4 mr-2" />
-          Importar CSV
+          Importar
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Importar Produtos</DialogTitle>
           <DialogDescription>
-            Carregue um ficheiro CSV com os produtos a importar
+            Carregue um ficheiro CSV ou Excel (.xlsx) com os produtos a importar
           </DialogDescription>
         </DialogHeader>
         
@@ -136,18 +208,18 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.txt"
+              accept=".csv,.txt,.xlsx,.xls"
               onChange={handleFileChange}
               className="hidden"
               id="file-upload"
             />
             <label htmlFor="file-upload">
               <Button variant="outline" asChild>
-                <span className="cursor-pointer">Selecionar ficheiro CSV</span>
+                <span className="cursor-pointer">Selecionar ficheiro (CSV ou Excel)</span>
               </Button>
             </label>
             <p className="text-sm text-muted-foreground mt-2">
-              Formato: codigo;nome;categoria;colis;descricao;localizacao;palete
+              Colunas: codigo, nome, categoria, colis, descricao, localizacao, palete
             </p>
           </div>
 
