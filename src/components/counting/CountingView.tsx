@@ -379,7 +379,7 @@ export function CountingView() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterStatus !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -393,7 +393,7 @@ export function CountingView() {
           </Select>
 
           <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterCategory !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
               <Tags className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Categoria" />
             </SelectTrigger>
@@ -406,7 +406,7 @@ export function CountingView() {
           </Select>
 
           <Select value={filterLocation} onValueChange={setFilterLocation}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterLocation !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
               <MapPin className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Localização" />
             </SelectTrigger>
@@ -419,7 +419,7 @@ export function CountingView() {
           </Select>
 
           <Select value={filterPallet} onValueChange={setFilterPallet}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterPallet !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
               <Box className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Palete" />
             </SelectTrigger>
