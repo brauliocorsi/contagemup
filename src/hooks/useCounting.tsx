@@ -261,9 +261,13 @@ export function useCounting(sessionId: string | null) {
       colisQuantities[i] = count?.quantity || 0;
     }
 
-    // Get location and pallet from any count (they should all have the same values)
-    const location = productCounts.find(c => c.location)?.location || null;
-    const palletNumber = productCounts.find(c => c.pallet_number)?.pallet_number || null;
+    // Get location and pallet from counts (session-specific) OR fallback to product defaults
+    const countLocation = productCounts.find(c => c.location)?.location || null;
+    const countPallet = productCounts.find(c => c.pallet_number)?.pallet_number || null;
+    
+    // Use session count location/pallet if available, otherwise use product's default
+    const location = countLocation || product.location || null;
+    const palletNumber = countPallet || product.pallet_number || null;
 
     // Calculate complete sets (minimum across all colis)
     const quantities = Object.values(colisQuantities);
