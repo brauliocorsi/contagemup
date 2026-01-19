@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags } from 'lucide-react';
+import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags, MapPin, Box } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +21,8 @@ export function CountingView() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterLocation, setFilterLocation] = useState<string>('all');
+  const [filterPallet, setFilterPallet] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionCategory, setNewSessionCategory] = useState('Todas');
@@ -73,11 +75,28 @@ export function CountingView() {
     return productsWithCounts.filter(p => p.category === currentSession.category);
   }, [productsWithCounts, currentSession]);
 
+  // Extract unique locations and pallets from products for filters
+  const uniqueLocations = useMemo(() => {
+    const locations = sessionFilteredProducts
+      .map(p => p.location)
+      .filter((loc): loc is string => loc !== null && loc !== undefined && loc.trim() !== '');
+    return [...new Set(locations)].sort();
+  }, [sessionFilteredProducts]);
+
+  const uniquePallets = useMemo(() => {
+    const pallets = sessionFilteredProducts
+      .map(p => p.pallet_number)
+      .filter((pallet): pallet is string => pallet !== null && pallet !== undefined && pallet.trim() !== '');
+    return [...new Set(pallets)].sort();
+  }, [sessionFilteredProducts]);
+
   const filteredProducts = useMemo(() => {
     return sessionFilteredProducts.filter(product => {
       const matchesSearch = 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.code.toLowerCase().includes(searchTerm.toLowerCase());
+        product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.pallet_number?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const isCompleteEnough = product.completeSets > 0;
       const isPending = product.hasPartialProduct;
@@ -88,9 +107,12 @@ export function CountingView() {
         (filterStatus === 'incomplete' && isPending) ||
         (filterStatus !== 'complete' && filterStatus !== 'incomplete' && product.status === filterStatus);
 
-      return matchesSearch && matchesFilter;
+      const matchesLocation = filterLocation === 'all' || product.location === filterLocation;
+      const matchesPallet = filterPallet === 'all' || product.pallet_number === filterPallet;
+
+      return matchesSearch && matchesFilter && matchesLocation && matchesPallet;
     });
-  }, [sessionFilteredProducts, searchTerm, filterStatus]);
+  }, [sessionFilteredProducts, searchTerm, filterStatus, filterLocation, filterPallet]);
 
   const incompleteProducts = filteredProducts.filter(p => p.hasPartialProduct);
   const completeProducts = filteredProducts.filter(p => p.completeSets > 0);
@@ -217,29 +239,57 @@ export function CountingView() {
       <CountingSummary products={sessionFilteredProducts} />
 
       {/* Search and filters */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Pesquisar por nome ou código..."
+            placeholder="Pesquisar por nome, código, localização ou palete..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full sm:w-48">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos status</SelectItem>
-            <SelectItem value="incomplete">Incompletos</SelectItem>
-            <SelectItem value="complete">Completos</SelectItem>
-            <SelectItem value="excess">Excesso</SelectItem>
-            <SelectItem value="not_counted">Não contados</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap gap-2">
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-full sm:w-40">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos status</SelectItem>
+              <SelectItem value="incomplete">Incompletos</SelectItem>
+              <SelectItem value="complete">Completos</SelectItem>
+              <SelectItem value="excess">Excesso</SelectItem>
+              <SelectItem value="not_counted">Não contados</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filterLocation} onValueChange={setFilterLocation}>
+            <SelectTrigger className="w-full sm:w-44">
+              <MapPin className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Localização" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas localizações</SelectItem>
+              {uniqueLocations.map(loc => (
+                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterPallet} onValueChange={setFilterPallet}>
+            <SelectTrigger className="w-full sm:w-40">
+              <Box className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Palete" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos paletes</SelectItem>
+              {uniquePallets.map(pallet => (
+                <SelectItem key={pallet} value={pallet}>{pallet}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Products organized by status */}

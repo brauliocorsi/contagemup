@@ -27,7 +27,7 @@ export function useProducts() {
     setLoading(false);
   };
 
-  const createProduct = async (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
+  const createProduct = async (product: Omit<Product, 'id' | 'created_at' | 'updated_at'> | { code: string; name: string; category: string; total_colis: number; description: string | null; location?: string | null; pallet_number?: string | null }) => {
     const { data, error } = await supabase
       .from('products')
       .insert(product)
@@ -90,7 +90,7 @@ export function useProducts() {
     return true;
   };
 
-  const importProducts = async (productsData: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string }>) => {
+  const importProducts = async (productsData: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>) => {
     const { error } = await supabase
       .from('products')
       .upsert(
@@ -99,7 +99,9 @@ export function useProducts() {
           name: p.name,
           category: p.category || 'Geral',
           total_colis: p.total_colis,
-          description: p.description || null
+          description: p.description || null,
+          location: p.location || null,
+          pallet_number: p.pallet_number || null
         })),
         { onConflict: 'code' }
       );

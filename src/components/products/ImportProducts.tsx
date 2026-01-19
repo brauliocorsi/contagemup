@@ -5,19 +5,19 @@ import { Upload, FileSpreadsheet, Loader2, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ImportProductsProps {
-  onImport: (products: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string }>) => Promise<boolean>;
+  onImport: (products: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>) => Promise<boolean>;
 }
 
 export function ImportProducts({ onImport }: ImportProductsProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [preview, setPreview] = useState<Array<{ code: string; name: string; category: string; total_colis: number; description?: string }>>([]);
+  const [preview, setPreview] = useState<Array<{ code: string; name: string; category: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const parseCSV = (text: string) => {
     const lines = text.split('\n').filter(line => line.trim());
-    const products: Array<{ code: string; name: string; category: string; total_colis: number; description?: string }> = [];
+    const products: Array<{ code: string; name: string; category: string; total_colis: number; description?: string; location?: string; pallet_number?: string }> = [];
 
     // Skip header line
     for (let i = 1; i < lines.length; i++) {
@@ -28,7 +28,9 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
           name: values[1],
           category: values[2] || 'Geral',
           total_colis: parseInt(values[3]) || 1,
-          description: values[4] || undefined
+          description: values[4] || undefined,
+          location: values[5] || undefined,
+          pallet_number: values[6] || undefined
         });
       }
     }
@@ -75,7 +77,7 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
   };
 
   const downloadTemplate = () => {
-    const template = 'codigo;nome;categoria;colis;descricao\nCAMA001;Cama Oslo Queen;Camas;3;Cama de casal\nMESA001;Mesa de Jantar;Mesas;1;Mesa 6 lugares\nROUP001;Roupeiro Oslo;Roupeiros;4;Roupeiro 3 portas';
+    const template = 'codigo;nome;categoria;colis;descricao;localizacao;palete\nCAMA001;Cama Oslo Queen;Camas;3;Cama de casal;Armazém A;PAL-001\nMESA001;Mesa de Jantar;Mesas;1;Mesa 6 lugares;Armazém B;PAL-002\nROUP001;Roupeiro Oslo;Roupeiros;4;Roupeiro 3 portas;Armazém A;PAL-003';
     const blob = new Blob(['\ufeff' + template], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -118,7 +120,7 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
               </Button>
             </label>
             <p className="text-sm text-muted-foreground mt-2">
-              Formato: codigo;nome;categoria;colis;descricao
+              Formato: codigo;nome;categoria;colis;descricao;localizacao;palete
             </p>
           </div>
 
@@ -137,6 +139,8 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
                     <th className="text-left p-2">Categoria</th>
                     <th className="text-left p-2">Colis</th>
                     <th className="text-left p-2">Descrição</th>
+                    <th className="text-left p-2">Localização</th>
+                    <th className="text-left p-2">Palete</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -147,6 +151,8 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
                       <td className="p-2">{product.category}</td>
                       <td className="p-2">{product.total_colis}</td>
                       <td className="p-2 text-muted-foreground">{product.description || '-'}</td>
+                      <td className="p-2 text-muted-foreground">{product.location || '-'}</td>
+                      <td className="p-2 text-muted-foreground">{product.pallet_number || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
