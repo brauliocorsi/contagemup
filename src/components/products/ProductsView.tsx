@@ -28,12 +28,13 @@ export function ProductsView() {
   const { lastCounts } = useLastCounts();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
-  const [sortColumn, setSortColumn] = useState<'code' | 'name' | 'category' | 'lastCount' | null>(null);
+  const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [sortColumn, setSortColumn] = useState<'code' | 'name' | 'category' | 'stock' | 'lastCount' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
 
-  const handleSort = (column: 'code' | 'name' | 'category' | 'lastCount') => {
+  const handleSort = (column: 'code' | 'name' | 'category' | 'stock' | 'lastCount') => {
     if (sortColumn === column) {
       if (sortDirection === 'asc') {
         setSortDirection('desc');
@@ -47,13 +48,48 @@ export function ProductsView() {
     }
   };
 
-  const getSortIcon = (column: 'code' | 'name' | 'category' | 'lastCount') => {
+  const getSortIcon = (column: 'code' | 'name' | 'category' | 'stock' | 'lastCount') => {
     if (sortColumn !== column) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     }
     return sortDirection === 'asc' 
       ? <ArrowUp className="h-4 w-4 ml-1 text-primary" />
       : <ArrowDown className="h-4 w-4 ml-1 text-primary" />;
+  };
+
+  const getStockStatus = (stock: number) => {
+    if (stock <= 0) return 'out_of_stock';
+    if (stock <= 5) return 'low_stock';
+    return 'in_stock';
+  };
+
+  const getStockBadge = (stock: number) => {
+    const status = getStockStatus(stock);
+    
+    if (status === 'out_of_stock') {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+          Esgotado
+        </Badge>
+      );
+    }
+    
+    if (status === 'low_stock') {
+      return (
+        <Badge variant="outline" className="gap-1 bg-yellow-50 text-yellow-700 border-yellow-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+          {stock} un.
+        </Badge>
+      );
+    }
+    
+    return (
+      <Badge variant="outline" className="gap-1 bg-green-50 text-green-700 border-green-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+        {stock} un.
+      </Badge>
+    );
   };
 
   const existingCategoryNames = categories.map(c => c.name);
@@ -71,8 +107,13 @@ export function ProductsView() {
         filterCountStatus === 'all' ||
         (filterCountStatus === 'with_count' && hasCount) ||
         (filterCountStatus === 'without_count' && !hasCount);
+
+      const stockStatus = getStockStatus(product.current_stock);
+      const matchesStockStatus = 
+        filterStockStatus === 'all' ||
+        filterStockStatus === stockStatus;
       
-      return matchesSearch && matchesCountStatus;
+      return matchesSearch && matchesCountStatus && matchesStockStatus;
     });
 
     // Apply sorting
@@ -90,6 +131,9 @@ export function ProductsView() {
           case 'category':
             comparison = a.category.localeCompare(b.category);
             break;
+          case 'stock':
+            comparison = a.current_stock - b.current_stock;
+            break;
           case 'lastCount':
             const countA = lastCounts[a.id]?.totalQuantity ?? -1;
             const countB = lastCounts[b.id]?.totalQuantity ?? -1;
@@ -102,7 +146,7 @@ export function ProductsView() {
     }
     
     return result;
-  }, [products, searchTerm, filterCountStatus, lastCounts, sortColumn, sortDirection]);
+  }, [products, searchTerm, filterCountStatus, filterStockStatus, lastCounts, sortColumn, sortDirection]);
 
   // Count stats for filter
   const countStats = useMemo(() => {
@@ -110,6 +154,14 @@ export function ProductsView() {
     const withoutCount = products.length - withCount;
     return { withCount, withoutCount };
   }, [products, lastCounts]);
+
+  // Stock stats for filter
+  const stockStats = useMemo(() => {
+    const inStock = products.filter(p => getStockStatus(p.current_stock) === 'in_stock').length;
+    const lowStock = products.filter(p => getStockStatus(p.current_stock) === 'low_stock').length;
+    const outOfStock = products.filter(p => getStockStatus(p.current_stock) === 'out_of_stock').length;
+    return { inStock, lowStock, outOfStock };
+  }, [products]);
 
   const exportLastCounts = () => {
     const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Última Quantidade', 'Sessão', 'Data Contagem'];
@@ -239,19 +291,46 @@ export function ProductsView() {
           />
         </div>
         <Select value={filterCountStatus} onValueChange={(v) => setFilterCountStatus(v as typeof filterCountStatus)}>
-          <SelectTrigger className={`w-full sm:w-56 transition-colors ${filterCountStatus !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
+          <SelectTrigger className={`w-full sm:w-52 transition-colors ${filterCountStatus !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
             <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Filtrar por contagem" />
+            <SelectValue placeholder="Contagem" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos ({products.length})</SelectItem>
+            <SelectItem value="all">Todas contagens</SelectItem>
             <SelectItem value="with_count">Com contagem ({countStats.withCount})</SelectItem>
             <SelectItem value="without_count">Sem contagem ({countStats.withoutCount})</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={filterStockStatus} onValueChange={(v) => setFilterStockStatus(v as typeof filterStockStatus)}>
+          <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterStockStatus !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
+            <Package className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Stock" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todo stock</SelectItem>
+            <SelectItem value="in_stock">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                Em stock ({stockStats.inStock})
+              </span>
+            </SelectItem>
+            <SelectItem value="low_stock">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                Stock baixo ({stockStats.lowStock})
+              </span>
+            </SelectItem>
+            <SelectItem value="out_of_stock">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                Esgotado ({stockStats.outOfStock})
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <Button variant="outline" onClick={exportLastCounts} className="whitespace-nowrap">
           <Download className="h-4 w-4 mr-2" />
-          Exportar Última Contagem
+          Exportar
         </Button>
       </div>
 
@@ -303,6 +382,15 @@ export function ProductsView() {
                     <TableHead>Colis</TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('stock')}
+                    >
+                      <span className="flex items-center">
+                        Stock
+                        {getSortIcon('stock')}
+                      </span>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('lastCount')}
                     >
                       <span className="flex items-center">
@@ -312,7 +400,6 @@ export function ProductsView() {
                     </TableHead>
                     <TableHead>Localização</TableHead>
                     <TableHead>Palete</TableHead>
-                    <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -322,12 +409,15 @@ export function ProductsView() {
                     return (
                     <TableRow key={product.id}>
                       <TableCell className="font-mono">{product.code}</TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="font-medium max-w-[150px] truncate">{product.name}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{product.category}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{product.total_colis} colis</Badge>
+                        <Badge variant="secondary">{product.total_colis}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {getStockBadge(product.current_stock)}
                       </TableCell>
                       <TableCell>
                         {lastCount ? (
@@ -368,9 +458,6 @@ export function ProductsView() {
                             {product.pallet_number}
                           </span>
                         ) : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground max-w-[200px] truncate">
-                        {product.description || '-'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
