@@ -2,14 +2,14 @@ import { useSessions } from '@/hooks/useSessions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { History, CheckCircle2, XCircle, Clock, Tags } from 'lucide-react';
+import { History, CheckCircle2, XCircle, Clock, Tags, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
 export function SessionsView() {
-  const { sessions, loading, completeSession, cancelSession } = useSessions();
+  const { sessions, loading, completeSession, cancelSession, deleteSession } = useSessions();
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -80,55 +80,102 @@ export function SessionsView() {
                     )}
                   </div>
                   
-                  {session.status === 'active' && (
-                    <div className="flex gap-2">
+                  <div className="flex gap-2">
+                    {session.status === 'active' && (
+                      <>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Completar
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Completar sessão?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Ao completar a sessão, ela será marcada como terminada e não poderá ser editada.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => completeSession(session.id)}>
+                                Completar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-destructive">
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Cancelar
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Cancelar sessão?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Ao cancelar a sessão, ela será marcada como inválida.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Voltar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => cancelSession(session.id)} className="bg-destructive text-destructive-foreground">
+                                Cancelar sessão
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
+                    )}
+
+                    {(session.status === 'completed' || session.status === 'cancelled') && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <CheckCircle2 className="h-4 w-4 mr-1" />
-                            Completar
+                          <Button variant="ghost" size="sm" className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Eliminar
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Completar sessão?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Ao completar a sessão, ela será marcada como terminada e não poderá ser editada.
+                            <AlertDialogTitle className="text-destructive">
+                              Eliminar sessão definitivamente?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="space-y-2">
+                              <p>
+                                <strong>ATENÇÃO:</strong> Esta ação é <strong>IRREVERSÍVEL</strong>.
+                              </p>
+                              <p>
+                                Serão eliminados permanentemente:
+                              </p>
+                              <ul className="list-disc list-inside text-sm space-y-1">
+                                <li>Todos os dados de contagem desta sessão</li>
+                                <li>Todos os logs de operações (+1/-1)</li>
+                                <li>Todas as conciliações associadas</li>
+                                <li>Todos os itens das conciliações</li>
+                              </ul>
+                              <p className="font-medium pt-2">
+                                Tem a certeza que deseja continuar?
+                              </p>
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => completeSession(session.id)}>
-                              Completar
+                            <AlertDialogAction 
+                              onClick={() => deleteSession(session.id)} 
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Sim, eliminar definitivamente
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
-
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-destructive">
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Cancelar
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Cancelar sessão?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Ao cancelar a sessão, ela será marcada como inválida.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Voltar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => cancelSession(session.id)} className="bg-destructive text-destructive-foreground">
-                              Cancelar sessão
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -15,8 +15,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, 
-  ArrowUpDown, Search, Eye, CheckCheck, X, Scale, FileQuestion, Download
+  ArrowUpDown, Search, Eye, CheckCheck, X, Scale, FileQuestion, Download, Trash2
 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CSVImportRow, ReconciliationItem, CSVValidationError } from '@/types/reconciliation';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -32,6 +33,7 @@ export function ReconciliationView() {
     getReconciliationItems,
     validateReconciliation,
     cancelReconciliation,
+    deleteReconciliation,
     parseCSV 
   } = useReconciliation();
 
@@ -114,6 +116,11 @@ export function ReconciliationView() {
 
   const handleCancel = async (id: string) => {
     await cancelReconciliation(id);
+    setViewingReconciliation(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteReconciliation(id);
     setViewingReconciliation(null);
   };
 
@@ -243,18 +250,57 @@ export function ReconciliationView() {
         </div>
 
         {/* Actions */}
-        {currentReconciliation.status === 'pending' && (
-          <div className="flex gap-2">
-            <Button onClick={() => setValidatingId(currentReconciliation.id)}>
-              <CheckCheck className="h-4 w-4 mr-2" />
-              Validar Conciliação
-            </Button>
-            <Button variant="outline" onClick={() => handleCancel(currentReconciliation.id)}>
-              <X className="h-4 w-4 mr-2" />
-              Cancelar
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          {currentReconciliation.status === 'pending' && (
+            <>
+              <Button onClick={() => setValidatingId(currentReconciliation.id)}>
+                <CheckCheck className="h-4 w-4 mr-2" />
+                Validar Conciliação
+              </Button>
+              <Button variant="outline" onClick={() => handleCancel(currentReconciliation.id)}>
+                <X className="h-4 w-4 mr-2" />
+                Cancelar
+              </Button>
+            </>
+          )}
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" className="text-destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-destructive">
+                  Eliminar conciliação definitivamente?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-2">
+                  <p>
+                    <strong>ATENÇÃO:</strong> Esta ação é <strong>IRREVERSÍVEL</strong>.
+                  </p>
+                  <p>
+                    Todos os itens desta conciliação serão permanentemente eliminados.
+                  </p>
+                  <p className="font-medium pt-2">
+                    Tem a certeza que deseja continuar?
+                  </p>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => handleDelete(currentReconciliation.id)} 
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Sim, eliminar definitivamente
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
 
         {currentReconciliation.notes && (
           <Card>
@@ -592,14 +638,49 @@ export function ReconciliationView() {
                         }
                       </TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleViewReconciliation(rec.id)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleViewReconciliation(rec.id)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Ver
+                          </Button>
+                          
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-destructive">
+                                  Eliminar conciliação definitivamente?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription className="space-y-2">
+                                  <p>
+                                    <strong>ATENÇÃO:</strong> Esta ação é <strong>IRREVERSÍVEL</strong>.
+                                  </p>
+                                  <p>
+                                    A conciliação "{rec.name}" e todos os seus itens serão permanentemente eliminados.
+                                  </p>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => handleDelete(rec.id)} 
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Sim, eliminar
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
