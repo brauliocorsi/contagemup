@@ -3,11 +3,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
 import { useCountLogs, CountLog } from '@/hooks/useCountLogs';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Clock, Plus, Minus, User, Package } from 'lucide-react';
+import { Clock, Plus, Minus, User, Package, CalendarIcon, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface CountHistoryPopoverProps {
   productId: string;
@@ -19,6 +22,8 @@ export function CountHistoryPopover({ productId, sessionId, children }: CountHis
   const { logs, loading, fetchLogsForProduct } = useCountLogs();
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [open, setOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   useEffect(() => {
     if (open && productId) {
@@ -50,6 +55,19 @@ export function CountHistoryPopover({ productId, sessionId, children }: CountHis
     }
   }, [logs]);
 
+  // Filter logs by selected date
+  const filteredLogs = selectedDate
+    ? logs.filter(log => isSameDay(new Date(log.created_at), selectedDate))
+    : logs;
+
+  // Get unique dates from logs for highlighting in calendar
+  const logDates = logs.map(log => startOfDay(new Date(log.created_at)));
+
+  const handleClearFilter = () => {
+    setSelectedDate(undefined);
+    setShowCalendar(false);
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -65,21 +83,76 @@ export function CountHistoryPopover({ productId, sessionId, children }: CountHis
             {sessionId ? 'Sessão atual' : 'Todas as sessões'}
           </p>
         </div>
-        <ScrollArea className="h-[250px]">
+
+        {/* Date filter */}
+        <div className="p-2 border-b bg-muted/30">
+          <div className="flex items-center gap-2">
+            <Popover open={showCalendar} onOpenChange={setShowCalendar}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "flex-1 justify-start text-left font-normal h-8",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="h-3.5 w-3.5 mr-2" />
+                  {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: pt }) : "Filtrar por data"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start" side="bottom">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    setShowCalendar(false);
+                  }}
+                  locale={pt}
+                  className={cn("p-3 pointer-events-auto")}
+                  modifiers={{
+                    hasLogs: logDates
+                  }}
+                  modifiersStyles={{
+                    hasLogs: { fontWeight: 'bold', textDecoration: 'underline' }
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+            {selectedDate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={handleClearFilter}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          {selectedDate && (
+            <div className="mt-1.5 text-xs text-muted-foreground">
+              {filteredLogs.length} registo{filteredLogs.length !== 1 ? 's' : ''} em {format(selectedDate, "dd/MM/yyyy")}
+            </div>
+          )}
+        </div>
+
+        <ScrollArea className="h-[220px]">
           {loading ? (
             <div className="p-3 space-y-2">
               {[1, 2, 3, 4].map(i => (
                 <Skeleton key={i} className="h-14 w-full" />
               ))}
             </div>
-          ) : logs.length === 0 ? (
+          ) : filteredLogs.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground text-sm">
               <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>Sem registos de contagem</p>
+              <p>{selectedDate ? 'Sem registos nesta data' : 'Sem registos de contagem'}</p>
             </div>
           ) : (
             <div className="p-2 space-y-2">
-              {logs.map((log) => (
+              {filteredLogs.map((log) => (
                 <div
                   key={log.id}
                   className="border rounded p-2 text-xs space-y-1.5 bg-muted/30"
