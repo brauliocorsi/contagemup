@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { useProductChanges } from '@/hooks/useProductChanges';
+import { useLastCounts } from '@/hooks/useLastCounts';
 import { ProductForm } from './ProductForm';
 import { ProductEditForm } from './ProductEditForm';
 import { ProductHistoryDialog } from './ProductHistoryDialog';
@@ -11,15 +12,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Trash2, Edit, Package, MapPin, Box, History } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Product } from '@/types/stock';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
 
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
   const { categories, createCategory, refetch: refetchCategories } = useCategories();
   const { logChange, logMultipleChanges } = useProductChanges();
+  const { lastCounts } = useLastCounts();
   const [searchTerm, setSearchTerm] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
@@ -152,6 +157,7 @@ export function ProductsView() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Categoria</TableHead>
                     <TableHead>Colis</TableHead>
+                    <TableHead>Última Contagem</TableHead>
                     <TableHead>Localização</TableHead>
                     <TableHead>Palete</TableHead>
                     <TableHead>Descrição</TableHead>
@@ -159,7 +165,9 @@ export function ProductsView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.map(product => (
+                {filteredProducts.map(product => {
+                    const lastCount = lastCounts[product.id];
+                    return (
                     <TableRow key={product.id}>
                       <TableCell className="font-mono">{product.code}</TableCell>
                       <TableCell className="font-medium">{product.name}</TableCell>
@@ -168,6 +176,30 @@ export function ProductsView() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{product.total_colis} colis</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {lastCount ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex items-center gap-1 cursor-help">
+                                  <ClipboardList className="h-3 w-3 text-muted-foreground" />
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                    {lastCount.totalQuantity} un.
+                                  </Badge>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="font-medium">{lastCount.sessionName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {format(new Date(lastCount.countedAt), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {product.location ? (
@@ -230,7 +262,8 @@ export function ProductsView() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );
+                })}
                 </TableBody>
               </Table>
             </div>

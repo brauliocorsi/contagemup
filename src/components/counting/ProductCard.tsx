@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil } from 'lucide-react';
+import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ProductHistoryPopover } from './ProductHistoryPopover';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -192,6 +193,11 @@ export function ProductCard({
                       <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   )}
+                  <ProductHistoryPopover productId={product.id}>
+                    <button className="p-0.5 rounded hover:bg-muted transition-colors" title="Ver histórico">
+                      <History className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  </ProductHistoryPopover>
                 </div>
                 <Badge variant="outline" className="mt-1 text-xs">{product.category}</Badge>
               </div>
