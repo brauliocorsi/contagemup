@@ -25,7 +25,7 @@ export function CountingView() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterLocation, setFilterLocation] = useState<string>('all');
   const [filterPallet, setFilterPallet] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionCategories, setNewSessionCategories] = useState<string[]>([]);
   const [allCategoriesSelected, setAllCategoriesSelected] = useState(true);
@@ -119,6 +119,14 @@ export function CountingView() {
     return productsWithCounts.filter(p => sessionCategories.includes(p.category));
   }, [productsWithCounts, currentSession]);
 
+  // Extract unique categories from session filtered products
+  const uniqueCategories = useMemo(() => {
+    const cats = sessionFilteredProducts
+      .map(p => p.category)
+      .filter((cat): cat is string => cat !== null && cat !== undefined && cat.trim() !== '');
+    return [...new Set(cats)].sort();
+  }, [sessionFilteredProducts]);
+
   // Extract unique locations and pallets from products for filters
   const uniqueLocations = useMemo(() => {
     const locations = sessionFilteredProducts
@@ -139,8 +147,8 @@ export function CountingView() {
       const matchesSearch = 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.pallet_number?.toLowerCase().includes(searchTerm.toLowerCase());
+        (product.location && product.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (product.pallet_number && product.pallet_number.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const isCompleteEnough = product.completeSets > 0;
       const isPending = product.hasPartialProduct;
@@ -151,12 +159,20 @@ export function CountingView() {
         (filterStatus === 'incomplete' && isPending) ||
         (filterStatus !== 'complete' && filterStatus !== 'incomplete' && product.status === filterStatus);
 
-      const matchesLocation = filterLocation === 'all' || product.location === filterLocation;
-      const matchesPallet = filterPallet === 'all' || product.pallet_number === filterPallet;
+      // Fixed location filter - handle null/undefined properly
+      const matchesLocation = filterLocation === 'all' || 
+        (product.location !== null && product.location !== undefined && product.location === filterLocation);
+      
+      // Fixed pallet filter - handle null/undefined properly  
+      const matchesPallet = filterPallet === 'all' || 
+        (product.pallet_number !== null && product.pallet_number !== undefined && product.pallet_number === filterPallet);
+      
+      // Category filter
+      const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
 
-      return matchesSearch && matchesFilter && matchesLocation && matchesPallet;
+      return matchesSearch && matchesFilter && matchesLocation && matchesPallet && matchesCategory;
     });
-  }, [sessionFilteredProducts, searchTerm, filterStatus, filterLocation, filterPallet]);
+  }, [sessionFilteredProducts, searchTerm, filterStatus, filterLocation, filterPallet, filterCategory]);
 
   const incompleteProducts = filteredProducts.filter(p => p.hasPartialProduct);
   const completeProducts = filteredProducts.filter(p => p.completeSets > 0);
@@ -348,6 +364,19 @@ export function CountingView() {
               <SelectItem value="complete">Completos</SelectItem>
               <SelectItem value="excess">Excesso</SelectItem>
               <SelectItem value="not_counted">Não contados</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="w-full sm:w-40">
+              <Tags className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas categorias</SelectItem>
+              {uniqueCategories.map(cat => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
