@@ -141,16 +141,52 @@ export function useCounting(sessionId: string | null) {
     const existingCount = counts.find(
       c => c.product_id === productId && c.colis_number === colisNumber
     );
-    const newQuantity = (existingCount?.quantity || 0) + 1;
-    return updateCount(productId, colisNumber, newQuantity);
+    const oldQuantity = existingCount?.quantity || 0;
+    const newQuantity = oldQuantity + 1;
+    
+    const success = await updateCount(productId, colisNumber, newQuantity);
+    
+    if (success && sessionId) {
+      // Log the count operation
+      await supabase.from('count_logs').insert({
+        product_id: productId,
+        session_id: sessionId,
+        colis_number: colisNumber,
+        operation: 'increment',
+        quantity_before: oldQuantity,
+        quantity_after: newQuantity,
+        counted_by: user?.id
+      });
+    }
+    
+    return success;
   };
 
   const decrementCount = async (productId: string, colisNumber: number) => {
     const existingCount = counts.find(
       c => c.product_id === productId && c.colis_number === colisNumber
     );
-    const newQuantity = Math.max(0, (existingCount?.quantity || 0) - 1);
-    return updateCount(productId, colisNumber, newQuantity);
+    const oldQuantity = existingCount?.quantity || 0;
+    const newQuantity = Math.max(0, oldQuantity - 1);
+    
+    if (newQuantity === oldQuantity) return true; // No change needed
+    
+    const success = await updateCount(productId, colisNumber, newQuantity);
+    
+    if (success && sessionId) {
+      // Log the count operation
+      await supabase.from('count_logs').insert({
+        product_id: productId,
+        session_id: sessionId,
+        colis_number: colisNumber,
+        operation: 'decrement',
+        quantity_before: oldQuantity,
+        quantity_after: newQuantity,
+        counted_by: user?.id
+      });
+    }
+    
+    return success;
   };
 
   const updateLocation = async (productId: string, location: string) => {

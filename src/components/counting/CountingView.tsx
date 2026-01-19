@@ -517,6 +517,7 @@ export function CountingView() {
                 onRemoveColi={handleRemoveColi}
                 onCodeChange={handleCodeChange}
                 colisNames={categoryColisNamesMap[product.category]}
+                sessionId={selectedSessionId || undefined}
               />
             ))}
           </div>
@@ -542,6 +543,7 @@ export function CountingView() {
                   onRemoveColi={handleRemoveColi}
                   onCodeChange={handleCodeChange}
                   colisNames={categoryColisNamesMap[product.category]}
+                  sessionId={selectedSessionId || undefined}
                 />
               ))}
             </div>
@@ -568,6 +570,7 @@ export function CountingView() {
                   onRemoveColi={handleRemoveColi}
                   onCodeChange={handleCodeChange}
                   colisNames={categoryColisNamesMap[product.category]}
+                  sessionId={selectedSessionId || undefined}
                 />
               ))}
             </div>
