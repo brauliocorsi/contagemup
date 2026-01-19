@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Product } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +29,29 @@ export function useProducts() {
       return (data as Product[]) || [];
     },
   });
+
+  // Subscribe to realtime changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('products-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products',
+        },
+        (payload) => {
+          // Invalidate and refetch products on any change
+          queryClient.invalidateQueries({ queryKey: ['products'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const createProduct = async (product: Omit<Product, 'id' | 'created_at' | 'updated_at'> | { code: string; name: string; category: string; total_colis: number; description: string | null; location?: string | null; pallet_number?: string | null }) => {
     const { data, error } = await supabase
