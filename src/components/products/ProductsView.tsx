@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -28,13 +28,38 @@ export function ProductsView() {
   const { lastCounts } = useLastCounts();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
+  const [sortColumn, setSortColumn] = useState<'code' | 'name' | 'category' | 'lastCount' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+
+  const handleSort = (column: 'code' | 'name' | 'category' | 'lastCount') => {
+    if (sortColumn === column) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else {
+        setSortColumn(null);
+        setSortDirection('asc');
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (column: 'code' | 'name' | 'category' | 'lastCount') => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1 text-primary" />
+      : <ArrowDown className="h-4 w-4 ml-1 text-primary" />;
+  };
 
   const existingCategoryNames = categories.map(c => c.name);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(product => {
+    let result = products.filter(product => {
       const matchesSearch = 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -49,7 +74,35 @@ export function ProductsView() {
       
       return matchesSearch && matchesCountStatus;
     });
-  }, [products, searchTerm, filterCountStatus, lastCounts]);
+
+    // Apply sorting
+    if (sortColumn) {
+      result = [...result].sort((a, b) => {
+        let comparison = 0;
+        
+        switch (sortColumn) {
+          case 'code':
+            comparison = a.code.localeCompare(b.code);
+            break;
+          case 'name':
+            comparison = a.name.localeCompare(b.name);
+            break;
+          case 'category':
+            comparison = a.category.localeCompare(b.category);
+            break;
+          case 'lastCount':
+            const countA = lastCounts[a.id]?.totalQuantity ?? -1;
+            const countB = lastCounts[b.id]?.totalQuantity ?? -1;
+            comparison = countA - countB;
+            break;
+        }
+        
+        return sortDirection === 'asc' ? comparison : -comparison;
+      });
+    }
+    
+    return result;
+  }, [products, searchTerm, filterCountStatus, lastCounts, sortColumn, sortDirection]);
 
   // Count stats for filter
   const countStats = useMemo(() => {
@@ -220,11 +273,43 @@ export function ProductsView() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Categoria</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('code')}
+                    >
+                      <span className="flex items-center">
+                        Código
+                        {getSortIcon('code')}
+                      </span>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('name')}
+                    >
+                      <span className="flex items-center">
+                        Nome
+                        {getSortIcon('name')}
+                      </span>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('category')}
+                    >
+                      <span className="flex items-center">
+                        Categoria
+                        {getSortIcon('category')}
+                      </span>
+                    </TableHead>
                     <TableHead>Colis</TableHead>
-                    <TableHead>Última Contagem</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('lastCount')}
+                    >
+                      <span className="flex items-center">
+                        Última Contagem
+                        {getSortIcon('lastCount')}
+                      </span>
+                    </TableHead>
                     <TableHead>Localização</TableHead>
                     <TableHead>Palete</TableHead>
                     <TableHead>Descrição</TableHead>
