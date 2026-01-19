@@ -51,6 +51,13 @@ export function useProducts() {
   };
 
   const updateProduct = async (id: string, updates: Partial<Product>) => {
+    // Fetch current product to get old values for audit log
+    const { data: currentProduct } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
+
     const { error } = await supabase
       .from('products')
       .update(updates)
@@ -59,10 +66,31 @@ export function useProducts() {
     if (error) {
       toast({
         title: 'Erro',
-        description: 'Não foi possível atualizar o produto',
+        description: error.code === '23505' 
+          ? 'Já existe um produto com este código' 
+          : 'Não foi possível atualizar o produto',
         variant: 'destructive'
       });
       return false;
+    }
+
+    // Log changes to product_changes table
+    if (currentProduct) {
+      const { data: { user } } = await supabase.auth.getUser();
+      const changePromises = Object.entries(updates).map(async ([field, newValue]) => {
+        const oldValue = currentProduct[field as keyof typeof currentProduct];
+        if (oldValue !== newValue) {
+          await supabase.from('product_changes').insert({
+            product_id: id,
+            change_type: 'update',
+            field_changed: field,
+            old_value: oldValue?.toString() || null,
+            new_value: newValue?.toString() || null,
+            changed_by: user?.id || null
+          });
+        }
+      });
+      await Promise.all(changePromises);
     }
 
     toast({ title: 'Sucesso', description: 'Produto atualizado' });
