@@ -1,14 +1,17 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, FileSpreadsheet, Loader2, Download } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, Download, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 interface ImportProductsProps {
   onImport: (products: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>) => Promise<boolean>;
+  existingCategories: string[];
+  onCreateCategory: (name: string) => Promise<boolean>;
 }
 
-export function ImportProducts({ onImport }: ImportProductsProps) {
+export function ImportProducts({ onImport, existingCategories, onCreateCategory }: ImportProductsProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [preview, setPreview] = useState<Array<{ code: string; name: string; category: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>>([]);
@@ -38,6 +41,13 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
     return products;
   };
 
+  // Calculate new categories that will be created
+  const newCategories = useMemo(() => {
+    if (preview.length === 0) return [];
+    const csvCategories = [...new Set(preview.map(p => p.category))];
+    return csvCategories.filter(cat => !existingCategories.includes(cat));
+  }, [preview, existingCategories]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -63,9 +73,24 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
     if (preview.length === 0) return;
     
     setIsLoading(true);
+    
+    // First create missing categories
+    let categoriesCreated = 0;
+    for (const categoryName of newCategories) {
+      const success = await onCreateCategory(categoryName);
+      if (success) categoriesCreated++;
+    }
+    
+    // Then import products
     const success = await onImport(preview);
     
     if (success) {
+      if (categoriesCreated > 0) {
+        toast({
+          title: 'Importação concluída',
+          description: `${preview.length} produtos importados. ${categoriesCreated} categoria(s) nova(s) criada(s).`
+        });
+      }
       setPreview([]);
       setOpen(false);
       if (fileInputRef.current) {
@@ -86,6 +111,8 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const isNewCategory = (category: string) => newCategories.includes(category);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -129,6 +156,22 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
             Descarregar template
           </Button>
 
+          {newCategories.length > 0 && (
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+              <p className="text-sm font-medium flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Categorias a criar: {newCategories.length} nova(s)
+              </p>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {newCategories.map(cat => (
+                  <Badge key={cat} variant="secondary" className="bg-primary/20">
+                    {cat}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
           {preview.length > 0 && (
             <div className="border rounded-lg max-h-64 overflow-auto">
               <table className="w-full text-sm">
@@ -148,7 +191,16 @@ export function ImportProducts({ onImport }: ImportProductsProps) {
                     <tr key={i} className="border-t">
                       <td className="p-2">{product.code}</td>
                       <td className="p-2">{product.name}</td>
-                      <td className="p-2">{product.category}</td>
+                      <td className="p-2">
+                        <span className="flex items-center gap-1">
+                          {product.category}
+                          {isNewCategory(product.category) && (
+                            <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30">
+                              NOVA
+                            </Badge>
+                          )}
+                        </span>
+                      </td>
                       <td className="p-2">{product.total_colis}</td>
                       <td className="p-2 text-muted-foreground">{product.description || '-'}</td>
                       <td className="p-2 text-muted-foreground">{product.location || '-'}</td>

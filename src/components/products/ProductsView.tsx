@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useProducts } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import { ProductForm } from './ProductForm';
 import { ImportProducts } from './ImportProducts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +14,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 export function ProductsView() {
   const { products, loading, createProduct, deleteProduct, importProducts } = useProducts();
+  const { categories, createCategory, refetch: refetchCategories } = useCategories();
   const [searchTerm, setSearchTerm] = useState('');
+
+  const existingCategoryNames = categories.map(c => c.name);
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -25,6 +29,15 @@ export function ProductsView() {
   const handleCreateProduct = async (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null }) => {
     const result = await createProduct(product);
     return !!result;
+  };
+
+  const handleCreateCategory = async (name: string): Promise<boolean> => {
+    const result = await createCategory(name);
+    if (result) {
+      await refetchCategories();
+      return true;
+    }
+    return false;
   };
 
   if (loading) {
@@ -47,7 +60,11 @@ export function ProductsView() {
           </p>
         </div>
         <div className="flex gap-2">
-          <ImportProducts onImport={importProducts} />
+          <ImportProducts 
+            onImport={importProducts} 
+            existingCategories={existingCategoryNames}
+            onCreateCategory={handleCreateCategory}
+          />
           <ProductForm onSubmit={handleCreateProduct} />
         </div>
       </div>
