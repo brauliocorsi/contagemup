@@ -1,9 +1,10 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, FileSpreadsheet, Loader2, Download, Plus, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, Download, Plus, CheckCircle2, XCircle, AlertCircle, Settings2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 
 interface ImportProductsProps {
@@ -76,104 +77,43 @@ const FIELD_LABELS: Record<keyof ColumnMapping, string> = {
   pallet_number: 'Palete'
 };
 
+const FIELD_ORDER: Array<keyof ColumnMapping> = ['code', 'name', 'category', 'total_colis', 'description', 'location', 'pallet_number'];
+
 export function ImportProducts({ onImport, existingCategories, onCreateCategory }: ImportProductsProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [preview, setPreview] = useState<ProductRow[]>([]);
-  const [detectedColumns, setDetectedColumns] = useState<ColumnMapping | null>(null);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping | null>(null);
   const [allFileColumns, setAllFileColumns] = useState<string[]>([]);
+  const [rawData, setRawData] = useState<Record<string, unknown>[]>([]);
+  const [showManualMapping, setShowManualMapping] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const parseCSV = (text: string): { products: ProductRow[]; mapping: ColumnMapping; columns: string[] } => {
-    const lines = text.split('\n').filter(line => line.trim());
-    const products: ProductRow[] = [];
-    
-    // Get header columns
-    const headerLine = lines[0] || '';
-    const columns = headerLine.split(/[,;]/).map(v => v.trim().replace(/^"|"$/g, ''));
-    
-    // For CSV, we use positional mapping
-    const mapping: ColumnMapping = {
-      code: columns[0] || null,
-      name: columns[1] || null,
-      category: columns[2] || null,
-      total_colis: columns[3] || null,
-      description: columns[4] || null,
-      location: columns[5] || null,
-      pallet_number: columns[6] || null
-    };
-
-    // Skip header line
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(/[,;]/).map(v => v.trim().replace(/^"|"$/g, ''));
-      if (values.length >= 2 && values[0] && values[1]) {
-        products.push({
-          code: values[0],
-          name: values[1],
-          category: values[2] || 'Geral',
-          total_colis: parseInt(values[3]) || 1,
-          description: values[4] || undefined,
-          location: values[5] || undefined,
-          pallet_number: values[6] || undefined
-        });
-      }
+  // Helper to find matching column
+  const findColumn = useCallback((columns: string[], aliases: string[]): string | null => {
+    for (const alias of aliases) {
+      const found = columns.find(col => 
+        col.toLowerCase().trim().replace(/[_\s.-]/g, '') === alias.toLowerCase().replace(/[_\s.-]/g, '')
+      );
+      if (found) return found;
     }
+    // Also try partial match
+    for (const alias of aliases) {
+      const found = columns.find(col => 
+        col.toLowerCase().trim().includes(alias.toLowerCase()) ||
+        alias.toLowerCase().includes(col.toLowerCase().trim())
+      );
+      if (found) return found;
+    }
+    return null;
+  }, []);
 
-    return { products, mapping, columns };
-  };
-
-  const parseXLSX = (data: ArrayBuffer): { products: ProductRow[]; mapping: ColumnMapping; columns: string[] } => {
-    const workbook = XLSX.read(data, { type: 'array' });
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
-    
-    // Convert to JSON with header row
-    const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
-    
-    // Get all column names from the file
-    const columns = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];
-    
+  // Generate products from raw data and current mapping
+  const generateProducts = useCallback((data: Record<string, unknown>[], mapping: ColumnMapping): ProductRow[] => {
     const products: ProductRow[] = [];
-    const mapping: ColumnMapping = {
-      code: null,
-      name: null,
-      category: null,
-      total_colis: null,
-      description: null,
-      location: null,
-      pallet_number: null
-    };
     
-    // Helper to find matching column
-    const findColumn = (aliases: string[]): string | null => {
-      for (const alias of aliases) {
-        const found = columns.find(col => 
-          col.toLowerCase().trim().replace(/[_\s.-]/g, '') === alias.toLowerCase().replace(/[_\s.-]/g, '')
-        );
-        if (found) return found;
-      }
-      // Also try partial match
-      for (const alias of aliases) {
-        const found = columns.find(col => 
-          col.toLowerCase().trim().includes(alias.toLowerCase()) ||
-          alias.toLowerCase().includes(col.toLowerCase().trim())
-        );
-        if (found) return found;
-      }
-      return null;
-    };
-    
-    // Detect column mappings
-    mapping.code = findColumn(COLUMN_ALIASES.code);
-    mapping.name = findColumn(COLUMN_ALIASES.name);
-    mapping.category = findColumn(COLUMN_ALIASES.category);
-    mapping.total_colis = findColumn(COLUMN_ALIASES.total_colis);
-    mapping.description = findColumn(COLUMN_ALIASES.description);
-    mapping.location = findColumn(COLUMN_ALIASES.location);
-    mapping.pallet_number = findColumn(COLUMN_ALIASES.pallet_number);
-    
-    for (const row of jsonData) {
+    for (const row of data) {
       const getValue = (columnName: string | null): string => {
         if (!columnName || row[columnName] === undefined || row[columnName] === '') return '';
         return String(row[columnName]).trim();
@@ -195,7 +135,65 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
       }
     }
     
-    return { products, mapping, columns };
+    return products;
+  }, []);
+
+  const parseCSV = (text: string): { data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] } => {
+    const lines = text.split('\n').filter(line => line.trim());
+    
+    // Get header columns
+    const headerLine = lines[0] || '';
+    const columns = headerLine.split(/[,;]/).map(v => v.trim().replace(/^"|"$/g, ''));
+    
+    // Detect column mappings using aliases
+    const mapping: ColumnMapping = {
+      code: findColumn(columns, COLUMN_ALIASES.code) || columns[0] || null,
+      name: findColumn(columns, COLUMN_ALIASES.name) || columns[1] || null,
+      category: findColumn(columns, COLUMN_ALIASES.category) || columns[2] || null,
+      total_colis: findColumn(columns, COLUMN_ALIASES.total_colis) || columns[3] || null,
+      description: findColumn(columns, COLUMN_ALIASES.description) || columns[4] || null,
+      location: findColumn(columns, COLUMN_ALIASES.location) || columns[5] || null,
+      pallet_number: findColumn(columns, COLUMN_ALIASES.pallet_number) || columns[6] || null
+    };
+
+    // Convert to JSON-like structure
+    const data: Record<string, unknown>[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(/[,;]/).map(v => v.trim().replace(/^"|"$/g, ''));
+      const row: Record<string, unknown> = {};
+      columns.forEach((col, idx) => {
+        row[col] = values[idx] || '';
+      });
+      if (Object.values(row).some(v => v !== '')) {
+        data.push(row);
+      }
+    }
+
+    return { data, mapping, columns };
+  };
+
+  const parseXLSX = (data: ArrayBuffer): { data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] } => {
+    const workbook = XLSX.read(data, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    
+    // Convert to JSON with header row
+    const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
+    
+    // Get all column names from the file
+    const columns = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];
+    
+    const mapping: ColumnMapping = {
+      code: findColumn(columns, COLUMN_ALIASES.code),
+      name: findColumn(columns, COLUMN_ALIASES.name),
+      category: findColumn(columns, COLUMN_ALIASES.category),
+      total_colis: findColumn(columns, COLUMN_ALIASES.total_colis),
+      description: findColumn(columns, COLUMN_ALIASES.description),
+      location: findColumn(columns, COLUMN_ALIASES.location),
+      pallet_number: findColumn(columns, COLUMN_ALIASES.pallet_number)
+    };
+    
+    return { data: jsonData, mapping, columns };
   };
 
   // Calculate new categories that will be created
@@ -215,16 +213,31 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
-          const data = event.target?.result as ArrayBuffer;
-          const { products, mapping, columns } = parseXLSX(data);
-          setPreview(products);
-          setDetectedColumns(mapping);
+          const arrayBuffer = event.target?.result as ArrayBuffer;
+          const { data, mapping, columns } = parseXLSX(arrayBuffer);
+          setRawData(data);
+          setColumnMapping(mapping);
           setAllFileColumns(columns);
+          
+          const products = generateProducts(data, mapping);
+          setPreview(products);
 
-          if (products.length === 0) {
+          // Show manual mapping if required columns are missing
+          if (!mapping.code || !mapping.name) {
+            setShowManualMapping(true);
+            toast({
+              title: 'Mapeamento necessário',
+              description: 'Selecione manualmente as colunas para código e nome.',
+              variant: 'default'
+            });
+          } else {
+            setShowManualMapping(false);
+          }
+
+          if (products.length === 0 && mapping.code && mapping.name) {
             toast({
               title: 'Nenhum produto encontrado',
-              description: `Colunas detectadas: ${columns.join(', ')}. Verifique se existem colunas para código e nome.`,
+              description: 'O ficheiro não contém dados válidos.',
               variant: 'destructive'
             });
           }
@@ -241,10 +254,19 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        const { products, mapping, columns } = parseCSV(text);
-        setPreview(products);
-        setDetectedColumns(mapping);
+        const { data, mapping, columns } = parseCSV(text);
+        setRawData(data);
+        setColumnMapping(mapping);
         setAllFileColumns(columns);
+        
+        const products = generateProducts(data, mapping);
+        setPreview(products);
+
+        if (!mapping.code || !mapping.name) {
+          setShowManualMapping(true);
+        } else {
+          setShowManualMapping(false);
+        }
 
         if (products.length === 0) {
           toast({
@@ -256,6 +278,20 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
       };
       reader.readAsText(file);
     }
+  };
+
+  const handleMappingChange = (field: keyof ColumnMapping, value: string) => {
+    if (!columnMapping) return;
+    
+    const newMapping = {
+      ...columnMapping,
+      [field]: value === '__none__' ? null : value
+    };
+    setColumnMapping(newMapping);
+    
+    // Regenerate products with new mapping
+    const products = generateProducts(rawData, newMapping);
+    setPreview(products);
   };
 
   const handleImport = async () => {
@@ -280,16 +316,22 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
           description: `${preview.length} produtos importados. ${categoriesCreated} categoria(s) nova(s) criada(s).`
         });
       }
-      setPreview([]);
-      setDetectedColumns(null);
-      setAllFileColumns([]);
+      resetState();
       setOpen(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     }
     
     setIsLoading(false);
+  };
+
+  const resetState = () => {
+    setPreview([]);
+    setColumnMapping(null);
+    setAllFileColumns([]);
+    setRawData([]);
+    setShowManualMapping(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const downloadTemplate = () => {
@@ -308,14 +350,11 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
   const handleClose = (isOpen: boolean) => {
     setOpen(isOpen);
     if (!isOpen) {
-      setPreview([]);
-      setDetectedColumns(null);
-      setAllFileColumns([]);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      resetState();
     }
   };
+
+  const hasRequiredColumns = columnMapping?.code && columnMapping?.name;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -359,53 +398,111 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
             Descarregar template
           </Button>
 
-          {/* Column Detection Display */}
-          {detectedColumns && allFileColumns.length > 0 && (
-            <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                Colunas do ficheiro: <span className="font-normal text-muted-foreground">{allFileColumns.join(', ')}</span>
+          {/* Column Mapping Section */}
+          {columnMapping && allFileColumns.length > 0 && (
+            <div className="border rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                  Colunas do ficheiro: <span className="font-normal text-muted-foreground">{allFileColumns.length}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowManualMapping(!showManualMapping)}
+                  className="gap-1"
+                >
+                  <Settings2 className="h-4 w-4" />
+                  {showManualMapping ? 'Ocultar mapeamento' : 'Mapear manualmente'}
+                </Button>
               </div>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {(Object.keys(detectedColumns) as Array<keyof ColumnMapping>).map(field => {
-                  const detected = detectedColumns[field];
-                  const isRequired = field === 'code' || field === 'name';
-                  const isDetected = detected !== null;
-                  
-                  return (
-                    <div 
-                      key={field}
-                      className={`flex items-center gap-2 text-sm p-2 rounded-md ${
-                        isDetected 
-                          ? 'bg-green-500/10 text-green-700 dark:text-green-400' 
-                          : isRequired 
-                            ? 'bg-destructive/10 text-destructive' 
-                            : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {isDetected ? (
-                        <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-                      ) : isRequired ? (
-                        <XCircle className="h-4 w-4 flex-shrink-0" />
-                      ) : (
-                        <div className="h-4 w-4 flex-shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{FIELD_LABELS[field]}</div>
-                        {isDetected && (
-                          <div className="text-xs opacity-75 truncate">← {detected}</div>
+
+              {/* Auto-detected status */}
+              {!showManualMapping && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {FIELD_ORDER.map(field => {
+                    const detected = columnMapping[field];
+                    const isRequired = field === 'code' || field === 'name';
+                    const isDetected = detected !== null;
+                    
+                    return (
+                      <div 
+                        key={field}
+                        className={`flex items-center gap-2 text-sm p-2 rounded-md ${
+                          isDetected 
+                            ? 'bg-green-500/10 text-green-700 dark:text-green-400' 
+                            : isRequired 
+                              ? 'bg-destructive/10 text-destructive' 
+                              : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {isDetected ? (
+                          <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                        ) : isRequired ? (
+                          <XCircle className="h-4 w-4 flex-shrink-0" />
+                        ) : (
+                          <div className="h-4 w-4 flex-shrink-0" />
                         )}
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{FIELD_LABELS[field]}</div>
+                          {isDetected && (
+                            <div className="text-xs opacity-75 truncate">← {detected}</div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Manual Mapping UI */}
+              {showManualMapping && (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Selecione a coluna do ficheiro correspondente a cada campo:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {FIELD_ORDER.map(field => {
+                      const isRequired = field === 'code' || field === 'name';
+                      const currentValue = columnMapping[field];
+                      
+                      return (
+                        <div key={field} className="flex items-center gap-2">
+                          <div className="w-28 flex-shrink-0">
+                            <span className={`text-sm font-medium ${isRequired ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              {FIELD_LABELS[field]}
+                              {isRequired && <span className="text-destructive ml-1">*</span>}
+                            </span>
+                          </div>
+                          <Select
+                            value={currentValue || '__none__'}
+                            onValueChange={(value) => handleMappingChange(field, value)}
+                          >
+                            <SelectTrigger className={`flex-1 ${!currentValue && isRequired ? 'border-destructive' : ''}`}>
+                              <SelectValue placeholder="Selecionar coluna..." />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover">
+                              <SelectItem value="__none__">
+                                <span className="text-muted-foreground">— Não mapear —</span>
+                              </SelectItem>
+                              {allFileColumns.map(col => (
+                                <SelectItem key={col} value={col}>
+                                  {col}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               
-              {(!detectedColumns.code || !detectedColumns.name) && (
+              {!hasRequiredColumns && (
                 <p className="text-sm text-destructive flex items-center gap-1">
                   <XCircle className="h-4 w-4" />
-                  Colunas obrigatórias em falta. Verifique o nome das colunas no ficheiro.
+                  Colunas obrigatórias em falta. Utilize o mapeamento manual.
                 </p>
               )}
             </div>
@@ -442,7 +539,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.map((product, i) => (
+                  {preview.slice(0, 50).map((product, i) => (
                     <tr key={i} className="border-t">
                       <td className="p-2">{product.code}</td>
                       <td className="p-2">{product.name}</td>
@@ -464,6 +561,17 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
                   ))}
                 </tbody>
               </table>
+              {preview.length > 50 && (
+                <div className="p-2 text-center text-sm text-muted-foreground bg-muted">
+                  Mostrando 50 de {preview.length} produtos
+                </div>
+              )}
+            </div>
+          )}
+
+          {rawData.length > 0 && preview.length === 0 && hasRequiredColumns && (
+            <div className="text-center py-4 text-muted-foreground">
+              Nenhum produto válido encontrado com o mapeamento atual.
             </div>
           )}
         </div>
@@ -472,7 +580,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
           <Button type="button" variant="outline" onClick={() => handleClose(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleImport} disabled={isLoading || preview.length === 0}>
+          <Button onClick={handleImport} disabled={isLoading || preview.length === 0 || !hasRequiredColumns}>
             {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Importar {preview.length} produtos
           </Button>
