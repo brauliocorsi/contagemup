@@ -222,6 +222,7 @@ export type Database = {
           category: string
           code: string
           created_at: string
+          current_stock: number
           description: string | null
           id: string
           location: string | null
@@ -234,6 +235,7 @@ export type Database = {
           category?: string
           code: string
           created_at?: string
+          current_stock?: number
           description?: string | null
           id?: string
           location?: string | null
@@ -246,6 +248,7 @@ export type Database = {
           category?: string
           code?: string
           created_at?: string
+          current_stock?: number
           description?: string | null
           id?: string
           location?: string | null
@@ -387,6 +390,50 @@ export type Database = {
           validated_by?: string | null
         }
         Relationships: []
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          movement_type: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          reason: string | null
+          reference: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          movement_type: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          reason?: string | null
+          reference?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          movement_type?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
