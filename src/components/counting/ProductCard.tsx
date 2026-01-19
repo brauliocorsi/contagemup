@@ -6,6 +6,16 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ProductCardProps {
   product: ProductWithCounts;
@@ -13,14 +23,26 @@ interface ProductCardProps {
   onDecrement: (productId: string, colisNumber: number) => void;
   onLocationChange?: (productId: string, location: string) => void;
   onPalletChange?: (productId: string, palletNumber: string) => void;
+  onAddColi?: (productId: string, newTotalColis: number) => void;
+  onRemoveColi?: (productId: string, newTotalColis: number) => void;
   colisNames?: Record<string, string> | null;
 }
 
-export function ProductCard({ product, onIncrement, onDecrement, onLocationChange, onPalletChange, colisNames }: ProductCardProps) {
+export function ProductCard({ 
+  product, 
+  onIncrement, 
+  onDecrement, 
+  onLocationChange, 
+  onPalletChange, 
+  onAddColi,
+  onRemoveColi,
+  colisNames 
+}: ProductCardProps) {
   const [localLocation, setLocalLocation] = useState(product.location || '');
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [localPallet, setLocalPallet] = useState(product.palletNumber || '');
   const [isEditingPallet, setIsEditingPallet] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   const getStatusIcon = () => {
     if (product.completeSets > 0) {
@@ -95,181 +117,246 @@ export function ProductCard({ product, onIncrement, onDecrement, onLocationChang
     }
   };
 
-  return (
-    <Card className={cn(
-      'transition-all',
-      product.hasPartialProduct && 'border-yellow-300 bg-yellow-50/50',
-      !product.hasPartialProduct && product.completeSets > 0 && 'border-green-300 bg-green-50/50',
-      product.status === 'not_counted' && 'border-muted'
-    )}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {getStatusIcon()}
-            <div>
-              <CardTitle className="text-base">{product.name}</CardTitle>
-              <p className="text-sm text-muted-foreground">{product.code}</p>
-              <Badge variant="outline" className="mt-1 text-xs">{product.category}</Badge>
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            {product.completeSets > 0 && (
-              <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                {product.completeSets} Completo{product.completeSets > 1 ? 's' : ''}
-              </Badge>
-            )}
-            {product.hasPartialProduct && (
-              <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-                1 Incompleto
-              </Badge>
-            )}
-            {product.status === 'not_counted' && (
-              <Badge variant="secondary">Não contado</Badge>
-            )}
-          </div>
-        </div>
-        
-        {/* Location field */}
-        <div className="mt-2 flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          {isEditingLocation ? (
-            <Input
-              value={localLocation}
-              onChange={(e) => setLocalLocation(e.target.value)}
-              onBlur={handleLocationBlur}
-              onKeyDown={handleLocationKeyDown}
-              placeholder="Onde está este produto?"
-              className="h-8 text-sm"
-              autoFocus
-            />
-          ) : (
-            <button
-              onClick={() => setIsEditingLocation(true)}
-              className={cn(
-                "flex-1 text-left text-sm px-2 py-1 rounded border border-dashed",
-                product.location 
-                  ? "border-primary/30 bg-primary/5 text-foreground" 
-                  : "border-muted-foreground/30 text-muted-foreground hover:border-primary/50"
-              )}
-            >
-              {product.location || 'Adicionar localização...'}
-            </button>
-          )}
-        </div>
+  const lastColisQuantity = getColisQuantity(product.total_colis);
 
-        {/* Pallet number field */}
-        <div className="mt-2 flex items-center gap-2">
-          <Box className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          {isEditingPallet ? (
-            <Input
-              value={localPallet}
-              onChange={(e) => setLocalPallet(e.target.value)}
-              onBlur={handlePalletBlur}
-              onKeyDown={handlePalletKeyDown}
-              placeholder="Nº da palete"
-              className="h-8 text-sm"
-              autoFocus
-            />
-          ) : (
-            <button
-              onClick={() => setIsEditingPallet(true)}
-              className={cn(
-                "flex-1 text-left text-sm px-2 py-1 rounded border border-dashed",
-                product.palletNumber 
-                  ? "border-primary/30 bg-primary/5 text-foreground" 
-                  : "border-muted-foreground/30 text-muted-foreground hover:border-primary/50"
-              )}
-            >
-              {product.palletNumber || 'Nº palete...'}
-            </button>
-          )}
-        </div>
-        
-        {/* Summary line showing complete + what's missing */}
-        {(product.completeSets > 0 || product.hasPartialProduct) && (
-          <div className="mt-2 p-2 rounded-md bg-muted/50 text-sm">
-            <div className="flex items-center gap-2 flex-wrap">
+  const handleRemoveColisClick = () => {
+    if (lastColisQuantity > 0) {
+      setShowRemoveConfirm(true);
+    } else {
+      onRemoveColi?.(product.id, product.total_colis - 1);
+    }
+  };
+
+  const confirmRemoveColi = () => {
+    onRemoveColi?.(product.id, product.total_colis - 1);
+    setShowRemoveConfirm(false);
+  };
+
+  return (
+    <>
+      <Card className={cn(
+        'transition-all',
+        product.hasPartialProduct && 'border-yellow-300 bg-yellow-50/50',
+        !product.hasPartialProduct && product.completeSets > 0 && 'border-green-300 bg-green-50/50',
+        product.status === 'not_counted' && 'border-muted'
+      )}>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {getStatusIcon()}
+              <div>
+                <CardTitle className="text-base">{product.name}</CardTitle>
+                <p className="text-sm text-muted-foreground">{product.code}</p>
+                <Badge variant="outline" className="mt-1 text-xs">{product.category}</Badge>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1">
               {product.completeSets > 0 && (
-                <span className="text-green-700 font-medium">
-                  ✓ {product.completeSets} produto{product.completeSets > 1 ? 's' : ''} completo{product.completeSets > 1 ? 's' : ''}
-                </span>
+                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                  {product.completeSets} Completo{product.completeSets > 1 ? 's' : ''}
+                </Badge>
               )}
-              {product.hasPartialProduct && product.missingForNextComplete.length > 0 && (
-                <>
-                  {product.completeSets > 0 && <span className="text-muted-foreground">|</span>}
-                  <span className="text-yellow-700">
-                    Para +1: {getMissingDescription()}
-                  </span>
-                </>
+              {product.hasPartialProduct && (
+                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                  1 Incompleto
+                </Badge>
+              )}
+              {product.status === 'not_counted' && (
+                <Badge variant="secondary">Não contado</Badge>
               )}
             </div>
           </div>
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-2">
-          {Array.from({ length: product.total_colis }, (_, i) => i + 1).map((colisNum) => {
-            const quantity = getColisQuantity(colisNum);
-            const isMissing = isColisMissing(colisNum);
-            const missingCount = getMissingCount(colisNum);
-            const isExcess = isColisExcess(colisNum);
-            const colisName = getColisName(colisNum);
-            
-            return (
-              <div
-                key={colisNum}
+          
+          {/* Location field */}
+          <div className="mt-2 flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            {isEditingLocation ? (
+              <Input
+                value={localLocation}
+                onChange={(e) => setLocalLocation(e.target.value)}
+                onBlur={handleLocationBlur}
+                onKeyDown={handleLocationKeyDown}
+                placeholder="Onde está este produto?"
+                className="h-8 text-sm"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => setIsEditingLocation(true)}
                 className={cn(
-                  'flex items-center justify-between p-2 rounded-lg border',
-                  isMissing && 'border-yellow-300 bg-yellow-100',
-                  isExcess && !isMissing && 'border-green-300 bg-green-100',
-                  !isMissing && !isExcess && 'bg-muted/30'
+                  "flex-1 text-left text-sm px-2 py-1 rounded border border-dashed",
+                  product.location 
+                    ? "border-primary/30 bg-primary/5 text-foreground" 
+                    : "border-muted-foreground/30 text-muted-foreground hover:border-primary/50"
                 )}
               >
-                <div className="flex flex-col">
-                  <span className="font-medium text-sm">
-                    Coli {colisNum}/{product.total_colis}
-                    {colisName && (
-                      <span className="text-muted-foreground font-normal ml-1">
-                        - {colisName}
+                {product.location || 'Adicionar localização...'}
+              </button>
+            )}
+          </div>
+
+          {/* Pallet number field */}
+          <div className="mt-2 flex items-center gap-2">
+            <Box className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            {isEditingPallet ? (
+              <Input
+                value={localPallet}
+                onChange={(e) => setLocalPallet(e.target.value)}
+                onBlur={handlePalletBlur}
+                onKeyDown={handlePalletKeyDown}
+                placeholder="Nº da palete"
+                className="h-8 text-sm"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => setIsEditingPallet(true)}
+                className={cn(
+                  "flex-1 text-left text-sm px-2 py-1 rounded border border-dashed",
+                  product.palletNumber 
+                    ? "border-primary/30 bg-primary/5 text-foreground" 
+                    : "border-muted-foreground/30 text-muted-foreground hover:border-primary/50"
+                )}
+              >
+                {product.palletNumber || 'Nº palete...'}
+              </button>
+            )}
+          </div>
+          
+          {/* Summary line showing complete + what's missing */}
+          {(product.completeSets > 0 || product.hasPartialProduct) && (
+            <div className="mt-2 p-2 rounded-md bg-muted/50 text-sm">
+              <div className="flex items-center gap-2 flex-wrap">
+                {product.completeSets > 0 && (
+                  <span className="text-green-700 font-medium">
+                    ✓ {product.completeSets} produto{product.completeSets > 1 ? 's' : ''} completo{product.completeSets > 1 ? 's' : ''}
+                  </span>
+                )}
+                {product.hasPartialProduct && product.missingForNextComplete.length > 0 && (
+                  <>
+                    {product.completeSets > 0 && <span className="text-muted-foreground">|</span>}
+                    <span className="text-yellow-700">
+                      Para +1: {getMissingDescription()}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2">
+            {Array.from({ length: product.total_colis }, (_, i) => i + 1).map((colisNum) => {
+              const quantity = getColisQuantity(colisNum);
+              const isMissing = isColisMissing(colisNum);
+              const missingCount = getMissingCount(colisNum);
+              const isExcess = isColisExcess(colisNum);
+              const colisName = getColisName(colisNum);
+              
+              return (
+                <div
+                  key={colisNum}
+                  className={cn(
+                    'flex items-center justify-between p-2 rounded-lg border',
+                    isMissing && 'border-yellow-300 bg-yellow-100',
+                    isExcess && !isMissing && 'border-green-300 bg-green-100',
+                    !isMissing && !isExcess && 'bg-muted/30'
+                  )}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm">
+                      Coli {colisNum}/{product.total_colis}
+                      {colisName && (
+                        <span className="text-muted-foreground font-normal ml-1">
+                          - {colisName}
+                        </span>
+                      )}
+                    </span>
+                    {isMissing && (
+                      <span className="text-xs text-yellow-700">
+                        Falta {missingCount} unidade{missingCount > 1 ? 's' : ''}
                       </span>
                     )}
-                  </span>
-                  {isMissing && (
-                    <span className="text-xs text-yellow-700">
-                      Falta {missingCount} unidade{missingCount > 1 ? 's' : ''}
-                    </span>
-                  )}
-                  {isExcess && !isMissing && (
-                    <span className="text-xs text-green-700">
-                      OK
-                    </span>
-                  )}
+                    {isExcess && !isMissing && (
+                      <span className="text-xs text-green-700">
+                        OK
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => onDecrement(product.id, colisNum)}
+                      disabled={quantity === 0}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="w-8 text-center font-bold text-lg">{quantity}</span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => onIncrement(product.id, colisNum)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onDecrement(product.id, colisNum)}
-                    disabled={quantity === 0}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="w-8 text-center font-bold text-lg">{quantity}</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onIncrement(product.id, colisNum)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+              );
+            })}
+          </div>
+
+          {/* Add/Remove colis buttons */}
+          {(onAddColi || onRemoveColi) && (
+            <div className="flex gap-2 mt-3 pt-3 border-t">
+              {onRemoveColi && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  disabled={product.total_colis <= 1}
+                  onClick={handleRemoveColisClick}
+                >
+                  <Minus className="h-4 w-4 mr-1" />
+                  Remover coli
+                </Button>
+              )}
+              {onAddColi && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() => onAddColi(product.id, product.total_colis + 1)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar coli
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Confirmation dialog for removing coli with counts */}
+      <AlertDialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Coli {product.total_colis}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este coli tem {lastColisQuantity} unidade{lastColisQuantity > 1 ? 's' : ''} contada{lastColisQuantity > 1 ? 's' : ''}.
+              Ao remover, as contagens serão eliminadas permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemoveColi} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
