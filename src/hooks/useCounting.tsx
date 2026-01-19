@@ -325,6 +325,29 @@ export function useCounting(sessionId: string | null) {
     };
   }, [counts]);
 
+  const deleteOrphanCounts = async (productId: string, newTotalColis: number) => {
+    if (!sessionId) return false;
+    
+    const { error } = await supabase
+      .from('counts')
+      .delete()
+      .eq('session_id', sessionId)
+      .eq('product_id', productId)
+      .gt('colis_number', newTotalColis);
+
+    if (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível limpar contagens órfãs',
+        variant: 'destructive'
+      });
+      return false;
+    }
+    
+    await fetchCounts();
+    return true;
+  };
+
   return {
     session,
     counts,
@@ -335,6 +358,7 @@ export function useCounting(sessionId: string | null) {
     updateLocation,
     updatePalletNumber,
     getProductWithCounts,
+    deleteOrphanCounts,
     refetch: fetchCounts
   };
 }

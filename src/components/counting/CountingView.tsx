@@ -13,9 +13,10 @@ import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags, MapPin,
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 
 export function CountingView() {
-  const { products, loading: productsLoading } = useProducts();
+  const { products, loading: productsLoading, updateProduct, fetchProducts } = useProducts();
   const { sessions, loading: sessionsLoading, createSession } = useSessions();
   const { categories, loading: categoriesLoading } = useCategories();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -29,7 +30,7 @@ export function CountingView() {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { incrementCount, decrementCount, updateLocation, updatePalletNumber, getProductWithCounts, loading: countingLoading } = useCounting(selectedSessionId);
+  const { incrementCount, decrementCount, updateLocation, updatePalletNumber, getProductWithCounts, deleteOrphanCounts, loading: countingLoading } = useCounting(selectedSessionId);
 
   const activeSessions = sessions.filter(s => s.status === 'active');
 
@@ -58,6 +59,23 @@ export function CountingView() {
       setDialogOpen(false);
     }
     setIsCreatingSession(false);
+  };
+
+  const handleAddColi = async (productId: string, newTotalColis: number) => {
+    await updateProduct(productId, { total_colis: newTotalColis });
+    await fetchProducts();
+    toast.success("Coli adicionado ao produto");
+  };
+
+  const handleRemoveColi = async (productId: string, newTotalColis: number) => {
+    // 1. Limpar contagens órfãs primeiro
+    await deleteOrphanCounts(productId, newTotalColis);
+    
+    // 2. Atualizar produto
+    await updateProduct(productId, { total_colis: newTotalColis });
+    await fetchProducts();
+    
+    toast.success("Coli removido do produto");
   };
 
   const productsWithCounts = useMemo(() => {
@@ -319,6 +337,8 @@ export function CountingView() {
                 onDecrement={decrementCount}
                 onLocationChange={updateLocation}
                 onPalletChange={updatePalletNumber}
+                onAddColi={handleAddColi}
+                onRemoveColi={handleRemoveColi}
                 colisNames={categoryColisNamesMap[product.category]}
               />
             ))}
@@ -341,6 +361,8 @@ export function CountingView() {
                   onDecrement={decrementCount}
                   onLocationChange={updateLocation}
                   onPalletChange={updatePalletNumber}
+                  onAddColi={handleAddColi}
+                  onRemoveColi={handleRemoveColi}
                   colisNames={categoryColisNamesMap[product.category]}
                 />
               ))}
@@ -364,6 +386,8 @@ export function CountingView() {
                   onDecrement={decrementCount}
                   onLocationChange={updateLocation}
                   onPalletChange={updatePalletNumber}
+                  onAddColi={handleAddColi}
+                  onRemoveColi={handleRemoveColi}
                   colisNames={categoryColisNamesMap[product.category]}
                 />
               ))}
