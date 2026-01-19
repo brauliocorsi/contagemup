@@ -41,6 +41,57 @@ export type Database = {
         }
         Relationships: []
       }
+      count_logs: {
+        Row: {
+          colis_number: number
+          counted_by: string | null
+          created_at: string
+          id: string
+          operation: string
+          product_id: string
+          quantity_after: number
+          quantity_before: number
+          session_id: string
+        }
+        Insert: {
+          colis_number: number
+          counted_by?: string | null
+          created_at?: string
+          id?: string
+          operation: string
+          product_id: string
+          quantity_after: number
+          quantity_before: number
+          session_id: string
+        }
+        Update: {
+          colis_number?: number
+          counted_by?: string | null
+          created_at?: string
+          id?: string
+          operation?: string
+          product_id?: string
+          quantity_after?: number
+          quantity_before?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "count_logs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "count_logs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "counting_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       counting_sessions: {
         Row: {
           category: string
