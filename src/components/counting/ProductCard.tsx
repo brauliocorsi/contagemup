@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box } from 'lucide-react';
+import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -25,6 +25,7 @@ interface ProductCardProps {
   onPalletChange?: (productId: string, palletNumber: string) => void;
   onAddColi?: (productId: string, newTotalColis: number) => void;
   onRemoveColi?: (productId: string, newTotalColis: number) => void;
+  onCodeChange?: (productId: string, newCode: string) => Promise<boolean>;
   colisNames?: Record<string, string> | null;
 }
 
@@ -36,12 +37,15 @@ export function ProductCard({
   onPalletChange, 
   onAddColi,
   onRemoveColi,
+  onCodeChange,
   colisNames 
 }: ProductCardProps) {
   const [localLocation, setLocalLocation] = useState(product.location || '');
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [localPallet, setLocalPallet] = useState(product.palletNumber || '');
   const [isEditingPallet, setIsEditingPallet] = useState(false);
+  const [localCode, setLocalCode] = useState(product.code);
+  const [isEditingCode, setIsEditingCode] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   const getStatusIcon = () => {
@@ -117,6 +121,28 @@ export function ProductCard({
     }
   };
 
+  const handleCodeBlur = async () => {
+    setIsEditingCode(false);
+    const trimmedCode = localCode.trim();
+    if (trimmedCode !== product.code && onCodeChange) {
+      const success = await onCodeChange(product.id, trimmedCode);
+      if (!success) {
+        setLocalCode(product.code); // Revert on failure
+      }
+    } else if (!trimmedCode) {
+      setLocalCode(product.code); // Revert if empty
+    }
+  };
+
+  const handleCodeKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleCodeBlur();
+    } else if (e.key === 'Escape') {
+      setLocalCode(product.code);
+      setIsEditingCode(false);
+    }
+  };
+
   const lastColisQuantity = getColisQuantity(product.total_colis);
 
   const handleRemoveColisClick = () => {
@@ -144,9 +170,29 @@ export function ProductCard({
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
               {getStatusIcon()}
-              <div>
+              <div className="flex-1 min-w-0">
                 <CardTitle className="text-base">{product.name}</CardTitle>
-                <p className="text-sm text-muted-foreground">{product.code}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Hash className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  {isEditingCode ? (
+                    <Input
+                      value={localCode}
+                      onChange={(e) => setLocalCode(e.target.value)}
+                      onBlur={handleCodeBlur}
+                      onKeyDown={handleCodeKeyDown}
+                      className="h-6 text-sm py-0 px-1 w-32"
+                      autoFocus
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setIsEditingCode(true)}
+                      className="group flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <span>{product.code}</span>
+                      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  )}
+                </div>
                 <Badge variant="outline" className="mt-1 text-xs">{product.category}</Badge>
               </div>
             </div>
