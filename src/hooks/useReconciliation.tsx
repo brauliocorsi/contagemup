@@ -291,6 +291,51 @@ export function useReconciliation() {
     return result;
   };
 
+  const deleteReconciliation = async (reconciliationId: string): Promise<boolean> => {
+    try {
+      // 1. Delete all reconciliation items
+      const { error: itemsError } = await supabase
+        .from('reconciliation_items')
+        .delete()
+        .eq('reconciliation_id', reconciliationId);
+
+      if (itemsError) {
+        console.error('Error deleting reconciliation items:', itemsError);
+      }
+
+      // 2. Delete the reconciliation
+      const { error } = await supabase
+        .from('reconciliations')
+        .delete()
+        .eq('id', reconciliationId);
+
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível eliminar a conciliação',
+          variant: 'destructive'
+        });
+        return false;
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: 'Conciliação eliminada definitivamente'
+      });
+
+      await fetchReconciliations();
+      return true;
+    } catch (err) {
+      console.error('Error deleting reconciliation:', err);
+      toast({
+        title: 'Erro',
+        description: 'Ocorreu um erro ao eliminar a conciliação',
+        variant: 'destructive'
+      });
+      return false;
+    }
+  };
+
   return {
     reconciliations,
     loading,
@@ -298,6 +343,7 @@ export function useReconciliation() {
     getReconciliationItems,
     validateReconciliation,
     cancelReconciliation,
+    deleteReconciliation,
     parseCSV,
     refetch: fetchReconciliations
   };
