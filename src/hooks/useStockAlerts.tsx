@@ -15,18 +15,24 @@ export function useStockAlerts() {
     const alertList: StockAlert[] = [];
 
     products.forEach((product) => {
-      if (product.current_stock <= 0) {
-        alertList.push({
-          product,
-          type: 'out_of_stock',
-          message: `${product.name} está esgotado`,
-        });
-      } else if (product.current_stock <= product.min_stock) {
-        alertList.push({
-          product,
-          type: 'low_stock',
-          message: `${product.name} tem stock baixo (${product.current_stock}/${product.min_stock})`,
-        });
+      const minStock = product.min_stock || 0;
+      
+      // Only show out_of_stock if current_stock is BELOW min_stock (not equal)
+      // If min_stock is 0 and current_stock is 0, it's considered OK
+      if (product.current_stock < minStock) {
+        if (product.current_stock <= 0) {
+          alertList.push({
+            product,
+            type: 'out_of_stock',
+            message: `${product.name} está esgotado`,
+          });
+        } else {
+          alertList.push({
+            product,
+            type: 'low_stock',
+            message: `${product.name} tem stock baixo (${product.current_stock}/${minStock})`,
+          });
+        }
       }
     });
 
