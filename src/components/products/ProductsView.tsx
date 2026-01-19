@@ -7,25 +7,29 @@ import { ProductForm } from './ProductForm';
 import { ProductEditForm } from './ProductEditForm';
 import { ProductHistoryDialog } from './ProductHistoryDialog';
 import { ImportProducts } from './ImportProducts';
+import { BulkMinStockDialog } from './BulkMinStockDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Product } from '@/types/stock';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
   const { categories, createCategory, refetch: refetchCategories } = useCategories();
   const { logChange, logMultipleChanges } = useProductChanges();
   const { lastCounts } = useLastCounts();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
   const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
@@ -33,6 +37,8 @@ export function ProductsView() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [bulkMinStockOpen, setBulkMinStockOpen] = useState(false);
 
   const handleSort = (column: 'code' | 'name' | 'category' | 'stock' | 'lastCount') => {
     if (sortColumn === column) {
@@ -193,6 +199,36 @@ export function ProductsView() {
     link.click();
   };
 
+  // Selection handlers
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleAllSelection = () => {
+    if (selectedProducts.size === filteredProducts.length) {
+      setSelectedProducts(new Set());
+    } else {
+      setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedProducts(new Set());
+  };
+
+  const handleBulkMinStockSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    clearSelection();
+  };
+
   const handleCreateProduct = async (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null }) => {
     const result = await createProduct(product);
     if (result) {
@@ -334,6 +370,31 @@ export function ProductsView() {
         </Button>
       </div>
 
+      {/* Selection action bar */}
+      {selectedProducts.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+          <span className="text-sm font-medium">
+            {selectedProducts.size} produto(s) selecionado(s)
+          </span>
+          <div className="flex-1" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBulkMinStockOpen(true)}
+          >
+            <Settings2 className="h-4 w-4 mr-2" />
+            Definir Stock Mínimo
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearSelection}
+          >
+            Limpar seleção
+          </Button>
+        </div>
+      )}
+
       {/* Products table */}
       {products.length === 0 ? (
         <Card>
@@ -352,6 +413,13 @@ export function ProductsView() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                        onCheckedChange={toggleAllSelection}
+                        aria-label="Selecionar todos"
+                      />
+                    </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('code')}
@@ -407,7 +475,14 @@ export function ProductsView() {
                 {filteredProducts.map(product => {
                     const lastCount = lastCounts[product.id];
                     return (
-                    <TableRow key={product.id}>
+                    <TableRow key={product.id} className={selectedProducts.has(product.id) ? 'bg-primary/5' : ''}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedProducts.has(product.id)}
+                          onCheckedChange={() => toggleProductSelection(product.id)}
+                          aria-label={`Selecionar ${product.name}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono">{product.code}</TableCell>
                       <TableCell className="font-medium max-w-[150px] truncate">{product.name}</TableCell>
                       <TableCell>
@@ -535,6 +610,14 @@ export function ProductsView() {
           onOpenChange={(open) => !open && setHistoryProduct(null)}
         />
       )}
+
+      {/* Bulk Min Stock Dialog */}
+      <BulkMinStockDialog
+        open={bulkMinStockOpen}
+        onOpenChange={setBulkMinStockOpen}
+        selectedProductIds={Array.from(selectedProducts)}
+        onSuccess={handleBulkMinStockSuccess}
+      />
     </div>
   );
 }
