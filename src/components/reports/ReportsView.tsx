@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { LocationStatsCard } from './LocationStatsCard';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
 import { ReportsCharts } from './ReportsCharts';
+import { StockMovementsReport } from './StockMovementsReport';
 
 export function ReportsView() {
   const { products, loading: productsLoading } = useProducts();
@@ -203,9 +204,12 @@ export function ReportsView() {
 
   return (
     <div className="p-4 space-y-4">
+      {/* Stock Movements Report - Always visible */}
+      <StockMovementsReport />
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold">Relatórios</h2>
+          <h2 className="text-lg font-semibold">Relatórios de Contagem</h2>
           <p className="text-sm text-muted-foreground">
             Análise de contagem por sessão
           </p>
