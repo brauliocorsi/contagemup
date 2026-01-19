@@ -29,6 +29,7 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
   const [description, setDescription] = useState(product.description || '');
   const [location, setLocation] = useState(product.location || '');
   const [palletNumber, setPalletNumber] = useState(product.pallet_number || '');
+  const [minStock, setMinStock] = useState(product.min_stock ?? 5);
   const [activeCounts, setActiveCounts] = useState<ActiveCountInfo[]>([]);
   const [showColisWarning, setShowColisWarning] = useState(false);
 
@@ -41,6 +42,7 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
     setDescription(product.description || '');
     setLocation(product.location || '');
     setPalletNumber(product.pallet_number || '');
+    setMinStock(product.min_stock ?? 5);
     setShowColisWarning(false);
     setActiveCounts([]);
   }, [product]);
@@ -76,7 +78,8 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
       total_colis: totalColis,
       description: description || null,
       location: location || null,
-      pallet_number: palletNumber || null
+      pallet_number: palletNumber || null,
+      min_stock: minStock
     });
 
     if (success) {
@@ -177,6 +180,19 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
                   <span>Este produto tem contagens em {activeCounts.length} sessão(ões) ativa(s)</span>
                 </div>
               )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-min-stock">Stock Mínimo</Label>
+              <Input
+                id="edit-min-stock"
+                type="number"
+                min={0}
+                value={minStock}
+                onChange={(e) => setMinStock(Math.max(0, parseInt(e.target.value) || 0))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Alerta quando o stock ficar abaixo deste valor
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-description">Descrição</Label>

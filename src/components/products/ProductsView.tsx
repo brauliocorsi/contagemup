@@ -57,14 +57,14 @@ export function ProductsView() {
       : <ArrowDown className="h-4 w-4 ml-1 text-primary" />;
   };
 
-  const getStockStatus = (stock: number) => {
+  const getStockStatus = (stock: number, minStock: number = 5) => {
     if (stock <= 0) return 'out_of_stock';
-    if (stock <= 5) return 'low_stock';
+    if (stock <= minStock) return 'low_stock';
     return 'in_stock';
   };
 
-  const getStockBadge = (stock: number) => {
-    const status = getStockStatus(stock);
+  const getStockBadge = (stock: number, minStock: number = 5) => {
+    const status = getStockStatus(stock, minStock);
     
     if (status === 'out_of_stock') {
       return (
@@ -108,7 +108,7 @@ export function ProductsView() {
         (filterCountStatus === 'with_count' && hasCount) ||
         (filterCountStatus === 'without_count' && !hasCount);
 
-      const stockStatus = getStockStatus(product.current_stock);
+      const stockStatus = getStockStatus(product.current_stock, product.min_stock);
       const matchesStockStatus = 
         filterStockStatus === 'all' ||
         filterStockStatus === stockStatus;
@@ -157,9 +157,9 @@ export function ProductsView() {
 
   // Stock stats for filter
   const stockStats = useMemo(() => {
-    const inStock = products.filter(p => getStockStatus(p.current_stock) === 'in_stock').length;
-    const lowStock = products.filter(p => getStockStatus(p.current_stock) === 'low_stock').length;
-    const outOfStock = products.filter(p => getStockStatus(p.current_stock) === 'out_of_stock').length;
+    const inStock = products.filter(p => getStockStatus(p.current_stock, p.min_stock) === 'in_stock').length;
+    const lowStock = products.filter(p => getStockStatus(p.current_stock, p.min_stock) === 'low_stock').length;
+    const outOfStock = products.filter(p => getStockStatus(p.current_stock, p.min_stock) === 'out_of_stock').length;
     return { inStock, lowStock, outOfStock };
   }, [products]);
 
@@ -417,7 +417,7 @@ export function ProductsView() {
                         <Badge variant="secondary">{product.total_colis}</Badge>
                       </TableCell>
                       <TableCell>
-                        {getStockBadge(product.current_stock)}
+                        {getStockBadge(product.current_stock, product.min_stock)}
                       </TableCell>
                       <TableCell>
                         {lastCount ? (

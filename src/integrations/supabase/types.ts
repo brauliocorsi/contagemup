@@ -226,6 +226,7 @@ export type Database = {
           description: string | null
           id: string
           location: string | null
+          min_stock: number
           name: string
           pallet_number: string | null
           total_colis: number
@@ -239,6 +240,7 @@ export type Database = {
           description?: string | null
           id?: string
           location?: string | null
+          min_stock?: number
           name: string
           pallet_number?: string | null
           total_colis?: number
@@ -252,6 +254,7 @@ export type Database = {
           description?: string | null
           id?: string
           location?: string | null
+          min_stock?: number
           name?: string
           pallet_number?: string | null
           total_colis?: number
