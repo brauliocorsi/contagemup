@@ -125,6 +125,47 @@ export type Database = {
           },
         ]
       }
+      product_changes: {
+        Row: {
+          change_type: string
+          changed_at: string
+          changed_by: string | null
+          field_changed: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          product_id: string
+        }
+        Insert: {
+          change_type: string
+          changed_at?: string
+          changed_by?: string | null
+          field_changed?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          product_id: string
+        }
+        Update: {
+          change_type?: string
+          changed_at?: string
+          changed_by?: string | null
+          field_changed?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_changes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category: string

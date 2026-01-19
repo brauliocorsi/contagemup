@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
+import { useProductChanges } from '@/hooks/useProductChanges';
 import { ProductForm } from './ProductForm';
 import { ProductEditForm } from './ProductEditForm';
+import { ProductHistoryDialog } from './ProductHistoryDialog';
 import { ImportProducts } from './ImportProducts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Trash2, Edit, Package, MapPin, Box } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Product } from '@/types/stock';
@@ -17,8 +19,10 @@ import { Product } from '@/types/stock';
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
   const { categories, createCategory, refetch: refetchCategories } = useCategories();
+  const { logChange, logMultipleChanges } = useProductChanges();
   const [searchTerm, setSearchTerm] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
 
   const existingCategoryNames = categories.map(c => c.name);
 
@@ -31,6 +35,9 @@ export function ProductsView() {
 
   const handleCreateProduct = async (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null }) => {
     const result = await createProduct(product);
+    if (result) {
+      await logChange(result.id, 'created');
+    }
     return !!result;
   };
 
@@ -44,7 +51,43 @@ export function ProductsView() {
   };
 
   const handleUpdateProduct = async (id: string, updates: Partial<Product>): Promise<boolean> => {
-    return await updateProduct(id, updates);
+    // Find the original product to compare changes
+    const originalProduct = products.find(p => p.id === id);
+    
+    const success = await updateProduct(id, updates);
+    
+    if (success && originalProduct) {
+      // Log each changed field
+      const changes: Array<{ field: string; oldValue: string | number | null; newValue: string | number | null }> = [];
+      
+      if (updates.code !== undefined && updates.code !== originalProduct.code) {
+        changes.push({ field: 'code', oldValue: originalProduct.code, newValue: updates.code });
+      }
+      if (updates.name !== undefined && updates.name !== originalProduct.name) {
+        changes.push({ field: 'name', oldValue: originalProduct.name, newValue: updates.name });
+      }
+      if (updates.category !== undefined && updates.category !== originalProduct.category) {
+        changes.push({ field: 'category', oldValue: originalProduct.category, newValue: updates.category });
+      }
+      if (updates.total_colis !== undefined && updates.total_colis !== originalProduct.total_colis) {
+        changes.push({ field: 'total_colis', oldValue: originalProduct.total_colis, newValue: updates.total_colis });
+      }
+      if (updates.description !== undefined && updates.description !== originalProduct.description) {
+        changes.push({ field: 'description', oldValue: originalProduct.description, newValue: updates.description });
+      }
+      if (updates.location !== undefined && updates.location !== originalProduct.location) {
+        changes.push({ field: 'location', oldValue: originalProduct.location, newValue: updates.location });
+      }
+      if (updates.pallet_number !== undefined && updates.pallet_number !== originalProduct.pallet_number) {
+        changes.push({ field: 'pallet_number', oldValue: originalProduct.pallet_number, newValue: updates.pallet_number });
+      }
+      
+      if (changes.length > 0) {
+        await logMultipleChanges(id, changes);
+      }
+    }
+    
+    return success;
   };
 
   if (loading) {
@@ -150,13 +193,22 @@ export function ProductsView() {
                           <Button 
                             variant="ghost" 
                             size="icon"
+                            onClick={() => setHistoryProduct(product)}
+                            title="Ver histórico"
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
                             onClick={() => setEditingProduct(product)}
+                            title="Editar"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title="Eliminar">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
@@ -199,6 +251,16 @@ export function ProductsView() {
           open={!!editingProduct}
           onOpenChange={(open) => !open && setEditingProduct(null)}
           onSubmit={handleUpdateProduct}
+        />
+      )}
+
+      {/* Product History Dialog */}
+      {historyProduct && (
+        <ProductHistoryDialog
+          productId={historyProduct.id}
+          productName={historyProduct.name}
+          open={!!historyProduct}
+          onOpenChange={(open) => !open && setHistoryProduct(null)}
         />
       )}
     </div>
