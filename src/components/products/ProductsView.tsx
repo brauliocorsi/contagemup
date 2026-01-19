@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { useProductChanges } from '@/hooks/useProductChanges';
@@ -10,9 +10,10 @@ import { ImportProducts } from './ImportProducts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -26,17 +27,66 @@ export function ProductsView() {
   const { logChange, logMultipleChanges } = useProductChanges();
   const { lastCounts } = useLastCounts();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
 
   const existingCategoryNames = categories.map(c => c.name);
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.pallet_number?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const matchesSearch = 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.pallet_number?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const hasCount = !!lastCounts[product.id];
+      const matchesCountStatus = 
+        filterCountStatus === 'all' ||
+        (filterCountStatus === 'with_count' && hasCount) ||
+        (filterCountStatus === 'without_count' && !hasCount);
+      
+      return matchesSearch && matchesCountStatus;
+    });
+  }, [products, searchTerm, filterCountStatus, lastCounts]);
+
+  // Count stats for filter
+  const countStats = useMemo(() => {
+    const withCount = products.filter(p => !!lastCounts[p.id]).length;
+    const withoutCount = products.length - withCount;
+    return { withCount, withoutCount };
+  }, [products, lastCounts]);
+
+  const exportLastCounts = () => {
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Última Quantidade', 'Sessão', 'Data Contagem'];
+    const rows = filteredProducts.map(product => {
+      const lastCount = lastCounts[product.id];
+      return [
+        product.code,
+        product.name,
+        product.category,
+        product.location || '',
+        product.pallet_number || '',
+        lastCount?.totalQuantity?.toString() || '0',
+        lastCount?.sessionName || '-',
+        lastCount?.countedAt 
+          ? format(new Date(lastCount.countedAt), 'dd/MM/yyyy HH:mm', { locale: pt })
+          : '-'
+      ];
+    });
+    
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+    ].join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `ultima_contagem_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.csv`;
+    link.click();
+  };
 
   const handleCreateProduct = async (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null }) => {
     const result = await createProduct(product);
@@ -124,15 +174,32 @@ export function ProductsView() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Pesquisar por nome, código, localização ou palete..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search and filters */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar por nome, código, localização ou palete..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={filterCountStatus} onValueChange={(v) => setFilterCountStatus(v as typeof filterCountStatus)}>
+          <SelectTrigger className={`w-full sm:w-56 transition-colors ${filterCountStatus !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
+            <Filter className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Filtrar por contagem" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos ({products.length})</SelectItem>
+            <SelectItem value="with_count">Com contagem ({countStats.withCount})</SelectItem>
+            <SelectItem value="without_count">Sem contagem ({countStats.withoutCount})</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" onClick={exportLastCounts} className="whitespace-nowrap">
+          <Download className="h-4 w-4 mr-2" />
+          Exportar Última Contagem
+        </Button>
       </div>
 
       {/* Products table */}
