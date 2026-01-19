@@ -9,11 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter, MapPin, Box, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter, MapPin, Box, ChevronDown, ChevronUp, Eye, PieChart } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LocationStatsCard } from './LocationStatsCard';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
+import { ReportsCharts } from './ReportsCharts';
 
 export function ReportsView() {
   const { products, loading: productsLoading } = useProducts();
@@ -23,6 +24,7 @@ export function ReportsView() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [categoryStatsOpen, setCategoryStatsOpen] = useState(true);
   const [locationStatsOpen, setLocationStatsOpen] = useState(true);
+  const [chartsOpen, setChartsOpen] = useState(true);
   const [selectedProductForDetails, setSelectedProductForDetails] = useState<any>(null);
   const [productDetailsOpen, setProductDetailsOpen] = useState(false);
   
@@ -299,6 +301,38 @@ export function ReportsView() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Charts Section - Collapsible */}
+          <Collapsible open={chartsOpen} onOpenChange={setChartsOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <PieChart className="h-4 w-4" />
+                      Gráficos Visuais
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      {chartsOpen ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0">
+                  <ReportsCharts
+                    productsWithCounts={productsWithCounts}
+                    categoryStats={categoryStats}
+                    locationStats={locationStats}
+                  />
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
           {/* Category Stats - Collapsible */}
           {categoryStats.length > 0 && (
