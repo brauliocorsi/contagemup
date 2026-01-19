@@ -119,27 +119,52 @@ export function CountingView() {
     return productsWithCounts.filter(p => sessionCategories.includes(p.category));
   }, [productsWithCounts, currentSession]);
 
-  // Extract unique categories from session filtered products
-  const uniqueCategories = useMemo(() => {
-    const cats = sessionFilteredProducts
-      .map(p => p.category)
-      .filter((cat): cat is string => cat !== null && cat !== undefined && cat.trim() !== '');
-    return [...new Set(cats)].sort();
+  // Extract unique categories from session filtered products with counts
+  const categoriesWithCounts = useMemo(() => {
+    const countMap: Record<string, number> = {};
+    sessionFilteredProducts.forEach(p => {
+      if (p.category) {
+        countMap[p.category] = (countMap[p.category] || 0) + 1;
+      }
+    });
+    return Object.entries(countMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [sessionFilteredProducts]);
 
-  // Extract unique locations and pallets from products for filters
-  const uniqueLocations = useMemo(() => {
-    const locations = sessionFilteredProducts
-      .map(p => p.location)
-      .filter((loc): loc is string => loc !== null && loc !== undefined && loc.trim() !== '');
-    return [...new Set(locations)].sort();
+  // Extract unique locations with counts
+  const locationsWithCounts = useMemo(() => {
+    const countMap: Record<string, number> = {};
+    sessionFilteredProducts.forEach(p => {
+      if (p.location && p.location.trim()) {
+        countMap[p.location] = (countMap[p.location] || 0) + 1;
+      }
+    });
+    return Object.entries(countMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [sessionFilteredProducts]);
 
-  const uniquePallets = useMemo(() => {
-    const pallets = sessionFilteredProducts
-      .map(p => p.pallet_number)
-      .filter((pallet): pallet is string => pallet !== null && pallet !== undefined && pallet.trim() !== '');
-    return [...new Set(pallets)].sort();
+  // Extract unique pallets with counts
+  const palletsWithCounts = useMemo(() => {
+    const countMap: Record<string, number> = {};
+    sessionFilteredProducts.forEach(p => {
+      if (p.pallet_number && p.pallet_number.trim()) {
+        countMap[p.pallet_number] = (countMap[p.pallet_number] || 0) + 1;
+      }
+    });
+    return Object.entries(countMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [sessionFilteredProducts]);
+
+  // Status counts
+  const statusCounts = useMemo(() => {
+    const incomplete = sessionFilteredProducts.filter(p => p.hasPartialProduct).length;
+    const complete = sessionFilteredProducts.filter(p => p.completeSets > 0).length;
+    const excess = sessionFilteredProducts.filter(p => p.status === 'excess').length;
+    const notCounted = sessionFilteredProducts.filter(p => p.status === 'not_counted').length;
+    return { incomplete, complete, excess, notCounted };
   }, [sessionFilteredProducts]);
 
   const filteredProducts = useMemo(() => {
@@ -354,54 +379,54 @@ export function CountingView() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-48">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos status</SelectItem>
-              <SelectItem value="incomplete">Incompletos</SelectItem>
-              <SelectItem value="complete">Completos</SelectItem>
-              <SelectItem value="excess">Excesso</SelectItem>
-              <SelectItem value="not_counted">Não contados</SelectItem>
+              <SelectItem value="all">Todos status ({sessionFilteredProducts.length})</SelectItem>
+              <SelectItem value="incomplete">Incompletos ({statusCounts.incomplete})</SelectItem>
+              <SelectItem value="complete">Completos ({statusCounts.complete})</SelectItem>
+              <SelectItem value="excess">Excesso ({statusCounts.excess})</SelectItem>
+              <SelectItem value="not_counted">Não contados ({statusCounts.notCounted})</SelectItem>
             </SelectContent>
           </Select>
 
           <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-48">
               <Tags className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Categoria" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas categorias</SelectItem>
-              {uniqueCategories.map(cat => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              <SelectItem value="all">Todas categorias ({sessionFilteredProducts.length})</SelectItem>
+              {categoriesWithCounts.map(({ name, count }) => (
+                <SelectItem key={name} value={name}>{name} ({count})</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
           <Select value={filterLocation} onValueChange={setFilterLocation}>
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="w-full sm:w-48">
               <MapPin className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Localização" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas localizações</SelectItem>
-              {uniqueLocations.map(loc => (
-                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+              <SelectItem value="all">Todas localizações ({sessionFilteredProducts.length})</SelectItem>
+              {locationsWithCounts.map(({ name, count }) => (
+                <SelectItem key={name} value={name}>{name} ({count})</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
           <Select value={filterPallet} onValueChange={setFilterPallet}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-48">
               <Box className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Palete" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos paletes</SelectItem>
-              {uniquePallets.map(pallet => (
-                <SelectItem key={pallet} value={pallet}>{pallet}</SelectItem>
+              <SelectItem value="all">Todos paletes ({sessionFilteredProducts.length})</SelectItem>
+              {palletsWithCounts.map(({ name, count }) => (
+                <SelectItem key={name} value={name}>{name} ({count})</SelectItem>
               ))}
             </SelectContent>
           </Select>
