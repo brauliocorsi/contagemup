@@ -520,7 +520,7 @@ export function ReconciliationView() {
   return (
     <div className="p-4 space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">Conciliação de Stock</h2>
+        <h2 className="text-lg font-semibold">Separação de Stock</h2>
         <p className="text-sm text-muted-foreground">
           Compare o stock esperado com a contagem realizada
         </p>
