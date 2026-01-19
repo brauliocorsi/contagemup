@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags, MapPin, Box } from 'lucide-react';
+import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags, MapPin, Box, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -149,13 +149,24 @@ export function CountingView() {
   const locationsWithCounts = useMemo(() => {
     const countMap: Record<string, number> = {};
     sessionFilteredProducts.forEach(p => {
-      if (p.location && p.location.trim()) {
-        countMap[p.location] = (countMap[p.location] || 0) + 1;
+      const loc = p.location?.trim();
+      if (loc) {
+        countMap[loc] = (countMap[loc] || 0) + 1;
       }
     });
     return Object.entries(countMap)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  }, [sessionFilteredProducts]);
+
+  // Count products without location
+  const productsWithoutLocation = useMemo(() => {
+    return sessionFilteredProducts.filter(p => !p.location?.trim()).length;
+  }, [sessionFilteredProducts]);
+
+  // Count products without pallet
+  const productsWithoutPallet = useMemo(() => {
+    return sessionFilteredProducts.filter(p => !p.pallet_number?.trim()).length;
   }, [sessionFilteredProducts]);
 
   // Extract unique pallets with counts
@@ -197,13 +208,17 @@ export function CountingView() {
         (filterStatus === 'incomplete' && isPending) ||
         (filterStatus !== 'complete' && filterStatus !== 'incomplete' && product.status === filterStatus);
 
-      // Fixed location filter - handle null/undefined properly
+      // Fixed location filter - handle null/undefined and "no location" option
+      const productLocation = product.location?.trim() || '';
       const matchesLocation = filterLocation === 'all' || 
-        (product.location !== null && product.location !== undefined && product.location === filterLocation);
+        (filterLocation === '__empty__' && !productLocation) ||
+        (productLocation === filterLocation);
       
-      // Fixed pallet filter - handle null/undefined properly  
+      // Fixed pallet filter - handle null/undefined and "no pallet" option  
+      const productPallet = product.pallet_number?.trim() || '';
       const matchesPallet = filterPallet === 'all' || 
-        (product.pallet_number !== null && product.pallet_number !== undefined && product.pallet_number === filterPallet);
+        (filterPallet === '__empty__' && !productPallet) ||
+        (productPallet === filterPallet);
       
       // Category filter
       const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
@@ -425,6 +440,9 @@ export function CountingView() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas localizações ({sessionFilteredProducts.length})</SelectItem>
+              {productsWithoutLocation > 0 && (
+                <SelectItem value="__empty__">Sem localização ({productsWithoutLocation})</SelectItem>
+              )}
               {locationsWithCounts.map(({ name, count }) => (
                 <SelectItem key={name} value={name}>{name} ({count})</SelectItem>
               ))}
@@ -438,11 +456,33 @@ export function CountingView() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos paletes ({sessionFilteredProducts.length})</SelectItem>
+              {productsWithoutPallet > 0 && (
+                <SelectItem value="__empty__">Sem palete ({productsWithoutPallet})</SelectItem>
+              )}
               {palletsWithCounts.map(({ name, count }) => (
                 <SelectItem key={name} value={name}>{name} ({count})</SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          {/* Clear filters button */}
+          {(filterStatus !== 'all' || filterLocation !== 'all' || filterPallet !== 'all' || filterCategory !== 'all' || searchTerm !== '') && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setFilterStatus('all');
+                setFilterLocation('all');
+                setFilterPallet('all');
+                setFilterCategory('all');
+                setSearchTerm('');
+              }}
+              className="whitespace-nowrap"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Limpar filtros
+            </Button>
+          )}
         </div>
       </div>
 
