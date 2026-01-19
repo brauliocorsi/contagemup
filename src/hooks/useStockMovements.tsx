@@ -163,13 +163,16 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
 
       if (movementError) throw movementError;
 
-      // Update each product's stock
+      // Update each product's stock and check for alerts
+      const lowStockProducts: string[] = [];
+      const outOfStockProducts: string[] = [];
+
       for (const item of items) {
         const stockChange = type === 'entrada' ? item.quantity : -item.quantity;
         
         const { data: product } = await supabase
           .from('products')
-          .select('current_stock')
+          .select('current_stock, min_stock, name')
           .eq('id', item.product_id)
           .single();
 
@@ -179,15 +182,52 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
           .from('products')
           .update({ current_stock: newStock })
           .eq('id', item.product_id);
+
+        // Check for low stock alerts (only on exits)
+        if (type === 'saida' && product) {
+          const minStock = product.min_stock ?? 5;
+          if (newStock <= 0) {
+            outOfStockProducts.push(product.name);
+          } else if (newStock <= minStock) {
+            lowStockProducts.push(product.name);
+          }
+        }
       }
+
+      return { lowStockProducts, outOfStockProducts };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      
       toast({
         title: 'Movimentos registados',
         description: `${variables.items.length} ${variables.type === 'entrada' ? 'entradas' : 'saídas'} registadas com sucesso.`,
       });
+
+      // Show alerts for low stock products
+      if (result?.outOfStockProducts && result.outOfStockProducts.length > 0) {
+        setTimeout(() => {
+          toast({
+            title: '⚠️ Produtos Esgotados!',
+            description: result.outOfStockProducts.length === 1
+              ? `${result.outOfStockProducts[0]} ficou sem stock!`
+              : `${result.outOfStockProducts.length} produtos ficaram sem stock!`,
+            variant: 'destructive',
+          });
+        }, 500);
+      }
+
+      if (result?.lowStockProducts && result.lowStockProducts.length > 0) {
+        setTimeout(() => {
+          toast({
+            title: '📉 Stock Baixo',
+            description: result.lowStockProducts.length === 1
+              ? `${result.lowStockProducts[0]} está com stock baixo`
+              : `${result.lowStockProducts.length} produtos estão com stock baixo`,
+          });
+        }, result?.outOfStockProducts?.length ? 1000 : 500);
+      }
     },
     onError: (error) => {
       toast({
