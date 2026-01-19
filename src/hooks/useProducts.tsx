@@ -1,31 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Product } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
 
 export function useProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchProducts = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('name');
+  // Fetch products with react-query
+  const { data: products = [], isLoading: loading, refetch: fetchProducts } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('name');
 
-    if (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar os produtos',
-        variant: 'destructive'
-      });
-    } else {
-      setProducts((data as Product[]) || []);
-    }
-    setLoading(false);
-  };
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível carregar os produtos',
+          variant: 'destructive'
+        });
+        throw error;
+      }
+
+      return (data as Product[]) || [];
+    },
+  });
 
   const createProduct = async (product: Omit<Product, 'id' | 'created_at' | 'updated_at'> | { code: string; name: string; category: string; total_colis: number; description: string | null; location?: string | null; pallet_number?: string | null }) => {
     const { data, error } = await supabase
@@ -46,7 +48,7 @@ export function useProducts() {
     }
 
     toast({ title: 'Sucesso', description: 'Produto criado com sucesso' });
-    await fetchProducts();
+    queryClient.invalidateQueries({ queryKey: ['products'] });
     return data as Product;
   };
 
@@ -94,7 +96,7 @@ export function useProducts() {
     }
 
     toast({ title: 'Sucesso', description: 'Produto atualizado' });
-    await fetchProducts();
+    queryClient.invalidateQueries({ queryKey: ['products'] });
     return true;
   };
 
@@ -114,7 +116,7 @@ export function useProducts() {
     }
 
     toast({ title: 'Sucesso', description: 'Produto eliminado' });
-    await fetchProducts();
+    queryClient.invalidateQueries({ queryKey: ['products'] });
     return true;
   };
 
@@ -157,13 +159,9 @@ export function useProducts() {
       : `${uniqueProducts.length} produtos importados`;
     
     toast({ title: 'Sucesso', description: message });
-    await fetchProducts();
+    queryClient.invalidateQueries({ queryKey: ['products'] });
     return true;
   };
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
 
   return {
     products,
