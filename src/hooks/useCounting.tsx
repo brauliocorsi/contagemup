@@ -157,6 +157,32 @@ export function useCounting(sessionId: string | null) {
         quantity_after: newQuantity,
         counted_by: user?.id
       });
+
+      // Sync with product stock - increment current_stock by 1
+      const { data: product } = await supabase
+        .from('products')
+        .select('current_stock, name, min_stock')
+        .eq('id', productId)
+        .maybeSingle();
+
+      if (product) {
+        const newStock = (product.current_stock || 0) + 1;
+        
+        await supabase
+          .from('products')
+          .update({ current_stock: newStock })
+          .eq('id', productId);
+
+        // Register stock movement
+        await supabase.from('stock_movements').insert({
+          product_id: productId,
+          movement_type: 'entrada',
+          quantity: 1,
+          reason: 'Contagem - Sessão',
+          reference: sessionId,
+          created_by: user?.id
+        });
+      }
     }
     
     return success;
@@ -184,6 +210,47 @@ export function useCounting(sessionId: string | null) {
         quantity_after: newQuantity,
         counted_by: user?.id
       });
+
+      // Sync with product stock - decrement current_stock by 1
+      const { data: product } = await supabase
+        .from('products')
+        .select('current_stock, name, min_stock')
+        .eq('id', productId)
+        .maybeSingle();
+
+      if (product) {
+        const newStock = Math.max(0, (product.current_stock || 0) - 1);
+        
+        await supabase
+          .from('products')
+          .update({ current_stock: newStock })
+          .eq('id', productId);
+
+        // Register stock movement
+        await supabase.from('stock_movements').insert({
+          product_id: productId,
+          movement_type: 'saida',
+          quantity: 1,
+          reason: 'Contagem - Sessão',
+          reference: sessionId,
+          created_by: user?.id
+        });
+
+        // Check for stock alerts
+        if (newStock === 0) {
+          toast({
+            title: 'Produto Esgotado',
+            description: `${product.name} está sem stock!`,
+            variant: 'destructive'
+          });
+        } else if (newStock <= (product.min_stock || 5)) {
+          toast({
+            title: 'Stock Baixo',
+            description: `${product.name} está com stock baixo (${newStock})`,
+            variant: 'destructive'
+          });
+        }
+      }
     }
     
     return success;
