@@ -34,12 +34,13 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   colis: 80,
   stock: 100,
   lastCount: 140,
+  colisLocations: 180,
   location: 120,
   pallet: 100,
   actions: 120,
 };
 
-type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'lastCount' | 'location' | 'pallet';
+type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'lastCount' | 'colisLocations' | 'location' | 'pallet';
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   code: 'Código',
@@ -48,11 +49,12 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   colis: 'Colis',
   stock: 'Stock',
   lastCount: 'Última Contagem',
+  colisLocations: 'Colis/Localização',
   location: 'Localização',
   pallet: 'Palete',
 };
 
-const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'lastCount', 'location', 'pallet'];
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'lastCount', 'colisLocations', 'location', 'pallet'];
 
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
@@ -564,6 +566,11 @@ export function ProductsView() {
                           </span>
                         </ResizableHeaderCell>
                       )}
+                      {isColumnVisible('colisLocations') && (
+                        <ResizableHeaderCell columnId="colisLocations" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
+                          Colis/Localização
+                        </ResizableHeaderCell>
+                      )}
                       {isColumnVisible('location') && (
                         <ResizableHeaderCell columnId="location" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
                           Localização
@@ -628,6 +635,58 @@ export function ProductsView() {
                                     <p className="text-xs text-muted-foreground">
                                       {format(new Date(lastCount.countedAt), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
                                     </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </ResizableCell>
+                        )}
+                        {isColumnVisible('colisLocations') && (
+                          <ResizableCell columnId="colisLocations" className="p-2 align-middle">
+                            {lastCount && lastCount.colisLocations.length > 0 ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex flex-wrap gap-0.5 max-w-[200px]">
+                                      {lastCount.uniqueLocations.length > 0 ? (
+                                        lastCount.uniqueLocations.length === 1 ? (
+                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                            <MapPin className="h-2.5 w-2.5" />
+                                            {lastCount.uniqueLocations[0]}
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="text-xs flex items-center gap-1 bg-orange-50 text-orange-700 border-orange-300">
+                                            <MapPin className="h-2.5 w-2.5" />
+                                            {lastCount.uniqueLocations.length} locais
+                                          </Badge>
+                                        )
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">-</span>
+                                      )}
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="max-w-[300px]">
+                                    <p className="font-medium mb-1">Colis por localização:</p>
+                                    <div className="space-y-0.5 text-xs">
+                                      {lastCount.colisLocations.map(c => (
+                                        <div key={c.colisNumber} className="flex items-center gap-2">
+                                          <span className="font-mono">C{c.colisNumber}</span>
+                                          <span>→</span>
+                                          <span className="flex items-center gap-1">
+                                            <MapPin className="h-2.5 w-2.5" />
+                                            {c.location || 'Sem local'}
+                                          </span>
+                                          {c.palletNumber && (
+                                            <span className="flex items-center gap-1 text-muted-foreground">
+                                              <Box className="h-2.5 w-2.5" />
+                                              {c.palletNumber}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>

@@ -7,18 +7,33 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Map, ChevronDown, ChevronUp, Package, MapPin, CheckCircle2, AlertCircle, Box, Eye } from 'lucide-react';
-import { ProductWithCounts } from '@/types/stock';
+import { ProductWithCounts, ColisDetail } from '@/types/stock';
 import { cn } from '@/lib/utils';
 
 interface WarehouseMapProps {
   productsWithCounts: ProductWithCounts[];
+  categoryColisNamesMap?: Record<string, Record<string, string> | null>;
   onProductClick?: (productId: string) => void;
+}
+
+interface ColisInZone {
+  productId: string;
+  productCode: string;
+  productName: string;
+  productCategory: string;
+  colisNumber: number;
+  colisName: string | null;
+  totalColis: number;
+  quantity: number;
+  palletNumber: string | null;
 }
 
 interface ZoneData {
   name: string;
   products: ProductWithCounts[];
+  colisInZone: ColisInZone[];
   totalProducts: number;
+  totalColis: number;
   totalSets: number;
   completeProducts: number;
   incompleteProducts: number;
@@ -26,36 +41,56 @@ interface ZoneData {
   completionPercentage: number;
 }
 
-export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMapProps) {
+export function WarehouseMap({ productsWithCounts, categoryColisNamesMap, onProductClick }: WarehouseMapProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [selectedZone, setSelectedZone] = useState<ZoneData | null>(null);
   const [zoneDialogOpen, setZoneDialogOpen] = useState(false);
 
-  // Group products by location
+  // Group products and colis by location
   const zones = useMemo(() => {
-    const locationMap: Record<string, ProductWithCounts[]> = {};
+    const locationMap: Record<string, { products: Set<ProductWithCounts>; colis: ColisInZone[] }> = {};
 
     productsWithCounts.forEach(product => {
-      // Get all unique locations for this product
-      const locations = product.uniqueLocations.length > 0 
-        ? product.uniqueLocations 
-        : [product.location || 'Sem localização'];
-
-      locations.forEach(loc => {
-        if (!locationMap[loc]) {
-          locationMap[loc] = [];
+      const colisNames = categoryColisNamesMap?.[product.category];
+      
+      // Process each coli's location
+      product.colisDetails.forEach(coli => {
+        const location = coli.location || product.location || 'Sem localização';
+        
+        if (!locationMap[location]) {
+          locationMap[location] = { products: new Set(), colis: [] };
         }
-        const existing = locationMap[loc];
-        if (!existing.find(p => p.id === product.id)) {
-          existing.push(product);
-        }
+        
+        locationMap[location].products.add(product);
+        locationMap[location].colis.push({
+          productId: product.id,
+          productCode: product.code,
+          productName: product.name,
+          productCategory: product.category,
+          colisNumber: coli.colis_number,
+          colisName: colisNames?.[coli.colis_number.toString()] || null,
+          totalColis: product.total_colis,
+          quantity: coli.quantity,
+          palletNumber: coli.pallet_number
+        });
       });
+
+      // If product has no colis details, add to default location
+      if (product.colisDetails.length === 0) {
+        const location = product.location || 'Sem localização';
+        if (!locationMap[location]) {
+          locationMap[location] = { products: new Set(), colis: [] };
+        }
+        locationMap[location].products.add(product);
+      }
     });
 
     const zonesArray: ZoneData[] = [];
     
-    Object.entries(locationMap).forEach(([name, products]) => {
+    Object.entries(locationMap).forEach(([name, data]) => {
+      const products = Array.from(data.products);
       const totalProducts = products.length;
+      const totalColis = data.colis.length;
       const totalSets = products.reduce((sum, p) => sum + p.completeSets, 0);
       const completeProducts = products.filter(p => p.completeSets > 0 && !p.hasPartialProduct).length;
       const incompleteProducts = products.filter(p => p.hasPartialProduct || (p.completeSets === 0 && p.status !== 'not_counted')).length;
@@ -78,7 +113,13 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
       zonesArray.push({
         name,
         products,
+        colisInZone: data.colis.sort((a, b) => {
+          const nameComp = a.productName.localeCompare(b.productName);
+          if (nameComp !== 0) return nameComp;
+          return a.colisNumber - b.colisNumber;
+        }),
         totalProducts,
+        totalColis,
         totalSets,
         completeProducts,
         incompleteProducts,
@@ -94,7 +135,7 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
       if (orderDiff !== 0) return orderDiff;
       return a.name.localeCompare(b.name);
     });
-  }, [productsWithCounts]);
+  }, [productsWithCounts, categoryColisNamesMap]);
 
   // Stats
   const stats = useMemo(() => {
@@ -102,7 +143,8 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
     const complete = zones.filter(z => z.status === 'complete').length;
     const incomplete = zones.filter(z => z.status === 'incomplete').length;
     const partial = zones.filter(z => z.status === 'partial').length;
-    return { total, complete, incomplete, partial };
+    const totalColis = zones.reduce((sum, z) => sum + z.totalColis, 0);
+    return { total, complete, incomplete, partial, totalColis };
   }, [zones]);
 
   const getZoneColor = (status: ZoneData['status']) => {
@@ -153,7 +195,7 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
                   <Map className="h-4 w-4" />
                   Mapa do Armazém
                   <Badge variant="outline" className="ml-2">
-                    {zones.length} zonas
+                    {zones.length} zonas • {stats.totalColis} colis
                   </Badge>
                 </CardTitle>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -207,6 +249,10 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
                               <span className="font-bold">{zone.totalProducts}</span>
                             </div>
                             <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Colis:</span>
+                              <span className="font-bold">{zone.totalColis}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
                               <span className="text-muted-foreground">Sets:</span>
                               <span className="font-bold">{zone.totalSets}</span>
                             </div>
@@ -232,16 +278,17 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
                           </div>
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[250px]">
+                      <TooltipContent side="top" className="max-w-[280px]">
                         <div className="space-y-1">
                           <p className="font-medium">{zone.name}</p>
                           <div className="text-xs space-y-0.5">
+                            <p>📦 {zone.totalProducts} produtos</p>
+                            <p>🧩 {zone.totalColis} colis nesta zona</p>
                             <p className="text-green-600">✓ {zone.completeProducts} completos</p>
                             <p className="text-red-600">✗ {zone.incompleteProducts} incompletos</p>
-                            <p className="text-blue-600">📦 {zone.totalSets} sets totais</p>
                           </div>
                           <p className="text-xs text-muted-foreground pt-1">
-                            Clique para ver detalhes
+                            Clique para ver colis
                           </p>
                         </div>
                       </TooltipContent>
@@ -251,10 +298,14 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
               </div>
 
               {/* Summary stats */}
-              <div className="grid grid-cols-4 gap-4 pt-2">
+              <div className="grid grid-cols-5 gap-4 pt-2">
                 <div className="text-center p-3 rounded-lg bg-muted/50">
                   <p className="text-xl font-bold">{zones.length}</p>
                   <p className="text-xs text-muted-foreground">Zonas</p>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-blue-50">
+                  <p className="text-xl font-bold text-blue-600">{stats.totalColis}</p>
+                  <p className="text-xs text-muted-foreground">Colis</p>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-green-50">
                   <p className="text-xl font-bold text-green-600">{stats.complete}</p>
@@ -274,9 +325,9 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
         </Card>
       </Collapsible>
 
-      {/* Zone Details Dialog */}
+      {/* Zone Details Dialog - Now shows colis details */}
       <Dialog open={zoneDialogOpen} onOpenChange={setZoneDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" />
@@ -301,13 +352,17 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
           {selectedZone && (
             <div className="flex-1 overflow-auto space-y-4">
               {/* Zone stats */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-5 gap-3">
                 <div className="text-center p-2 rounded-lg bg-muted/50">
                   <p className="text-lg font-bold">{selectedZone.totalProducts}</p>
                   <p className="text-xs text-muted-foreground">Produtos</p>
                 </div>
                 <div className="text-center p-2 rounded-lg bg-blue-50">
-                  <p className="text-lg font-bold text-blue-600">{selectedZone.totalSets}</p>
+                  <p className="text-lg font-bold text-blue-600">{selectedZone.totalColis}</p>
+                  <p className="text-xs text-muted-foreground">Colis</p>
+                </div>
+                <div className="text-center p-2 rounded-lg bg-primary/10">
+                  <p className="text-lg font-bold text-primary">{selectedZone.totalSets}</p>
                   <p className="text-xs text-muted-foreground">Sets</p>
                 </div>
                 <div className="text-center p-2 rounded-lg bg-green-50">
@@ -320,87 +375,92 @@ export function WarehouseMap({ productsWithCounts, onProductClick }: WarehouseMa
                 </div>
               </div>
 
-              {/* Products table */}
+              {/* Colis table - detailed view */}
               <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="py-2">Código</TableHead>
-                      <TableHead className="py-2">Nome</TableHead>
-                      <TableHead className="py-2">Categoria</TableHead>
-                      <TableHead className="py-2 text-center">Sets</TableHead>
-                      <TableHead className="py-2">Status</TableHead>
-                      <TableHead className="py-2">Palete</TableHead>
-                      {onProductClick && <TableHead className="py-2 w-20">Ações</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedZone.products.map(product => (
-                      <TableRow 
-                        key={product.id}
-                        className={cn(
-                          product.hasPartialProduct && "bg-yellow-50/50"
-                        )}
-                      >
-                        <TableCell className="py-2 font-mono text-sm">{product.code}</TableCell>
-                        <TableCell className="py-2">{product.name}</TableCell>
-                        <TableCell className="py-2">
-                          <Badge variant="outline" className="text-xs">{product.category}</Badge>
-                        </TableCell>
-                        <TableCell className="py-2 text-center font-bold">{product.completeSets}</TableCell>
-                        <TableCell className="py-2">
-                          {product.completeSets > 0 && !product.hasPartialProduct && (
-                            <Badge className="bg-green-100 text-green-800">Completo</Badge>
-                          )}
-                          {product.completeSets > 0 && product.hasPartialProduct && (
-                            <Badge className="bg-yellow-100 text-yellow-800">Pendente</Badge>
-                          )}
-                          {product.completeSets === 0 && product.status !== 'not_counted' && (
-                            <Badge variant="destructive">Incompleto</Badge>
-                          )}
-                          {product.status === 'not_counted' && (
-                            <Badge variant="secondary">Não contado</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {product.uniquePallets.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {product.uniquePallets.slice(0, 2).map((p, i) => (
-                                <Badge key={i} variant="secondary" className="text-xs">
-                                  <Box className="h-2.5 w-2.5 mr-1" />
-                                  {p}
-                                </Badge>
-                              ))}
-                              {product.uniquePallets.length > 2 && (
-                                <Badge variant="secondary" className="text-xs">
-                                  +{product.uniquePallets.length - 2}
-                                </Badge>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        {onProductClick && (
-                          <TableCell className="py-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => {
-                                setZoneDialogOpen(false);
-                                onProductClick(product.id);
-                              }}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              Ver
-                            </Button>
-                          </TableCell>
-                        )}
+                <div className="bg-muted/50 px-3 py-2 border-b">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Colis nesta localização ({selectedZone.colisInZone.length})
+                  </h4>
+                </div>
+                <div className="max-h-[400px] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30">
+                        <TableHead className="py-2 sticky top-0 bg-muted/30">Produto</TableHead>
+                        <TableHead className="py-2 sticky top-0 bg-muted/30">Código</TableHead>
+                        <TableHead className="py-2 sticky top-0 bg-muted/30">Coli</TableHead>
+                        <TableHead className="py-2 sticky top-0 bg-muted/30">Parte</TableHead>
+                        <TableHead className="py-2 text-center sticky top-0 bg-muted/30">Qtd</TableHead>
+                        <TableHead className="py-2 sticky top-0 bg-muted/30">Palete</TableHead>
+                        {onProductClick && <TableHead className="py-2 w-16 sticky top-0 bg-muted/30">Ver</TableHead>}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedZone.colisInZone.map((coli, idx) => (
+                        <TableRow key={`${coli.productId}-${coli.colisNumber}`}>
+                          <TableCell className="py-1.5 text-sm font-medium max-w-[200px] truncate">
+                            {coli.productName}
+                          </TableCell>
+                          <TableCell className="py-1.5 font-mono text-xs text-muted-foreground">
+                            {coli.productCode}
+                          </TableCell>
+                          <TableCell className="py-1.5">
+                            <Badge variant="outline" className="text-xs">
+                              {coli.colisNumber}/{coli.totalColis}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-1.5 text-sm text-muted-foreground">
+                            {coli.colisName || '-'}
+                          </TableCell>
+                          <TableCell className="py-1.5 text-center">
+                            <Badge 
+                              variant={coli.quantity > 0 ? "default" : "secondary"}
+                              className={cn(
+                                "text-xs",
+                                coli.quantity > 0 && "bg-green-100 text-green-800"
+                              )}
+                            >
+                              {coli.quantity}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-1.5">
+                            {coli.palletNumber ? (
+                              <Badge variant="secondary" className="text-xs">
+                                <Box className="h-2.5 w-2.5 mr-1" />
+                                {coli.palletNumber}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          {onProductClick && (
+                            <TableCell className="py-1.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => {
+                                  setZoneDialogOpen(false);
+                                  onProductClick(coli.productId);
+                                }}
+                              >
+                                <Eye className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                      {selectedZone.colisInZone.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                            Nenhum coli registado nesta localização
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </div>
           )}
