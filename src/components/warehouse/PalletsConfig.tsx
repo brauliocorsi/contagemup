@@ -226,15 +226,20 @@ export function PalletsConfig() {
             <div className="space-y-2">
               <Label>Localização Atual</Label>
               <Select
-                value={formData.current_location_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, current_location_id: value }))}
+                value={formData.current_location_id || "__none__"}
+                onValueChange={(value) => setFormData(prev => ({ 
+                  ...prev, 
+                  current_location_id: value === "__none__" ? '' : value 
+                }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar localização" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
-                  {locations.map((location) => (
+                  <SelectItem value="__none__">
+                    <span className="text-muted-foreground italic">Nenhuma</span>
+                  </SelectItem>
+                  {locations.filter(loc => loc.code && loc.code.trim() !== '').map((location) => (
                     <SelectItem key={location.id} value={location.id}>
                       <span className="flex items-center gap-2">
                         <MapPin className="h-3 w-3" />
