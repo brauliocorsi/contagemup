@@ -238,11 +238,31 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
     },
   });
 
+  // Security constants
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const MAX_ROWS = 10000;
+  const MAX_CODE_LENGTH = 100;
+  const MAX_QUANTITY = 1000000;
+
+  // Security: Sanitize value to prevent CSV injection
+  const sanitizeValue = (value: string): string => {
+    if (!value) return '';
+    if (/^[=+\-@\t\r]/.test(value)) {
+      return "'" + value;
+    }
+    return value;
+  };
+
   // Parse CSV/Excel file
   const parseStockFile = async (file: File): Promise<ParsedCSVItem[]> => {
     setIsProcessing(true);
     
     try {
+      // Security: File size validation
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error(`Ficheiro muito grande (máximo ${MAX_FILE_SIZE / (1024 * 1024)}MB)`);
+      }
+
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
@@ -251,6 +271,11 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
 
       if (rows.length === 0) {
         throw new Error('Ficheiro vazio');
+      }
+
+      // Security: Row limit validation
+      if (rows.length > MAX_ROWS) {
+        throw new Error(`Ficheiro contém mais de ${MAX_ROWS.toLocaleString()} linhas`);
       }
 
       // Find code and quantity columns
@@ -276,8 +301,13 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
 
       // Parse and validate each row
       const parsedItems: ParsedCSVItem[] = rows.map((row) => {
-        const code = String(row[codeKey] || '').trim();
-        const quantity = parseInt(String(row[qtyKey] || '0'), 10);
+        // Security: Sanitize and validate code
+        const rawCode = String(row[codeKey] || '').trim();
+        const code = sanitizeValue(rawCode).substring(0, MAX_CODE_LENGTH);
+        
+        // Security: Validate quantity with bounds
+        const rawQuantity = parseInt(String(row[qtyKey] || '0'), 10);
+        const quantity = isNaN(rawQuantity) ? 0 : Math.min(Math.max(0, rawQuantity), MAX_QUANTITY);
 
         const product = productMap.get(code.toLowerCase());
 
@@ -285,8 +315,12 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
           return { code, quantity, valid: false, error: 'Código vazio' };
         }
 
-        if (isNaN(quantity) || quantity <= 0) {
+        if (isNaN(rawQuantity) || rawQuantity <= 0) {
           return { code, quantity, valid: false, error: 'Quantidade inválida' };
+        }
+
+        if (rawQuantity > MAX_QUANTITY) {
+          return { code, quantity, valid: false, error: `Quantidade excede máximo (${MAX_QUANTITY.toLocaleString()})` };
         }
 
         if (!product) {

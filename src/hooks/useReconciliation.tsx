@@ -74,6 +74,20 @@ export function useReconciliation() {
     return mapping;
   };
 
+  // Security constants
+  const MAX_CODE_LENGTH = 100;
+  const MAX_NAME_LENGTH = 300;
+  const MAX_QUANTITY = 1000000;
+
+  // Security: Sanitize value to prevent CSV injection
+  const sanitizeValue = (value: string): string => {
+    if (!value) return '';
+    if (/^[=+\-@\t\r]/.test(value)) {
+      return "'" + value;
+    }
+    return value;
+  };
+
   const parseFileWithMapping = (
     rawData: Record<string, unknown>[],
     mapping: ColumnMapping
@@ -90,14 +104,19 @@ export function useReconciliation() {
       const lineErrors: string[] = [];
       const lineNumber = index + 2; // +2 because of header row and 1-based indexing
 
-      const code = String(row[mapping.code!] || '').trim();
+      // Security: Sanitize and validate fields
+      const rawCode = String(row[mapping.code!] || '').trim();
+      const code = sanitizeValue(rawCode).substring(0, MAX_CODE_LENGTH);
       const quantityStr = String(row[mapping.quantity!] || '').trim();
       const quantity = parseInt(quantityStr, 10);
-      const name = mapping.name ? String(row[mapping.name] || '').trim() : undefined;
+      const rawName = mapping.name ? String(row[mapping.name] || '').trim() : undefined;
+      const name = rawName ? sanitizeValue(rawName).substring(0, MAX_NAME_LENGTH) : undefined;
 
       // Validate code
       if (!code) {
         lineErrors.push('Código em falta');
+      } else if (code.length > MAX_CODE_LENGTH) {
+        lineErrors.push(`Código muito longo (máx. ${MAX_CODE_LENGTH} caracteres)`);
       } else if (seenCodes.has(code.toLowerCase())) {
         lineErrors.push(`Código duplicado: "${code}"`);
       }
@@ -109,6 +128,8 @@ export function useReconciliation() {
         lineErrors.push(`Quantidade inválida: "${quantityStr}"`);
       } else if (quantity < 0) {
         lineErrors.push('Quantidade não pode ser negativa');
+      } else if (quantity > MAX_QUANTITY) {
+        lineErrors.push(`Quantidade excede máximo (${MAX_QUANTITY.toLocaleString()})`);
       }
 
       if (lineErrors.length > 0) {
@@ -119,12 +140,15 @@ export function useReconciliation() {
         });
       } else if (code) {
         seenCodes.add(code.toLowerCase());
-        rows.push({ code, name, quantity });
+        rows.push({ code, name, quantity: Math.min(quantity, MAX_QUANTITY) });
       }
     });
 
     return { rows, errors };
   };
+
+  // Security: File limits
+  const MAX_ROWS = 10000;
 
   const parseXLSX = (data: ArrayBuffer): FileParseResult => {
     const result: FileParseResult = {
@@ -145,6 +169,12 @@ export function useReconciliation() {
       
       if (jsonData.length === 0) {
         result.headerError = 'O ficheiro está vazio ou não contém dados';
+        return result;
+      }
+
+      // Security: Row limit validation
+      if (jsonData.length > MAX_ROWS) {
+        result.headerError = `O ficheiro contém mais de ${MAX_ROWS.toLocaleString()} linhas. Por favor, divida em ficheiros menores.`;
         return result;
       }
 
@@ -192,6 +222,12 @@ export function useReconciliation() {
     const lines = content.trim().split('\n');
     if (lines.length < 2) {
       result.headerError = 'O ficheiro está vazio ou não contém dados';
+      return result;
+    }
+
+    // Security: Row limit validation
+    if (lines.length > MAX_ROWS + 1) { // +1 for header
+      result.headerError = `O ficheiro contém mais de ${MAX_ROWS.toLocaleString()} linhas. Por favor, divida em ficheiros menores.`;
       return result;
     }
 
