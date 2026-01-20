@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { ProductHistoryPopover } from './ProductHistoryPopover';
 import { CountHistoryPopover } from './CountHistoryPopover';
 import { SplitStockDialog } from './SplitStockDialog';
+import { LocationSelect } from './LocationSelect';
+import { PalletSelect } from './PalletSelect';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,9 +61,7 @@ export function ProductCard({
   sessionId
 }: ProductCardProps) {
   const [localLocation, setLocalLocation] = useState(product.location || '');
-  const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [localPallet, setLocalPallet] = useState(product.palletNumber || '');
-  const [isEditingPallet, setIsEditingPallet] = useState(false);
   const [localCode, setLocalCode] = useState(product.code);
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -134,29 +134,17 @@ export function ProductCard({
     return `Falta: ${missingItems}`;
   };
 
-  const handleLocationBlur = () => {
-    setIsEditingLocation(false);
-    if (localLocation !== (product.location || '') && onLocationChange) {
-      onLocationChange(product.id, localLocation);
+  const handleLocationChange = (newLocation: string) => {
+    setLocalLocation(newLocation);
+    if (onLocationChange) {
+      onLocationChange(product.id, newLocation);
     }
   };
 
-  const handleLocationKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleLocationBlur();
-    }
-  };
-
-  const handlePalletBlur = () => {
-    setIsEditingPallet(false);
-    if (localPallet !== (product.palletNumber || '') && onPalletChange) {
-      onPalletChange(product.id, localPallet);
-    }
-  };
-
-  const handlePalletKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handlePalletBlur();
+  const handlePalletChange = (newPallet: string) => {
+    setLocalPallet(newPallet);
+    if (onPalletChange) {
+      onPalletChange(product.id, newPallet);
     }
   };
 
@@ -421,54 +409,17 @@ export function ProductCard({
             </div>
           </div>
           
-          {/* Global Location field with indicator */}
+          {/* Global Location field with Select */}
           <div className="mt-2 flex items-center gap-2">
-            <MapPin className={cn(
-              "h-4 w-4 flex-shrink-0",
-              product.hasMultipleLocations ? "text-orange-500" : "text-muted-foreground"
-            )} />
-            {isEditingLocation ? (
-              <Input
-                value={localLocation}
-                onChange={(e) => setLocalLocation(e.target.value)}
-                onBlur={handleLocationBlur}
-                onKeyDown={handleLocationKeyDown}
-                placeholder="Localização padrão..."
-                className="h-8 text-sm"
-                autoFocus
-              />
-            ) : (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setIsEditingLocation(true)}
-                      className={cn(
-                        "flex-1 text-left text-sm px-2 py-1 rounded border border-dashed flex items-center gap-1",
-                        product.hasMultipleLocations 
-                          ? "border-orange-300 bg-orange-50 text-orange-700" 
-                          : product.location 
-                            ? "border-primary/30 bg-primary/5 text-foreground" 
-                            : "border-muted-foreground/30 text-muted-foreground hover:border-primary/50"
-                      )}
-                    >
-                      <span className="truncate">{getLocationsSummary()}</span>
-                      {product.hasMultipleLocations && (
-                        <AlertCircle className="h-3 w-3 flex-shrink-0" />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  {product.hasMultipleLocations && (
-                    <TooltipContent>
-                      <p className="font-medium mb-1">Localizações:</p>
-                      {product.uniqueLocations.map((loc, i) => (
-                        <p key={i} className="text-sm">{loc}</p>
-                      ))}
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            <LocationSelect
+              value={localLocation}
+              onValueChange={handleLocationChange}
+              placeholder="Selecionar localização..."
+              className={cn(
+                "flex-1",
+                product.hasMultipleLocations && "border-orange-300 bg-orange-50"
+              )}
+            />
             {onLocationChange && product.hasMultipleLocations && (
               <TooltipProvider>
                 <Tooltip>
@@ -492,54 +443,17 @@ export function ProductCard({
             )}
           </div>
 
-          {/* Global Pallet number field with indicator */}
+          {/* Global Pallet field with Select */}
           <div className="mt-2 flex items-center gap-2">
-            <Box className={cn(
-              "h-4 w-4 flex-shrink-0",
-              product.hasMultiplePallets ? "text-orange-500" : "text-muted-foreground"
-            )} />
-            {isEditingPallet ? (
-              <Input
-                value={localPallet}
-                onChange={(e) => setLocalPallet(e.target.value)}
-                onBlur={handlePalletBlur}
-                onKeyDown={handlePalletKeyDown}
-                placeholder="Nº palete padrão..."
-                className="h-8 text-sm"
-                autoFocus
-              />
-            ) : (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setIsEditingPallet(true)}
-                      className={cn(
-                        "flex-1 text-left text-sm px-2 py-1 rounded border border-dashed flex items-center gap-1",
-                        product.hasMultiplePallets 
-                          ? "border-orange-300 bg-orange-50 text-orange-700" 
-                          : product.palletNumber 
-                            ? "border-primary/30 bg-primary/5 text-foreground" 
-                            : "border-muted-foreground/30 text-muted-foreground hover:border-primary/50"
-                      )}
-                    >
-                      <span className="truncate">{getPalletsSummary()}</span>
-                      {product.hasMultiplePallets && (
-                        <AlertCircle className="h-3 w-3 flex-shrink-0" />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  {product.hasMultiplePallets && (
-                    <TooltipContent>
-                      <p className="font-medium mb-1">Paletes:</p>
-                      {product.uniquePallets.map((p, i) => (
-                        <p key={i} className="text-sm">{p}</p>
-                      ))}
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            <PalletSelect
+              value={localPallet}
+              onValueChange={handlePalletChange}
+              placeholder="Selecionar palete..."
+              className={cn(
+                "flex-1",
+                product.hasMultiplePallets && "border-orange-300 bg-orange-50"
+              )}
+            />
             {onPalletChange && product.hasMultiplePallets && (
               <TooltipProvider>
                 <Tooltip>
