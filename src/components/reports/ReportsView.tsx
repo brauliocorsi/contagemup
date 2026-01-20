@@ -16,6 +16,7 @@ import { LocationStatsCard } from './LocationStatsCard';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
 import { ReportsCharts } from './ReportsCharts';
 import { StockMovementsReport } from './StockMovementsReport';
+import { CountingMovementsReport } from './CountingMovementsReport';
 
 export function ReportsView() {
   const { products, loading: productsLoading } = useProducts();
@@ -204,7 +205,10 @@ export function ReportsView() {
 
   return (
     <div className="p-4 space-y-4">
-      {/* Stock Movements Report - Always visible */}
+      {/* Counting Movements Report */}
+      <CountingMovementsReport />
+
+      {/* Stock Movements Report */}
       <StockMovementsReport />
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
