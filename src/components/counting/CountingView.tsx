@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useCounting } from '@/hooks/useCounting';
 import { useSessions } from '@/hooks/useSessions';
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { StockDistribution } from '@/types/stock';
 
 const STORAGE_KEY = 'counting_selected_session';
 const PREFERRED_SESSION_NAME = 'Inventário 2026';
@@ -38,7 +39,21 @@ export function CountingView() {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { incrementCount, decrementCount, updateLocation, updatePalletNumber, updateColisLocation, updateColisPalletNumber, getProductWithCounts, deleteOrphanCounts, loading: countingLoading } = useCounting(selectedSessionId);
+  const { 
+    incrementCount, 
+    decrementCount, 
+    updateLocation, 
+    updatePalletNumber, 
+    updateColisLocation, 
+    updateColisPalletNumber, 
+    getProductWithCounts, 
+    deleteOrphanCounts, 
+    splitColisStock,
+    mergeColisStock,
+    incrementCountAtLocation,
+    decrementCountAtLocation,
+    loading: countingLoading 
+  } = useCounting(selectedSessionId);
 
   const activeSessions = sessions.filter(s => s.status === 'active');
 
@@ -150,6 +165,22 @@ export function CountingView() {
     }
     return success;
   };
+
+  const handleSplitStock = useCallback(async (productId: string, colisNumber: number, distributions: StockDistribution[]): Promise<boolean> => {
+    return await splitColisStock(productId, colisNumber, distributions);
+  }, [splitColisStock]);
+
+  const handleMergeStock = useCallback(async (productId: string, colisNumber: number, location: string, pallet: string): Promise<boolean> => {
+    return await mergeColisStock(productId, colisNumber, location, pallet);
+  }, [mergeColisStock]);
+
+  const handleIncrementAtLocation = useCallback((productId: string, colisNumber: number, countId: string) => {
+    incrementCountAtLocation(productId, colisNumber, countId);
+  }, [incrementCountAtLocation]);
+
+  const handleDecrementAtLocation = useCallback((productId: string, colisNumber: number, countId: string) => {
+    decrementCountAtLocation(productId, colisNumber, countId);
+  }, [decrementCountAtLocation]);
 
   const productsWithCounts = useMemo(() => {
     return products.map(p => getProductWithCounts(p));
@@ -559,6 +590,8 @@ export function CountingView() {
                 product={product}
                 onIncrement={incrementCount}
                 onDecrement={decrementCount}
+                onIncrementAtLocation={handleIncrementAtLocation}
+                onDecrementAtLocation={handleDecrementAtLocation}
                 onLocationChange={updateLocation}
                 onPalletChange={updatePalletNumber}
                 onColisLocationChange={updateColisLocation}
@@ -566,6 +599,8 @@ export function CountingView() {
                 onAddColi={handleAddColi}
                 onRemoveColi={handleRemoveColi}
                 onCodeChange={handleCodeChange}
+                onSplitStock={handleSplitStock}
+                onMergeStock={handleMergeStock}
                 colisNames={categoryColisNamesMap[product.category]}
                 sessionId={selectedSessionId || undefined}
               />
@@ -587,6 +622,8 @@ export function CountingView() {
                   product={product}
                   onIncrement={incrementCount}
                   onDecrement={decrementCount}
+                  onIncrementAtLocation={handleIncrementAtLocation}
+                  onDecrementAtLocation={handleDecrementAtLocation}
                   onLocationChange={updateLocation}
                   onPalletChange={updatePalletNumber}
                   onColisLocationChange={updateColisLocation}
@@ -594,6 +631,8 @@ export function CountingView() {
                   onAddColi={handleAddColi}
                   onRemoveColi={handleRemoveColi}
                   onCodeChange={handleCodeChange}
+                  onSplitStock={handleSplitStock}
+                  onMergeStock={handleMergeStock}
                   colisNames={categoryColisNamesMap[product.category]}
                   sessionId={selectedSessionId || undefined}
                 />
@@ -616,6 +655,8 @@ export function CountingView() {
                   product={product}
                   onIncrement={incrementCount}
                   onDecrement={decrementCount}
+                  onIncrementAtLocation={handleIncrementAtLocation}
+                  onDecrementAtLocation={handleDecrementAtLocation}
                   onLocationChange={updateLocation}
                   onPalletChange={updatePalletNumber}
                   onColisLocationChange={updateColisLocation}
@@ -623,6 +664,8 @@ export function CountingView() {
                   onAddColi={handleAddColi}
                   onRemoveColi={handleRemoveColi}
                   onCodeChange={handleCodeChange}
+                  onSplitStock={handleSplitStock}
+                  onMergeStock={handleMergeStock}
                   colisNames={categoryColisNamesMap[product.category]}
                   sessionId={selectedSessionId || undefined}
                 />
