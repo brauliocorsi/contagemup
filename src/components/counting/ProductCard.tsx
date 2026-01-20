@@ -385,7 +385,9 @@ export function ProductCard({
                       <Box className="h-2.5 w-2.5" />
                       {product.uniquePallets.length === 1 
                         ? product.uniquePallets[0] 
-                        : `${product.uniquePallets.length} pal.`
+                        : product.uniquePallets.length === 2
+                          ? product.uniquePallets.join(' + ')
+                          : `${product.uniquePallets.length} pal.`
                       }
                     </Badge>
                   )}
