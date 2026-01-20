@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { CountingSession, Count, Product, ProductWithCounts } from '@/types/stock';
+import { CountingSession, Count, Product, ProductWithCounts, ColisDetail } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
 
@@ -353,23 +353,141 @@ export function useCounting(sessionId: string | null) {
     return true;
   };
 
+  const updateColisLocation = async (productId: string, colisNumber: number, location: string) => {
+    if (!sessionId || !user) return false;
+
+    const existingCount = counts.find(
+      c => c.product_id === productId && c.colis_number === colisNumber
+    );
+
+    if (existingCount) {
+      const { error } = await supabase
+        .from('counts')
+        .update({ location })
+        .eq('id', existingCount.id);
+
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível atualizar a localização',
+          variant: 'destructive'
+        });
+        return false;
+      }
+    } else {
+      // Create a count entry for this coli with quantity 0 just to store location
+      const { error } = await supabase
+        .from('counts')
+        .insert({
+          session_id: sessionId,
+          product_id: productId,
+          colis_number: colisNumber,
+          quantity: 0,
+          location,
+          counted_by: user.id
+        });
+
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível guardar a localização',
+          variant: 'destructive'
+        });
+        return false;
+      }
+    }
+
+    await fetchCounts();
+    return true;
+  };
+
+  const updateColisPalletNumber = async (productId: string, colisNumber: number, palletNumber: string) => {
+    if (!sessionId || !user) return false;
+
+    const existingCount = counts.find(
+      c => c.product_id === productId && c.colis_number === colisNumber
+    );
+
+    if (existingCount) {
+      const { error } = await supabase
+        .from('counts')
+        .update({ pallet_number: palletNumber })
+        .eq('id', existingCount.id);
+
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível atualizar o número da palete',
+          variant: 'destructive'
+        });
+        return false;
+      }
+    } else {
+      // Create a count entry for this coli with quantity 0 just to store pallet number
+      const { error } = await supabase
+        .from('counts')
+        .insert({
+          session_id: sessionId,
+          product_id: productId,
+          colis_number: colisNumber,
+          quantity: 0,
+          pallet_number: palletNumber,
+          counted_by: user.id
+        });
+
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível guardar o número da palete',
+          variant: 'destructive'
+        });
+        return false;
+      }
+    }
+
+    await fetchCounts();
+    return true;
+  };
+
   const getProductWithCounts = useCallback((product: Product): ProductWithCounts => {
     const productCounts = counts.filter(c => c.product_id === product.id);
     
-    // Get quantity for each colis
+    // Build colis details with location/pallet per coli
+    const colisDetails: ColisDetail[] = [];
     const colisQuantities: Record<number, number> = {};
+    
     for (let i = 1; i <= product.total_colis; i++) {
       const count = productCounts.find(c => c.colis_number === i);
       colisQuantities[i] = count?.quantity || 0;
+      
+      colisDetails.push({
+        colis_number: i,
+        quantity: count?.quantity || 0,
+        location: count?.location || null,
+        pallet_number: count?.pallet_number || null
+      });
     }
 
-    // Get location and pallet from counts (session-specific) OR fallback to product defaults
-    const countLocation = productCounts.find(c => c.location)?.location || null;
-    const countPallet = productCounts.find(c => c.pallet_number)?.pallet_number || null;
-    
-    // Use session count location/pallet if available, otherwise use product's default
-    const location = countLocation || product.location || null;
-    const palletNumber = countPallet || product.pallet_number || null;
+    // Get unique locations and pallets from colis
+    const uniqueLocations = [...new Set(
+      colisDetails
+        .map(c => c.location)
+        .filter((loc): loc is string => loc !== null && loc.trim() !== '')
+    )].sort();
+
+    const uniquePallets = [...new Set(
+      colisDetails
+        .map(c => c.pallet_number)
+        .filter((p): p is string => p !== null && p.trim() !== '')
+    )].sort();
+
+    // Fallback to product defaults if no session-specific data
+    const hasMultipleLocations = uniqueLocations.length > 1;
+    const hasMultiplePallets = uniquePallets.length > 1;
+
+    // Primary location/pallet: from first coli with data, or product default
+    const location = uniqueLocations[0] || product.location || null;
+    const palletNumber = uniquePallets[0] || product.pallet_number || null;
 
     // Calculate complete sets (minimum across all colis)
     const quantities = Object.values(colisQuantities);
@@ -401,19 +519,14 @@ export function useCounting(sessionId: string | null) {
     }
 
     // Determine status
-    // - 'complete': All colis have same quantity (no partial product in progress)
-    // - 'incomplete': Some colis have more than others (partial product in progress)
-    // - 'not_counted': Nothing counted yet
     let status: ProductWithCounts['status'] = 'not_counted';
     const totalCounted = quantities.reduce((sum, q) => sum + q, 0);
     
     if (totalCounted === 0) {
       status = 'not_counted';
     } else if (hasPartialProduct) {
-      // Has some colis with different quantities - partial product in progress
       status = 'incomplete';
     } else if (completeSets > 0) {
-      // All colis have same quantity > 0
       status = 'complete';
     }
 
@@ -427,7 +540,12 @@ export function useCounting(sessionId: string | null) {
       hasPartialProduct,
       location,
       palletNumber,
-      status
+      status,
+      colisDetails,
+      uniqueLocations,
+      uniquePallets,
+      hasMultipleLocations,
+      hasMultiplePallets
     };
   }, [counts]);
 
@@ -463,6 +581,8 @@ export function useCounting(sessionId: string | null) {
     decrementCount,
     updateLocation,
     updatePalletNumber,
+    updateColisLocation,
+    updateColisPalletNumber,
     getProductWithCounts,
     deleteOrphanCounts,
     refetch: fetchCounts
