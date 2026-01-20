@@ -68,8 +68,6 @@ export function ProductCard({
   const [expandedColis, setExpandedColis] = useState<Set<number>>(new Set());
   const [colisLocations, setColisLocations] = useState<Record<number, string>>({});
   const [colisPallets, setColisPallets] = useState<Record<number, string>>({});
-  const [editingColisLocation, setEditingColisLocation] = useState<number | null>(null);
-  const [editingColisPallet, setEditingColisPallet] = useState<number | null>(null);
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [selectedColisForSplit, setSelectedColisForSplit] = useState<ColisDetail | null>(null);
 
@@ -180,52 +178,6 @@ export function ProductCard({
       }
       return next;
     });
-  };
-
-  const handleColisLocationBlur = (colisNum: number) => {
-    setEditingColisLocation(null);
-    const newLocation = colisLocations[colisNum]?.trim() || '';
-    const currentLocation = getColisLocation(colisNum) || '';
-    if (newLocation !== currentLocation && onColisLocationChange) {
-      onColisLocationChange(product.id, colisNum, newLocation);
-    }
-  };
-
-  const handleColisLocationKeyDown = (e: React.KeyboardEvent, colisNum: number) => {
-    if (e.key === 'Enter') {
-      handleColisLocationBlur(colisNum);
-    } else if (e.key === 'Escape') {
-      setEditingColisLocation(null);
-      setColisLocations(prev => ({ ...prev, [colisNum]: getColisLocation(colisNum) || '' }));
-    }
-  };
-
-  const handleColisPalletBlur = (colisNum: number) => {
-    setEditingColisPallet(null);
-    const newPallet = colisPallets[colisNum]?.trim() || '';
-    const currentPallet = getColisPallet(colisNum) || '';
-    if (newPallet !== currentPallet && onColisPalletChange) {
-      onColisPalletChange(product.id, colisNum, newPallet);
-    }
-  };
-
-  const handleColisPalletKeyDown = (e: React.KeyboardEvent, colisNum: number) => {
-    if (e.key === 'Enter') {
-      handleColisPalletBlur(colisNum);
-    } else if (e.key === 'Escape') {
-      setEditingColisPallet(null);
-      setColisPallets(prev => ({ ...prev, [colisNum]: getColisPallet(colisNum) || '' }));
-    }
-  };
-
-  const startEditingColisLocation = (colisNum: number) => {
-    setColisLocations(prev => ({ ...prev, [colisNum]: getColisLocation(colisNum) || '' }));
-    setEditingColisLocation(colisNum);
-  };
-
-  const startEditingColisPallet = (colisNum: number) => {
-    setColisPallets(prev => ({ ...prev, [colisNum]: getColisPallet(colisNum) || '' }));
-    setEditingColisPallet(colisNum);
   };
 
   const lastColisQuantity = getColisQuantity(product.total_colis);
@@ -551,11 +503,13 @@ export function ProductCard({
                           {hasMultipleLocationsForColi && (
                             <TooltipProvider>
                               <Tooltip>
-                                <TooltipTrigger>
-                                  <Badge variant="outline" className="text-xs h-5 gap-1 text-blue-600 border-blue-300">
-                                    <Split className="h-3 w-3" />
-                                    {locationEntries.filter(e => e.quantity > 0).length}
-                                  </Badge>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex">
+                                    <Badge variant="outline" className="text-xs h-5 gap-1 text-blue-600 border-blue-300">
+                                      <Split className="h-3 w-3" />
+                                      {locationEntries.filter(e => e.quantity > 0).length}
+                                    </Badge>
+                                  </span>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p className="font-medium mb-1">Dividido em {locationEntries.filter(e => e.quantity > 0).length} localizações:</p>
@@ -571,8 +525,10 @@ export function ProductCard({
                           {(locDiff || palDiff) && !hasMultipleLocationsForColi && !isExpanded && (
                             <TooltipProvider>
                               <Tooltip>
-                                <TooltipTrigger>
-                                  <AlertCircle className="h-3 w-3 text-orange-500" />
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex">
+                                    <AlertCircle className="h-3 w-3 text-orange-500" />
+                                  </span>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   {locDiff && <p>📍 {colisLocation || 'Sem localização'}</p>}
@@ -703,70 +659,40 @@ export function ProductCard({
                         </div>
                       ) : (
                         <>
-                          {/* Per-coli location */}
-                          <div className="flex items-center gap-1.5">
-                            <MapPin className={cn(
-                              "h-3 w-3 flex-shrink-0",
-                              locDiff ? "text-orange-500" : "text-muted-foreground"
-                            )} />
-                            {editingColisLocation === colisNum ? (
-                              <Input
-                                value={colisLocations[colisNum] || ''}
-                                onChange={(e) => setColisLocations(prev => ({ ...prev, [colisNum]: e.target.value }))}
-                                onBlur={() => handleColisLocationBlur(colisNum)}
-                                onKeyDown={(e) => handleColisLocationKeyDown(e, colisNum)}
-                                placeholder="Localização..."
-                                className="h-6 text-xs py-0"
-                                autoFocus
-                              />
-                            ) : (
-                              <button
-                                onClick={() => startEditingColisLocation(colisNum)}
-                                className={cn(
-                                  "flex-1 text-left text-xs px-1.5 py-0.5 rounded border border-dashed truncate",
-                                  locDiff
-                                    ? "border-orange-300 bg-orange-50 text-orange-700"
-                                    : colisLocation
-                                      ? "border-primary/30 bg-primary/5"
-                                      : "border-muted-foreground/20 text-muted-foreground"
-                                )}
-                              >
-                                {colisLocation || 'Localização...'}
-                              </button>
-                            )}
+                          {/* Per-coli location with Select */}
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <LocationSelect
+                              value={colisLocations[colisNum] ?? colisLocation ?? ''}
+                              onValueChange={(newLoc) => {
+                                setColisLocations(prev => ({ ...prev, [colisNum]: newLoc }));
+                                if (onColisLocationChange) {
+                                  onColisLocationChange(product.id, colisNum, newLoc);
+                                }
+                              }}
+                              placeholder="Selecionar localização..."
+                              className={cn(
+                                "flex-1 h-7 text-xs",
+                                locDiff && "border-orange-300 bg-orange-50"
+                              )}
+                            />
                           </div>
 
-                          {/* Per-coli pallet */}
+                          {/* Per-coli pallet with Select */}
                           <div className="flex items-center gap-1.5">
-                            <Box className={cn(
-                              "h-3 w-3 flex-shrink-0",
-                              palDiff ? "text-orange-500" : "text-muted-foreground"
-                            )} />
-                            {editingColisPallet === colisNum ? (
-                              <Input
-                                value={colisPallets[colisNum] || ''}
-                                onChange={(e) => setColisPallets(prev => ({ ...prev, [colisNum]: e.target.value }))}
-                                onBlur={() => handleColisPalletBlur(colisNum)}
-                                onKeyDown={(e) => handleColisPalletKeyDown(e, colisNum)}
-                                placeholder="Nº palete..."
-                                className="h-6 text-xs py-0"
-                                autoFocus
-                              />
-                            ) : (
-                              <button
-                                onClick={() => startEditingColisPallet(colisNum)}
-                                className={cn(
-                                  "flex-1 text-left text-xs px-1.5 py-0.5 rounded border border-dashed truncate",
-                                  palDiff
-                                    ? "border-orange-300 bg-orange-50 text-orange-700"
-                                    : colisPallet
-                                      ? "border-primary/30 bg-primary/5"
-                                      : "border-muted-foreground/20 text-muted-foreground"
-                                )}
-                              >
-                                {colisPallet || 'Nº palete...'}
-                              </button>
-                            )}
+                            <PalletSelect
+                              value={colisPallets[colisNum] ?? colisPallet ?? ''}
+                              onValueChange={(newPal) => {
+                                setColisPallets(prev => ({ ...prev, [colisNum]: newPal }));
+                                if (onColisPalletChange) {
+                                  onColisPalletChange(product.id, colisNum, newPal);
+                                }
+                              }}
+                              placeholder="Selecionar palete..."
+                              className={cn(
+                                "flex-1 h-7 text-xs",
+                                palDiff && "border-orange-300 bg-orange-50"
+                              )}
+                            />
                           </div>
                         </>
                       )}
