@@ -38,7 +38,7 @@ export function CountingView() {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { incrementCount, decrementCount, updateLocation, updatePalletNumber, getProductWithCounts, deleteOrphanCounts, loading: countingLoading } = useCounting(selectedSessionId);
+  const { incrementCount, decrementCount, updateLocation, updatePalletNumber, updateColisLocation, updateColisPalletNumber, getProductWithCounts, deleteOrphanCounts, loading: countingLoading } = useCounting(selectedSessionId);
 
   const activeSessions = sessions.filter(s => s.status === 'active');
 
@@ -181,13 +181,19 @@ export function CountingView() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [sessionFilteredProducts]);
 
-  // Extract unique locations with counts
+  // Extract unique locations with counts - now considering all coli locations
   const locationsWithCounts = useMemo(() => {
     const countMap: Record<string, number> = {};
     sessionFilteredProducts.forEach(p => {
-      const loc = p.location?.trim();
-      if (loc) {
-        countMap[loc] = (countMap[loc] || 0) + 1;
+      // Include all unique locations from colis
+      p.uniqueLocations.forEach(loc => {
+        if (loc) {
+          countMap[loc] = (countMap[loc] || 0) + 1;
+        }
+      });
+      // Also check product default location if no coli locations
+      if (p.uniqueLocations.length === 0 && p.location?.trim()) {
+        countMap[p.location.trim()] = (countMap[p.location.trim()] || 0) + 1;
       }
     });
     return Object.entries(countMap)
@@ -244,11 +250,13 @@ export function CountingView() {
         (filterStatus === 'incomplete' && isPending) ||
         (filterStatus !== 'complete' && filterStatus !== 'incomplete' && product.status === filterStatus);
 
-      // Fixed location filter - handle null/undefined and "no location" option
-      const productLocation = product.location?.trim() || '';
+      // Fixed location filter - check all coli locations
+      const productLocations = product.uniqueLocations.length > 0 
+        ? product.uniqueLocations 
+        : (product.location?.trim() ? [product.location.trim()] : []);
       const matchesLocation = filterLocation === 'all' || 
-        (filterLocation === '__empty__' && !productLocation) ||
-        (productLocation === filterLocation);
+        (filterLocation === '__empty__' && productLocations.length === 0) ||
+        productLocations.includes(filterLocation);
       
       // Fixed pallet filter - handle null/undefined and "no pallet" option  
       const productPallet = product.pallet_number?.trim() || '';
@@ -553,6 +561,8 @@ export function CountingView() {
                 onDecrement={decrementCount}
                 onLocationChange={updateLocation}
                 onPalletChange={updatePalletNumber}
+                onColisLocationChange={updateColisLocation}
+                onColisPalletChange={updateColisPalletNumber}
                 onAddColi={handleAddColi}
                 onRemoveColi={handleRemoveColi}
                 onCodeChange={handleCodeChange}
@@ -579,6 +589,8 @@ export function CountingView() {
                   onDecrement={decrementCount}
                   onLocationChange={updateLocation}
                   onPalletChange={updatePalletNumber}
+                  onColisLocationChange={updateColisLocation}
+                  onColisPalletChange={updateColisPalletNumber}
                   onAddColi={handleAddColi}
                   onRemoveColi={handleRemoveColi}
                   onCodeChange={handleCodeChange}
@@ -606,6 +618,8 @@ export function CountingView() {
                   onDecrement={decrementCount}
                   onLocationChange={updateLocation}
                   onPalletChange={updatePalletNumber}
+                  onColisLocationChange={updateColisLocation}
+                  onColisPalletChange={updateColisPalletNumber}
                   onAddColi={handleAddColi}
                   onRemoveColi={handleRemoveColi}
                   onCodeChange={handleCodeChange}

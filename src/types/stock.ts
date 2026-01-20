@@ -50,6 +50,13 @@ export interface Count {
   updated_at: string;
 }
 
+export interface ColisDetail {
+  colis_number: number;
+  quantity: number;
+  location: string | null;
+  pallet_number: string | null;
+}
+
 export interface ProductWithCounts extends Product {
   counts: Count[];
   completeSets: number;
@@ -60,6 +67,12 @@ export interface ProductWithCounts extends Product {
   location: string | null;
   palletNumber: string | null;
   status: 'complete' | 'incomplete' | 'excess' | 'not_counted';
+  // Per-coli location/pallet tracking
+  colisDetails: ColisDetail[];
+  uniqueLocations: string[];
+  uniquePallets: string[];
+  hasMultipleLocations: boolean;
+  hasMultiplePallets: boolean;
 }
 
 export interface Profile {
