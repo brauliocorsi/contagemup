@@ -72,14 +72,17 @@ export function ProductsView() {
   const getStockBadge = (stock: number, minStock: number = 5) => {
     const status = getStockStatus(stock, minStock);
     
-    if (status === 'out_of_stock') {
+    // Stock zero - gray/neutral
+    if (stock <= 0) {
       return (
-        <Badge variant="outline" className="gap-1 text-muted-foreground">
-          {stock} un.
+        <Badge variant="outline" className="gap-1 bg-slate-100 text-slate-500 border-slate-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+          0 un.
         </Badge>
       );
     }
     
+    // Low stock (below minimum) - yellow/warning
     if (status === 'low_stock') {
       return (
         <Badge variant="outline" className="gap-1 bg-yellow-50 text-yellow-700 border-yellow-300">
