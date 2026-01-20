@@ -6,6 +6,7 @@ import { useLastCounts } from '@/hooks/useLastCounts';
 import { ProductForm } from './ProductForm';
 import { ProductEditForm } from './ProductEditForm';
 import { ProductHistoryDialog } from './ProductHistoryDialog';
+import { ProductColisDetailsDialog } from './ProductColisDetailsDialog';
 import { ImportProducts } from './ImportProducts';
 import { BulkMinStockDialog } from './BulkMinStockDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ResizableTableProvider, ResizableHeaderCell, ResizableCell } from '@/components/ui/resizable-table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3 } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse } from 'lucide-react';
+import { classifyLocation } from '@/lib/locationUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -69,6 +71,7 @@ export function ProductsView() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+  const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [bulkMinStockOpen, setBulkMinStockOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(new Set(DEFAULT_VISIBLE_COLUMNS));
@@ -581,7 +584,7 @@ export function ProductsView() {
                           Palete
                         </ResizableHeaderCell>
                       )}
-                      <TableHead className="text-right w-28">Ações</TableHead>
+                      <TableHead className="text-right w-36">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -650,6 +653,7 @@ export function ProductsView() {
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <div className="flex flex-wrap gap-0.5 max-w-[200px]">
+                                      {/* Location Badge */}
                                       {lastCount.uniqueLocations.length > 0 ? (
                                         lastCount.uniqueLocations.length === 1 ? (
                                           <Badge variant="outline" className="text-xs flex items-center gap-1">
@@ -662,30 +666,52 @@ export function ProductsView() {
                                             {lastCount.uniqueLocations.length} locais
                                           </Badge>
                                         )
-                                      ) : (
+                                      ) : null}
+                                      {/* Pallet Badge */}
+                                      {lastCount.uniquePallets.length > 0 && (
+                                        lastCount.uniquePallets.length === 1 ? (
+                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                            <Box className="h-2.5 w-2.5" />
+                                            {lastCount.uniquePallets[0]}
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="text-xs flex items-center gap-1 bg-purple-50 text-purple-700 border-purple-300">
+                                            <Box className="h-2.5 w-2.5" />
+                                            {lastCount.uniquePallets.length} paletes
+                                          </Badge>
+                                        )
+                                      )}
+                                      {lastCount.uniqueLocations.length === 0 && lastCount.uniquePallets.length === 0 && (
                                         <span className="text-xs text-muted-foreground">-</span>
                                       )}
                                     </div>
                                   </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-[300px]">
-                                    <p className="font-medium mb-1">Colis por localização:</p>
-                                    <div className="space-y-0.5 text-xs">
-                                      {lastCount.colisLocations.map(c => (
-                                        <div key={c.colisNumber} className="flex items-center gap-2">
-                                          <span className="font-mono">C{c.colisNumber}</span>
-                                          <span>→</span>
-                                          <span className="flex items-center gap-1">
-                                            <MapPin className="h-2.5 w-2.5" />
-                                            {c.location || 'Sem local'}
-                                          </span>
-                                          {c.palletNumber && (
-                                            <span className="flex items-center gap-1 text-muted-foreground">
-                                              <Box className="h-2.5 w-2.5" />
-                                              {c.palletNumber}
-                                            </span>
-                                          )}
-                                        </div>
-                                      ))}
+                                  <TooltipContent side="left" className="max-w-[350px]">
+                                    <p className="font-medium mb-2">Detalhes por Coli:</p>
+                                    <div className="space-y-1 text-xs">
+                                      {lastCount.colisLocations.map(c => {
+                                        const locInfo = classifyLocation(c.location);
+                                        return (
+                                          <div key={c.colisNumber} className="flex items-center gap-2 p-1 rounded bg-muted/50">
+                                            <span className="font-mono font-medium w-6">C{c.colisNumber}</span>
+                                            <span className="text-muted-foreground">→</span>
+                                            <div className="flex items-center gap-1 flex-1">
+                                              <MapPin className="h-2.5 w-2.5 text-muted-foreground" />
+                                              <span>{c.location || 'Sem local'}</span>
+                                              <Badge variant="outline" className={`text-[10px] px-1 py-0 ${locInfo.color}`}>
+                                                {locInfo.shortLabel}
+                                              </Badge>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              <Box className="h-2.5 w-2.5 text-muted-foreground" />
+                                              <span>{c.palletNumber || '-'}</span>
+                                            </div>
+                                            <Badge variant="secondary" className="text-[10px]">
+                                              {c.quantity}
+                                            </Badge>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </TooltipContent>
                                 </Tooltip>
@@ -715,8 +741,16 @@ export function ProductsView() {
                             ) : '-'}
                           </ResizableCell>
                         )}
-                        <TableCell className="text-right w-28">
+                        <TableCell className="text-right w-36">
                           <div className="flex items-center justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => setDetailsProduct(product)}
+                              title="Ver detalhes"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                             <Button 
                               variant="ghost" 
                               size="icon"
@@ -790,6 +824,16 @@ export function ProductsView() {
           productName={historyProduct.name}
           open={!!historyProduct}
           onOpenChange={(open) => !open && setHistoryProduct(null)}
+        />
+      )}
+
+      {/* Product Colis Details Dialog */}
+      {detailsProduct && (
+        <ProductColisDetailsDialog
+          product={detailsProduct}
+          lastCount={lastCounts[detailsProduct.id] || null}
+          open={!!detailsProduct}
+          onOpenChange={(open) => !open && setDetailsProduct(null)}
         />
       )}
 
