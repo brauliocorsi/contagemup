@@ -13,6 +13,12 @@ import {
 import { toast } from 'sonner';
 
 export interface LocationWithProducts extends WarehouseLocation {
+  aisleName?: string;
+  aisleColor?: string;
+  levelName?: string;
+  levelShortName?: string;
+  requiresForklift?: boolean;
+  levelColor?: string;
   products: {
     productId: string;
     productName: string;
@@ -64,10 +70,19 @@ export function useWarehouseMap(sessionId?: string) {
   const locationsWithProducts = useMemo(() => {
     const locationMap = new Map<string, LocationWithProducts>();
 
-    // Initialize all configured locations
+    // Initialize all configured locations with aisle and level info
     locations.forEach(loc => {
+      const aisle = aisles.find(a => a.id === loc.aisle_id);
+      const level = levels.find(l => l.id === loc.level_id);
+      
       locationMap.set(loc.code.toLowerCase(), {
         ...loc,
+        aisleName: aisle?.name,
+        aisleColor: aisle?.color || undefined,
+        levelName: level?.name,
+        levelShortName: level?.short_name,
+        requiresForklift: level?.requires_forklift,
+        levelColor: level?.color || undefined,
         products: [],
         totalColis: 0,
         totalProducts: 0,
@@ -99,7 +114,7 @@ export function useWarehouseMap(sessionId?: string) {
     });
 
     return Array.from(locationMap.values());
-  }, [locations, counts]);
+  }, [locations, counts, aisles, levels]);
 
   // Build grid structure for the visual map
   const mapGrid = useMemo(() => {
