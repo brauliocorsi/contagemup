@@ -17,6 +17,7 @@ import { ProductDetailsDialog } from './ProductDetailsDialog';
 import { ReportsCharts } from './ReportsCharts';
 import { StockMovementsReport } from './StockMovementsReport';
 import { CountingMovementsReport } from './CountingMovementsReport';
+import { ColisDispersionCard } from './ColisDispersionCard';
 
 export function ReportsView() {
   const { products, loading: productsLoading } = useProducts();
@@ -425,6 +426,12 @@ export function ReportsView() {
             </Collapsible>
           )}
 
+          {/* Colis Dispersion Card */}
+          <ColisDispersionCard
+            productsWithCounts={productsWithCounts}
+            categoryColisNamesMap={categoryColisNamesMap}
+            onProductClick={handleProductDetailsClick}
+          />
 
           {/* Products table */}
           <Card>
