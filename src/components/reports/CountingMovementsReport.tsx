@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
-import { Calendar as CalendarIcon, FileDown, Search, X, ClipboardList, User, ArrowUpDown, ArrowUp, ArrowDown, Plus, Minus } from 'lucide-react';
+import { Calendar as CalendarIcon, FileDown, Search, X, ClipboardList, User, ArrowUpDown, ArrowUp, ArrowDown, Plus, Minus, BarChart3, Trophy } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSessions } from '@/hooks/useSessions';
 import { cn } from '@/lib/utils';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 
 interface DateRange {
   from: Date | undefined;
@@ -235,6 +236,44 @@ export function CountingMovementsReport() {
       uniqueUsers,
     };
   }, [filteredLogs]);
+
+  // Productivity data per user
+  const productivityData = useMemo(() => {
+    const userStats: Record<string, { operations: number; increments: number; decrements: number; volume: number }> = {};
+    
+    filteredLogs.forEach(log => {
+      const userId = log.counted_by || 'system';
+      if (!userStats[userId]) {
+        userStats[userId] = { operations: 0, increments: 0, decrements: 0, volume: 0 };
+      }
+      userStats[userId].operations += 1;
+      if (log.operation === 'increment') {
+        userStats[userId].increments += 1;
+        userStats[userId].volume += (log.quantity_after - log.quantity_before);
+      } else {
+        userStats[userId].decrements += 1;
+        userStats[userId].volume += Math.abs(log.quantity_after - log.quantity_before);
+      }
+    });
+
+    return Object.entries(userStats)
+      .map(([userId, data]) => ({
+        userId,
+        name: userId === 'system' ? 'Sistema' : (userNames[userId] || 'Desconhecido'),
+        ...data,
+      }))
+      .sort((a, b) => b.operations - a.operations);
+  }, [filteredLogs, userNames]);
+
+  // Top performers
+  const topPerformers = useMemo(() => {
+    return productivityData
+      .filter(u => u.userId !== 'system')
+      .slice(0, 3);
+  }, [productivityData]);
+
+  const [showChart, setShowChart] = useState(true);
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -467,6 +506,179 @@ export function CountingMovementsReport() {
                 <p className="text-xs text-muted-foreground">únicos</p>
               </div>
             </div>
+
+            {/* Productivity Chart Section */}
+            {productivityData.length > 0 && (
+              <Collapsible open={showChart} onOpenChange={setShowChart}>
+                <div className="border rounded-lg">
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                        <span className="font-medium">Produtividade por Funcionário</span>
+                        <Badge variant="outline">{productivityData.filter(u => u.userId !== 'system').length} funcionários</Badge>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        {showChart ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="p-4 pt-0 space-y-4">
+                      {/* Top Performers */}
+                      {topPerformers.length > 0 && (
+                        <div className="flex flex-wrap gap-3">
+                          {topPerformers.map((performer, index) => (
+                            <div 
+                              key={performer.userId}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-lg border",
+                                index === 0 && "bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800",
+                                index === 1 && "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700",
+                                index === 2 && "bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800"
+                              )}
+                            >
+                              <Trophy className={cn(
+                                "h-4 w-4",
+                                index === 0 && "text-yellow-500",
+                                index === 1 && "text-slate-400",
+                                index === 2 && "text-orange-500"
+                              )} />
+                              <div>
+                                <p className="text-sm font-medium">{performer.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {performer.operations} ops • {performer.volume} unidades
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Charts */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Operations per User */}
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-muted-foreground">Operações por Funcionário</p>
+                          <div className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart 
+                                data={productivityData.filter(u => u.userId !== 'system').slice(0, 10)} 
+                                layout="vertical"
+                                margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                <XAxis type="number" className="text-xs" />
+                                <YAxis 
+                                  type="category" 
+                                  dataKey="name" 
+                                  className="text-xs"
+                                  width={75}
+                                  tick={{ fontSize: 11 }}
+                                />
+                                <Tooltip 
+                                  contentStyle={{ 
+                                    backgroundColor: 'hsl(var(--background))',
+                                    border: '1px solid hsl(var(--border))',
+                                    borderRadius: '8px'
+                                  }}
+                                  formatter={(value: number, name: string) => {
+                                    const labels: Record<string, string> = {
+                                      increments: 'Incrementos',
+                                      decrements: 'Decrementos'
+                                    };
+                                    return [value, labels[name] || name];
+                                  }}
+                                />
+                                <Legend 
+                                  formatter={(value) => {
+                                    const labels: Record<string, string> = {
+                                      increments: 'Incrementos',
+                                      decrements: 'Decrementos'
+                                    };
+                                    return labels[value] || value;
+                                  }}
+                                />
+                                <Bar dataKey="increments" stackId="a" fill="hsl(142, 76%, 36%)" name="increments" />
+                                <Bar dataKey="decrements" stackId="a" fill="hsl(0, 84%, 60%)" name="decrements" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+
+                        {/* Volume per User */}
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-muted-foreground">Volume por Funcionário (unidades)</p>
+                          <div className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart 
+                                data={productivityData.filter(u => u.userId !== 'system').slice(0, 10)} 
+                                layout="vertical"
+                                margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                <XAxis type="number" className="text-xs" />
+                                <YAxis 
+                                  type="category" 
+                                  dataKey="name" 
+                                  className="text-xs"
+                                  width={75}
+                                  tick={{ fontSize: 11 }}
+                                />
+                                <Tooltip 
+                                  contentStyle={{ 
+                                    backgroundColor: 'hsl(var(--background))',
+                                    border: '1px solid hsl(var(--border))',
+                                    borderRadius: '8px'
+                                  }}
+                                  formatter={(value: number) => [value, 'Volume']}
+                                />
+                                <Bar dataKey="volume" fill="hsl(var(--primary))">
+                                  {productivityData.filter(u => u.userId !== 'system').slice(0, 10).map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Detailed Table */}
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Funcionário</TableHead>
+                              <TableHead className="text-right">Operações</TableHead>
+                              <TableHead className="text-right">Incrementos</TableHead>
+                              <TableHead className="text-right">Decrementos</TableHead>
+                              <TableHead className="text-right">Volume Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {productivityData.filter(u => u.userId !== 'system').map((user) => (
+                              <TableRow key={user.userId}>
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                    {user.name}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">{user.operations}</TableCell>
+                                <TableCell className="text-right text-green-600">+{user.increments}</TableCell>
+                                <TableCell className="text-right text-red-600">-{user.decrements}</TableCell>
+                                <TableCell className="text-right font-medium">{user.volume}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            )}
 
             {/* Table */}
             {isLoading ? (
