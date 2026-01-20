@@ -438,6 +438,158 @@ export type Database = {
           },
         ]
       }
+      warehouse_aisles: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      warehouse_levels: {
+        Row: {
+          color: string | null
+          created_at: string
+          display_order: number
+          id: string
+          level_number: number
+          name: string
+          requires_forklift: boolean
+          short_name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          level_number?: number
+          name: string
+          requires_forklift?: boolean
+          short_name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          level_number?: number
+          name?: string
+          requires_forklift?: boolean
+          short_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      warehouse_locations: {
+        Row: {
+          aisle_id: string | null
+          code: string
+          created_at: string
+          id: string
+          level_id: string | null
+          notes: string | null
+          position_in_aisle: number
+          updated_at: string
+        }
+        Insert: {
+          aisle_id?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          level_id?: string | null
+          notes?: string | null
+          position_in_aisle?: number
+          updated_at?: string
+        }
+        Update: {
+          aisle_id?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          level_id?: string | null
+          notes?: string | null
+          position_in_aisle?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_locations_aisle_id_fkey"
+            columns: ["aisle_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_aisles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_locations_level_id_fkey"
+            columns: ["level_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_pallets: {
+        Row: {
+          code: string
+          created_at: string
+          current_location_id: string | null
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_location_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_location_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_pallets_current_location_id_fkey"
+            columns: ["current_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

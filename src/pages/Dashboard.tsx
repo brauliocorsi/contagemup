@@ -10,6 +10,7 @@ import { ReconciliationView } from '@/components/reconciliation/ReconciliationVi
 import { StockEntriesView } from '@/components/stock/StockEntriesView';
 import { StockExitsView } from '@/components/stock/StockExitsView';
 import { StockAlertsPanel } from '@/components/stock/StockAlertsPanel';
+import { WarehouseMapView } from '@/components/warehouse/WarehouseMapView';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('counting');
@@ -37,6 +38,7 @@ export default function Dashboard() {
         {activeTab === 'entries' && <StockEntriesView />}
         {activeTab === 'exits' && <StockExitsView />}
         {activeTab === 'reconciliation' && <ReconciliationView />}
+        {activeTab === 'warehouse' && <WarehouseMapView />}
         {activeTab === 'reports' && <ReportsView />}
       </main>
     </div>
