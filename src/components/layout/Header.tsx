@@ -1,24 +1,37 @@
 import { useAuth } from '@/hooks/useAuth';
+import { useActiveSession } from '@/hooks/useActiveSession';
 import { Button } from '@/components/ui/button';
-import { Package, LogOut, User } from 'lucide-react';
+import { Package, LogOut, User, ClipboardList } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StockAlertsBell } from '@/components/stock/StockAlertsBell';
+import { Badge } from '@/components/ui/badge';
 
 interface HeaderProps {
   onNavigateToProducts?: () => void;
 }
 
 export function Header({ onNavigateToProducts }: HeaderProps) {
-  const {
-    profile,
-    signOut
-  } = useAuth();
-  return <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+  const { profile, signOut } = useAuth();
+  const { activeSession } = useActiveSession();
+
+  return (
+    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Package className="h-6 w-6 text-primary" />
-          <span className="font-semibold text-lg">​Conferências UP Móveis     </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Package className="h-6 w-6 text-primary" />
+            <span className="font-semibold text-lg hidden sm:inline">Conferências UP Móveis</span>
+          </div>
+          
+          {activeSession && (
+            <div className="flex items-center gap-2 pl-3 border-l">
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-medium">
+                {activeSession.name}
+              </Badge>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -50,5 +63,6 @@ export function Header({ onNavigateToProducts }: HeaderProps) {
           </DropdownMenu>
         </div>
       </div>
-    </header>;
+    </header>
+  );
 }
