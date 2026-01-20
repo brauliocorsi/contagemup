@@ -109,6 +109,31 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
     return null;
   }, []);
 
+  // Security: Maximum field lengths
+  const MAX_FIELD_LENGTHS = {
+    code: 100,
+    name: 300,
+    category: 100,
+    description: 1000,
+    location: 200,
+    pallet_number: 100
+  };
+
+  // Security: Sanitize value to prevent CSV injection
+  const sanitizeValue = useCallback((value: string): string => {
+    if (!value) return '';
+    // Remove leading characters that could trigger formulas in Excel
+    if (/^[=+\-@\t\r]/.test(value)) {
+      return "'" + value;
+    }
+    return value;
+  }, []);
+
+  // Security: Validate and truncate field
+  const validateFieldValue = useCallback((value: string, maxLength: number): string => {
+    return sanitizeValue(value.trim()).substring(0, maxLength);
+  }, [sanitizeValue]);
+
   // Generate products from raw data and current mapping
   const generateProducts = useCallback((data: Record<string, unknown>[], mapping: ColumnMapping): ProductRow[] => {
     const products: ProductRow[] = [];
@@ -119,24 +144,24 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
         return String(row[columnName]).trim();
       };
       
-      const code = getValue(mapping.code);
-      const name = getValue(mapping.name);
+      const code = validateFieldValue(getValue(mapping.code), MAX_FIELD_LENGTHS.code);
+      const name = validateFieldValue(getValue(mapping.name), MAX_FIELD_LENGTHS.name);
       
       if (code && name) {
         products.push({
           code,
           name,
-          category: getValue(mapping.category) || 'Geral',
-          total_colis: parseInt(getValue(mapping.total_colis)) || 1,
-          description: getValue(mapping.description) || undefined,
-          location: getValue(mapping.location) || undefined,
-          pallet_number: getValue(mapping.pallet_number) || undefined
+          category: validateFieldValue(getValue(mapping.category), MAX_FIELD_LENGTHS.category) || 'Geral',
+          total_colis: Math.max(1, Math.min(10000, parseInt(getValue(mapping.total_colis)) || 1)),
+          description: validateFieldValue(getValue(mapping.description), MAX_FIELD_LENGTHS.description) || undefined,
+          location: validateFieldValue(getValue(mapping.location), MAX_FIELD_LENGTHS.location) || undefined,
+          pallet_number: validateFieldValue(getValue(mapping.pallet_number), MAX_FIELD_LENGTHS.pallet_number) || undefined
         });
       }
     }
     
     return products;
-  }, []);
+  }, [validateFieldValue]);
 
   const parseCSV = (text: string): { data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] } => {
     const lines = text.split('\n').filter(line => line.trim());
@@ -203,9 +228,41 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
     return csvCategories.filter(cat => !existingCategories.includes(cat));
   }, [preview, existingCategories]);
 
+  // Security constants for file uploads
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const MAX_ROWS = 10000;
+  const MAX_FIELD_LENGTH = { code: 100, name: 300, category: 100, description: 1000, location: 200, pallet_number: 100 };
+
+  // Sanitize string to prevent CSV injection
+  const sanitizeCSVValue = (value: string): string => {
+    if (!value) return '';
+    // Remove leading characters that could trigger formulas in Excel
+    if (/^[=+\-@\t\r]/.test(value)) {
+      return "'" + value;
+    }
+    return value;
+  };
+
+  // Validate and truncate field lengths
+  const validateField = (value: string, maxLength: number): string => {
+    const sanitized = sanitizeCSVValue(value.trim());
+    return sanitized.substring(0, maxLength);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Security: File size validation
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: 'Ficheiro muito grande',
+        description: `O ficheiro excede o limite de ${MAX_FILE_SIZE / (1024 * 1024)}MB`,
+        variant: 'destructive'
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
 
@@ -215,6 +272,18 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
         try {
           const arrayBuffer = event.target?.result as ArrayBuffer;
           const { data, mapping, columns } = parseXLSX(arrayBuffer);
+          
+          // Security: Row limit validation
+          if (data.length > MAX_ROWS) {
+            toast({
+              title: 'Demasiadas linhas',
+              description: `O ficheiro contém mais de ${MAX_ROWS.toLocaleString()} linhas. Por favor, divida em ficheiros menores.`,
+              variant: 'destructive'
+            });
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+          }
+          
           setRawData(data);
           setColumnMapping(mapping);
           setAllFileColumns(columns);
@@ -255,6 +324,18 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
       reader.onload = (event) => {
         const text = event.target?.result as string;
         const { data, mapping, columns } = parseCSV(text);
+        
+        // Security: Row limit validation
+        if (data.length > MAX_ROWS) {
+          toast({
+            title: 'Demasiadas linhas',
+            description: `O ficheiro contém mais de ${MAX_ROWS.toLocaleString()} linhas. Por favor, divida em ficheiros menores.`,
+            variant: 'destructive'
+          });
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+        
         setRawData(data);
         setColumnMapping(mapping);
         setAllFileColumns(columns);
