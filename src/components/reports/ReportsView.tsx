@@ -18,6 +18,7 @@ import { ReportsCharts } from './ReportsCharts';
 import { StockMovementsReport } from './StockMovementsReport';
 import { CountingMovementsReport } from './CountingMovementsReport';
 import { ColisDispersionCard } from './ColisDispersionCard';
+import { WarehouseMap } from './WarehouseMap';
 
 export function ReportsView() {
   const { products, loading: productsLoading } = useProducts();
@@ -342,6 +343,12 @@ export function ReportsView() {
               </CollapsibleContent>
             </Card>
           </Collapsible>
+
+          {/* Warehouse Map */}
+          <WarehouseMap
+            productsWithCounts={productsWithCounts}
+            onProductClick={handleProductDetailsClick}
+          />
 
           {/* Category Stats - Collapsible */}
           {categoryStats.length > 0 && (
