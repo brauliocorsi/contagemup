@@ -6,6 +6,19 @@ interface ColisLocationInfo {
   quantity: number;
   location: string | null;
   palletNumber: string | null;
+  countId: string;
+}
+
+// Represents a split entry (same coli in multiple locations)
+interface SplitEntry {
+  colisNumber: number;
+  entries: {
+    countId: string;
+    quantity: number;
+    location: string | null;
+    palletNumber: string | null;
+  }[];
+  totalQuantity: number;
 }
 
 interface LastCountInfo {
@@ -17,6 +30,10 @@ interface LastCountInfo {
   colisLocations: ColisLocationInfo[];
   uniqueLocations: string[];
   uniquePallets: string[];
+  // New: split tracking
+  splitEntries: SplitEntry[];
+  hasSplitColis: boolean;
+  splitColisCount: number;
 }
 
 export function useLastCounts() {
@@ -30,6 +47,7 @@ export function useLastCounts() {
       const { data: counts, error } = await supabase
         .from('counts')
         .select(`
+          id,
           product_id,
           session_id,
           colis_number,
@@ -69,48 +87,91 @@ export function useLastCounts() {
         sessionId: string; 
         totalQuantity: number; 
         countedAt: string;
-        colisMap: Record<number, ColisLocationInfo>;
+        // Use array to collect ALL entries (including multiple per coli)
+        allEntries: Array<{
+          countId: string;
+          colisNumber: number;
+          quantity: number;
+          location: string | null;
+          palletNumber: string | null;
+        }>;
       }> = {};
 
       counts?.forEach(count => {
         const recentSession = productRecentSession[count.product_id];
-        if (recentSession && count.session_id === recentSession.sessionId) {
+        if (recentSession && count.session_id === recentSession.sessionId && count.quantity > 0) {
           const key = count.product_id;
           if (!productDataMap[key]) {
             productDataMap[key] = {
               sessionId: count.session_id,
               totalQuantity: 0,
               countedAt: count.counted_at,
-              colisMap: {}
+              allEntries: []
             };
           }
           
           productDataMap[key].totalQuantity += count.quantity;
-          
-          // Store colis location info
-          productDataMap[key].colisMap[count.colis_number] = {
+          productDataMap[key].allEntries.push({
+            countId: count.id,
             colisNumber: count.colis_number,
             quantity: count.quantity,
             location: count.location,
             palletNumber: count.pallet_number
-          };
+          });
         }
       });
 
       // Build final map
       const result: Record<string, LastCountInfo> = {};
       Object.entries(productDataMap).forEach(([productId, info]) => {
-        const colisLocations = Object.values(info.colisMap).sort((a, b) => a.colisNumber - b.colisNumber);
-        
+        // Group entries by colis number to detect splits
+        const coliGroups: Record<number, typeof info.allEntries> = {};
+        info.allEntries.forEach(entry => {
+          if (!coliGroups[entry.colisNumber]) {
+            coliGroups[entry.colisNumber] = [];
+          }
+          coliGroups[entry.colisNumber].push(entry);
+        });
+
+        // Build colisLocations (aggregated view - one entry per coli with primary location)
+        const colisLocations: ColisLocationInfo[] = Object.entries(coliGroups)
+          .map(([colisNum, entries]) => {
+            const totalQty = entries.reduce((sum, e) => sum + e.quantity, 0);
+            const primary = entries[0];
+            return {
+              colisNumber: parseInt(colisNum),
+              quantity: totalQty,
+              location: primary.location,
+              palletNumber: primary.palletNumber,
+              countId: primary.countId
+            };
+          })
+          .sort((a, b) => a.colisNumber - b.colisNumber);
+
+        // Build splitEntries (colis that have multiple location entries)
+        const splitEntries: SplitEntry[] = Object.entries(coliGroups)
+          .filter(([_, entries]) => entries.length > 1)
+          .map(([colisNum, entries]) => ({
+            colisNumber: parseInt(colisNum),
+            entries: entries.map(e => ({
+              countId: e.countId,
+              quantity: e.quantity,
+              location: e.location,
+              palletNumber: e.palletNumber
+            })),
+            totalQuantity: entries.reduce((sum, e) => sum + e.quantity, 0)
+          }));
+
+        // Collect all unique locations from ALL entries
         const uniqueLocations = [...new Set(
-          colisLocations
-            .map(c => c.location)
+          info.allEntries
+            .map(e => e.location)
             .filter((loc): loc is string => loc !== null && loc.trim() !== '')
         )].sort();
 
         const uniquePallets = [...new Set(
-          colisLocations
-            .map(c => c.palletNumber)
+          info.allEntries
+            .map(e => e.palletNumber)
             .filter((p): p is string => p !== null && p.trim() !== '')
         )].sort();
 
@@ -122,7 +183,10 @@ export function useLastCounts() {
           countedAt: info.countedAt,
           colisLocations,
           uniqueLocations,
-          uniquePallets
+          uniquePallets,
+          splitEntries,
+          hasSplitColis: splitEntries.length > 0,
+          splitColisCount: splitEntries.length
         };
       });
 

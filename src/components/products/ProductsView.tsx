@@ -17,8 +17,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ResizableTableProvider, ResizableHeaderCell, ResizableCell } from '@/components/ui/resizable-table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split } from 'lucide-react';
 import { classifyLocation } from '@/lib/locationUtils';
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -653,6 +654,13 @@ export function ProductsView() {
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <div className="flex flex-wrap gap-0.5 max-w-[200px]">
+                                      {/* Split indicator */}
+                                      {lastCount.hasSplitColis && (
+                                        <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 text-blue-700 border-blue-300">
+                                          <Split className="h-2.5 w-2.5" />
+                                          {lastCount.splitColisCount} div.
+                                        </Badge>
+                                      )}
                                       {/* Location Badge */}
                                       {lastCount.uniqueLocations.length > 0 ? (
                                         lastCount.uniqueLocations.length === 1 ? (
@@ -681,19 +689,29 @@ export function ProductsView() {
                                           </Badge>
                                         )
                                       )}
-                                      {lastCount.uniqueLocations.length === 0 && lastCount.uniquePallets.length === 0 && (
+                                      {lastCount.uniqueLocations.length === 0 && lastCount.uniquePallets.length === 0 && !lastCount.hasSplitColis && (
                                         <span className="text-xs text-muted-foreground">-</span>
                                       )}
                                     </div>
                                   </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-[350px]">
+                                  <TooltipContent side="left" className="max-w-[400px]">
                                     <p className="font-medium mb-2">Detalhes por Coli:</p>
                                     <div className="space-y-1 text-xs">
                                       {lastCount.colisLocations.map(c => {
                                         const locInfo = classifyLocation(c.location);
+                                        const splitEntry = lastCount.splitEntries.find(s => s.colisNumber === c.colisNumber);
                                         return (
-                                          <div key={c.colisNumber} className="flex items-center gap-2 p-1 rounded bg-muted/50">
+                                          <div key={c.colisNumber} className={cn(
+                                            "flex items-center gap-2 p-1 rounded",
+                                            splitEntry ? "bg-blue-50 border border-blue-200" : "bg-muted/50"
+                                          )}>
                                             <span className="font-mono font-medium w-6">C{c.colisNumber}</span>
+                                            {splitEntry && (
+                                              <Badge variant="outline" className="text-[10px] px-1 py-0 bg-blue-100 text-blue-700 border-blue-300">
+                                                <Split className="h-2 w-2 mr-0.5" />
+                                                {splitEntry.entries.length}
+                                              </Badge>
+                                            )}
                                             <span className="text-muted-foreground">→</span>
                                             <div className="flex items-center gap-1 flex-1">
                                               <MapPin className="h-2.5 w-2.5 text-muted-foreground" />
@@ -712,6 +730,12 @@ export function ProductsView() {
                                           </div>
                                         );
                                       })}
+                                      {lastCount.hasSplitColis && (
+                                        <p className="text-blue-600 mt-2 pt-2 border-t">
+                                          <Split className="h-3 w-3 inline mr-1" />
+                                          {lastCount.splitColisCount} coli(s) dividido(s) em múltiplas localizações
+                                        </p>
+                                      )}
                                     </div>
                                   </TooltipContent>
                                 </Tooltip>
