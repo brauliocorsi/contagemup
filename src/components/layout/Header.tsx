@@ -1,7 +1,8 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveSession } from '@/hooks/useActiveSession';
+import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
-import { Package, LogOut, User, ClipboardList } from 'lucide-react';
+import { Package, LogOut, User, ClipboardList, Moon, Sun } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StockAlertsBell } from '@/components/stock/StockAlertsBell';
@@ -14,6 +15,11 @@ interface HeaderProps {
 export function Header({ onNavigateToProducts }: HeaderProps) {
   const { profile, signOut } = useAuth();
   const { activeSession } = useActiveSession();
+  const { theme, setTheme } = useTheme();
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -54,6 +60,20 @@ export function Header({ onNavigateToProducts }: HeaderProps) {
                   <p className="text-xs text-muted-foreground capitalize">{profile?.role}</p>
                 </div>
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={toggleTheme}>
+                {theme === 'dark' ? (
+                  <>
+                    <Sun className="mr-2 h-4 w-4" />
+                    Modo claro
+                  </>
+                ) : (
+                  <>
+                    <Moon className="mr-2 h-4 w-4" />
+                    Modo escuro
+                  </>
+                )}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
