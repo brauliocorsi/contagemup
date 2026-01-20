@@ -55,15 +55,17 @@ export function LocationSelect({
   const [inputValue, setInputValue] = useState('');
   const { locations, isLoading } = useWarehouseLocations();
 
-  const locationOptions = useMemo(() => locations.map(loc => ({
-    value: loc.code,
-    label: loc.code,
-    aisle: loc.aisle?.name,
-    aisleColor: loc.aisle?.color,
-    level: loc.level?.name,
-    levelShort: loc.level?.short_name,
-    requiresForklift: loc.level?.requires_forklift ?? false,
-  })), [locations]);
+  const locationOptions = useMemo(() => locations
+    .filter(loc => loc.code && loc.code.trim() !== '')
+    .map(loc => ({
+      value: loc.code,
+      label: loc.code,
+      aisle: loc.aisle?.name,
+      aisleColor: loc.aisle?.color,
+      level: loc.level?.name,
+      levelShort: loc.level?.short_name,
+      requiresForklift: loc.level?.requires_forklift ?? false,
+    })), [locations]);
 
   // Group locations by aisle
   const groupedLocations = useMemo(() => {
