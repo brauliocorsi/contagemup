@@ -15,14 +15,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Product } from '@/types/stock';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
+
+type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'lastCount' | 'location' | 'pallet';
+
+const COLUMN_LABELS: Record<ColumnKey, string> = {
+  code: 'Código',
+  name: 'Nome',
+  category: 'Categoria',
+  colis: 'Colis',
+  stock: 'Stock',
+  lastCount: 'Última Contagem',
+  location: 'Localização',
+  pallet: 'Palete',
+};
+
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'lastCount', 'location', 'pallet'];
 
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
@@ -39,6 +55,24 @@ export function ProductsView() {
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [bulkMinStockOpen, setBulkMinStockOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(new Set(DEFAULT_VISIBLE_COLUMNS));
+
+  const toggleColumn = (column: ColumnKey) => {
+    setVisibleColumns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(column)) {
+        // Don't allow hiding all columns - keep at least name
+        if (newSet.size > 1 || column === 'name') {
+          newSet.delete(column);
+        }
+      } else {
+        newSet.add(column);
+      }
+      return newSet;
+    });
+  };
+
+  const isColumnVisible = (column: ColumnKey) => visibleColumns.has(column);
 
   const handleSort = (column: 'code' | 'name' | 'category' | 'stock' | 'lastCount') => {
     if (sortColumn === column) {
@@ -370,6 +404,34 @@ export function ProductsView() {
           <Download className="h-4 w-4 mr-2" />
           Exportar
         </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="whitespace-nowrap">
+              <Columns3 className="h-4 w-4 mr-2" />
+              Colunas
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56" align="end">
+            <div className="space-y-2">
+              <p className="text-sm font-medium mb-3">Colunas visíveis</p>
+              {(Object.keys(COLUMN_LABELS) as ColumnKey[]).map((column) => (
+                <div key={column} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`col-${column}`}
+                    checked={isColumnVisible(column)}
+                    onCheckedChange={() => toggleColumn(column)}
+                  />
+                  <label
+                    htmlFor={`col-${column}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    {COLUMN_LABELS[column]}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Selection action bar */}
@@ -422,54 +484,64 @@ export function ProductsView() {
                         aria-label="Selecionar todos"
                       />
                     </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('code')}
-                    >
-                      <span className="flex items-center">
-                        Código
-                        {getSortIcon('code')}
-                      </span>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('name')}
-                    >
-                      <span className="flex items-center">
-                        Nome
-                        {getSortIcon('name')}
-                      </span>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('category')}
-                    >
-                      <span className="flex items-center">
-                        Categoria
-                        {getSortIcon('category')}
-                      </span>
-                    </TableHead>
-                    <TableHead>Colis</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('stock')}
-                    >
-                      <span className="flex items-center">
-                        Stock
-                        {getSortIcon('stock')}
-                      </span>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('lastCount')}
-                    >
-                      <span className="flex items-center">
-                        Última Contagem
-                        {getSortIcon('lastCount')}
-                      </span>
-                    </TableHead>
-                    <TableHead>Localização</TableHead>
-                    <TableHead>Palete</TableHead>
+                    {isColumnVisible('code') && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort('code')}
+                      >
+                        <span className="flex items-center">
+                          Código
+                          {getSortIcon('code')}
+                        </span>
+                      </TableHead>
+                    )}
+                    {isColumnVisible('name') && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort('name')}
+                      >
+                        <span className="flex items-center">
+                          Nome
+                          {getSortIcon('name')}
+                        </span>
+                      </TableHead>
+                    )}
+                    {isColumnVisible('category') && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort('category')}
+                      >
+                        <span className="flex items-center">
+                          Categoria
+                          {getSortIcon('category')}
+                        </span>
+                      </TableHead>
+                    )}
+                    {isColumnVisible('colis') && <TableHead>Colis</TableHead>}
+                    {isColumnVisible('stock') && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort('stock')}
+                      >
+                        <span className="flex items-center">
+                          Stock
+                          {getSortIcon('stock')}
+                        </span>
+                      </TableHead>
+                    )}
+                    {isColumnVisible('lastCount') && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort('lastCount')}
+                      >
+                        <span className="flex items-center">
+                          Última Contagem
+                          {getSortIcon('lastCount')}
+                        </span>
+                      </TableHead>
+                    )}
+                    {isColumnVisible('location') && <TableHead>Localização</TableHead>}
+                    {isColumnVisible('pallet') && <TableHead>Palete</TableHead>}
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -485,57 +557,73 @@ export function ProductsView() {
                           aria-label={`Selecionar ${product.name}`}
                         />
                       </TableCell>
-                      <TableCell className="font-mono">{product.code}</TableCell>
-                      <TableCell className="font-medium max-w-[150px] truncate">{product.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{product.category}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{product.total_colis}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {getStockBadge(product.current_stock, product.min_stock)}
-                      </TableCell>
-                      <TableCell>
-                        {lastCount ? (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="flex items-center gap-1 cursor-help">
-                                  <ClipboardList className="h-3 w-3 text-muted-foreground" />
-                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                    {lastCount.totalQuantity} un.
-                                  </Badge>
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="font-medium">{lastCount.sessionName}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {format(new Date(lastCount.countedAt), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {product.location ? (
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            <MapPin className="h-3 w-3" />
-                            {product.location}
-                          </span>
-                        ) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {product.pallet_number ? (
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            <Box className="h-3 w-3" />
-                            {product.pallet_number}
-                          </span>
-                        ) : '-'}
-                      </TableCell>
+                      {isColumnVisible('code') && (
+                        <TableCell className="font-mono">{product.code}</TableCell>
+                      )}
+                      {isColumnVisible('name') && (
+                        <TableCell className="font-medium max-w-[200px] truncate" title={product.name}>{product.name}</TableCell>
+                      )}
+                      {isColumnVisible('category') && (
+                        <TableCell>
+                          <Badge variant="outline">{product.category}</Badge>
+                        </TableCell>
+                      )}
+                      {isColumnVisible('colis') && (
+                        <TableCell>
+                          <Badge variant="secondary">{product.total_colis}</Badge>
+                        </TableCell>
+                      )}
+                      {isColumnVisible('stock') && (
+                        <TableCell>
+                          {getStockBadge(product.current_stock, product.min_stock)}
+                        </TableCell>
+                      )}
+                      {isColumnVisible('lastCount') && (
+                        <TableCell>
+                          {lastCount ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="flex items-center gap-1 cursor-help">
+                                    <ClipboardList className="h-3 w-3 text-muted-foreground" />
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                      {lastCount.totalQuantity} un.
+                                    </Badge>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="font-medium">{lastCount.sessionName}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {format(new Date(lastCount.countedAt), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {isColumnVisible('location') && (
+                        <TableCell>
+                          {product.location ? (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              {product.location}
+                            </span>
+                          ) : '-'}
+                        </TableCell>
+                      )}
+                      {isColumnVisible('pallet') && (
+                        <TableCell>
+                          {product.pallet_number ? (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <Box className="h-3 w-3" />
+                              {product.pallet_number}
+                            </span>
+                          ) : '-'}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button 
