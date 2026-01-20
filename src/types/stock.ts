@@ -50,11 +50,23 @@ export interface Count {
   updated_at: string;
 }
 
-export interface ColisDetail {
-  colis_number: number;
+// Represents a single location allocation for a coli
+export interface ColisLocationEntry {
+  countId: string; // ID of the count record
   quantity: number;
   location: string | null;
   pallet_number: string | null;
+}
+
+// Updated ColisDetail to support multiple locations per coli
+export interface ColisDetail {
+  colis_number: number;
+  quantity: number; // Total quantity across all locations
+  location: string | null; // Primary location (first one)
+  pallet_number: string | null; // Primary pallet (first one)
+  // New: Array of all location entries for this coli
+  locationEntries: ColisLocationEntry[];
+  hasMultipleLocations: boolean;
 }
 
 export interface ProductWithCounts extends Product {
@@ -82,4 +94,13 @@ export interface Profile {
   role: 'admin' | 'operator';
   created_at: string;
   updated_at: string;
+}
+
+// Distribution entry for split stock dialog
+export interface StockDistribution {
+  id: string; // Temporary ID for UI purposes
+  countId?: string; // Existing count ID (if editing)
+  quantity: number;
+  location: string;
+  pallet_number: string;
 }
