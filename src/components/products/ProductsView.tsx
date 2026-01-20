@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ResizableTableProvider, ResizableHeaderCell, ResizableCell } from '@/components/ui/resizable-table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3 } from 'lucide-react';
@@ -24,6 +25,19 @@ import { Product } from '@/types/stock';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
+
+const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
+  checkbox: 48,
+  code: 120,
+  name: 200,
+  category: 120,
+  colis: 80,
+  stock: 100,
+  lastCount: 140,
+  location: 120,
+  pallet: 100,
+  actions: 120,
+};
 
 type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'lastCount' | 'location' | 'pallet';
 
@@ -473,204 +487,223 @@ export function ProductsView() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
-                        onCheckedChange={toggleAllSelection}
-                        aria-label="Selecionar todos"
-                      />
-                    </TableHead>
-                    {isColumnVisible('code') && (
-                      <TableHead 
-                        className="cursor-pointer hover:bg-muted/50 select-none"
-                        onClick={() => handleSort('code')}
-                      >
-                        <span className="flex items-center">
-                          Código
-                          {getSortIcon('code')}
-                        </span>
-                      </TableHead>
-                    )}
-                    {isColumnVisible('name') && (
-                      <TableHead 
-                        className="cursor-pointer hover:bg-muted/50 select-none"
-                        onClick={() => handleSort('name')}
-                      >
-                        <span className="flex items-center">
-                          Nome
-                          {getSortIcon('name')}
-                        </span>
-                      </TableHead>
-                    )}
-                    {isColumnVisible('category') && (
-                      <TableHead 
-                        className="cursor-pointer hover:bg-muted/50 select-none"
-                        onClick={() => handleSort('category')}
-                      >
-                        <span className="flex items-center">
-                          Categoria
-                          {getSortIcon('category')}
-                        </span>
-                      </TableHead>
-                    )}
-                    {isColumnVisible('colis') && <TableHead>Colis</TableHead>}
-                    {isColumnVisible('stock') && (
-                      <TableHead 
-                        className="cursor-pointer hover:bg-muted/50 select-none"
-                        onClick={() => handleSort('stock')}
-                      >
-                        <span className="flex items-center">
-                          Stock
-                          {getSortIcon('stock')}
-                        </span>
-                      </TableHead>
-                    )}
-                    {isColumnVisible('lastCount') && (
-                      <TableHead 
-                        className="cursor-pointer hover:bg-muted/50 select-none"
-                        onClick={() => handleSort('lastCount')}
-                      >
-                        <span className="flex items-center">
-                          Última Contagem
-                          {getSortIcon('lastCount')}
-                        </span>
-                      </TableHead>
-                    )}
-                    {isColumnVisible('location') && <TableHead>Localização</TableHead>}
-                    {isColumnVisible('pallet') && <TableHead>Palete</TableHead>}
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                {filteredProducts.map(product => {
-                    const lastCount = lastCounts[product.id];
-                    return (
-                    <TableRow key={product.id} className={selectedProducts.has(product.id) ? 'bg-primary/5' : ''}>
-                      <TableCell>
+            <ResizableTableProvider defaultWidths={DEFAULT_COLUMN_WIDTHS}>
+              <div className="overflow-x-auto">
+                <Table className="table-fixed">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
                         <Checkbox
-                          checked={selectedProducts.has(product.id)}
-                          onCheckedChange={() => toggleProductSelection(product.id)}
-                          aria-label={`Selecionar ${product.name}`}
+                          checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                          onCheckedChange={toggleAllSelection}
+                          aria-label="Selecionar todos"
                         />
-                      </TableCell>
+                      </TableHead>
                       {isColumnVisible('code') && (
-                        <TableCell className="font-mono">{product.code}</TableCell>
+                        <ResizableHeaderCell 
+                          columnId="code"
+                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
+                          onClick={() => handleSort('code')}
+                        >
+                          <span className="flex items-center">
+                            Código
+                            {getSortIcon('code')}
+                          </span>
+                        </ResizableHeaderCell>
                       )}
                       {isColumnVisible('name') && (
-                        <TableCell className="font-medium max-w-[200px] truncate" title={product.name}>{product.name}</TableCell>
+                        <ResizableHeaderCell 
+                          columnId="name"
+                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
+                          onClick={() => handleSort('name')}
+                        >
+                          <span className="flex items-center">
+                            Nome
+                            {getSortIcon('name')}
+                          </span>
+                        </ResizableHeaderCell>
                       )}
                       {isColumnVisible('category') && (
-                        <TableCell>
-                          <Badge variant="outline">{product.category}</Badge>
-                        </TableCell>
+                        <ResizableHeaderCell 
+                          columnId="category"
+                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
+                          onClick={() => handleSort('category')}
+                        >
+                          <span className="flex items-center">
+                            Categoria
+                            {getSortIcon('category')}
+                          </span>
+                        </ResizableHeaderCell>
                       )}
                       {isColumnVisible('colis') && (
-                        <TableCell>
-                          <Badge variant="secondary">{product.total_colis}</Badge>
-                        </TableCell>
+                        <ResizableHeaderCell columnId="colis" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
+                          Colis
+                        </ResizableHeaderCell>
                       )}
                       {isColumnVisible('stock') && (
-                        <TableCell>
-                          {getStockBadge(product.current_stock, product.min_stock)}
-                        </TableCell>
+                        <ResizableHeaderCell 
+                          columnId="stock"
+                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
+                          onClick={() => handleSort('stock')}
+                        >
+                          <span className="flex items-center">
+                            Stock
+                            {getSortIcon('stock')}
+                          </span>
+                        </ResizableHeaderCell>
                       )}
                       {isColumnVisible('lastCount') && (
-                        <TableCell>
-                          {lastCount ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="flex items-center gap-1 cursor-help">
-                                    <ClipboardList className="h-3 w-3 text-muted-foreground" />
-                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                      {lastCount.totalQuantity} un.
-                                    </Badge>
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="font-medium">{lastCount.sessionName}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {format(new Date(lastCount.countedAt), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
-                                  </p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </TableCell>
+                        <ResizableHeaderCell 
+                          columnId="lastCount"
+                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
+                          onClick={() => handleSort('lastCount')}
+                        >
+                          <span className="flex items-center">
+                            Última Contagem
+                            {getSortIcon('lastCount')}
+                          </span>
+                        </ResizableHeaderCell>
                       )}
                       {isColumnVisible('location') && (
-                        <TableCell>
-                          {product.location ? (
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <MapPin className="h-3 w-3" />
-                              {product.location}
-                            </span>
-                          ) : '-'}
-                        </TableCell>
+                        <ResizableHeaderCell columnId="location" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
+                          Localização
+                        </ResizableHeaderCell>
                       )}
                       {isColumnVisible('pallet') && (
-                        <TableCell>
-                          {product.pallet_number ? (
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <Box className="h-3 w-3" />
-                              {product.pallet_number}
-                            </span>
-                          ) : '-'}
-                        </TableCell>
+                        <ResizableHeaderCell columnId="pallet" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
+                          Palete
+                        </ResizableHeaderCell>
                       )}
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => setHistoryProduct(product)}
-                            title="Ver histórico"
-                          >
-                            <History className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => setEditingProduct(product)}
-                            title="Editar"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title="Eliminar">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Eliminar produto?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta ação não pode ser revertida. O produto "{product.name}" será permanentemente eliminado.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteProduct(product.id)}>
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
+                      <TableHead className="text-right w-28">Ações</TableHead>
                     </TableRow>
-                  );
-                })}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                  {filteredProducts.map(product => {
+                      const lastCount = lastCounts[product.id];
+                      return (
+                      <TableRow key={product.id} className={selectedProducts.has(product.id) ? 'bg-primary/5' : ''}>
+                        <TableCell className="w-12">
+                          <Checkbox
+                            checked={selectedProducts.has(product.id)}
+                            onCheckedChange={() => toggleProductSelection(product.id)}
+                            aria-label={`Selecionar ${product.name}`}
+                          />
+                        </TableCell>
+                        {isColumnVisible('code') && (
+                          <ResizableCell columnId="code" className="p-2 align-middle font-mono">{product.code}</ResizableCell>
+                        )}
+                        {isColumnVisible('name') && (
+                          <ResizableCell columnId="name" className="p-2 align-middle font-medium" title={product.name}>{product.name}</ResizableCell>
+                        )}
+                        {isColumnVisible('category') && (
+                          <ResizableCell columnId="category" className="p-2 align-middle">
+                            <Badge variant="outline">{product.category}</Badge>
+                          </ResizableCell>
+                        )}
+                        {isColumnVisible('colis') && (
+                          <ResizableCell columnId="colis" className="p-2 align-middle">
+                            <Badge variant="secondary">{product.total_colis}</Badge>
+                          </ResizableCell>
+                        )}
+                        {isColumnVisible('stock') && (
+                          <ResizableCell columnId="stock" className="p-2 align-middle">
+                            {getStockBadge(product.current_stock, product.min_stock)}
+                          </ResizableCell>
+                        )}
+                        {isColumnVisible('lastCount') && (
+                          <ResizableCell columnId="lastCount" className="p-2 align-middle">
+                            {lastCount ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="flex items-center gap-1 cursor-help">
+                                      <ClipboardList className="h-3 w-3 text-muted-foreground" />
+                                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                        {lastCount.totalQuantity} un.
+                                      </Badge>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="font-medium">{lastCount.sessionName}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {format(new Date(lastCount.countedAt), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </ResizableCell>
+                        )}
+                        {isColumnVisible('location') && (
+                          <ResizableCell columnId="location" className="p-2 align-middle">
+                            {product.location ? (
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                <MapPin className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate">{product.location}</span>
+                              </span>
+                            ) : '-'}
+                          </ResizableCell>
+                        )}
+                        {isColumnVisible('pallet') && (
+                          <ResizableCell columnId="pallet" className="p-2 align-middle">
+                            {product.pallet_number ? (
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                <Box className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate">{product.pallet_number}</span>
+                              </span>
+                            ) : '-'}
+                          </ResizableCell>
+                        )}
+                        <TableCell className="text-right w-28">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => setHistoryProduct(product)}
+                              title="Ver histórico"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => setEditingProduct(product)}
+                              title="Editar"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title="Eliminar">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Eliminar produto?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta ação não pode ser revertida. O produto "{product.name}" será permanentemente eliminado.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteProduct(product.id)}>
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  </TableBody>
+                </Table>
+              </div>
+            </ResizableTableProvider>
           </CardContent>
         </Card>
       )}
