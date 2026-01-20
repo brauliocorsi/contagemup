@@ -177,9 +177,11 @@ export function InteractiveWarehouseMap() {
     const totalLocations = locations.length;
     const occupiedLocations = locations.filter(l => l.totalColis > 0).length;
     const totalColis = locations.reduce((sum, l) => sum + l.totalColis, 0);
+    const totalQuantity = locations.reduce((sum, l) => sum + l.totalQuantity, 0);
     const totalProducts = locations.reduce((sum, l) => sum + l.totalProducts, 0);
     const forkliftRequired = locations.filter(l => l.requiresForklift && l.totalColis > 0).length;
-    return { totalLocations, occupiedLocations, totalColis, totalProducts, forkliftRequired };
+    const splitLocations = locations.filter(l => l.products.some(p => p.isSplitEntry)).length;
+    return { totalLocations, occupiedLocations, totalColis, totalQuantity, totalProducts, forkliftRequired, splitLocations };
   }, [locations]);
 
   const handleDragStart = (item: DragItem) => {
@@ -225,6 +227,9 @@ export function InteractiveWarehouseMap() {
   const getLocationColor = (location: LocationWithProducts, isHighlighted: boolean) => {
     if (isHighlighted) return 'bg-yellow-300 border-yellow-500 ring-4 ring-yellow-400 animate-pulse';
     if (location.totalColis === 0) return 'bg-muted/30 border-muted';
+    // Check if any products are split entries
+    const hasSplit = location.products.some(p => p.isSplitEntry);
+    if (hasSplit) return 'bg-blue-100 border-blue-400 border-dashed';
     if (location.totalColis >= 5) return 'bg-primary/20 border-primary/50';
     if (location.totalColis >= 2) return 'bg-blue-100 border-blue-300';
     return 'bg-green-100 border-green-300';
@@ -255,7 +260,7 @@ export function InteractiveWarehouseMap() {
     <>
       <div className="space-y-4">
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
           <Card className="p-3">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -278,8 +283,8 @@ export function InteractiveWarehouseMap() {
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-green-500" />
               <div>
-                <p className="text-xl font-bold">{stats.totalColis}</p>
-                <p className="text-xs text-muted-foreground">Colis</p>
+                <p className="text-xl font-bold">{stats.totalQuantity}</p>
+                <p className="text-xs text-muted-foreground">Unidades</p>
               </div>
             </div>
           </Card>
@@ -289,6 +294,15 @@ export function InteractiveWarehouseMap() {
               <div>
                 <p className="text-xl font-bold">{stats.totalProducts}</p>
                 <p className="text-xs text-muted-foreground">Produtos</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <Split className="h-4 w-4 text-blue-600" />
+              <div>
+                <p className="text-xl font-bold">{stats.splitLocations}</p>
+                <p className="text-xs text-muted-foreground">C/ Parciais</p>
               </div>
             </div>
           </Card>
@@ -413,15 +427,19 @@ export function InteractiveWarehouseMap() {
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-green-100 border border-green-300" />
-            <span className="text-muted-foreground">1 coli</span>
+            <span className="text-muted-foreground">1 entrada</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-blue-100 border border-blue-300" />
-            <span className="text-muted-foreground">2-4 colis</span>
+            <span className="text-muted-foreground">2-4 entradas</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-primary/20 border border-primary/50" />
-            <span className="text-muted-foreground">5+ colis</span>
+            <span className="text-muted-foreground">5+ entradas</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-blue-100 border-2 border-dashed border-blue-400" />
+            <span className="text-muted-foreground">Stock parcial</span>
           </div>
           <div className="flex items-center gap-2">
             <Forklift className="h-4 w-4 text-orange-500" />
@@ -509,7 +527,10 @@ export function InteractiveWarehouseMap() {
                                         <span className="font-bold text-xs">{location.code}</span>
                                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                           <Package className="h-2.5 w-2.5" />
-                                          {location.totalColis}
+                                          {location.totalQuantity}
+                                          {location.products.some(p => p.isSplitEntry) && (
+                                            <Split className="h-2.5 w-2.5 text-blue-600" />
+                                          )}
                                         </div>
                                         {location.requiresForklift && (
                                           <Forklift className="h-3 w-3 text-orange-500 mt-0.5" />
@@ -520,7 +541,10 @@ export function InteractiveWarehouseMap() {
                                       <div className="text-xs space-y-1">
                                         <p className="font-bold">{location.code}</p>
                                         <p>Rua {location.aisleName} • {location.levelName}</p>
-                                        <p>{location.totalColis} colis • {location.totalProducts} produtos</p>
+                                        <p>{location.totalQuantity} unidades • {location.totalProducts} produtos</p>
+                                        {location.products.some(p => p.isSplitEntry) && (
+                                          <p className="text-blue-600">✂️ Contém stock parcial/dividido</p>
+                                        )}
                                         {location.requiresForklift && (
                                           <p className="text-orange-500">🚜 Precisa empilhador</p>
                                         )}

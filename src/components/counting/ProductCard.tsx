@@ -350,7 +350,54 @@ export function ProductCard({
                     </button>
                   </CountHistoryPopover>
                 </div>
-                <Badge variant="outline" className="mt-1 text-xs">{product.category}</Badge>
+                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                  <Badge variant="outline" className="text-xs">{product.category}</Badge>
+                  {/* Quick location/pallet summary badges */}
+                  {product.uniqueLocations.length > 0 && (
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "text-xs flex items-center gap-0.5",
+                        product.hasMultipleLocations 
+                          ? "bg-orange-50 text-orange-700 border-orange-300" 
+                          : "bg-blue-50 text-blue-700 border-blue-300"
+                      )}
+                    >
+                      <MapPin className="h-2.5 w-2.5" />
+                      {product.uniqueLocations.length === 1 
+                        ? product.uniqueLocations[0] 
+                        : `${product.uniqueLocations.length} loc.`
+                      }
+                    </Badge>
+                  )}
+                  {product.uniquePallets.length > 0 && (
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "text-xs flex items-center gap-0.5",
+                        product.hasMultiplePallets 
+                          ? "bg-purple-50 text-purple-700 border-purple-300" 
+                          : ""
+                      )}
+                    >
+                      <Box className="h-2.5 w-2.5" />
+                      {product.uniquePallets.length === 1 
+                        ? product.uniquePallets[0] 
+                        : `${product.uniquePallets.length} pal.`
+                      }
+                    </Badge>
+                  )}
+                  {/* Split indicator */}
+                  {product.colisDetails.some(c => c.hasMultipleLocations) && (
+                    <Badge 
+                      variant="outline" 
+                      className="text-xs flex items-center gap-0.5 bg-blue-50 text-blue-600 border-blue-300"
+                    >
+                      <Split className="h-2.5 w-2.5" />
+                      Dividido
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex flex-col items-end gap-1">
