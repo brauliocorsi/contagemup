@@ -61,15 +61,17 @@ export function PalletSelect({
   const [inputValue, setInputValue] = useState('');
   const { pallets, isLoading } = useWarehousePallets();
 
-  const palletOptions = useMemo(() => pallets.map(p => ({
-    value: p.code,
-    label: p.code,
-    status: p.status as keyof typeof STATUS_CONFIG,
-    location: p.location?.code,
-    aisle: p.location?.aisle?.name,
-    level: p.location?.level?.name,
-    requiresForklift: p.location?.level?.requires_forklift ?? false,
-  })), [pallets]);
+  const palletOptions = useMemo(() => pallets
+    .filter(p => p.code && p.code.trim() !== '')
+    .map(p => ({
+      value: p.code,
+      label: p.code,
+      status: p.status as keyof typeof STATUS_CONFIG,
+      location: p.location?.code,
+      aisle: p.location?.aisle?.name,
+      level: p.location?.level?.name,
+      requiresForklift: p.location?.level?.requires_forklift ?? false,
+    })), [pallets]);
 
   // Group by status
   const groupedPallets = useMemo(() => {
