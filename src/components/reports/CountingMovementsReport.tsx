@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
-import { pt } from 'date-fns/locale';
-import { Calendar as CalendarIcon, FileDown, TrendingUp, TrendingDown, Search, Filter, X, User } from 'lucide-react';
+import { Calendar as CalendarIcon, FileDown, Search, X, ClipboardList, User, ArrowUpDown, ArrowUp, ArrowDown, Plus, Minus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,9 +28,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { useStockMovements, StockMovement } from '@/hooks/useStockMovements';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useSessions } from '@/hooks/useSessions';
 import { cn } from '@/lib/utils';
 
 interface DateRange {
@@ -39,23 +38,73 @@ interface DateRange {
   to: Date | undefined;
 }
 
-export function StockMovementsReport() {
-  const { movements, isLoading } = useStockMovements();
+interface CountingLog {
+  id: string;
+  product_id: string;
+  session_id: string;
+  colis_number: number;
+  operation: string;
+  quantity_before: number;
+  quantity_after: number;
+  counted_by: string | null;
+  created_at: string;
+  products?: {
+    code: string;
+    name: string;
+  };
+  counting_sessions?: {
+    name: string;
+  };
+}
+
+export function CountingMovementsReport() {
+  const { sessions } = useSessions();
   const [isOpen, setIsOpen] = useState(true);
+  const [logs, setLogs] = useState<CountingLog[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
+  
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'entrada' | 'saida'>('all');
+  const [filterOperation, setFilterOperation] = useState<'all' | 'increment' | 'decrement'>('all');
+  const [filterSession, setFilterSession] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
-  const [sortColumn, setSortColumn] = useState<'date' | 'product' | 'quantity' | 'user' | null>('date');
+  const [sortColumn, setSortColumn] = useState<'date' | 'product' | 'user' | null>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [userNames, setUserNames] = useState<Record<string, string>>({});
 
-  // Fetch user names for movements
+  // Fetch count logs
+  useEffect(() => {
+    const fetchLogs = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('count_logs')
+          .select(`
+            *,
+            products (code, name),
+            counting_sessions (name)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        if (error) throw error;
+        setLogs(data || []);
+      } catch (error) {
+        console.error('Error fetching count logs:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLogs();
+  }, []);
+
+  // Fetch user names
   useEffect(() => {
     const fetchUserNames = async () => {
-      const userIds = [...new Set(movements.filter(m => m.created_by).map(m => m.created_by!))];
+      const userIds = [...new Set(logs.filter(l => l.counted_by).map(l => l.counted_by!))];
       if (userIds.length === 0) return;
 
       const { data } = await supabase
@@ -72,12 +121,12 @@ export function StockMovementsReport() {
       }
     };
 
-    if (movements.length > 0) {
+    if (logs.length > 0) {
       fetchUserNames();
     }
-  }, [movements]);
+  }, [logs]);
 
-  const handleSort = (column: 'date' | 'product' | 'quantity' | 'user') => {
+  const handleSort = (column: 'date' | 'product' | 'user') => {
     if (sortColumn === column) {
       if (sortDirection === 'desc') {
         setSortDirection('asc');
@@ -91,7 +140,7 @@ export function StockMovementsReport() {
     }
   };
 
-  const getSortIcon = (column: 'date' | 'product' | 'quantity' | 'user') => {
+  const getSortIcon = (column: 'date' | 'product' | 'user') => {
     if (sortColumn !== column) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     }
@@ -100,37 +149,41 @@ export function StockMovementsReport() {
       : <ArrowDown className="h-4 w-4 ml-1 text-primary" />;
   };
 
-  const filteredMovements = useMemo(() => {
-    let result = movements;
+  const filteredLogs = useMemo(() => {
+    let result = logs;
 
-    // Filter by type
-    if (filterType !== 'all') {
-      result = result.filter(m => m.movement_type === filterType);
+    // Filter by operation type
+    if (filterOperation !== 'all') {
+      result = result.filter(l => l.operation === filterOperation);
+    }
+
+    // Filter by session
+    if (filterSession !== 'all') {
+      result = result.filter(l => l.session_id === filterSession);
     }
 
     // Filter by search term
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(m => 
-        m.products?.code?.toLowerCase().includes(term) ||
-        m.products?.name?.toLowerCase().includes(term) ||
-        m.reason?.toLowerCase().includes(term) ||
-        m.reference?.toLowerCase().includes(term)
+      result = result.filter(l => 
+        l.products?.code?.toLowerCase().includes(term) ||
+        l.products?.name?.toLowerCase().includes(term) ||
+        (l.counted_by && userNames[l.counted_by]?.toLowerCase().includes(term))
       );
     }
 
     // Filter by date range
     if (dateRange.from || dateRange.to) {
-      result = result.filter(m => {
-        const movementDate = parseISO(m.created_at);
+      result = result.filter(l => {
+        const logDate = parseISO(l.created_at);
         if (dateRange.from && dateRange.to) {
-          return isWithinInterval(movementDate, { start: dateRange.from, end: dateRange.to });
+          return isWithinInterval(logDate, { start: dateRange.from, end: dateRange.to });
         }
         if (dateRange.from) {
-          return movementDate >= dateRange.from;
+          return logDate >= dateRange.from;
         }
         if (dateRange.to) {
-          return movementDate <= dateRange.to;
+          return logDate <= dateRange.to;
         }
         return true;
       });
@@ -148,12 +201,9 @@ export function StockMovementsReport() {
           case 'product':
             comparison = (a.products?.name || '').localeCompare(b.products?.name || '');
             break;
-          case 'quantity':
-            comparison = a.quantity - b.quantity;
-            break;
           case 'user':
-            const nameA = a.created_by ? userNames[a.created_by] || '' : '';
-            const nameB = b.created_by ? userNames[b.created_by] || '' : '';
+            const nameA = a.counted_by ? userNames[a.counted_by] || '' : '';
+            const nameB = b.counted_by ? userNames[b.counted_by] || '' : '';
             comparison = nameA.localeCompare(nameB);
             break;
         }
@@ -163,59 +213,67 @@ export function StockMovementsReport() {
     }
 
     return result;
-  }, [movements, filterType, searchTerm, dateRange, sortColumn, sortDirection, userNames]);
+  }, [logs, filterOperation, filterSession, searchTerm, dateRange, sortColumn, sortDirection, userNames]);
 
   // Statistics
   const stats = useMemo(() => {
-    const entries = filteredMovements.filter(m => m.movement_type === 'entrada');
-    const exits = filteredMovements.filter(m => m.movement_type === 'saida');
+    const increments = filteredLogs.filter(l => l.operation === 'increment');
+    const decrements = filteredLogs.filter(l => l.operation === 'decrement');
     
-    const totalEntries = entries.reduce((sum, m) => sum + m.quantity, 0);
-    const totalExits = exits.reduce((sum, m) => sum + m.quantity, 0);
-    const balance = totalEntries - totalExits;
+    const totalIncrements = increments.reduce((sum, l) => sum + (l.quantity_after - l.quantity_before), 0);
+    const totalDecrements = decrements.reduce((sum, l) => sum + Math.abs(l.quantity_after - l.quantity_before), 0);
+    
+    const uniqueUsers = [...new Set(filteredLogs.filter(l => l.counted_by).map(l => l.counted_by))].length;
 
     return {
-      totalMovements: filteredMovements.length,
-      entriesCount: entries.length,
-      exitsCount: exits.length,
-      totalEntries,
-      totalExits,
-      balance,
+      totalOperations: filteredLogs.length,
+      incrementsCount: increments.length,
+      decrementsCount: decrements.length,
+      totalIncrements,
+      totalDecrements,
+      balance: totalIncrements - totalDecrements,
+      uniqueUsers,
     };
-  }, [filteredMovements]);
+  }, [filteredLogs]);
 
   const clearFilters = () => {
     setSearchTerm('');
-    setFilterType('all');
+    setFilterOperation('all');
+    setFilterSession('all');
     setDateRange({ from: undefined, to: undefined });
   };
 
-  const hasActiveFilters = searchTerm || filterType !== 'all' || dateRange.from || dateRange.to;
+  const hasActiveFilters = searchTerm || filterOperation !== 'all' || filterSession !== 'all' || dateRange.from || dateRange.to;
 
   const exportToCSV = () => {
-    if (filteredMovements.length === 0) return;
+    if (filteredLogs.length === 0) return;
 
-    const headers = ['Data', 'Hora', 'Tipo', 'Código', 'Produto', 'Quantidade', 'Motivo', 'Referência', 'Funcionário'];
-    const rows = filteredMovements.map(m => [
-      format(new Date(m.created_at), 'dd/MM/yyyy'),
-      format(new Date(m.created_at), 'HH:mm'),
-      m.movement_type === 'entrada' ? 'Entrada' : 'Saída',
-      m.products?.code || '',
-      m.products?.name || '',
-      m.movement_type === 'entrada' ? `+${m.quantity}` : `-${m.quantity}`,
-      m.reason || '',
-      m.reference || '',
-      m.created_by ? userNames[m.created_by] || 'Desconhecido' : 'Sistema',
+    const headers = ['Data', 'Hora', 'Operação', 'Código', 'Produto', 'Coli', 'Antes', 'Depois', 'Alteração', 'Sessão', 'Funcionário'];
+    const rows = filteredLogs.map(l => [
+      format(new Date(l.created_at), 'dd/MM/yyyy'),
+      format(new Date(l.created_at), 'HH:mm:ss'),
+      l.operation === 'increment' ? 'Incremento' : 'Decremento',
+      l.products?.code || '',
+      l.products?.name || '',
+      l.colis_number,
+      l.quantity_before,
+      l.quantity_after,
+      l.operation === 'increment' ? `+${l.quantity_after - l.quantity_before}` : `-${Math.abs(l.quantity_after - l.quantity_before)}`,
+      l.counting_sessions?.name || '',
+      l.counted_by ? userNames[l.counted_by] || 'Desconhecido' : 'Sistema',
     ]);
 
     // Summary rows
     const summaryRows = [
       [],
       ['RESUMO'],
-      ['Total de movimentos', stats.totalMovements],
-      ['Total entradas', stats.totalEntries],
-      ['Total saídas', stats.totalExits],
+      ['Total de operações', stats.totalOperations],
+      ['Incrementos', stats.incrementsCount],
+      ['Decrementos', stats.decrementsCount],
+      ['Total adicionado', `+${stats.totalIncrements}`],
+      ['Total removido', `-${stats.totalDecrements}`],
       ['Balanço', stats.balance > 0 ? `+${stats.balance}` : stats.balance],
+      ['Funcionários únicos', stats.uniqueUsers],
     ];
 
     const csv = [...[headers], ...rows, ...summaryRows]
@@ -229,10 +287,12 @@ export function StockMovementsReport() {
     const dateStr = dateRange.from && dateRange.to
       ? `${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}`
       : format(new Date(), 'yyyy-MM-dd');
-    a.download = `movimentos_stock_${dateStr}.csv`;
+    a.download = `movimentos_contagem_${dateStr}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const activeSessions = sessions.filter(s => s.status === 'active' || s.status === 'completed');
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -241,9 +301,9 @@ export function StockMovementsReport() {
           <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Relatório de Movimentos de Stock
-                <Badge variant="secondary">{movements.length} total</Badge>
+                <ClipboardList className="h-4 w-4" />
+                Relatório de Movimentos de Contagem
+                <Badge variant="secondary">{logs.length} total</Badge>
               </CardTitle>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                 {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -254,13 +314,13 @@ export function StockMovementsReport() {
         <CollapsibleContent>
           <CardContent className="space-y-4">
             {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="space-y-2">
                 <Label>Pesquisar</Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Código, nome, motivo..."
+                    placeholder="Código, produto, funcionário..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -269,25 +329,40 @@ export function StockMovementsReport() {
               </div>
 
               <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)}>
+                <Label>Operação</Label>
+                <Select value={filterOperation} onValueChange={(v) => setFilterOperation(v as typeof filterOperation)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
+                    <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="entrada">
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="increment">
                       <span className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                        Entradas
+                        <Plus className="h-4 w-4 text-green-600" />
+                        Incrementos
                       </span>
                     </SelectItem>
-                    <SelectItem value="saida">
+                    <SelectItem value="decrement">
                       <span className="flex items-center gap-2">
-                        <TrendingDown className="h-4 w-4 text-red-600" />
-                        Saídas
+                        <Minus className="h-4 w-4 text-red-600" />
+                        Decrementos
                       </span>
                     </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Sessão</Label>
+                <Select value={filterSession} onValueChange={setFilterSession}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {activeSessions.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -355,43 +430,48 @@ export function StockMovementsReport() {
                   </Button>
                 )}
                 <span className="text-sm text-muted-foreground">
-                  {filteredMovements.length} movimentos encontrados
+                  {filteredLogs.length} operações encontradas
                 </span>
               </div>
-              <Button onClick={exportToCSV} disabled={filteredMovements.length === 0}>
+              <Button onClick={exportToCSV} disabled={filteredLogs.length === 0}>
                 <FileDown className="h-4 w-4 mr-2" />
                 Exportar CSV
               </Button>
             </div>
 
             {/* Stats Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-sm text-muted-foreground">Total Movimentos</p>
-                <p className="text-2xl font-bold">{stats.totalMovements}</p>
+                <p className="text-sm text-muted-foreground">Total Operações</p>
+                <p className="text-2xl font-bold">{stats.totalOperations}</p>
               </div>
-              <div className="bg-green-50 rounded-lg p-3">
-                <p className="text-sm text-green-600">Entradas</p>
-                <p className="text-2xl font-bold text-green-700">+{stats.totalEntries}</p>
-                <p className="text-xs text-muted-foreground">{stats.entriesCount} operações</p>
+              <div className="bg-green-50 dark:bg-green-950 rounded-lg p-3">
+                <p className="text-sm text-green-600 dark:text-green-400">Incrementos</p>
+                <p className="text-2xl font-bold text-green-700 dark:text-green-300">+{stats.totalIncrements}</p>
+                <p className="text-xs text-muted-foreground">{stats.incrementsCount} operações</p>
               </div>
-              <div className="bg-red-50 rounded-lg p-3">
-                <p className="text-sm text-red-600">Saídas</p>
-                <p className="text-2xl font-bold text-red-700">-{stats.totalExits}</p>
-                <p className="text-xs text-muted-foreground">{stats.exitsCount} operações</p>
+              <div className="bg-red-50 dark:bg-red-950 rounded-lg p-3">
+                <p className="text-sm text-red-600 dark:text-red-400">Decrementos</p>
+                <p className="text-2xl font-bold text-red-700 dark:text-red-300">-{stats.totalDecrements}</p>
+                <p className="text-xs text-muted-foreground">{stats.decrementsCount} operações</p>
               </div>
-              <div className={`rounded-lg p-3 ${stats.balance >= 0 ? 'bg-blue-50' : 'bg-orange-50'}`}>
-                <p className={`text-sm ${stats.balance >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>Balanço</p>
-                <p className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
+              <div className={`rounded-lg p-3 ${stats.balance >= 0 ? 'bg-blue-50 dark:bg-blue-950' : 'bg-orange-50 dark:bg-orange-950'}`}>
+                <p className={`text-sm ${stats.balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>Balanço</p>
+                <p className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-orange-700 dark:text-orange-300'}`}>
                   {stats.balance > 0 ? '+' : ''}{stats.balance}
                 </p>
+              </div>
+              <div className="bg-purple-50 dark:bg-purple-950 rounded-lg p-3">
+                <p className="text-sm text-purple-600 dark:text-purple-400">Funcionários</p>
+                <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{stats.uniqueUsers}</p>
+                <p className="text-xs text-muted-foreground">únicos</p>
               </div>
             </div>
 
             {/* Table */}
             {isLoading ? (
               <p className="text-sm text-muted-foreground text-center py-8">A carregar...</p>
-            ) : filteredMovements.length === 0 ? (
+            ) : filteredLogs.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
                 Nenhum movimento encontrado com os filtros aplicados.
               </p>
@@ -409,7 +489,7 @@ export function StockMovementsReport() {
                           {getSortIcon('date')}
                         </span>
                       </TableHead>
-                      <TableHead>Tipo</TableHead>
+                      <TableHead>Operação</TableHead>
                       <TableHead
                         className="cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort('product')}
@@ -419,17 +499,9 @@ export function StockMovementsReport() {
                           {getSortIcon('product')}
                         </span>
                       </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-muted/50 select-none text-right"
-                        onClick={() => handleSort('quantity')}
-                      >
-                        <span className="flex items-center justify-end">
-                          Qtd
-                          {getSortIcon('quantity')}
-                        </span>
-                      </TableHead>
-                      <TableHead>Motivo</TableHead>
-                      <TableHead>Referência</TableHead>
+                      <TableHead className="text-center">Coli</TableHead>
+                      <TableHead className="text-right">Alteração</TableHead>
+                      <TableHead>Sessão</TableHead>
                       <TableHead
                         className="cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort('user')}
@@ -443,54 +515,55 @@ export function StockMovementsReport() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredMovements.map((m) => (
-                      <TableRow key={m.id}>
+                    {filteredLogs.map((l) => (
+                      <TableRow key={l.id}>
                         <TableCell className="whitespace-nowrap">
                           <div>
-                            <p className="text-sm">{format(new Date(m.created_at), 'dd/MM/yy')}</p>
-                            <p className="text-xs text-muted-foreground">{format(new Date(m.created_at), 'HH:mm')}</p>
+                            <p className="text-sm">{format(new Date(l.created_at), 'dd/MM/yy')}</p>
+                            <p className="text-xs text-muted-foreground">{format(new Date(l.created_at), 'HH:mm:ss')}</p>
                           </div>
                         </TableCell>
                         <TableCell>
-                          {m.movement_type === 'entrada' ? (
+                          {l.operation === 'increment' ? (
                             <Badge className="bg-green-600 gap-1">
-                              <TrendingUp className="h-3 w-3" />
-                              Entrada
+                              <Plus className="h-3 w-3" />
+                              Incremento
                             </Badge>
                           ) : (
                             <Badge variant="destructive" className="gap-1">
-                              <TrendingDown className="h-3 w-3" />
-                              Saída
+                              <Minus className="h-3 w-3" />
+                              Decremento
                             </Badge>
                           )}
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-mono text-sm">{m.products?.code || '-'}</p>
+                            <p className="font-mono text-sm">{l.products?.code || '-'}</p>
                             <p className="text-xs text-muted-foreground truncate max-w-[150px]">
-                              {m.products?.name || '-'}
+                              {l.products?.name || '-'}
                             </p>
                           </div>
                         </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline">#{l.colis_number}</Badge>
+                        </TableCell>
                         <TableCell className="text-right">
-                          <Badge
-                            variant={m.movement_type === 'entrada' ? 'default' : 'destructive'}
-                            className={m.movement_type === 'entrada' ? 'bg-green-600' : ''}
-                          >
-                            {m.movement_type === 'entrada' ? '+' : '-'}{m.quantity}
-                          </Badge>
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">{l.quantity_before}</span>
+                            <span className="mx-1">→</span>
+                            <span className="font-medium">{l.quantity_after}</span>
+                          </div>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">
-                          {m.reason || '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">
-                          {m.reference || '-'}
+                        <TableCell>
+                          <p className="text-sm text-muted-foreground truncate max-w-[100px]">
+                            {l.counting_sessions?.name || '-'}
+                          </p>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <User className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="text-sm">
-                              {m.created_by ? userNames[m.created_by] || 'Carregando...' : 'Sistema'}
+                              {l.counted_by ? userNames[l.counted_by] || 'Carregando...' : 'Sistema'}
                             </span>
                           </div>
                         </TableCell>
