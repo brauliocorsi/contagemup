@@ -366,7 +366,9 @@ export function ProductCard({
                       <MapPin className="h-2.5 w-2.5" />
                       {product.uniqueLocations.length === 1 
                         ? product.uniqueLocations[0] 
-                        : `${product.uniqueLocations.length} loc.`
+                        : product.uniqueLocations.length === 2
+                          ? product.uniqueLocations.join(' + ')
+                          : `${product.uniqueLocations.length} loc.`
                       }
                     </Badge>
                   )}
