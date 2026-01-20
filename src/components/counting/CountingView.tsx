@@ -64,10 +64,12 @@ export function CountingView() {
     }
   }, [sessionsLoading, activeSessions, selectedSessionId]);
 
-  // Persist session selection to localStorage
+  // Persist session selection to localStorage and notify header
   const handleSessionChange = (sessionId: string) => {
     setSelectedSessionId(sessionId);
     localStorage.setItem(STORAGE_KEY, sessionId);
+    // Dispatch custom event for same-tab header update
+    window.dispatchEvent(new CustomEvent('session-changed'));
   };
 
   // Use categories from database
@@ -423,6 +425,7 @@ export function CountingView() {
         <Button variant="outline" size="sm" onClick={() => {
           setSelectedSessionId(null);
           localStorage.removeItem(STORAGE_KEY);
+          window.dispatchEvent(new CustomEvent('session-changed'));
         }}>
           Mudar sessão
         </Button>
