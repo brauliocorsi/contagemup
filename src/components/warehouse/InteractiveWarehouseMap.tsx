@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { 
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { 
   Map, 
   Package, 
@@ -15,7 +29,9 @@ import {
   Box,
   ArrowRight,
   Filter,
-  Layers
+  Layers,
+  Search,
+  X
 } from 'lucide-react';
 import { useWarehouseMap, LocationWithProducts } from '@/hooks/useWarehouseMap';
 import { useActiveSession } from '@/hooks/useActiveSession';
@@ -31,6 +47,15 @@ interface DragItem {
   fromLocationCode: string;
 }
 
+interface ProductSearchResult {
+  productId: string;
+  productName: string;
+  productCode: string;
+  locationCode: string;
+  locationId: string;
+  colisCount: number;
+}
+
 export function InteractiveWarehouseMap() {
   const { activeSession } = useActiveSession();
   const { aisles, levels, locations, mapGrid, isLoading, moveProduct } = useWarehouseMap(activeSession?.id);
@@ -41,6 +66,76 @@ export function InteractiveWarehouseMap() {
   const [dropTargetCode, setDropTargetCode] = useState<string | null>(null);
   const [filterAisle, setFilterAisle] = useState<string>('all');
   const [filterLevel, setFilterLevel] = useState<string>('all');
+  
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [highlightedLocationId, setHighlightedLocationId] = useState<string | null>(null);
+  const highlightedRef = useRef<HTMLButtonElement>(null);
+
+  // Build searchable product list
+  const searchableProducts = useMemo(() => {
+    const products: ProductSearchResult[] = [];
+    locations.forEach(loc => {
+      // Group products by productId in this location
+      const productGroups: Record<string, { name: string; code: string; count: number }> = {};
+      loc.products.forEach(p => {
+        const existing = productGroups[p.productId];
+        if (existing) {
+          existing.count++;
+        } else {
+          productGroups[p.productId] = { name: p.productName, code: p.productCode, count: 1 };
+        }
+      });
+      
+      Object.entries(productGroups).forEach(([productId, group]) => {
+        products.push({
+          productId,
+          productName: group.name,
+          productCode: group.code,
+          locationCode: loc.code,
+          locationId: loc.id,
+          colisCount: group.count,
+        });
+      });
+    });
+    return products;
+  }, [locations]);
+
+  // Filter search results
+  const filteredSearchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    return searchableProducts.filter(p => 
+      p.productName.toLowerCase().includes(query) || 
+      p.productCode.toLowerCase().includes(query)
+    ).slice(0, 10);
+  }, [searchableProducts, searchQuery]);
+
+  // Scroll to highlighted location
+  useEffect(() => {
+    if (highlightedLocationId && highlightedRef.current) {
+      highlightedRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightedLocationId]);
+
+  // Clear highlight after 5 seconds
+  useEffect(() => {
+    if (highlightedLocationId) {
+      const timer = setTimeout(() => setHighlightedLocationId(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedLocationId]);
+
+  const handleSelectProduct = (result: ProductSearchResult) => {
+    setHighlightedLocationId(result.locationId);
+    setSearchOpen(false);
+    setSearchQuery('');
+  };
+
+  const clearHighlight = () => {
+    setHighlightedLocationId(null);
+  };
 
   // Filter locations based on selected filters
   const filteredLocations = useMemo(() => {
@@ -122,7 +217,8 @@ export function InteractiveWarehouseMap() {
     setLocationDialogOpen(true);
   };
 
-  const getLocationColor = (location: LocationWithProducts) => {
+  const getLocationColor = (location: LocationWithProducts, isHighlighted: boolean) => {
+    if (isHighlighted) return 'bg-yellow-300 border-yellow-500 ring-4 ring-yellow-400 animate-pulse';
     if (location.totalColis === 0) return 'bg-muted/30 border-muted';
     if (location.totalColis >= 5) return 'bg-primary/20 border-primary/50';
     if (location.totalColis >= 2) return 'bg-blue-100 border-blue-300';
@@ -202,9 +298,68 @@ export function InteractiveWarehouseMap() {
           </Card>
         </div>
 
-        {/* Filters */}
+        {/* Filters and Search */}
         <Card className="p-3">
           <div className="flex flex-wrap items-center gap-4">
+            {/* Product Search */}
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[250px] justify-start">
+                  <Search className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span className="text-muted-foreground">Buscar produto...</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0" align="start">
+                <Command>
+                  <CommandInput 
+                    placeholder="Nome ou código do produto..." 
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                  />
+                  <CommandList>
+                    <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                    <CommandGroup heading="Produtos no armazém">
+                      {filteredSearchResults.map((result, idx) => (
+                        <CommandItem
+                          key={`${result.productId}-${result.locationId}-${idx}`}
+                          value={`${result.productName} ${result.productCode}`}
+                          onSelect={() => handleSelectProduct(result)}
+                          className="cursor-pointer"
+                        >
+                          <div className="flex flex-col flex-1">
+                            <span className="font-medium">{result.productName}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {result.productCode} • {result.colisCount} colis
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="ml-2">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {result.locationCode}
+                          </Badge>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            {/* Highlighted location indicator */}
+            {highlightedLocationId && (
+              <Badge variant="default" className="bg-yellow-500 text-yellow-950 gap-1">
+                <MapPin className="h-3 w-3" />
+                {locations.find(l => l.id === highlightedLocationId)?.code} destacada
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-4 w-4 ml-1 hover:bg-yellow-600"
+                  onClick={clearHighlight}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Filtros:</span>
@@ -326,45 +481,49 @@ export function InteractiveWarehouseMap() {
                                 -
                               </div>
                             ) : (
-                              locs.map(location => (
-                                <Tooltip key={location.id}>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      onClick={() => handleLocationClick(location)}
-                                      onDragOver={(e) => handleDragOver(e, location.code)}
-                                      onDragLeave={handleDragLeave}
-                                      onDrop={(e) => handleDrop(e, location.code)}
-                                      className={cn(
-                                        "flex-1 min-w-[60px] h-16 rounded border-2 transition-all",
-                                        "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
-                                        "flex flex-col items-center justify-center p-1",
-                                        getLocationColor(location),
-                                        dropTargetCode === location.code && "ring-2 ring-primary ring-offset-2 scale-105"
-                                      )}
-                                    >
-                                      <span className="font-bold text-xs">{location.code}</span>
-                                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                        <Package className="h-2.5 w-2.5" />
-                                        {location.totalColis}
+                              locs.map(location => {
+                                const isHighlighted = highlightedLocationId === location.id;
+                                return (
+                                  <Tooltip key={location.id}>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        ref={isHighlighted ? highlightedRef : undefined}
+                                        onClick={() => handleLocationClick(location)}
+                                        onDragOver={(e) => handleDragOver(e, location.code)}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={(e) => handleDrop(e, location.code)}
+                                        className={cn(
+                                          "flex-1 min-w-[60px] h-16 rounded border-2 transition-all",
+                                          "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
+                                          "flex flex-col items-center justify-center p-1",
+                                          getLocationColor(location, isHighlighted),
+                                          dropTargetCode === location.code && "ring-2 ring-primary ring-offset-2 scale-105"
+                                        )}
+                                      >
+                                        <span className="font-bold text-xs">{location.code}</span>
+                                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                          <Package className="h-2.5 w-2.5" />
+                                          {location.totalColis}
+                                        </div>
+                                        {location.requiresForklift && (
+                                          <Forklift className="h-3 w-3 text-orange-500 mt-0.5" />
+                                        )}
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <div className="text-xs space-y-1">
+                                        <p className="font-bold">{location.code}</p>
+                                        <p>Rua {location.aisleName} • {location.levelName}</p>
+                                        <p>{location.totalColis} colis • {location.totalProducts} produtos</p>
+                                        {location.requiresForklift && (
+                                          <p className="text-orange-500">🚜 Precisa empilhador</p>
+                                        )}
+                                        <p className="text-muted-foreground">Clique para detalhes</p>
                                       </div>
-                                      {location.requiresForklift && (
-                                        <Forklift className="h-3 w-3 text-orange-500 mt-0.5" />
-                                      )}
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">
-                                    <div className="text-xs space-y-1">
-                                      <p className="font-bold">{location.code}</p>
-                                      <p>Rua {location.aisleName} • {location.levelName}</p>
-                                      <p>{location.totalColis} colis • {location.totalProducts} produtos</p>
-                                      {location.requiresForklift && (
-                                        <p className="text-orange-500">🚜 Precisa empilhador</p>
-                                      )}
-                                      <p className="text-muted-foreground">Clique para detalhes</p>
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ))
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
+                              })
                             )}
                           </div>
                         );
