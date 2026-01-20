@@ -347,6 +347,7 @@ export function ReportsView() {
           {/* Warehouse Map */}
           <WarehouseMap
             productsWithCounts={productsWithCounts}
+            categoryColisNamesMap={categoryColisNamesMap}
             onProductClick={handleProductDetailsClick}
           />
 
