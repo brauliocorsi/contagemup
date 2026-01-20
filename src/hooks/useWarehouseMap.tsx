@@ -12,6 +12,19 @@ import {
 } from './useWarehouseConfig';
 import { toast } from 'sonner';
 
+export interface ProductInLocation {
+  countId: string; // ID of the specific count record
+  productId: string;
+  productName: string;
+  productCode: string;
+  colisNumber: number;
+  quantity: number;
+  palletNumber: string | null;
+  // For split stock: indicates if this is one of multiple locations for same coli
+  isSplitEntry: boolean;
+  totalQuantityForColi: number; // Total across all locations for this coli
+}
+
 export interface LocationWithProducts extends WarehouseLocation {
   aisleName?: string;
   aisleColor?: string;
@@ -19,15 +32,9 @@ export interface LocationWithProducts extends WarehouseLocation {
   levelShortName?: string;
   requiresForklift?: boolean;
   levelColor?: string;
-  products: {
-    productId: string;
-    productName: string;
-    productCode: string;
-    colisNumber: number;
-    quantity: number;
-    palletNumber: string | null;
-  }[];
+  products: ProductInLocation[];
   totalColis: number;
+  totalQuantity: number; // Sum of all quantities
   totalProducts: number;
 }
 
@@ -85,28 +92,51 @@ export function useWarehouseMap(sessionId?: string) {
         levelColor: level?.color || undefined,
         products: [],
         totalColis: 0,
+        totalQuantity: 0,
         totalProducts: 0,
       });
     });
 
+    // Group counts by product+coli to detect split entries
+    const coliCountsMap = new Map<string, number>();
+    counts.forEach(count => {
+      const key = `${count.product_id}-${count.colis_number}`;
+      coliCountsMap.set(key, (coliCountsMap.get(key) || 0) + 1);
+    });
+
+    // Calculate total quantity per product+coli across all locations
+    const coliTotalQuantityMap = new Map<string, number>();
+    counts.forEach(count => {
+      const key = `${count.product_id}-${count.colis_number}`;
+      coliTotalQuantityMap.set(key, (coliTotalQuantityMap.get(key) || 0) + count.quantity);
+    });
+
     // Add products from counts
     counts.forEach(count => {
-      if (!count.location) return;
+      if (!count.location || count.quantity === 0) return;
       
       const locationCode = count.location.toLowerCase();
       let locWithProducts = locationMap.get(locationCode);
       
+      const coliKey = `${count.product_id}-${count.colis_number}`;
+      const isSplitEntry = (coliCountsMap.get(coliKey) || 0) > 1;
+      const totalQuantityForColi = coliTotalQuantityMap.get(coliKey) || count.quantity;
+      
       // If location exists in our config, add the product
       if (locWithProducts) {
         locWithProducts.products.push({
+          countId: count.id,
           productId: count.product_id,
           productName: count.product?.name || 'Desconhecido',
           productCode: count.product?.code || '',
           colisNumber: count.colis_number,
           quantity: count.quantity,
           palletNumber: count.pallet_number,
+          isSplitEntry,
+          totalQuantityForColi,
         });
         locWithProducts.totalColis++;
+        locWithProducts.totalQuantity += count.quantity;
         locWithProducts.totalProducts = new Set(
           locWithProducts.products.map(p => p.productId)
         ).size;
@@ -157,7 +187,7 @@ export function useWarehouseMap(sessionId?: string) {
     return grid;
   }, [aisles, levels, locationsWithProducts]);
 
-  // Move product between locations
+  // Move product between locations (moves all quantity for that coli)
   const moveProduct = async (
     productId: string,
     colisNumber: number,
@@ -182,6 +212,26 @@ export function useWarehouseMap(sessionId?: string) {
     }
   };
 
+  // Move a specific count record (partial quantity) to a new location
+  const movePartialProduct = async (
+    countId: string,
+    toLocationCode: string
+  ) => {
+    try {
+      const { error } = await supabase
+        .from('counts')
+        .update({ location: toLocationCode })
+        .eq('id', countId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['warehouse-map-counts'] });
+      toast.success(`Stock movido para ${toLocationCode}`);
+    } catch (error: any) {
+      toast.error('Erro ao mover stock: ' + error.message);
+    }
+  };
+
   const isLoading = aislesLoading || levelsLoading || locationsLoading || palletsLoading || countsLoading;
 
   return {
@@ -192,6 +242,7 @@ export function useWarehouseMap(sessionId?: string) {
     mapGrid,
     isLoading,
     moveProduct,
+    movePartialProduct,
     refetch: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-map-counts'] });
     },
