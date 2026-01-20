@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useCounting } from '@/hooks/useCounting';
 import { useSessions } from '@/hooks/useSessions';
@@ -16,11 +16,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
+const STORAGE_KEY = 'counting_selected_session';
+const PREFERRED_SESSION_NAME = 'Inventário 2026';
+
 export function CountingView() {
   const { products, loading: productsLoading, updateProduct, fetchProducts } = useProducts();
   const { sessions, loading: sessionsLoading, createSession } = useSessions();
   const { categories, loading: categoriesLoading } = useCategories();
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(() => {
+    // Try to restore from localStorage
+    return localStorage.getItem(STORAGE_KEY);
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterLocation, setFilterLocation] = useState<string>('all');
@@ -35,6 +41,34 @@ export function CountingView() {
   const { incrementCount, decrementCount, updateLocation, updatePalletNumber, getProductWithCounts, deleteOrphanCounts, loading: countingLoading } = useCounting(selectedSessionId);
 
   const activeSessions = sessions.filter(s => s.status === 'active');
+
+  // Auto-select session logic: prioritize saved session, then "Inventário 2026", then first active
+  useEffect(() => {
+    if (sessionsLoading || activeSessions.length === 0) return;
+    
+    // If we already have a valid selected session, keep it
+    if (selectedSessionId) {
+      const sessionExists = activeSessions.some(s => s.id === selectedSessionId);
+      if (sessionExists) return;
+    }
+    
+    // Try to find "Inventário 2026" session first
+    const preferredSession = activeSessions.find(s => 
+      s.name.toLowerCase().includes('inventário 2026') || 
+      s.name.toLowerCase().includes('inventario 2026')
+    );
+    
+    if (preferredSession) {
+      setSelectedSessionId(preferredSession.id);
+      localStorage.setItem(STORAGE_KEY, preferredSession.id);
+    }
+  }, [sessionsLoading, activeSessions, selectedSessionId]);
+
+  // Persist session selection to localStorage
+  const handleSessionChange = (sessionId: string) => {
+    setSelectedSessionId(sessionId);
+    localStorage.setItem(STORAGE_KEY, sessionId);
+  };
 
   // Use categories from database
   const availableCategories = useMemo(() => {
@@ -76,7 +110,7 @@ export function CountingView() {
     
     const session = await createSession(newSessionName, categoryValue);
     if (session) {
-      setSelectedSessionId(session.id);
+      handleSessionChange(session.id);
       setNewSessionName('');
       setNewSessionCategories([]);
       setAllCategoriesSelected(true);
@@ -256,7 +290,7 @@ export function CountingView() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
             {activeSessions.length > 0 && (
-              <Select onValueChange={setSelectedSessionId}>
+              <Select onValueChange={handleSessionChange}>
                 <SelectTrigger className="w-full sm:w-64">
                   <SelectValue placeholder="Selecionar sessão existente" />
                 </SelectTrigger>
@@ -386,7 +420,10 @@ export function CountingView() {
             Sessão ativa • {sessionFilteredProducts.length} produtos
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setSelectedSessionId(null)}>
+        <Button variant="outline" size="sm" onClick={() => {
+          setSelectedSessionId(null);
+          localStorage.removeItem(STORAGE_KEY);
+        }}>
           Mudar sessão
         </Button>
       </div>
