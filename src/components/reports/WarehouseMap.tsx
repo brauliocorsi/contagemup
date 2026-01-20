@@ -6,9 +6,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Map, ChevronDown, ChevronUp, Package, MapPin, CheckCircle2, AlertCircle, Box, Eye } from 'lucide-react';
+import { Map, ChevronDown, ChevronUp, Package, MapPin, CheckCircle2, AlertCircle, Box, Eye, Warehouse } from 'lucide-react';
 import { ProductWithCounts, ColisDetail } from '@/types/stock';
 import { cn } from '@/lib/utils';
+import { classifyLocation } from '@/lib/locationUtils';
 
 interface WarehouseMapProps {
   productsWithCounts: ProductWithCounts[];
@@ -236,11 +237,21 @@ export function WarehouseMap({ productsWithCounts, categoryColisNamesMap, onProd
                             getZoneColor(zone.status)
                           )}
                         >
-                          {/* Zone name */}
+                          {/* Zone name with location type */}
                           <div className="flex items-center gap-1 mb-2">
                             <MapPin className="h-3 w-3 flex-shrink-0" />
                             <span className="font-medium text-sm truncate">{zone.name}</span>
                           </div>
+                          {/* Location type badge */}
+                          {(() => {
+                            const locInfo = classifyLocation(zone.name);
+                            return (
+                              <Badge variant="outline" className={`text-[10px] mb-1 ${locInfo.color}`}>
+                                {locInfo.icon === 'rack' && <Warehouse className="h-2 w-2 mr-0.5" />}
+                                {locInfo.label}
+                              </Badge>
+                            );
+                          })()}
 
                           {/* Stats */}
                           <div className="space-y-1 text-xs">
@@ -333,18 +344,26 @@ export function WarehouseMap({ productsWithCounts, categoryColisNamesMap, onProd
               <MapPin className="h-5 w-5" />
               {selectedZone?.name}
               {selectedZone && (
-                <Badge 
-                  className={cn(
-                    "ml-2",
-                    selectedZone.status === 'complete' && "bg-green-100 text-green-800",
-                    selectedZone.status === 'partial' && "bg-yellow-100 text-yellow-800",
-                    selectedZone.status === 'incomplete' && "bg-red-100 text-red-800"
-                  )}
-                >
-                  {selectedZone.status === 'complete' && '✓ Completa'}
-                  {selectedZone.status === 'partial' && '⚠ Parcial'}
-                  {selectedZone.status === 'incomplete' && '✗ Incompleta'}
-                </Badge>
+                <>
+                  <Badge 
+                    variant="outline"
+                    className={classifyLocation(selectedZone.name).color}
+                  >
+                    {classifyLocation(selectedZone.name).label}
+                  </Badge>
+                  <Badge 
+                    className={cn(
+                      "ml-1",
+                      selectedZone.status === 'complete' && "bg-green-100 text-green-800",
+                      selectedZone.status === 'partial' && "bg-yellow-100 text-yellow-800",
+                      selectedZone.status === 'incomplete' && "bg-red-100 text-red-800"
+                    )}
+                  >
+                    {selectedZone.status === 'complete' && '✓ Completa'}
+                    {selectedZone.status === 'partial' && '⚠ Parcial'}
+                    {selectedZone.status === 'incomplete' && '✗ Incompleta'}
+                  </Badge>
+                </>
               )}
             </DialogTitle>
           </DialogHeader>
