@@ -31,13 +31,15 @@ import {
   Filter,
   Layers,
   Search,
-  X
+  X,
+  Split
 } from 'lucide-react';
-import { useWarehouseMap, LocationWithProducts } from '@/hooks/useWarehouseMap';
+import { useWarehouseMap, LocationWithProducts, ProductInLocation } from '@/hooks/useWarehouseMap';
 import { useActiveSession } from '@/hooks/useActiveSession';
 import { cn } from '@/lib/utils';
 
 interface DragItem {
+  countId: string;
   productId: string;
   productName: string;
   productCode: string;
@@ -45,6 +47,8 @@ interface DragItem {
   quantity: number;
   palletNumber: string | null;
   fromLocationCode: string;
+  isSplitEntry: boolean;
+  totalQuantityForColi: number;
 }
 
 interface ProductSearchResult {
@@ -54,11 +58,12 @@ interface ProductSearchResult {
   locationCode: string;
   locationId: string;
   colisCount: number;
+  totalQuantity: number;
 }
 
 export function InteractiveWarehouseMap() {
   const { activeSession } = useActiveSession();
-  const { aisles, levels, locations, mapGrid, isLoading, moveProduct } = useWarehouseMap(activeSession?.id);
+  const { aisles, levels, locations, mapGrid, isLoading, moveProduct, movePartialProduct } = useWarehouseMap(activeSession?.id);
   
   const [selectedLocation, setSelectedLocation] = useState<LocationWithProducts | null>(null);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
@@ -78,13 +83,14 @@ export function InteractiveWarehouseMap() {
     const products: ProductSearchResult[] = [];
     locations.forEach(loc => {
       // Group products by productId in this location
-      const productGroups: Record<string, { name: string; code: string; count: number }> = {};
+      const productGroups: Record<string, { name: string; code: string; count: number; totalQty: number }> = {};
       loc.products.forEach(p => {
         const existing = productGroups[p.productId];
         if (existing) {
           existing.count++;
+          existing.totalQty += p.quantity;
         } else {
-          productGroups[p.productId] = { name: p.productName, code: p.productCode, count: 1 };
+          productGroups[p.productId] = { name: p.productName, code: p.productCode, count: 1, totalQty: p.quantity };
         }
       });
       
@@ -96,6 +102,7 @@ export function InteractiveWarehouseMap() {
           locationCode: loc.code,
           locationId: loc.id,
           colisCount: group.count,
+          totalQuantity: group.totalQty,
         });
       });
     });
@@ -200,12 +207,10 @@ export function InteractiveWarehouseMap() {
     if (!draggedItem || !activeSession) return;
     
     if (draggedItem.fromLocationCode !== toLocationCode) {
-      await moveProduct(
-        draggedItem.productId,
-        draggedItem.colisNumber,
-        draggedItem.fromLocationCode,
-        toLocationCode,
-        activeSession.id
+      // Use movePartialProduct for specific count record (handles split entries properly)
+      await movePartialProduct(
+        draggedItem.countId,
+        toLocationCode
       );
     }
     
@@ -329,7 +334,7 @@ export function InteractiveWarehouseMap() {
                           <div className="flex flex-col flex-1">
                             <span className="font-medium">{result.productName}</span>
                             <span className="text-xs text-muted-foreground">
-                              {result.productCode} • {result.colisCount} colis
+                              {result.productCode} • {result.colisCount} entrada{result.colisCount > 1 ? 's' : ''} • {result.totalQuantity} un
                             </span>
                           </div>
                           <Badge variant="outline" className="ml-2">
@@ -394,6 +399,7 @@ export function InteractiveWarehouseMap() {
               <Badge variant="outline" className="animate-pulse bg-primary/10">
                 <GripVertical className="h-3 w-3 mr-1" />
                 Arrastando: {draggedItem.productCode} Coli {draggedItem.colisNumber}
+                {draggedItem.isSplitEntry && ` (${draggedItem.quantity}/${draggedItem.totalQuantityForColi} un)`}
               </Badge>
             )}
           </div>
@@ -572,14 +578,18 @@ export function InteractiveWarehouseMap() {
           {selectedLocation && (
             <div className="flex-1 overflow-auto space-y-4">
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <div className="text-center p-3 rounded-lg bg-muted/50">
                   <p className="text-2xl font-bold">{selectedLocation.totalProducts}</p>
                   <p className="text-xs text-muted-foreground">Produtos</p>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-blue-50">
                   <p className="text-2xl font-bold text-blue-600">{selectedLocation.totalColis}</p>
-                  <p className="text-xs text-muted-foreground">Colis</p>
+                  <p className="text-xs text-muted-foreground">Entradas</p>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-purple-50">
+                  <p className="text-2xl font-bold text-purple-600">{selectedLocation.totalQuantity}</p>
+                  <p className="text-xs text-muted-foreground">Unidades</p>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-green-50">
                   <p className="text-2xl font-bold text-green-600">
@@ -602,7 +612,7 @@ export function InteractiveWarehouseMap() {
                     <div className="space-y-2 pr-4">
                       {selectedLocation.products.map((product, idx) => (
                         <div
-                          key={`${product.productId}-${product.colisNumber}-${idx}`}
+                          key={`${product.countId}-${idx}`}
                           draggable
                           onDragStart={() => handleDragStart({
                             ...product,
@@ -611,13 +621,34 @@ export function InteractiveWarehouseMap() {
                           onDragEnd={handleDragEnd}
                           className={cn(
                             "flex items-center justify-between p-3 rounded-lg border bg-card",
-                            "cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
+                            "cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow",
+                            product.isSplitEntry && "border-blue-300 bg-blue-50/50"
                           )}
                         >
                           <div className="flex items-center gap-3">
                             <GripVertical className="h-4 w-4 text-muted-foreground" />
                             <div>
-                              <p className="font-medium text-sm">{product.productName}</p>
+                              <div className="flex items-center gap-1">
+                                <p className="font-medium text-sm">{product.productName}</p>
+                                {product.isSplitEntry && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Badge variant="outline" className="h-5 text-xs text-blue-600 border-blue-300 gap-0.5">
+                                          <Split className="h-3 w-3" />
+                                          Dividido
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Este coli está dividido em múltiplas localizações</p>
+                                        <p className="text-muted-foreground">
+                                          {product.quantity} de {product.totalQuantityForColi} unidades aqui
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">
                                 {product.productCode} • Coli {product.colisNumber}
                               </p>
@@ -629,7 +660,18 @@ export function InteractiveWarehouseMap() {
                                 {product.palletNumber}
                               </Badge>
                             )}
-                            <Badge>{product.quantity} un</Badge>
+                            <Badge className={cn(
+                              product.isSplitEntry 
+                                ? "bg-blue-100 text-blue-700 hover:bg-blue-100" 
+                                : ""
+                            )}>
+                              {product.quantity} un
+                              {product.isSplitEntry && (
+                                <span className="text-blue-500 ml-1">
+                                  /{product.totalQuantityForColi}
+                                </span>
+                              )}
+                            </Badge>
                           </div>
                         </div>
                       ))}
@@ -638,6 +680,12 @@ export function InteractiveWarehouseMap() {
                   <p className="text-xs text-muted-foreground text-center pt-2">
                     <GripVertical className="h-3 w-3 inline mr-1" />
                     Arraste um produto para mover para outra localização
+                    {selectedLocation.products.some(p => p.isSplitEntry) && (
+                      <span className="block mt-1 text-blue-600">
+                        <Split className="h-3 w-3 inline mr-1" />
+                        Itens divididos: apenas a quantidade desta localização será movida
+                      </span>
+                    )}
                   </p>
                 </div>
               )}
