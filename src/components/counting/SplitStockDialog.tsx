@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Plus, Trash2, MapPin, Box, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { ColisDetail, StockDistribution } from '@/types/stock';
 import { cn } from '@/lib/utils';
+import { LocationSelect } from './LocationSelect';
+import { PalletSelect } from './PalletSelect';
 
 interface SplitStockDialogProps {
   open: boolean;
@@ -197,10 +199,10 @@ export function SplitStockDialog({
                       <MapPin className="h-3 w-3" />
                       Localização
                     </Label>
-                    <Input
+                    <LocationSelect
                       value={dist.location}
-                      onChange={(e) => updateDistribution(dist.id, 'location', e.target.value)}
-                      placeholder="Ex: A1-N2"
+                      onValueChange={(value) => updateDistribution(dist.id, 'location', value)}
+                      placeholder="Selecionar..."
                       className="h-8"
                     />
                   </div>
@@ -211,10 +213,10 @@ export function SplitStockDialog({
                       <Box className="h-3 w-3" />
                       Palete
                     </Label>
-                    <Input
+                    <PalletSelect
                       value={dist.pallet_number}
-                      onChange={(e) => updateDistribution(dist.id, 'pallet_number', e.target.value)}
-                      placeholder="Ex: PAL-001"
+                      onValueChange={(value) => updateDistribution(dist.id, 'pallet_number', value)}
+                      placeholder="Selecionar..."
                       className="h-8"
                     />
                   </div>
