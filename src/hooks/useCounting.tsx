@@ -247,7 +247,6 @@ export function useCounting(sessionId: string | null) {
           toast({
             title: 'Stock Baixo',
             description: `${product.name} está com stock baixo (${newStock})`,
-            variant: 'destructive'
           });
         }
       }
