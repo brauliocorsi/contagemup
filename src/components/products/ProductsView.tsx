@@ -157,6 +157,18 @@ export function ProductsView() {
 
     // If we have colis distribution data, wrap in tooltip
     if (colisDistribution && colisDistribution.length > 0 && totalColis > 1) {
+      // Calculate totals and incomplete units
+      const totalUnits = colisDistribution.reduce((sum, c) => sum + c.quantity, 0);
+      const unitsInCompleteSets = stock * totalColis;
+      const incompleteUnits = totalUnits - unitsInCompleteSets;
+      
+      // Find which colis have excess (incomplete units)
+      const excessPerColi = colisDistribution.map(c => ({
+        colisNumber: c.colisNumber,
+        quantity: c.quantity,
+        excess: c.quantity - stock
+      })).filter(c => c.excess > 0);
+
       return (
         <TooltipProvider>
           <Tooltip>
@@ -168,16 +180,34 @@ export function ProductsView() {
             <TooltipContent className="max-w-xs">
               <p className="font-medium mb-1">Distribuição por Coli:</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-                {colisDistribution.map((coli) => (
-                  <div key={coli.colisNumber} className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">Coli {coli.colisNumber}:</span>
-                    <span className="font-medium">{coli.quantity} un.</span>
-                  </div>
-                ))}
+                {colisDistribution.map((coli) => {
+                  const excess = coli.quantity - stock;
+                  return (
+                    <div key={coli.colisNumber} className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Coli {coli.colisNumber}:</span>
+                      <span className={cn("font-medium", excess > 0 && "text-orange-600")}>
+                        {coli.quantity} un.
+                        {excess > 0 && <span className="text-orange-500 ml-1">(+{excess})</span>}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="mt-2 pt-1 border-t text-xs">
-                <span className="text-muted-foreground">Sets completos: </span>
-                <span className="font-medium">{stock}</span>
+              <div className="mt-2 pt-2 border-t space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total unidades:</span>
+                  <span className="font-medium">{totalUnits}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-green-600">Sets completos:</span>
+                  <span className="font-medium text-green-600">{stock}</span>
+                </div>
+                {incompleteUnits > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-orange-600">Unidades incompletas:</span>
+                    <span className="font-medium text-orange-600">{incompleteUnits}</span>
+                  </div>
+                )}
               </div>
             </TooltipContent>
           </Tooltip>
