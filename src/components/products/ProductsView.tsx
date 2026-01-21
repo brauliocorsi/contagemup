@@ -131,12 +131,30 @@ export function ProductsView() {
   const getStockBadge = (stock: number, minStock: number = 5, totalColis: number = 1, colisDistribution?: { colisNumber: number; quantity: number }[]) => {
     const status = getStockStatus(stock, minStock);
     
+    // Calculate incomplete units if we have distribution data
+    let incompleteUnits = 0;
+    let totalUnits = 0;
+    if (colisDistribution && colisDistribution.length > 0 && totalColis > 1) {
+      totalUnits = colisDistribution.reduce((sum, c) => sum + c.quantity, 0);
+      const unitsInCompleteSets = stock * totalColis;
+      incompleteUnits = totalUnits - unitsInCompleteSets;
+    }
+    
+    const hasIncomplete = incompleteUnits > 0;
+    
     const badgeContent = (badgeClassName: string, dotClassName: string) => (
       <div className="flex flex-col gap-0.5">
-        <Badge variant="outline" className={cn("gap-1", badgeClassName)}>
-          <span className={cn("w-1.5 h-1.5 rounded-full", dotClassName)} />
-          {stock} {stock === 1 ? 'set' : 'sets'}
-        </Badge>
+        <div className="flex items-center gap-1">
+          <Badge variant="outline" className={cn("gap-1", badgeClassName)}>
+            <span className={cn("w-1.5 h-1.5 rounded-full", dotClassName)} />
+            {stock} {stock === 1 ? 'set' : 'sets'}
+          </Badge>
+          {hasIncomplete && (
+            <Badge variant="outline" className="gap-0.5 px-1.5 py-0 h-5 bg-orange-50 text-orange-600 border-orange-300 text-[10px]">
+              +{incompleteUnits}
+            </Badge>
+          )}
+        </div>
         {totalColis > 1 && (
           <span className="text-[10px] text-muted-foreground">({totalColis} colis/set)</span>
         )}
@@ -160,18 +178,6 @@ export function ProductsView() {
 
     // If we have colis distribution data, wrap in tooltip
     if (colisDistribution && colisDistribution.length > 0 && totalColis > 1) {
-      // Calculate totals and incomplete units
-      const totalUnits = colisDistribution.reduce((sum, c) => sum + c.quantity, 0);
-      const unitsInCompleteSets = stock * totalColis;
-      const incompleteUnits = totalUnits - unitsInCompleteSets;
-      
-      // Find which colis have excess (incomplete units)
-      const excessPerColi = colisDistribution.map(c => ({
-        colisNumber: c.colisNumber,
-        quantity: c.quantity,
-        excess: c.quantity - stock
-      })).filter(c => c.excess > 0);
-
       return (
         <TooltipProvider>
           <Tooltip>
