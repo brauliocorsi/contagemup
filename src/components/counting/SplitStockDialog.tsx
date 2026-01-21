@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, MapPin, Box, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, MapPin, Box, AlertCircle, CheckCircle2, Pencil, Check, X } from 'lucide-react';
 import { ColisDetail, StockDistribution } from '@/types/stock';
 import { cn } from '@/lib/utils';
 import { LocationSelect } from './LocationSelect';
@@ -28,10 +28,16 @@ export function SplitStockDialog({
 }: SplitStockDialogProps) {
   const [distributions, setDistributions] = useState<StockDistribution[]>([]);
   const [saving, setSaving] = useState(false);
+  const [editableTotal, setEditableTotal] = useState<number>(0);
+  const [isEditingTotal, setIsEditingTotal] = useState(false);
 
   // Initialize distributions from existing data
   useEffect(() => {
     if (open) {
+      // Set the editable total from the colis detail
+      setEditableTotal(colisDetail.quantity);
+      setIsEditingTotal(false);
+      
       if (colisDetail.locationEntries.length > 0) {
         // Use existing entries
         setDistributions(
@@ -63,16 +69,21 @@ export function SplitStockDialog({
     }
   }, [open, colisDetail]);
 
-  const totalQuantity = colisDetail.quantity;
+  const totalQuantity = editableTotal;
   const distributedQuantity = useMemo(
     () => distributions.reduce((sum, d) => sum + d.quantity, 0),
     [distributions]
   );
   const remaining = totalQuantity - distributedQuantity;
-  // Valid when all quantity is distributed (not more, not less) and each entry has quantity > 0
-  const isValid = remaining === 0 && distributions.every(d => d.quantity > 0);
+  // Valid when:
+  // - All quantity is distributed (remaining === 0), OR
+  // - We have distributions that sum to totalQuantity
+  // - Each distribution entry has quantity > 0 OR totalQuantity is 0 (allowing clearing)
+  const isValid = remaining === 0 && (totalQuantity === 0 || distributions.every(d => d.quantity > 0));
   // Check if user is trying to add more than the total
   const isOverDistributed = remaining < 0;
+  // Check if total was changed from original
+  const totalChanged = editableTotal !== colisDetail.quantity;
 
   const addDistribution = () => {
     // Always start new distributions with 0 quantity - user must manually set it
@@ -134,8 +145,59 @@ export function SplitStockDialog({
           )}>
             <div className="flex items-center justify-between">
               <span className="font-medium">Total a distribuir:</span>
-              <span className="text-lg font-bold">{totalQuantity} unidades</span>
+              {isEditingTotal ? (
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editableTotal}
+                    onChange={(e) => setEditableTotal(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="h-8 w-20 text-right"
+                    autoFocus
+                  />
+                  <span className="text-sm text-muted-foreground">un.</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-green-600 hover:text-green-700"
+                    onClick={() => setIsEditingTotal(false)}
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setEditableTotal(colisDetail.quantity);
+                      setIsEditingTotal(false);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold">{totalQuantity} unidades</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={() => setIsEditingTotal(true)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
+            {totalChanged && !isEditingTotal && (
+              <div className="flex items-center gap-1 text-blue-600 text-xs mt-1">
+                <AlertCircle className="h-3 w-3" />
+                <span>
+                  Alterado de {colisDetail.quantity} para {editableTotal} ({editableTotal > colisDetail.quantity ? '+' : ''}{editableTotal - colisDetail.quantity})
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between text-sm mt-1">
               <span>Distribuído:</span>
               <span className={cn(
