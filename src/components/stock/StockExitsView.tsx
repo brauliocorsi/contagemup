@@ -14,7 +14,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useStockMovements, MovementItem, ParsedCSVItem } from '@/hooks/useStockMovements';
-import { usePickingHistory, usePickingData, optimizePickingRoute } from '@/hooks/usePickingHistory';
+import { usePickingHistory } from '@/hooks/usePickingHistory';
+import { useDetailedPickingData } from '@/hooks/useDetailedPickingData';
 import { useProducts } from '@/hooks/useProducts';
 import { StockUploadSection, ParsedItemsPreview } from './StockUploadSection';
 import { ManualStockSection } from './ManualStockSection';
@@ -34,15 +35,6 @@ const EXIT_REASONS = [
   'Amostra',
   'Outro',
 ];
-
-interface PickingItemWithLocation extends MovementItem {
-  location?: string;
-  pallet_number?: string;
-  requires_forklift?: boolean;
-  level_name?: string;
-  aisle_name?: string;
-  position_in_aisle?: number;
-}
 
 export function StockExitsView() {
   const {
@@ -70,7 +62,7 @@ export function StockExitsView() {
   
   // Picking report dialog state
   const [showPickingReport, setShowPickingReport] = useState(false);
-  const [pickingItems, setPickingItems] = useState<PickingItemWithLocation[]>([]);
+  const [itemsForPicking, setItemsForPicking] = useState<MovementItem[]>([]);
 
   // Create stock map for validation
   const stockMap = useMemo(() => {
@@ -109,9 +101,10 @@ export function StockExitsView() {
 
   const hasStockErrors = stockErrors.length > 0;
 
-  // Fetch picking data for all items in cart
-  const productIds = allItems.map(i => i.product_id);
-  const { data: pickingData } = usePickingData(productIds);
+  // Fetch detailed picking data when showing report
+  const { data: detailedPickingItems = [], isLoading: isLoadingPickingData } = useDetailedPickingData(
+    showPickingReport ? itemsForPicking : []
+  );
 
   const handleAddToCart = useCallback((item: MovementItem) => {
     setCart(prev => {
@@ -155,29 +148,8 @@ export function StockExitsView() {
   };
   
   // Show picking report with prepared items
-  const showPickingReportWithItems = (itemsToProcess: MovementItem[]) => {
-    // Create picking session with location data
-    const items = itemsToProcess.map(item => {
-      const locations = pickingData?.[item.product_id] || [];
-      const firstLocation = locations[0];
-      
-      return {
-        product_id: item.product_id,
-        product_code: item.product_code,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        location: firstLocation?.location || undefined,
-        pallet_number: firstLocation?.pallet_number || undefined,
-        requires_forklift: firstLocation?.requires_forklift ?? false,
-        level_name: firstLocation?.level_name || undefined,
-        aisle_name: firstLocation?.aisle_name || undefined,
-        position_in_aisle: firstLocation?.position_in_aisle ?? 0,
-      };
-    });
-
-    // Optimize the picking route
-    const optimizedItems = optimizePickingRoute(items);
-    setPickingItems(optimizedItems);
+  const showPickingReportWithItems = (items: MovementItem[]) => {
+    setItemsForPicking(items);
     setShowPickingReport(true);
   };
 
@@ -234,18 +206,35 @@ export function StockExitsView() {
 
   // Final confirmation after picking report
   const handleFinalConfirm = async () => {
-    if (pickingItems.length === 0) return;
+    if (detailedPickingItems.length === 0) return;
 
-    // Create picking session first
+    // Create picking session with location details
+    const pickingSessionItems = detailedPickingItems.flatMap(item => {
+      // Get the first coli with location data for the session record
+      const firstColi = item.colisDetails.find(c => c.location) || item.colisDetails[0];
+      
+      return {
+        product_id: item.product_id,
+        product_code: item.product_code,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        location: firstColi?.location || undefined,
+        pallet_number: firstColi?.pallet_number || undefined,
+        requires_forklift: item.hasForkliftRequired,
+        level_name: firstColi?.level_name || undefined,
+        aisle_name: firstColi?.aisle_name || undefined,
+      };
+    });
+
     await createSession.mutateAsync({
       reference: reference || undefined,
       reason: reason || undefined,
       notes: notes || undefined,
-      items: pickingItems,
+      items: pickingSessionItems,
     });
 
     // Then register the stock movements
-    const movementItems = pickingItems.map(item => ({
+    const movementItems = detailedPickingItems.map(item => ({
       product_id: item.product_id,
       product_code: item.product_code,
       product_name: item.product_name,
@@ -267,7 +256,7 @@ export function StockExitsView() {
     setReference('');
     setNotes('');
     setShowPickingReport(false);
-    setPickingItems([]);
+    setItemsForPicking([]);
   };
 
   const handleClearAll = () => {
@@ -436,13 +425,16 @@ export function StockExitsView() {
       {/* Picking Report Dialog */}
       <PickingReportDialog
         open={showPickingReport}
-        onOpenChange={setShowPickingReport}
-        items={pickingItems}
+        onOpenChange={(open) => {
+          setShowPickingReport(open);
+          if (!open) setItemsForPicking([]);
+        }}
+        items={detailedPickingItems}
         reference={reference}
         reason={reason}
         notes={notes}
         onConfirm={handleFinalConfirm}
-        isLoading={registerBulkMovements.isPending || createSession.isPending}
+        isLoading={registerBulkMovements.isPending || createSession.isPending || isLoadingPickingData}
       />
     </>
   );
