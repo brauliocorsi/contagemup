@@ -1,95 +1,70 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CountingSession, Count, Product, ProductWithCounts, ColisDetail, StockDistribution } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export function useCounting(sessionId: string | null) {
-  const [session, setSession] = useState<CountingSession | null>(null);
-  const [counts, setCounts] = useState<Count[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  const fetchSession = useCallback(async () => {
-    if (!sessionId) {
-      setSession(null);
-      setCounts([]);
-      setLoading(false);
-      return;
-    }
+  // Fetch session with react-query
+  const { data: session = null, isLoading: sessionLoading } = useQuery({
+    queryKey: ['counting-session', sessionId],
+    queryFn: async () => {
+      if (!sessionId) return null;
+      const { data, error } = await supabase
+        .from('counting_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .maybeSingle();
+      
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível carregar a sessão',
+          variant: 'destructive'
+        });
+        return null;
+      }
+      return data as CountingSession | null;
+    },
+    enabled: !!sessionId,
+    staleTime: 30000, // Cache for 30 seconds
+  });
 
-    const { data, error } = await supabase
-      .from('counting_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .maybeSingle();
+  // Fetch counts with react-query
+  const { data: counts = [], isLoading: countsLoading, refetch: refetchCounts } = useQuery({
+    queryKey: ['counts', sessionId],
+    queryFn: async () => {
+      if (!sessionId) return [];
+      const { data, error } = await supabase
+        .from('counts')
+        .select('*')
+        .eq('session_id', sessionId);
+      
+      if (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível carregar as contagens',
+          variant: 'destructive'
+        });
+        return [];
+      }
+      return (data as Count[]) || [];
+    },
+    enabled: !!sessionId,
+    staleTime: 5000, // Cache for 5 seconds
+  });
 
-    if (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar a sessão',
-        variant: 'destructive'
-      });
-    } else {
-      setSession(data as CountingSession | null);
-    }
-  }, [sessionId, toast]);
+  const loading = sessionLoading || countsLoading;
 
-  const fetchCounts = useCallback(async () => {
-    if (!sessionId) {
-      setCounts([]);
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('counts')
-      .select('*')
-      .eq('session_id', sessionId);
-
-    if (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as contagens',
-        variant: 'destructive'
-      });
-    } else {
-      setCounts((data as Count[]) || []);
-    }
-    setLoading(false);
-  }, [sessionId, toast]);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchSession();
-    fetchCounts();
-  }, [fetchSession, fetchCounts]);
-
-  // Real-time subscription
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const channel = supabase
-      .channel(`counts-${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'counts',
-          filter: `session_id=eq.${sessionId}`
-        },
-        () => {
-          fetchCounts();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [sessionId, fetchCounts]);
+  // Invalidate counts to refetch
+  const invalidateCounts = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['counts', sessionId] });
+  }, [queryClient, sessionId]);
 
   const updateCount = async (productId: string, colisNumber: number, quantity: number) => {
     if (!sessionId || !user) return false;
@@ -133,7 +108,7 @@ export function useCounting(sessionId: string | null) {
       }
     }
 
-    await fetchCounts();
+    invalidateCounts();
     return true;
   };
 
@@ -300,7 +275,7 @@ export function useCounting(sessionId: string | null) {
       }
     }
 
-    await fetchCounts();
+    invalidateCounts();
     return true;
   };
 
@@ -349,7 +324,7 @@ export function useCounting(sessionId: string | null) {
       }
     }
 
-    await fetchCounts();
+    invalidateCounts();
     return true;
   };
 
@@ -397,7 +372,7 @@ export function useCounting(sessionId: string | null) {
       }
     }
 
-    await fetchCounts();
+    invalidateCounts();
     return true;
   };
 
@@ -445,10 +420,11 @@ export function useCounting(sessionId: string | null) {
       }
     }
 
-    await fetchCounts();
+    invalidateCounts();
     return true;
   };
 
+  // Memoized function to process a single product with counts
   const getProductWithCounts = useCallback((product: Product): ProductWithCounts => {
     const productCounts = counts.filter(c => c.product_id === product.id);
     
@@ -583,7 +559,7 @@ export function useCounting(sessionId: string | null) {
       return false;
     }
     
-    await fetchCounts();
+    invalidateCounts();
     return true;
   };
 
@@ -623,7 +599,7 @@ export function useCounting(sessionId: string | null) {
         if (insertError) throw insertError;
       }
 
-      await fetchCounts();
+      invalidateCounts();
       toast({
         title: 'Stock dividido',
         description: `Coli ${colisNumber} distribuído em ${distributions.length} localização${distributions.length > 1 ? 'es' : ''}`
@@ -679,7 +655,7 @@ export function useCounting(sessionId: string | null) {
         if (insertError) throw insertError;
       }
 
-      await fetchCounts();
+      invalidateCounts();
       toast({
         title: 'Stock unificado',
         description: `${totalQuantity} unidades do Coli ${colisNumber} agora em ${targetLocation || 'localização única'}`
@@ -754,7 +730,7 @@ export function useCounting(sessionId: string | null) {
         });
       }
 
-      await fetchCounts();
+      invalidateCounts();
       return true;
     }
 
@@ -836,7 +812,7 @@ export function useCounting(sessionId: string | null) {
         }
       }
 
-      await fetchCounts();
+      invalidateCounts();
       return true;
     }
 
@@ -861,6 +837,6 @@ export function useCounting(sessionId: string | null) {
     mergeColisStock,
     incrementCountAtLocation,
     decrementCountAtLocation,
-    refetch: fetchCounts
+    refetch: invalidateCounts
   };
 }
