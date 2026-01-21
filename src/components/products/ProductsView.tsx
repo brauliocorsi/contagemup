@@ -123,34 +123,49 @@ export function ProductsView() {
     return 'in_stock';
   };
 
-  const getStockBadge = (stock: number, minStock: number = 5) => {
+  const getStockBadge = (stock: number, minStock: number = 5, totalColis: number = 1) => {
     const status = getStockStatus(stock, minStock);
     
     // Stock zero - gray/neutral
     if (stock <= 0) {
       return (
-        <Badge variant="outline" className="gap-1 bg-slate-100 text-slate-500 border-slate-300">
-          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-          0 un.
-        </Badge>
+        <div className="flex flex-col gap-0.5">
+          <Badge variant="outline" className="gap-1 bg-slate-100 text-slate-500 border-slate-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+            0 sets
+          </Badge>
+          {totalColis > 1 && (
+            <span className="text-[10px] text-muted-foreground">({totalColis} colis/set)</span>
+          )}
+        </div>
       );
     }
     
     // Low stock (below minimum) - yellow/warning
     if (status === 'low_stock') {
       return (
-        <Badge variant="outline" className="gap-1 bg-yellow-50 text-yellow-700 border-yellow-300">
-          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-          {stock} un.
-        </Badge>
+        <div className="flex flex-col gap-0.5">
+          <Badge variant="outline" className="gap-1 bg-yellow-50 text-yellow-700 border-yellow-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+            {stock} {stock === 1 ? 'set' : 'sets'}
+          </Badge>
+          {totalColis > 1 && (
+            <span className="text-[10px] text-muted-foreground">({totalColis} colis/set)</span>
+          )}
+        </div>
       );
     }
     
     return (
-      <Badge variant="outline" className="gap-1 bg-green-50 text-green-700 border-green-200">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-        {stock} un.
-      </Badge>
+      <div className="flex flex-col gap-0.5">
+        <Badge variant="outline" className="gap-1 bg-green-50 text-green-700 border-green-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+          {stock} {stock === 1 ? 'set' : 'sets'}
+        </Badge>
+        {totalColis > 1 && (
+          <span className="text-[10px] text-muted-foreground">({totalColis} colis/set)</span>
+        )}
+      </div>
     );
   };
 
@@ -618,7 +633,7 @@ export function ProductsView() {
                         )}
                         {isColumnVisible('stock') && (
                           <ResizableCell columnId="stock" className="p-2 align-middle">
-                            {getStockBadge(product.current_stock, product.min_stock)}
+                            {getStockBadge(product.current_stock, product.min_stock, product.total_colis)}
                           </ResizableCell>
                         )}
                         {isColumnVisible('lastCount') && (
