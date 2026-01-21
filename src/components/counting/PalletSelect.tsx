@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, ChevronsUpDown, Box, Plus, MapPin, Forklift, Footprints } from 'lucide-react';
+import { Check, ChevronsUpDown, Box, Plus, MapPin, Forklift, Footprints, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/popover';
 import { useWarehousePallets } from '@/hooks/useWarehouseConfig';
 import { Badge } from '@/components/ui/badge';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PalletSelectProps {
   value: string;
@@ -24,6 +26,7 @@ interface PalletSelectProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  sessionId?: string; // Optional: filter counts by session
 }
 
 const STATUS_CONFIG = {
@@ -69,23 +72,66 @@ export function PalletSelect({
   onValueChange, 
   placeholder = "Selecionar palete...",
   className,
-  disabled = false
+  disabled = false,
+  sessionId
 }: PalletSelectProps) {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const { pallets, isLoading } = useWarehousePallets();
 
+  // Fetch product counts per pallet
+  const { data: palletProductCounts = {} } = useQuery({
+    queryKey: ['pallet-product-counts', sessionId],
+    queryFn: async () => {
+      let query = supabase
+        .from('counts')
+        .select('pallet_number, quantity, product_id')
+        .not('pallet_number', 'is', null)
+        .gt('quantity', 0);
+      
+      if (sessionId) {
+        query = query.eq('session_id', sessionId);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      // Aggregate: count unique products and total quantity per pallet
+      const counts: Record<string, { products: Set<string>; totalQty: number }> = {};
+      data?.forEach(count => {
+        if (!count.pallet_number) return;
+        if (!counts[count.pallet_number]) {
+          counts[count.pallet_number] = { products: new Set(), totalQty: 0 };
+        }
+        counts[count.pallet_number].products.add(count.product_id);
+        counts[count.pallet_number].totalQty += count.quantity;
+      });
+      
+      // Convert to simple object
+      const result: Record<string, { productCount: number; totalQty: number }> = {};
+      Object.entries(counts).forEach(([pallet, data]) => {
+        result[pallet] = { productCount: data.products.size, totalQty: data.totalQty };
+      });
+      return result;
+    },
+  });
+
   const palletOptions = useMemo(() => pallets
     .filter(p => p.code && p.code.trim() !== '')
-    .map(p => ({
-      value: p.code,
-      label: p.code,
-      status: p.status as keyof typeof STATUS_CONFIG,
-      location: p.location?.code,
-      aisle: p.location?.aisle?.name,
-      level: p.location?.level?.name,
-      requiresForklift: p.location?.level?.requires_forklift ?? false,
-    })), [pallets]);
+    .map(p => {
+      const countData = palletProductCounts[p.code];
+      return {
+        value: p.code,
+        label: p.code,
+        status: p.status as keyof typeof STATUS_CONFIG,
+        location: p.location?.code,
+        aisle: p.location?.aisle?.name,
+        level: p.location?.level?.name,
+        requiresForklift: p.location?.level?.requires_forklift ?? false,
+        productCount: countData?.productCount ?? 0,
+        totalQty: countData?.totalQty ?? 0,
+      };
+    }), [pallets, palletProductCounts]);
 
   // Group by status
   const groupedPallets = useMemo(() => {
@@ -161,6 +207,11 @@ export function PalletSelect({
             {selectedOption ? (
               <>
                 <span>{selectedOption.label}</span>
+                {selectedOption.productCount > 0 && (
+                  <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
+                    {selectedOption.productCount} prod.
+                  </Badge>
+                )}
                 {selectedStatus && (
                   <span className={cn("text-xs", selectedStatus.text)}>
                     {selectedStatus.icon}
@@ -237,7 +288,15 @@ export function PalletSelect({
                         )}
                       />
                       <div className="flex flex-col flex-1 min-w-0">
-                        <span className="font-medium">{option.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{option.label}</span>
+                          {option.productCount > 0 && (
+                            <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4 flex items-center gap-1">
+                              <Package className="h-3 w-3" />
+                              {option.productCount} prod. • {option.totalQty} un.
+                            </Badge>
+                          )}
+                        </div>
                         {option.location && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
