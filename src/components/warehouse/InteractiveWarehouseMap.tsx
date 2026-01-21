@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   Command,
   CommandEmpty,
@@ -36,7 +37,9 @@ import {
   Split,
   Truck,
   AlertTriangle,
-  MoveRight
+  MoveRight,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { useWarehouseMap, LocationWithProducts, ProductInLocation } from '@/hooks/useWarehouseMap';
 import { useWarehousePallets, WarehousePallet, WarehouseAisle } from '@/hooks/useWarehouseConfig';
@@ -109,6 +112,24 @@ export function InteractiveWarehouseMap() {
   
   // Show products without location
   const [showNoLocationProducts, setShowNoLocationProducts] = useState(false);
+  
+  // Collapsed aisles state
+  const [collapsedAisles, setCollapsedAisles] = useState<Set<string>>(new Set());
+
+  const toggleAisleCollapse = (aisleId: string) => {
+    setCollapsedAisles(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(aisleId)) {
+        newSet.delete(aisleId);
+      } else {
+        newSet.add(aisleId);
+      }
+      return newSet;
+    });
+  };
+
+  const expandAllAisles = () => setCollapsedAisles(new Set());
+  const collapseAllAisles = () => setCollapsedAisles(new Set(aisles.map(a => a.id)));
 
   // Build searchable product list
   const searchableProducts = useMemo(() => {
@@ -809,12 +830,34 @@ export function InteractiveWarehouseMap() {
           </Card>
         )}
 
-        {/* Session info */}
-        {!activeSession && (
-          <Badge variant="secondary" className="mb-2">
-            Sem sessão ativa - mostrando todas as contagens
-          </Badge>
-        )}
+        {/* Session info and expand/collapse controls */}
+        <div className="flex items-center justify-between">
+          {!activeSession && (
+            <Badge variant="secondary">
+              Sem sessão ativa - mostrando todas as contagens
+            </Badge>
+          )}
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={expandAllAisles}
+              disabled={collapsedAisles.size === 0}
+            >
+              <ChevronDown className="h-4 w-4 mr-1" />
+              Expandir Todas
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={collapseAllAisles}
+              disabled={collapsedAisles.size === aislesWithLocations.length}
+            >
+              <ChevronRight className="h-4 w-4 mr-1" />
+              Recolher Todas
+            </Button>
+          </div>
+        </div>
 
         {/* Visual Map - Separate Cards per Aisle */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -822,125 +865,140 @@ export function InteractiveWarehouseMap() {
             const aisleStats = getAisleStats(aisle.id);
             const locationGrid = getLocationGrid(aisle.id);
             const isHighlightedAisle = highlightedAisleId === aisle.id;
+            const isCollapsed = collapsedAisles.has(aisle.id);
 
             return (
-              <Card 
-                key={aisle.id} 
-                id={`aisle-card-${aisle.id}`}
-                className={cn(
-                  "transition-all",
-                  isHighlightedAisle && "ring-2 ring-yellow-400 shadow-lg"
-                )}
+              <Collapsible
+                key={aisle.id}
+                open={!isCollapsed}
+                onOpenChange={() => toggleAisleCollapse(aisle.id)}
               >
-                <CardHeader 
-                  className="pb-2"
-                  style={{ borderLeft: `4px solid ${aisle.color || 'hsl(var(--primary))'}` }}
+                <Card
+                  id={`aisle-card-${aisle.id}`}
+                  className={cn(
+                    "transition-all",
+                    isHighlightedAisle && "ring-2 ring-yellow-400 shadow-lg"
+                  )}
                 >
-                  <CardTitle className="text-base flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Map className="h-4 w-4" />
-                      Rua {aisle.name}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-normal">
-                      <Badge variant="outline" className="text-xs">
-                        <MapPin className="h-3 w-3 mr-1" />
-                        {aisleStats.occupiedLocations}/{aisleStats.totalLocations}
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs">
-                        <Package className="h-3 w-3 mr-1" />
-                        {aisleStats.totalQuantity} un
-                      </Badge>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-2">
-                  <TooltipProvider>
-                    <div className="space-y-1">
-                      {sortedLevels.map(level => {
-                        const locs = locationGrid[level.id] || [];
-                        if (locs.length === 0 && filterLevel === 'all') return null;
-                        if (filterLevel !== 'all' && filterLevel !== level.id) return null;
+                  <CardHeader 
+                    className="pb-2"
+                    style={{ borderLeft: `4px solid ${aisle.color || 'hsl(var(--primary))'}` }}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <CardTitle className="text-base flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-2 px-2 py-1 rounded transition-colors">
+                        <div className="flex items-center gap-2">
+                          {isCollapsed ? (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <Map className="h-4 w-4" />
+                          Rua {aisle.name}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-normal">
+                          <Badge variant="outline" className="text-xs">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {aisleStats.occupiedLocations}/{aisleStats.totalLocations}
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            <Package className="h-3 w-3 mr-1" />
+                            {aisleStats.totalQuantity} un
+                          </Badge>
+                        </div>
+                      </CardTitle>
+                    </CollapsibleTrigger>
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent className="pt-2 animate-accordion-down">
+                      <TooltipProvider>
+                        <div className="space-y-1">
+                          {sortedLevels.map(level => {
+                            const locs = locationGrid[level.id] || [];
+                            if (locs.length === 0 && filterLevel === 'all') return null;
+                            if (filterLevel !== 'all' && filterLevel !== level.id) return null;
 
-                        return (
-                          <div key={level.id} className="flex items-stretch gap-1">
-                            {/* Level label */}
-                            <div 
-                              className="w-14 flex-shrink-0 flex items-center justify-center text-xs font-medium rounded px-1"
-                              style={{ backgroundColor: `${level.color}20`, color: level.color || 'inherit' }}
-                            >
-                              <span className="flex items-center gap-1">
-                                {level.short_name}
-                                {level.requires_forklift && (
-                                  <Forklift className="h-3 w-3 text-orange-500" />
-                                )}
-                              </span>
-                            </div>
-
-                            {/* Locations for this level */}
-                            <div className="flex-1 flex gap-1 flex-wrap">
-                              {locs.length === 0 ? (
-                                <div className="flex-1 h-14 rounded border-2 border-dashed border-muted/50 flex items-center justify-center text-xs text-muted-foreground min-w-[60px]">
-                                  -
+                            return (
+                              <div key={level.id} className="flex items-stretch gap-1">
+                                {/* Level label */}
+                                <div 
+                                  className="w-14 flex-shrink-0 flex items-center justify-center text-xs font-medium rounded px-1"
+                                  style={{ backgroundColor: `${level.color}20`, color: level.color || 'inherit' }}
+                                >
+                                  <span className="flex items-center gap-1">
+                                    {level.short_name}
+                                    {level.requires_forklift && (
+                                      <Forklift className="h-3 w-3 text-orange-500" />
+                                    )}
+                                  </span>
                                 </div>
-                              ) : (
-                                locs.map(location => {
-                                  const isHighlighted = highlightedLocationId === location.id;
-                                  return (
-                                    <Tooltip key={location.id}>
-                                      <TooltipTrigger asChild>
-                                        <button
-                                          ref={isHighlighted ? highlightedRef : undefined}
-                                          onClick={() => handleLocationClick(location)}
-                                          onDragOver={(e) => handleDragOver(e, location.code)}
-                                          onDragLeave={handleDragLeave}
-                                          onDrop={(e) => handleDrop(e, location.code)}
-                                          className={cn(
-                                            "min-w-[60px] h-14 rounded border-2 transition-all",
-                                            "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
-                                            "flex flex-col items-center justify-center p-1",
-                                            getLocationColor(location, isHighlighted),
-                                            dropTargetCode === location.code && "ring-2 ring-primary ring-offset-2 scale-105"
-                                          )}
-                                        >
-                                          <span className="font-bold text-xs">{location.code}</span>
-                                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                            <Package className="h-2.5 w-2.5" />
-                                            {location.totalQuantity}
-                                            {location.products.some(p => p.isSplitEntry) && (
-                                              <Split className="h-2.5 w-2.5 text-blue-600" />
-                                            )}
-                                          </div>
-                                          {location.requiresForklift && (
-                                            <Forklift className="h-3 w-3 text-orange-500 mt-0.5" />
-                                          )}
-                                        </button>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <div className="text-xs space-y-1">
-                                          <p className="font-bold">{location.code}</p>
-                                          <p>Rua {location.aisleName} • {location.levelName}</p>
-                                          <p>{location.totalQuantity} unidades • {location.totalProducts} produtos</p>
-                                          {location.products.some(p => p.isSplitEntry) && (
-                                            <p className="text-blue-600">✂️ Contém stock parcial/dividido</p>
-                                          )}
-                                          {location.requiresForklift && (
-                                            <p className="text-orange-500">🚜 Precisa empilhador</p>
-                                          )}
-                                          <p className="text-muted-foreground">Clique para detalhes</p>
-                                        </div>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </TooltipProvider>
-                </CardContent>
-              </Card>
+
+                                {/* Locations for this level */}
+                                <div className="flex-1 flex gap-1 flex-wrap">
+                                  {locs.length === 0 ? (
+                                    <div className="flex-1 h-14 rounded border-2 border-dashed border-muted/50 flex items-center justify-center text-xs text-muted-foreground min-w-[60px]">
+                                      -
+                                    </div>
+                                  ) : (
+                                    locs.map(location => {
+                                      const isHighlighted = highlightedLocationId === location.id;
+                                      return (
+                                        <Tooltip key={location.id}>
+                                          <TooltipTrigger asChild>
+                                            <button
+                                              ref={isHighlighted ? highlightedRef : undefined}
+                                              onClick={() => handleLocationClick(location)}
+                                              onDragOver={(e) => handleDragOver(e, location.code)}
+                                              onDragLeave={handleDragLeave}
+                                              onDrop={(e) => handleDrop(e, location.code)}
+                                              className={cn(
+                                                "min-w-[60px] h-14 rounded border-2 transition-all",
+                                                "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
+                                                "flex flex-col items-center justify-center p-1",
+                                                getLocationColor(location, isHighlighted),
+                                                dropTargetCode === location.code && "ring-2 ring-primary ring-offset-2 scale-105"
+                                              )}
+                                            >
+                                              <span className="font-bold text-xs">{location.code}</span>
+                                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                <Package className="h-2.5 w-2.5" />
+                                                {location.totalQuantity}
+                                                {location.products.some(p => p.isSplitEntry) && (
+                                                  <Split className="h-2.5 w-2.5 text-blue-600" />
+                                                )}
+                                              </div>
+                                              {location.requiresForklift && (
+                                                <Forklift className="h-3 w-3 text-orange-500 mt-0.5" />
+                                              )}
+                                            </button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top">
+                                            <div className="text-xs space-y-1">
+                                              <p className="font-bold">{location.code}</p>
+                                              <p>Rua {location.aisleName} • {location.levelName}</p>
+                                              <p>{location.totalQuantity} unidades • {location.totalProducts} produtos</p>
+                                              {location.products.some(p => p.isSplitEntry) && (
+                                                <p className="text-blue-600">✂️ Contém stock parcial/dividido</p>
+                                              )}
+                                              {location.requiresForklift && (
+                                                <p className="text-orange-500">🚜 Precisa empilhador</p>
+                                              )}
+                                              <p className="text-muted-foreground">Clique para detalhes</p>
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </TooltipProvider>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
             );
           })}
         </div>
