@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, forwardRef } from 'react';
 import { Check, ChevronsUpDown, MapPin, Plus, Forklift, Footprints } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -44,13 +44,13 @@ const getAisleColor = (aisleName: string | undefined) => {
   return AISLE_COLORS[firstChar] || { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300' };
 };
 
-export function LocationSelect({ 
+export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>(({ 
   value, 
   onValueChange, 
   placeholder = "Selecionar localização...",
   className,
   disabled = false
-}: LocationSelectProps) {
+}, ref) => {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const { locations, isLoading } = useWarehouseLocations();
@@ -244,4 +244,6 @@ export function LocationSelect({
       </PopoverContent>
     </Popover>
   );
-}
+});
+
+LocationSelect.displayName = 'LocationSelect';
