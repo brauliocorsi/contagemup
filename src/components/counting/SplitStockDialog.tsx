@@ -190,14 +190,24 @@ export function SplitStockDialog({
                 </div>
               )}
             </div>
-            {totalChanged && !isEditingTotal && (
-              <div className="flex items-center gap-1 text-blue-600 text-xs mt-1">
-                <AlertCircle className="h-3 w-3" />
-                <span>
-                  Alterado de {colisDetail.quantity} para {editableTotal} ({editableTotal > colisDetail.quantity ? '+' : ''}{editableTotal - colisDetail.quantity})
-                </span>
-              </div>
-            )}
+              {totalChanged && !isEditingTotal && (
+                <div className="flex items-center gap-1 text-blue-600 text-xs mt-1">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>
+                    Alterado de {colisDetail.quantity} para {editableTotal} ({editableTotal > colisDetail.quantity ? '+' : ''}{editableTotal - colisDetail.quantity})
+                  </span>
+                </div>
+              )}
+              {remaining !== 0 && distributedQuantity > 0 && !isEditingTotal && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-xs text-blue-600 hover:text-blue-700"
+                  onClick={() => setEditableTotal(distributedQuantity)}
+                >
+                  Definir total = {distributedQuantity} (soma atual)
+                </Button>
+              )}
             <div className="flex items-center justify-between text-sm mt-1">
               <span>Distribuído:</span>
               <span className={cn(
