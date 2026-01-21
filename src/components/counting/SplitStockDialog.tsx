@@ -69,14 +69,19 @@ export function SplitStockDialog({
     [distributions]
   );
   const remaining = totalQuantity - distributedQuantity;
+  // Valid when all quantity is distributed (not more, not less) and each entry has quantity > 0
   const isValid = remaining === 0 && distributions.every(d => d.quantity > 0);
+  // Check if user is trying to add more than the total
+  const isOverDistributed = remaining < 0;
 
   const addDistribution = () => {
+    // Always start new distributions with 0 quantity - user must manually set it
+    // This prevents accidentally adding units when splitting stock
     setDistributions(prev => [
       ...prev,
       {
         id: `new-${Date.now()}`,
-        quantity: Math.max(0, remaining),
+        quantity: 0,
         location: '',
         pallet_number: ''
       }
@@ -124,7 +129,8 @@ export function SplitStockDialog({
           {/* Total summary */}
           <div className={cn(
             "p-3 rounded-lg border",
-            remaining === 0 ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+            remaining === 0 ? "bg-green-50 border-green-200" : 
+            isOverDistributed ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"
           )}>
             <div className="flex items-center justify-between">
               <span className="font-medium">Total a distribuir:</span>
@@ -134,19 +140,23 @@ export function SplitStockDialog({
               <span>Distribuído:</span>
               <span className={cn(
                 "font-medium",
-                remaining === 0 ? "text-green-700" : "text-amber-700"
+                remaining === 0 ? "text-green-700" : 
+                isOverDistributed ? "text-red-700" : "text-amber-700"
               )}>
                 {distributedQuantity} / {totalQuantity}
               </span>
             </div>
-            {remaining !== 0 && (
+            {remaining > 0 && (
               <div className="flex items-center gap-1 text-amber-700 text-sm mt-1">
                 <AlertCircle className="h-4 w-4" />
+                <span>Falta distribuir {remaining} unidade{remaining > 1 ? 's' : ''}</span>
+              </div>
+            )}
+            {isOverDistributed && (
+              <div className="flex items-center gap-1 text-red-700 text-sm mt-1">
+                <AlertCircle className="h-4 w-4" />
                 <span>
-                  {remaining > 0 
-                    ? `Falta distribuir ${remaining} unidade${remaining > 1 ? 's' : ''}`
-                    : `Excedeu em ${Math.abs(remaining)} unidade${Math.abs(remaining) > 1 ? 's' : ''}`
-                  }
+                  Excedeu em {Math.abs(remaining)} unidade{Math.abs(remaining) > 1 ? 's' : ''}! Reduza as quantidades.
                 </span>
               </div>
             )}
