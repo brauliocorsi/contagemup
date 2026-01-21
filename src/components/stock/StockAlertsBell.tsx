@@ -130,7 +130,14 @@ function AlertListItem({ alert }: { alert: StockAlert }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{alert.product.name}</p>
-        <p className="text-xs text-muted-foreground font-mono">{alert.product.code}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-muted-foreground font-mono">{alert.product.code}</p>
+          {alert.product.total_colis > 1 && (
+            <span className="text-xs text-muted-foreground">
+              ({alert.product.total_colis} colis)
+            </span>
+          )}
+        </div>
       </div>
       <Badge
         variant={isOutOfStock ? 'destructive' : 'outline'}

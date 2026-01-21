@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Package, ClipboardList, History, BarChart3, Tags, Scale, TrendingUp, TrendingDown, Warehouse } from 'lucide-react';
+import { Package, ClipboardList, History, BarChart3, Tags, Scale, TrendingUp, TrendingDown, Warehouse, AlertTriangle } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -14,6 +14,7 @@ const tabs = [
   { id: 'sessions', label: 'Sessões', icon: History },
   { id: 'entries', label: 'Entradas', icon: TrendingUp },
   { id: 'exits', label: 'Saídas', icon: TrendingDown },
+  { id: 'alerts', label: 'Alertas', icon: AlertTriangle },
   { id: 'reconciliation', label: 'Separação', icon: Scale },
   { id: 'warehouse', label: 'Mapa do Armazém', icon: Warehouse },
   { id: 'reports', label: 'Relatórios', icon: BarChart3 },

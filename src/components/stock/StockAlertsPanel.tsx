@@ -126,10 +126,12 @@ function AlertItem({ alert, onClick }: AlertItemProps) {
           )}
         </div>
         <div>
-          <p className="font-medium text-sm">{alert.product.name}</p>
-          <p className="text-xs text-muted-foreground font-mono">
-            {alert.product.code}
-          </p>
+        <div>
+            <p className="font-medium text-sm">{alert.product.name}</p>
+            <p className="text-xs text-muted-foreground font-mono">
+              {alert.product.code}
+            </p>
+          </div>
         </div>
       </div>
       <div className="text-right">
@@ -139,9 +141,16 @@ function AlertItem({ alert, onClick }: AlertItemProps) {
         >
           {alert.product.current_stock} / {alert.product.min_stock}
         </Badge>
-        <p className="text-xs text-muted-foreground mt-1">
-          {isOutOfStock ? 'Esgotado' : 'Stock baixo'}
-        </p>
+        <div className="flex items-center justify-end gap-2 mt-1">
+          {alert.product.total_colis > 1 && (
+            <span className="text-xs text-muted-foreground">
+              {alert.product.total_colis} colis
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground">
+            {isOutOfStock ? 'Esgotado' : 'Stock baixo'}
+          </span>
+        </div>
       </div>
     </div>
   );
