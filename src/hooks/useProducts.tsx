@@ -28,6 +28,8 @@ export function useProducts() {
 
       return (data as Product[]) || [];
     },
+    staleTime: 2000, // Consider data fresh for 2 seconds
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   // Subscribe to realtime changes
