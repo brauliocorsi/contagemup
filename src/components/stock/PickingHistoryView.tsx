@@ -15,6 +15,7 @@ import {
   Trash2,
   Download,
   AlertCircle,
+  FileDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,8 @@ import { usePickingHistory, PickingSession, PickingItem } from '@/hooks/usePicki
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export function PickingHistoryView() {
   const [startDate, setStartDate] = useState<Date | undefined>();
@@ -147,6 +150,199 @@ export function PickingHistoryView() {
     const noLocationItems = items.filter(i => !i.location);
 
     return { forkliftItems, floorItems, noLocationItems };
+  };
+
+  // Export session to PDF
+  const exportSessionToPDF = async (session: PickingSession, items: PickingItem[]) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const groups = groupItemsByForklift(items);
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Relatório de Picking', pageWidth / 2, 20, { align: 'center' });
+    
+    // Subheader with date/time
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const sessionDate = format(new Date(session.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt });
+    doc.text(`Data: ${sessionDate}`, pageWidth / 2, 28, { align: 'center' });
+    
+    // Info box
+    let yPos = 38;
+    doc.setDrawColor(200);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(14, yPos, pageWidth - 28, 28, 3, 3, 'FD');
+    
+    yPos += 8;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total: ${session.total_products} produtos | ${session.total_units} unidades`, 20, yPos);
+    
+    yPos += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    const infoText = [
+      session.reference && `Ref: ${session.reference}`,
+      session.reason && `Motivo: ${session.reason}`,
+      session.operator_name && `Operador: ${session.operator_name}`,
+    ].filter(Boolean).join('  |  ');
+    doc.text(infoText, 20, yPos);
+    
+    yPos += 18;
+    
+    // Forklift section
+    if (groups.forkliftItems.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(220, 38, 38);
+      doc.text(`EMPILHADOR (${groups.forkliftItems.length} itens)`, 14, yPos);
+      doc.setTextColor(0);
+      yPos += 4;
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Palete', 'Nível']],
+        body: groups.forkliftItems.map((item, idx) => [
+          (idx + 1).toString(),
+          item.product_code,
+          item.product_name.substring(0, 30) + (item.product_name.length > 30 ? '...' : ''),
+          item.quantity.toString(),
+          item.location || '-',
+          item.pallet_number || '-',
+          item.level_name || '-',
+        ]),
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [254, 242, 242] },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 25, fontStyle: 'bold' },
+          2: { cellWidth: 50 },
+          3: { cellWidth: 15, halign: 'center' },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 20 },
+          6: { cellWidth: 20 },
+        },
+        margin: { left: 14, right: 14 },
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+    // Floor section
+    if (groups.floorItems.length > 0) {
+      if (yPos > doc.internal.pageSize.getHeight() - 60) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(22, 163, 74);
+      doc.text(`ACESSÍVEL A PÉ (${groups.floorItems.length} itens)`, 14, yPos);
+      doc.setTextColor(0);
+      yPos += 4;
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Palete', 'Nível']],
+        body: groups.floorItems.map((item, idx) => [
+          (idx + 1).toString(),
+          item.product_code,
+          item.product_name.substring(0, 30) + (item.product_name.length > 30 ? '...' : ''),
+          item.quantity.toString(),
+          item.location || '-',
+          item.pallet_number || '-',
+          item.level_name || '-',
+        ]),
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [22, 163, 74], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [240, 253, 244] },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 25, fontStyle: 'bold' },
+          2: { cellWidth: 50 },
+          3: { cellWidth: 15, halign: 'center' },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 20 },
+          6: { cellWidth: 20 },
+        },
+        margin: { left: 14, right: 14 },
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+    // No location section
+    if (groups.noLocationItems.length > 0) {
+      if (yPos > doc.internal.pageSize.getHeight() - 60) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`SEM LOCALIZAÇÃO (${groups.noLocationItems.length} itens)`, 14, yPos);
+      doc.setTextColor(0);
+      yPos += 4;
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['#', 'Código', 'Produto', 'Qtd']],
+        body: groups.noLocationItems.map((item, idx) => [
+          (idx + 1).toString(),
+          item.product_code,
+          item.product_name.substring(0, 40) + (item.product_name.length > 40 ? '...' : ''),
+          item.quantity.toString(),
+        ]),
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [100, 100, 100], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 30, fontStyle: 'bold' },
+          2: { cellWidth: 80 },
+          3: { cellWidth: 20, halign: 'center' },
+        },
+        margin: { left: 14, right: 14 },
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+    // Notes section
+    if (session.notes) {
+      if (yPos > doc.internal.pageSize.getHeight() - 40) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Notas:', 14, yPos);
+      doc.setFont('helvetica', 'normal');
+      yPos += 5;
+      
+      const splitNotes = doc.splitTextToSize(session.notes, pageWidth - 28);
+      doc.text(splitNotes, 14, yPos);
+    }
+    
+    // Footer with signature line
+    const footerY = doc.internal.pageSize.getHeight() - 25;
+    doc.setDrawColor(200);
+    doc.line(14, footerY, 80, footerY);
+    doc.setFontSize(9);
+    doc.text('Assinatura do Operador', 14, footerY + 5);
+    
+    doc.line(pageWidth - 80, footerY, pageWidth - 14, footerY);
+    doc.text('Data/Hora', pageWidth - 80, footerY + 5);
+    
+    // Save
+    const filename = `picking_${session.reference?.replace(/[^a-zA-Z0-9]/g, '_') || format(new Date(session.created_at), 'yyyyMMdd_HHmm')}.pdf`;
+    doc.save(filename);
   };
 
   return (
@@ -277,6 +473,15 @@ export function PickingHistoryView() {
               items={sessionItems[session.id]}
               onToggle={() => toggleSession(session.id)}
               onDelete={() => deleteSession.mutate(session.id)}
+              onExportPDF={async () => {
+                // Load items if not already loaded
+                let itemsToExport = sessionItems[session.id];
+                if (!itemsToExport) {
+                  itemsToExport = await fetchSessionItems(session.id);
+                  setSessionItems(prev => ({ ...prev, [session.id]: itemsToExport }));
+                }
+                exportSessionToPDF(session, itemsToExport);
+              }}
               groupItemsByForklift={groupItemsByForklift}
             />
           ))
@@ -293,6 +498,7 @@ interface SessionCardProps {
   items?: PickingItem[];
   onToggle: () => void;
   onDelete: () => void;
+  onExportPDF: () => void;
   groupItemsByForklift: (items: PickingItem[]) => {
     forkliftItems: PickingItem[];
     floorItems: PickingItem[];
@@ -307,6 +513,7 @@ function SessionCard({
   items,
   onToggle,
   onDelete,
+  onExportPDF,
   groupItemsByForklift,
 }: SessionCardProps) {
   const groups = items ? groupItemsByForklift(items) : null;
@@ -349,7 +556,20 @@ function SessionCard({
                 </div>
               </div>
 
-              <AlertDialog>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExportPDF();
+                  }}
+                  title="Exportar PDF"
+                >
+                  <FileDown className="h-4 w-4" />
+                </Button>
+
+                <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="ghost"
@@ -375,6 +595,7 @@ function SessionCard({
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              </div>
             </div>
           </CardHeader>
         </CollapsibleTrigger>
