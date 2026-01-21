@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useProducts } from '@/hooks/useProducts';
 import { MovementItem } from '@/hooks/useStockMovements';
 import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ManualStockSectionProps {
   cart: MovementItem[];
@@ -15,6 +16,7 @@ interface ManualStockSectionProps {
   onUpdateQuantity: (productId: string, quantity: number) => void;
   onRemoveFromCart: (productId: string) => void;
   movementType: 'entrada' | 'saida';
+  stockOverrides?: Record<string, number>; // Allow passing stock from parent
 }
 
 export function ManualStockSection({
@@ -23,18 +25,19 @@ export function ManualStockSection({
   onUpdateQuantity,
   onRemoveFromCart,
   movementType,
+  stockOverrides,
 }: ManualStockSectionProps) {
   const { products } = useProducts();
   const [search, setSearch] = useState('');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  // Create stock map for quick lookup
+  // Create stock map for quick lookup - use overrides if provided
   const stockMap = useMemo(() => {
     return products.reduce((acc, p) => {
-      acc[p.id] = p.current_stock ?? 0;
+      acc[p.id] = stockOverrides?.[p.id] ?? p.current_stock ?? 0;
       return acc;
     }, {} as Record<string, number>);
-  }, [products]);
+  }, [products, stockOverrides]);
 
   const filteredProducts = useMemo(() => {
     const term = search.toLowerCase().trim();
