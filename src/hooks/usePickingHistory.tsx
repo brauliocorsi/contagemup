@@ -213,7 +213,7 @@ export function usePickingData(productIds: string[]) {
   return useQuery({
     queryKey: ['picking-data', productIds],
     queryFn: async () => {
-      if (productIds.length === 0) return [];
+      if (productIds.length === 0) return {};
 
       // Fetch counts for the products
       const { data: counts, error: countsError } = await supabase
@@ -226,13 +226,14 @@ export function usePickingData(productIds: string[]) {
       // Fetch location metadata
       const locations = [...new Set((counts || []).map(c => c.location).filter(Boolean))];
       
-      let locationMetadata: Record<string, { requires_forklift: boolean; level_name: string; aisle_name: string }> = {};
+      let locationMetadata: Record<string, { requires_forklift: boolean; level_name: string; aisle_name: string; position_in_aisle: number }> = {};
 
       if (locations.length > 0) {
         const { data: locData } = await supabase
           .from('warehouse_locations')
           .select(`
             code,
+            position_in_aisle,
             warehouse_levels!warehouse_locations_level_id_fkey(name, requires_forklift),
             warehouse_aisles!warehouse_locations_aisle_id_fkey(name)
           `)
@@ -245,9 +246,10 @@ export function usePickingData(productIds: string[]) {
             requires_forklift: level?.requires_forklift ?? false,
             level_name: level?.name ?? '',
             aisle_name: aisle?.name ?? '',
+            position_in_aisle: loc.position_in_aisle ?? 0,
           };
           return acc;
-        }, {} as Record<string, { requires_forklift: boolean; level_name: string; aisle_name: string }>);
+        }, {} as Record<string, { requires_forklift: boolean; level_name: string; aisle_name: string; position_in_aisle: number }>);
       }
 
       // Group counts by product
@@ -259,6 +261,7 @@ export function usePickingData(productIds: string[]) {
         requires_forklift: boolean;
         level_name: string;
         aisle_name: string;
+        position_in_aisle: number;
       }[]> = {};
 
       (counts || []).forEach(count => {
@@ -274,11 +277,49 @@ export function usePickingData(productIds: string[]) {
           requires_forklift: meta?.requires_forklift ?? false,
           level_name: meta?.level_name ?? '',
           aisle_name: meta?.aisle_name ?? '',
+          position_in_aisle: meta?.position_in_aisle ?? 0,
         });
       });
 
       return productLocations;
     },
     enabled: productIds.length > 0,
+  });
+}
+
+// Function to optimize picking route
+export function optimizePickingRoute<T extends {
+  requires_forklift?: boolean;
+  aisle_name?: string | null;
+  level_name?: string | null;
+  position_in_aisle?: number;
+}>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    // 1. Group by forklift requirement (forklift items first to batch forklift operations)
+    const aForklift = a.requires_forklift ?? false;
+    const bForklift = b.requires_forklift ?? false;
+    if (aForklift !== bForklift) {
+      return aForklift ? -1 : 1;
+    }
+
+    // 2. Sort by aisle (alphabetical/numerical order)
+    const aisleCompare = (a.aisle_name || '').localeCompare(b.aisle_name || '', 'pt', { numeric: true });
+    if (aisleCompare !== 0) return aisleCompare;
+
+    // 3. Sort by position in aisle
+    const posA = a.position_in_aisle ?? 0;
+    const posB = b.position_in_aisle ?? 0;
+    if (posA !== posB) return posA - posB;
+
+    // 4. Sort by level (higher levels first when using forklift, lower first when on foot)
+    const levelA = a.level_name || '';
+    const levelB = b.level_name || '';
+    if (aForklift) {
+      // For forklift: higher levels first (descending)
+      return levelB.localeCompare(levelA, 'pt', { numeric: true });
+    } else {
+      // For foot: ground level first (ascending)
+      return levelA.localeCompare(levelB, 'pt', { numeric: true });
+    }
   });
 }
