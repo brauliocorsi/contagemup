@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { TrendingDown, History, AlertTriangle } from 'lucide-react';
+import { TrendingDown, History, AlertTriangle, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,7 @@ import { ManualStockSection } from './ManualStockSection';
 import { StockHistoryTable } from './StockHistoryTable';
 import { PickingHistoryView } from './PickingHistoryView';
 import { StockValidationDialog, StockValidationError } from './StockValidationDialog';
+import { PickingReportDialog } from './PickingReportDialog';
 import { toast } from 'sonner';
 
 const EXIT_REASONS = [
@@ -33,6 +34,15 @@ const EXIT_REASONS = [
   'Amostra',
   'Outro',
 ];
+
+interface PickingItemWithLocation extends MovementItem {
+  location?: string;
+  pallet_number?: string;
+  requires_forklift?: boolean;
+  level_name?: string;
+  aisle_name?: string;
+  position_in_aisle?: number;
+}
 
 export function StockExitsView() {
   const {
@@ -57,6 +67,10 @@ export function StockExitsView() {
   // Validation dialog state
   const [validationErrors, setValidationErrors] = useState<StockValidationError[]>([]);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
+  
+  // Picking report dialog state
+  const [showPickingReport, setShowPickingReport] = useState(false);
+  const [pickingItems, setPickingItems] = useState<PickingItemWithLocation[]>([]);
 
   // Create stock map for validation
   const stockMap = useMemo(() => {
@@ -125,7 +139,7 @@ export function StockExitsView() {
     setCart(prev => prev.filter(item => item.product_id !== productId));
   }, []);
 
-  // Validate and then confirm exits
+  // Validate and show picking report
   const handleValidateAndConfirm = () => {
     if (allItems.length === 0) return;
 
@@ -136,8 +150,35 @@ export function StockExitsView() {
       return;
     }
 
-    // All good, proceed to confirm
-    handleConfirm(allItems);
+    // All good, show picking report
+    showPickingReportWithItems(allItems);
+  };
+  
+  // Show picking report with prepared items
+  const showPickingReportWithItems = (itemsToProcess: MovementItem[]) => {
+    // Create picking session with location data
+    const items = itemsToProcess.map(item => {
+      const locations = pickingData?.[item.product_id] || [];
+      const firstLocation = locations[0];
+      
+      return {
+        product_id: item.product_id,
+        product_code: item.product_code,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        location: firstLocation?.location || undefined,
+        pallet_number: firstLocation?.pallet_number || undefined,
+        requires_forklift: firstLocation?.requires_forklift ?? false,
+        level_name: firstLocation?.level_name || undefined,
+        aisle_name: firstLocation?.aisle_name || undefined,
+        position_in_aisle: firstLocation?.position_in_aisle ?? 0,
+      };
+    });
+
+    // Optimize the picking route
+    const optimizedItems = optimizePickingRoute(items);
+    setPickingItems(optimizedItems);
+    setShowPickingReport(true);
   };
 
   // Handle adjusting quantities to available stock
@@ -188,45 +229,31 @@ export function StockExitsView() {
     }
 
     setShowValidationDialog(false);
-    handleConfirm(validItems);
+    showPickingReportWithItems(validItems);
   };
 
-  const handleConfirm = async (itemsToProcess: MovementItem[]) => {
-    if (itemsToProcess.length === 0) return;
-
-    // Create picking session with location data and optimize route
-    const pickingItems = itemsToProcess.map(item => {
-      const locations = pickingData?.[item.product_id] || [];
-      const firstLocation = locations[0];
-      
-      return {
-        product_id: item.product_id,
-        product_code: item.product_code,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        location: firstLocation?.location || undefined,
-        pallet_number: firstLocation?.pallet_number || undefined,
-        requires_forklift: firstLocation?.requires_forklift ?? false,
-        level_name: firstLocation?.level_name || undefined,
-        aisle_name: firstLocation?.aisle_name || undefined,
-        position_in_aisle: firstLocation?.position_in_aisle ?? 0,
-      };
-    });
-
-    // Optimize the picking route
-    const optimizedItems = optimizePickingRoute(pickingItems);
+  // Final confirmation after picking report
+  const handleFinalConfirm = async () => {
+    if (pickingItems.length === 0) return;
 
     // Create picking session first
     await createSession.mutateAsync({
       reference: reference || undefined,
       reason: reason || undefined,
       notes: notes || undefined,
-      items: optimizedItems,
+      items: pickingItems,
     });
 
     // Then register the stock movements
+    const movementItems = pickingItems.map(item => ({
+      product_id: item.product_id,
+      product_code: item.product_code,
+      product_name: item.product_name,
+      quantity: item.quantity,
+    }));
+
     await registerBulkMovements.mutateAsync({
-      items: itemsToProcess,
+      items: movementItems,
       type: 'saida',
       reason: reason || undefined,
       reference: reference || undefined,
@@ -239,6 +266,8 @@ export function StockExitsView() {
     setReason('');
     setReference('');
     setNotes('');
+    setShowPickingReport(false);
+    setPickingItems([]);
   };
 
   const handleClearAll = () => {
@@ -367,11 +396,12 @@ export function StockExitsView() {
                       </Button>
                       <Button
                         variant="destructive"
-                        className="flex-1"
+                        className="flex-1 gap-2"
                         onClick={handleValidateAndConfirm}
                         disabled={allItems.length === 0 || registerBulkMovements.isPending || createSession.isPending}
                       >
-                        {(registerBulkMovements.isPending || createSession.isPending) ? 'A registar...' : 'Confirmar Saídas'}
+                        <ClipboardList className="h-4 w-4" />
+                        {(registerBulkMovements.isPending || createSession.isPending) ? 'A registar...' : 'Ver Picking'}
                       </Button>
                     </div>
                   </div>
@@ -401,6 +431,18 @@ export function StockExitsView() {
         errors={validationErrors}
         onAdjustQuantities={handleAdjustQuantities}
         onConfirmPartial={handleConfirmPartial}
+      />
+
+      {/* Picking Report Dialog */}
+      <PickingReportDialog
+        open={showPickingReport}
+        onOpenChange={setShowPickingReport}
+        items={pickingItems}
+        reference={reference}
+        reason={reason}
+        notes={notes}
+        onConfirm={handleFinalConfirm}
+        isLoading={registerBulkMovements.isPending || createSession.isPending}
       />
     </>
   );
