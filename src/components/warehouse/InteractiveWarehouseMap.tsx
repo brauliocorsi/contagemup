@@ -39,7 +39,7 @@ import {
   MoveRight
 } from 'lucide-react';
 import { useWarehouseMap, LocationWithProducts, ProductInLocation } from '@/hooks/useWarehouseMap';
-import { useWarehousePallets, WarehousePallet } from '@/hooks/useWarehouseConfig';
+import { useWarehousePallets, WarehousePallet, WarehouseAisle } from '@/hooks/useWarehouseConfig';
 import { useActiveSession } from '@/hooks/useActiveSession';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,8 +64,17 @@ interface ProductSearchResult {
   productCode: string;
   locationCode: string;
   locationId: string;
+  aisleId: string | null;
   colisCount: number;
   totalQuantity: number;
+}
+
+interface AisleStats {
+  totalLocations: number;
+  occupiedLocations: number;
+  totalQuantity: number;
+  totalProducts: number;
+  totalColis: number;
 }
 
 export function InteractiveWarehouseMap() {
@@ -77,7 +86,6 @@ export function InteractiveWarehouseMap() {
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
   const [dropTargetCode, setDropTargetCode] = useState<string | null>(null);
-  const [filterAisle, setFilterAisle] = useState<string>('all');
   const [filterLevel, setFilterLevel] = useState<string>('all');
   const [filterPallet, setFilterPallet] = useState<string>('all');
   
@@ -85,6 +93,7 @@ export function InteractiveWarehouseMap() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedLocationId, setHighlightedLocationId] = useState<string | null>(null);
+  const [highlightedAisleId, setHighlightedAisleId] = useState<string | null>(null);
   const highlightedRef = useRef<HTMLButtonElement>(null);
   
   // Pallet search state
@@ -124,6 +133,7 @@ export function InteractiveWarehouseMap() {
           productCode: group.code,
           locationCode: loc.code,
           locationId: loc.id,
+          aisleId: loc.aisle_id,
           colisCount: group.count,
           totalQuantity: group.totalQty,
         });
@@ -142,35 +152,43 @@ export function InteractiveWarehouseMap() {
     ).slice(0, 10);
   }, [searchableProducts, searchQuery]);
 
-  // Scroll to highlighted location
+  // Scroll to highlighted aisle card when product is selected
   useEffect(() => {
-    if (highlightedLocationId && highlightedRef.current) {
-      highlightedRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (highlightedAisleId) {
+      const aisleCard = document.getElementById(`aisle-card-${highlightedAisleId}`);
+      if (aisleCard) {
+        aisleCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
-  }, [highlightedLocationId]);
+  }, [highlightedAisleId]);
 
   // Clear highlight after 5 seconds
   useEffect(() => {
     if (highlightedLocationId) {
-      const timer = setTimeout(() => setHighlightedLocationId(null), 5000);
+      const timer = setTimeout(() => {
+        setHighlightedLocationId(null);
+        setHighlightedAisleId(null);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [highlightedLocationId]);
 
   const handleSelectProduct = (result: ProductSearchResult) => {
     setHighlightedLocationId(result.locationId);
+    setHighlightedAisleId(result.aisleId);
     setSearchOpen(false);
     setSearchQuery('');
   };
 
   const clearHighlight = () => {
     setHighlightedLocationId(null);
+    setHighlightedAisleId(null);
     setHighlightedPallet(null);
   };
 
   // Build searchable pallets list with their locations
   const searchablePallets = useMemo(() => {
-    const palletsWithLocations: { code: string; locationCode: string; locationId: string; productCount: number; totalQuantity: number }[] = [];
+    const palletsWithLocations: { code: string; locationCode: string; locationId: string; aisleId: string | null; productCount: number; totalQuantity: number }[] = [];
     
     locations.forEach(loc => {
       const palletGroups: Record<string, { count: number; qty: number }> = {};
@@ -191,6 +209,7 @@ export function InteractiveWarehouseMap() {
           code: palletCode,
           locationCode: loc.code,
           locationId: loc.id,
+          aisleId: loc.aisle_id,
           productCount: data.count,
           totalQuantity: data.qty,
         });
@@ -202,7 +221,7 @@ export function InteractiveWarehouseMap() {
 
   // Get unique pallets with locations
   const uniquePalletsInWarehouse = useMemo(() => {
-    const palletMap: Record<string, { locations: string[]; totalProducts: number; totalQuantity: number }> = {};
+    const palletMap: Record<string, { locations: string[]; aisleIds: (string | null)[]; totalProducts: number; totalQuantity: number }> = {};
     
     searchablePallets.forEach(p => {
       const existing = palletMap[p.code];
@@ -210,11 +229,15 @@ export function InteractiveWarehouseMap() {
         if (!existing.locations.includes(p.locationCode)) {
           existing.locations.push(p.locationCode);
         }
+        if (p.aisleId && !existing.aisleIds.includes(p.aisleId)) {
+          existing.aisleIds.push(p.aisleId);
+        }
         existing.totalProducts += p.productCount;
         existing.totalQuantity += p.totalQuantity;
       } else {
         palletMap[p.code] = {
           locations: [p.locationCode],
+          aisleIds: p.aisleId ? [p.aisleId] : [],
           totalProducts: p.productCount,
           totalQuantity: p.totalQuantity,
         };
@@ -244,23 +267,25 @@ export function InteractiveWarehouseMap() {
         noLocationProducts.push(...loc.products);
       }
     });
-    // Also check for products with empty/null location in products array
-    locations.forEach(loc => {
-      loc.products.forEach(p => {
-        if (!p.palletNumber && loc.code) {
-          // This product doesn't have a pallet assigned
-        }
-      });
-    });
     return noLocationProducts;
   }, [locations]);
 
   // Handle pallet selection
-  const handleSelectPallet = (palletCode: string) => {
+  const handleSelectPallet = (palletCode: string, firstAisleId: string | null) => {
     setHighlightedPallet(palletCode);
     setFilterPallet(palletCode);
     setPalletSearchOpen(false);
     setPalletSearchQuery('');
+    
+    // Scroll to first aisle containing this pallet
+    if (firstAisleId) {
+      setTimeout(() => {
+        const aisleCard = document.getElementById(`aisle-card-${firstAisleId}`);
+        if (aisleCard) {
+          aisleCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
   };
 
   // Open pallet transfer dialog
@@ -296,10 +321,9 @@ export function InteractiveWarehouseMap() {
     }
   };
 
-  // Filter locations based on selected filters (including pallet filter)
+  // Filter locations based on selected filters
   const filteredLocations = useMemo(() => {
     return locations.filter(loc => {
-      if (filterAisle !== 'all' && loc.aisle_id !== filterAisle) return false;
       if (filterLevel !== 'all' && loc.level_id !== filterLevel) return false;
       if (filterPallet !== 'all') {
         const hasPallet = loc.products.some(p => p.palletNumber === filterPallet);
@@ -307,26 +331,35 @@ export function InteractiveWarehouseMap() {
       }
       return true;
     });
-  }, [locations, filterAisle, filterLevel, filterPallet]);
+  }, [locations, filterLevel, filterPallet]);
+
+  // Get stats per aisle
+  const getAisleStats = (aisleId: string): AisleStats => {
+    const aisleLocations = filteredLocations.filter(l => l.aisle_id === aisleId);
+    return {
+      totalLocations: aisleLocations.length,
+      occupiedLocations: aisleLocations.filter(l => l.totalColis > 0).length,
+      totalQuantity: aisleLocations.reduce((sum, l) => sum + l.totalQuantity, 0),
+      totalProducts: aisleLocations.reduce((sum, l) => sum + l.totalProducts, 0),
+      totalColis: aisleLocations.reduce((sum, l) => sum + l.totalColis, 0),
+    };
+  };
 
   // Group locations by aisle and level for grid display
-  const locationGrid = useMemo(() => {
-    const grid: Record<string, Record<string, LocationWithProducts[]>> = {};
+  const getLocationGrid = (aisleId: string) => {
+    const grid: Record<string, LocationWithProducts[]> = {};
     
     // Sort levels by level_number descending (highest first)
     const sortedLevels = [...levels].sort((a, b) => b.level_number - a.level_number);
     
     sortedLevels.forEach(level => {
-      grid[level.id] = {};
-      aisles.forEach(aisle => {
-        grid[level.id][aisle.id] = filteredLocations
-          .filter(loc => loc.level_id === level.id && loc.aisle_id === aisle.id)
-          .sort((a, b) => a.position_in_aisle - b.position_in_aisle);
-      });
+      grid[level.id] = filteredLocations
+        .filter(loc => loc.level_id === level.id && loc.aisle_id === aisleId)
+        .sort((a, b) => a.position_in_aisle - b.position_in_aisle);
     });
     
     return grid;
-  }, [filteredLocations, aisles, levels]);
+  };
 
   // Stats
   const stats = useMemo(() => {
@@ -398,6 +431,17 @@ export function InteractiveWarehouseMap() {
     return 'bg-green-100 border-green-300';
   };
 
+  // Sort levels for display (highest first)
+  const sortedLevels = useMemo(() => [...levels].sort((a, b) => b.level_number - a.level_number), [levels]);
+
+  // Filter aisles that have locations after applying filters
+  const aislesWithLocations = useMemo(() => {
+    return aisles.filter(aisle => {
+      const aisleStats = getAisleStats(aisle.id);
+      return aisleStats.totalLocations > 0;
+    });
+  }, [aisles, filteredLocations]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -416,14 +460,11 @@ export function InteractiveWarehouseMap() {
     );
   }
 
-  // Sort levels for display (highest first)
-  const sortedLevels = [...levels].sort((a, b) => b.level_number - a.level_number);
-
   return (
     <>
       <div className="space-y-4">
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           <Card className="p-3">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -557,7 +598,7 @@ export function InteractiveWarehouseMap() {
                         <CommandItem
                           key={`${pallet.code}-${idx}`}
                           value={pallet.code}
-                          onSelect={() => handleSelectPallet(pallet.code)}
+                          onSelect={() => handleSelectPallet(pallet.code, pallet.aisleIds[0] || null)}
                           className="cursor-pointer"
                         >
                           <div className="flex flex-col flex-1">
@@ -648,19 +689,6 @@ export function InteractiveWarehouseMap() {
               <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Filtros:</span>
             </div>
-            <Select value={filterAisle} onValueChange={setFilterAisle}>
-              <SelectTrigger className="w-[130px]">
-                <SelectValue placeholder="Todas as ruas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as ruas</SelectItem>
-                {aisles.map(aisle => (
-                  <SelectItem key={aisle.id} value={aisle.id}>
-                    Rua {aisle.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select value={filterLevel} onValueChange={setFilterLevel}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Todos os níveis" />
@@ -781,124 +809,141 @@ export function InteractiveWarehouseMap() {
           </Card>
         )}
 
-        {/* Visual Map Grid */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Map className="h-4 w-4" />
-              Mapa Visual do Armazém
-              {!activeSession && (
-                <Badge variant="secondary" className="ml-2">
-                  Sem sessão ativa - mostrando todas as contagens
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="w-full">
-              <div className="min-w-[600px]">
-                {/* Aisle headers */}
-                <div className="flex mb-2">
-                  <div className="w-20 flex-shrink-0" /> {/* Spacer for level labels */}
-                  {aisles.map(aisle => (
-                    <div 
-                      key={aisle.id}
-                      className="flex-1 text-center font-bold text-sm py-2 mx-1 rounded"
-                      style={{ backgroundColor: `${aisle.color}20`, color: aisle.color }}
-                    >
+        {/* Session info */}
+        {!activeSession && (
+          <Badge variant="secondary" className="mb-2">
+            Sem sessão ativa - mostrando todas as contagens
+          </Badge>
+        )}
+
+        {/* Visual Map - Separate Cards per Aisle */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {aislesWithLocations.map(aisle => {
+            const aisleStats = getAisleStats(aisle.id);
+            const locationGrid = getLocationGrid(aisle.id);
+            const isHighlightedAisle = highlightedAisleId === aisle.id;
+
+            return (
+              <Card 
+                key={aisle.id} 
+                id={`aisle-card-${aisle.id}`}
+                className={cn(
+                  "transition-all",
+                  isHighlightedAisle && "ring-2 ring-yellow-400 shadow-lg"
+                )}
+              >
+                <CardHeader 
+                  className="pb-2"
+                  style={{ borderLeft: `4px solid ${aisle.color || 'hsl(var(--primary))'}` }}
+                >
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Map className="h-4 w-4" />
                       Rua {aisle.name}
                     </div>
-                  ))}
-                </div>
+                    <div className="flex items-center gap-2 text-xs font-normal">
+                      <Badge variant="outline" className="text-xs">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {aisleStats.occupiedLocations}/{aisleStats.totalLocations}
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        <Package className="h-3 w-3 mr-1" />
+                        {aisleStats.totalQuantity} un
+                      </Badge>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <TooltipProvider>
+                    <div className="space-y-1">
+                      {sortedLevels.map(level => {
+                        const locs = locationGrid[level.id] || [];
+                        if (locs.length === 0 && filterLevel === 'all') return null;
+                        if (filterLevel !== 'all' && filterLevel !== level.id) return null;
 
-                {/* Grid rows by level */}
-                <TooltipProvider>
-                  {sortedLevels.map(level => (
-                    <div key={level.id} className="flex mb-1">
-                      {/* Level label */}
-                      <div 
-                        className="w-20 flex-shrink-0 flex items-center justify-center text-xs font-medium rounded-l mr-1"
-                        style={{ backgroundColor: `${level.color}20`, color: level.color }}
-                      >
-                        <span className="flex items-center gap-1">
-                          {level.short_name}
-                          {level.requires_forklift && (
-                            <Forklift className="h-3 w-3 text-orange-500" />
-                          )}
-                        </span>
-                      </div>
-
-                      {/* Locations for each aisle at this level */}
-                      {aisles.map(aisle => {
-                        const locs = locationGrid[level.id]?.[aisle.id] || [];
-                        
                         return (
-                          <div key={aisle.id} className="flex-1 flex gap-1 mx-1">
-                            {locs.length === 0 ? (
-                              <div className="flex-1 h-16 rounded border-2 border-dashed border-muted/50 flex items-center justify-center text-xs text-muted-foreground">
-                                -
-                              </div>
-                            ) : (
-                              locs.map(location => {
-                                const isHighlighted = highlightedLocationId === location.id;
-                                return (
-                                  <Tooltip key={location.id}>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        ref={isHighlighted ? highlightedRef : undefined}
-                                        onClick={() => handleLocationClick(location)}
-                                        onDragOver={(e) => handleDragOver(e, location.code)}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={(e) => handleDrop(e, location.code)}
-                                        className={cn(
-                                          "flex-1 min-w-[60px] h-16 rounded border-2 transition-all",
-                                          "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
-                                          "flex flex-col items-center justify-center p-1",
-                                          getLocationColor(location, isHighlighted),
-                                          dropTargetCode === location.code && "ring-2 ring-primary ring-offset-2 scale-105"
-                                        )}
-                                      >
-                                        <span className="font-bold text-xs">{location.code}</span>
-                                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                          <Package className="h-2.5 w-2.5" />
-                                          {location.totalQuantity}
-                                          {location.products.some(p => p.isSplitEntry) && (
-                                            <Split className="h-2.5 w-2.5 text-blue-600" />
+                          <div key={level.id} className="flex items-stretch gap-1">
+                            {/* Level label */}
+                            <div 
+                              className="w-14 flex-shrink-0 flex items-center justify-center text-xs font-medium rounded px-1"
+                              style={{ backgroundColor: `${level.color}20`, color: level.color || 'inherit' }}
+                            >
+                              <span className="flex items-center gap-1">
+                                {level.short_name}
+                                {level.requires_forklift && (
+                                  <Forklift className="h-3 w-3 text-orange-500" />
+                                )}
+                              </span>
+                            </div>
+
+                            {/* Locations for this level */}
+                            <div className="flex-1 flex gap-1 flex-wrap">
+                              {locs.length === 0 ? (
+                                <div className="flex-1 h-14 rounded border-2 border-dashed border-muted/50 flex items-center justify-center text-xs text-muted-foreground min-w-[60px]">
+                                  -
+                                </div>
+                              ) : (
+                                locs.map(location => {
+                                  const isHighlighted = highlightedLocationId === location.id;
+                                  return (
+                                    <Tooltip key={location.id}>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          ref={isHighlighted ? highlightedRef : undefined}
+                                          onClick={() => handleLocationClick(location)}
+                                          onDragOver={(e) => handleDragOver(e, location.code)}
+                                          onDragLeave={handleDragLeave}
+                                          onDrop={(e) => handleDrop(e, location.code)}
+                                          className={cn(
+                                            "min-w-[60px] h-14 rounded border-2 transition-all",
+                                            "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
+                                            "flex flex-col items-center justify-center p-1",
+                                            getLocationColor(location, isHighlighted),
+                                            dropTargetCode === location.code && "ring-2 ring-primary ring-offset-2 scale-105"
                                           )}
+                                        >
+                                          <span className="font-bold text-xs">{location.code}</span>
+                                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                            <Package className="h-2.5 w-2.5" />
+                                            {location.totalQuantity}
+                                            {location.products.some(p => p.isSplitEntry) && (
+                                              <Split className="h-2.5 w-2.5 text-blue-600" />
+                                            )}
+                                          </div>
+                                          {location.requiresForklift && (
+                                            <Forklift className="h-3 w-3 text-orange-500 mt-0.5" />
+                                          )}
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        <div className="text-xs space-y-1">
+                                          <p className="font-bold">{location.code}</p>
+                                          <p>Rua {location.aisleName} • {location.levelName}</p>
+                                          <p>{location.totalQuantity} unidades • {location.totalProducts} produtos</p>
+                                          {location.products.some(p => p.isSplitEntry) && (
+                                            <p className="text-blue-600">✂️ Contém stock parcial/dividido</p>
+                                          )}
+                                          {location.requiresForklift && (
+                                            <p className="text-orange-500">🚜 Precisa empilhador</p>
+                                          )}
+                                          <p className="text-muted-foreground">Clique para detalhes</p>
                                         </div>
-                                        {location.requiresForklift && (
-                                          <Forklift className="h-3 w-3 text-orange-500 mt-0.5" />
-                                        )}
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">
-                                      <div className="text-xs space-y-1">
-                                        <p className="font-bold">{location.code}</p>
-                                        <p>Rua {location.aisleName} • {location.levelName}</p>
-                                        <p>{location.totalQuantity} unidades • {location.totalProducts} produtos</p>
-                                        {location.products.some(p => p.isSplitEntry) && (
-                                          <p className="text-blue-600">✂️ Contém stock parcial/dividido</p>
-                                        )}
-                                        {location.requiresForklift && (
-                                          <p className="text-orange-500">🚜 Precisa empilhador</p>
-                                        )}
-                                        <p className="text-muted-foreground">Clique para detalhes</p>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                );
-                              })
-                            )}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  );
+                                })
+                              )}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  ))}
-                </TooltipProvider>
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                  </TooltipProvider>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
 
       {/* Location Details Dialog */}
