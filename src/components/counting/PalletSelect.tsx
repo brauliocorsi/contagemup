@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, forwardRef } from 'react';
 import { Check, ChevronsUpDown, Box, Plus, MapPin, Forklift, Footprints, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -67,14 +67,14 @@ const STATUS_CONFIG = {
   },
 } as const;
 
-export function PalletSelect({ 
+export const PalletSelect = forwardRef<HTMLButtonElement, PalletSelectProps>(({ 
   value, 
   onValueChange, 
   placeholder = "Selecionar palete...",
   className,
   disabled = false,
   sessionId
-}: PalletSelectProps) {
+}, ref) => {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const { pallets, isLoading } = useWarehousePallets();
@@ -332,4 +332,6 @@ export function PalletSelect({
       </PopoverContent>
     </Popover>
   );
-}
+});
+
+PalletSelect.displayName = 'PalletSelect';
