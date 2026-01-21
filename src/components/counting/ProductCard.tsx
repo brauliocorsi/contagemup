@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil, History, Clock, ChevronDown, ChevronUp, Copy, Split, Merge } from 'lucide-react';
+import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil, History, Clock, ChevronDown, ChevronUp, Split, Merge } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProductHistoryPopover } from './ProductHistoryPopover';
 import { CountHistoryPopover } from './CountHistoryPopover';
@@ -60,8 +60,7 @@ export function ProductCard({
   colisNames,
   sessionId
 }: ProductCardProps) {
-  const [localLocation, setLocalLocation] = useState(product.location || '');
-  const [localPallet, setLocalPallet] = useState(product.palletNumber || '');
+  // Global location/pallet removed - each coli manages its own
   const [localCode, setLocalCode] = useState(product.code);
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -132,19 +131,7 @@ export function ProductCard({
     return `Falta: ${missingItems}`;
   };
 
-  const handleLocationChange = (newLocation: string) => {
-    setLocalLocation(newLocation);
-    if (onLocationChange) {
-      onLocationChange(product.id, newLocation);
-    }
-  };
-
-  const handlePalletChange = (newPallet: string) => {
-    setLocalPallet(newPallet);
-    if (onPalletChange) {
-      onPalletChange(product.id, newPallet);
-    }
-  };
+  // Global location/pallet handlers removed - each coli manages its own
 
   const handleCodeBlur = async () => {
     setIsEditingCode(false);
@@ -361,73 +348,6 @@ export function ProductCard({
             </div>
           </div>
           
-          {/* Global Location field with Select */}
-          <div className="mt-2 flex items-center gap-2">
-            <LocationSelect
-              value={localLocation}
-              onValueChange={handleLocationChange}
-              placeholder="Selecionar localização..."
-              className={cn(
-                "flex-1",
-                product.hasMultipleLocations && "border-orange-300 bg-orange-50"
-              )}
-            />
-            {onLocationChange && product.hasMultipleLocations && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => {
-                        if (localLocation && onLocationChange) {
-                          onLocationChange(product.id, localLocation);
-                        }
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Aplicar a todos os colis</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-
-          {/* Global Pallet field with Select */}
-          <div className="mt-2 flex items-center gap-2">
-            <PalletSelect
-              value={localPallet}
-              onValueChange={handlePalletChange}
-              placeholder="Selecionar palete..."
-              className={cn(
-                "flex-1",
-                product.hasMultiplePallets && "border-orange-300 bg-orange-50"
-              )}
-            />
-            {onPalletChange && product.hasMultiplePallets && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => {
-                        if (localPallet && onPalletChange) {
-                          onPalletChange(product.id, localPallet);
-                        }
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Aplicar a todos os colis</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
           
           {/* Summary line showing complete + what's missing */}
           {(product.completeSets > 0 || product.hasPartialProduct) && (
