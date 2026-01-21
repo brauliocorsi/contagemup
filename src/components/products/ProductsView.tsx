@@ -3,6 +3,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { useProductChanges } from '@/hooks/useProductChanges';
 import { useLastCounts } from '@/hooks/useLastCounts';
+import { useToast } from '@/hooks/use-toast';
 import { ProductForm } from './ProductForm';
 import { ProductEditForm } from './ProductEditForm';
 import { ProductHistoryDialog } from './ProductHistoryDialog';
@@ -17,7 +18,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ResizableTableProvider, ResizableHeaderCell, ResizableCell } from '@/components/ui/resizable-table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { classifyLocation } from '@/lib/locationUtils';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,6 +68,7 @@ export function ProductsView() {
   const { categories, createCategory, refetch: refetchCategories } = useCategories();
   const { logChange, logMultipleChanges } = useProductChanges();
   const { lastCounts } = useLastCounts();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
@@ -319,6 +322,95 @@ export function ProductsView() {
     link.click();
   };
 
+  const exportIncompleteProducts = () => {
+    // Find products with incomplete units (excess colis that don't form complete sets)
+    const incompleteProducts = products
+      .map(product => {
+        const lastCount = lastCounts[product.id];
+        if (!lastCount || product.total_colis <= 1) return null;
+        
+        const colisDistribution = lastCount.colisLocations.map(c => ({
+          colisNumber: c.colisNumber,
+          quantity: c.quantity
+        }));
+        
+        const totalUnits = colisDistribution.reduce((sum, c) => sum + c.quantity, 0);
+        const completeSets = product.current_stock;
+        const unitsInCompleteSets = completeSets * product.total_colis;
+        const incompleteUnits = totalUnits - unitsInCompleteSets;
+        
+        if (incompleteUnits <= 0) return null;
+        
+        // Build colis detail string
+        const colisDetail = colisDistribution
+          .map(c => `Coli ${c.colisNumber}: ${c.quantity}`)
+          .join(' | ');
+        
+        // Find which colis have excess
+        const excessColis = colisDistribution
+          .filter(c => c.quantity > completeSets)
+          .map(c => `Coli ${c.colisNumber}: +${c.quantity - completeSets}`)
+          .join(', ');
+        
+        return {
+          code: product.code,
+          name: product.name,
+          category: product.category,
+          totalColis: product.total_colis,
+          completeSets,
+          totalUnits,
+          incompleteUnits,
+          colisDetail,
+          excessColis,
+          locations: lastCount.uniqueLocations.join(', ') || '-'
+        };
+      })
+      .filter(Boolean);
+    
+    if (incompleteProducts.length === 0) {
+      return { count: 0 };
+    }
+    
+    const headers = [
+      'Código',
+      'Nome', 
+      'Categoria',
+      'Colis/Set',
+      'Sets Completos',
+      'Total Unidades',
+      'Unidades Incompletas',
+      'Distribuição por Coli',
+      'Colis em Excesso',
+      'Localizações'
+    ];
+    
+    const rows = incompleteProducts.map(p => [
+      p!.code,
+      p!.name,
+      p!.category,
+      p!.totalColis.toString(),
+      p!.completeSets.toString(),
+      p!.totalUnits.toString(),
+      p!.incompleteUnits.toString(),
+      p!.colisDetail,
+      p!.excessColis || '-',
+      p!.locations
+    ]);
+    
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+    ].join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `produtos_incompletos_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.csv`;
+    link.click();
+    
+    return { count: incompleteProducts.length };
+  };
+
   // Selection handlers
   const toggleProductSelection = (productId: string) => {
     setSelectedProducts(prev => {
@@ -484,10 +576,37 @@ export function ProductsView() {
             </SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" onClick={exportLastCounts} className="whitespace-nowrap">
-          <Download className="h-4 w-4 mr-2" />
-          Exportar
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="whitespace-nowrap">
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={exportLastCounts}>
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Última Contagem
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              const result = exportIncompleteProducts();
+              if (result.count === 0) {
+                toast({
+                  title: 'Tudo completo!',
+                  description: 'Não existem produtos com unidades incompletas',
+                });
+              } else {
+                toast({
+                  title: 'Exportação concluída',
+                  description: `${result.count} produtos com unidades incompletas exportados`,
+                });
+              }
+            }}>
+              <AlertTriangle className="h-4 w-4 mr-2 text-orange-500" />
+              Produtos Incompletos
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className="whitespace-nowrap">
