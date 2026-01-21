@@ -36,6 +36,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   category: 120,
   colis: 80,
   stock: 100,
+  totalUnits: 100,
   lastCount: 140,
   colisLocations: 180,
   location: 120,
@@ -43,21 +44,22 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   actions: 120,
 };
 
-type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'lastCount' | 'colisLocations' | 'location' | 'pallet';
+type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'pallet';
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   code: 'Código',
   name: 'Nome',
   category: 'Categoria',
   colis: 'Colis',
-  stock: 'Stock',
+  stock: 'Stock (Sets)',
+  totalUnits: 'Total Unidades',
   lastCount: 'Última Contagem',
   colisLocations: 'Colis/Localização',
   location: 'Localização',
   pallet: 'Palete',
 };
 
-const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'lastCount', 'colisLocations', 'location', 'pallet'];
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'totalUnits', 'lastCount', 'colisLocations', 'location', 'pallet'];
 
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
@@ -123,43 +125,13 @@ export function ProductsView() {
     return 'in_stock';
   };
 
-  const getStockBadge = (stock: number, minStock: number = 5, totalColis: number = 1) => {
+  const getStockBadge = (stock: number, minStock: number = 5, totalColis: number = 1, colisDistribution?: { colisNumber: number; quantity: number }[]) => {
     const status = getStockStatus(stock, minStock);
     
-    // Stock zero - gray/neutral
-    if (stock <= 0) {
-      return (
-        <div className="flex flex-col gap-0.5">
-          <Badge variant="outline" className="gap-1 bg-slate-100 text-slate-500 border-slate-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-            0 sets
-          </Badge>
-          {totalColis > 1 && (
-            <span className="text-[10px] text-muted-foreground">({totalColis} colis/set)</span>
-          )}
-        </div>
-      );
-    }
-    
-    // Low stock (below minimum) - yellow/warning
-    if (status === 'low_stock') {
-      return (
-        <div className="flex flex-col gap-0.5">
-          <Badge variant="outline" className="gap-1 bg-yellow-50 text-yellow-700 border-yellow-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-            {stock} {stock === 1 ? 'set' : 'sets'}
-          </Badge>
-          {totalColis > 1 && (
-            <span className="text-[10px] text-muted-foreground">({totalColis} colis/set)</span>
-          )}
-        </div>
-      );
-    }
-    
-    return (
+    const badgeContent = (badgeClassName: string, dotClassName: string) => (
       <div className="flex flex-col gap-0.5">
-        <Badge variant="outline" className="gap-1 bg-green-50 text-green-700 border-green-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+        <Badge variant="outline" className={cn("gap-1", badgeClassName)}>
+          <span className={cn("w-1.5 h-1.5 rounded-full", dotClassName)} />
           {stock} {stock === 1 ? 'set' : 'sets'}
         </Badge>
         {totalColis > 1 && (
@@ -167,6 +139,53 @@ export function ProductsView() {
         )}
       </div>
     );
+
+    // Determine badge styles based on status
+    let badgeClassName: string;
+    let dotClassName: string;
+    
+    if (stock <= 0) {
+      badgeClassName = "bg-slate-100 text-slate-500 border-slate-300";
+      dotClassName = "bg-slate-400";
+    } else if (status === 'low_stock') {
+      badgeClassName = "bg-yellow-50 text-yellow-700 border-yellow-300";
+      dotClassName = "bg-yellow-500";
+    } else {
+      badgeClassName = "bg-green-50 text-green-700 border-green-200";
+      dotClassName = "bg-green-500";
+    }
+
+    // If we have colis distribution data, wrap in tooltip
+    if (colisDistribution && colisDistribution.length > 0 && totalColis > 1) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="cursor-help">
+                {badgeContent(badgeClassName, dotClassName)}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="font-medium mb-1">Distribuição por Coli:</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                {colisDistribution.map((coli) => (
+                  <div key={coli.colisNumber} className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">Coli {coli.colisNumber}:</span>
+                    <span className="font-medium">{coli.quantity} un.</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 pt-1 border-t text-xs">
+                <span className="text-muted-foreground">Sets completos: </span>
+                <span className="font-medium">{stock}</span>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return badgeContent(badgeClassName, dotClassName);
   };
 
   const existingCategoryNames = categories.map(c => c.name);
@@ -568,9 +587,14 @@ export function ProductsView() {
                           onClick={() => handleSort('stock')}
                         >
                           <span className="flex items-center">
-                            Stock
+                            Sets
                             {getSortIcon('stock')}
                           </span>
+                        </ResizableHeaderCell>
+                      )}
+                      {isColumnVisible('totalUnits') && (
+                        <ResizableHeaderCell columnId="totalUnits" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
+                          Unidades
                         </ResizableHeaderCell>
                       )}
                       {isColumnVisible('lastCount') && (
@@ -633,7 +657,19 @@ export function ProductsView() {
                         )}
                         {isColumnVisible('stock') && (
                           <ResizableCell columnId="stock" className="p-2 align-middle">
-                            {getStockBadge(product.current_stock, product.min_stock, product.total_colis)}
+                            {getStockBadge(
+                              product.current_stock, 
+                              product.min_stock, 
+                              product.total_colis,
+                              lastCount?.colisLocations?.map(c => ({ colisNumber: c.colisNumber, quantity: c.quantity }))
+                            )}
+                          </ResizableCell>
+                        )}
+                        {isColumnVisible('totalUnits') && (
+                          <ResizableCell columnId="totalUnits" className="p-2 align-middle">
+                            <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+                              {lastCount?.totalQuantity ?? 0} un.
+                            </Badge>
                           </ResizableCell>
                         )}
                         {isColumnVisible('lastCount') && (
