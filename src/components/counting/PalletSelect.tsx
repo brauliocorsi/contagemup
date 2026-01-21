@@ -27,6 +27,13 @@ interface PalletSelectProps {
 }
 
 const STATUS_CONFIG = {
+  'active': { 
+    label: 'Ativo', 
+    bg: 'bg-green-100', 
+    text: 'text-green-700',
+    border: 'border-green-300',
+    icon: '✓'
+  },
   'available': { 
     label: 'Livre', 
     bg: 'bg-green-100', 
@@ -40,6 +47,13 @@ const STATUS_CONFIG = {
     text: 'text-blue-700',
     border: 'border-blue-300',
     icon: '●'
+  },
+  'inactive': { 
+    label: 'Inativo', 
+    bg: 'bg-gray-100', 
+    text: 'text-gray-700',
+    border: 'border-gray-300',
+    icon: '○'
   },
   'maintenance': { 
     label: 'Manutenção', 
@@ -76,13 +90,16 @@ export function PalletSelect({
   // Group by status
   const groupedPallets = useMemo(() => {
     const groups: Record<string, typeof palletOptions> = {
+      'active': [],
       'available': [],
       'in_use': [],
+      'inactive': [],
       'maintenance': [],
     };
     palletOptions.forEach(opt => {
-      const key = opt.status || 'available';
+      const key = opt.status || 'active';
       if (groups[key]) groups[key].push(opt);
+      else groups['active'].push(opt); // Fallback for unknown statuses
     });
     return groups;
   }, [palletOptions]);
