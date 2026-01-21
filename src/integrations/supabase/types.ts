@@ -176,6 +176,98 @@ export type Database = {
           },
         ]
       }
+      picking_items: {
+        Row: {
+          aisle_name: string | null
+          id: string
+          level_name: string | null
+          location: string | null
+          pallet_number: string | null
+          picked_at: string
+          picking_session_id: string
+          product_code: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          requires_forklift: boolean
+        }
+        Insert: {
+          aisle_name?: string | null
+          id?: string
+          level_name?: string | null
+          location?: string | null
+          pallet_number?: string | null
+          picked_at?: string
+          picking_session_id: string
+          product_code: string
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          requires_forklift?: boolean
+        }
+        Update: {
+          aisle_name?: string | null
+          id?: string
+          level_name?: string | null
+          location?: string | null
+          pallet_number?: string | null
+          picked_at?: string
+          picking_session_id?: string
+          product_code?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          requires_forklift?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "picking_items_picking_session_id_fkey"
+            columns: ["picking_session_id"]
+            isOneToOne: false
+            referencedRelation: "picking_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      picking_sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          reason: string | null
+          reference: string | null
+          status: string
+          total_products: number
+          total_units: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reason?: string | null
+          reference?: string | null
+          status?: string
+          total_products?: number
+          total_units?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reason?: string | null
+          reference?: string | null
+          status?: string
+          total_products?: number
+          total_units?: number
+        }
+        Relationships: []
+      }
       product_changes: {
         Row: {
           change_type: string
