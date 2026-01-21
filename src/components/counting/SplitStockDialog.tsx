@@ -76,11 +76,10 @@ export function SplitStockDialog({
   );
   const remaining = totalQuantity - distributedQuantity;
   // Valid when:
-  // - All quantity is distributed (remaining === 0), OR
-  // - We have distributions that sum to totalQuantity
-  // - Each distribution entry has quantity > 0 OR totalQuantity is 0 (allowing clearing)
-  const isValid = remaining === 0 && (totalQuantity === 0 || distributions.every(d => d.quantity > 0));
-  // Check if user is trying to add more than the total
+  // - All quantity is distributed (remaining === 0) OR exceeding (remaining < 0)
+  // - Each distribution entry has quantity > 0 OR total is 0 (allowing clearing)
+  const isValid = remaining <= 0 && (distributedQuantity === 0 || distributions.every(d => d.quantity > 0));
+  // Check if user is adding more than the original total (will increase coli stock)
   const isOverDistributed = remaining < 0;
   // Check if total was changed from original
   const totalChanged = editableTotal !== colisDetail.quantity;
@@ -141,7 +140,7 @@ export function SplitStockDialog({
           <div className={cn(
             "p-3 rounded-lg border",
             remaining === 0 ? "bg-green-50 border-green-200" : 
-            isOverDistributed ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"
+            isOverDistributed ? "bg-blue-50 border-blue-200" : "bg-amber-50 border-amber-200"
           )}>
             <div className="flex items-center justify-between">
               <span className="font-medium">Total a distribuir:</span>
@@ -225,10 +224,10 @@ export function SplitStockDialog({
               </div>
             )}
             {isOverDistributed && (
-              <div className="flex items-center gap-1 text-red-700 text-sm mt-1">
+              <div className="flex items-center gap-1 text-blue-700 text-sm mt-1">
                 <AlertCircle className="h-4 w-4" />
                 <span>
-                  Excedeu em {Math.abs(remaining)} unidade{Math.abs(remaining) > 1 ? 's' : ''}! Reduza as quantidades.
+                  +{Math.abs(remaining)} unidade{Math.abs(remaining) > 1 ? 's' : ''} serão adicionadas ao coli
                 </span>
               </div>
             )}
@@ -268,7 +267,6 @@ export function SplitStockDialog({
                     <Input
                       type="number"
                       min={0}
-                      max={totalQuantity}
                       value={dist.quantity}
                       onChange={(e) => updateDistribution(dist.id, 'quantity', parseInt(e.target.value) || 0)}
                       className="h-8"
