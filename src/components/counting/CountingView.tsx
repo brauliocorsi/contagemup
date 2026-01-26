@@ -237,17 +237,26 @@ export function CountingView() {
     return sessionFilteredProducts.filter(p => !p.location?.trim()).length;
   }, [sessionFilteredProducts]);
 
-  // Count products without pallet
+  // Count products without pallet - check uniquePallets array and product default
   const productsWithoutPallet = useMemo(() => {
-    return sessionFilteredProducts.filter(p => !p.pallet_number?.trim()).length;
+    return sessionFilteredProducts.filter(p => 
+      p.uniquePallets.length === 0 && !p.pallet_number?.trim()
+    ).length;
   }, [sessionFilteredProducts]);
 
-  // Extract unique pallets with counts
+  // Extract unique pallets with counts - from all coli pallets
   const palletsWithCounts = useMemo(() => {
     const countMap: Record<string, number> = {};
     sessionFilteredProducts.forEach(p => {
-      if (p.pallet_number && p.pallet_number.trim()) {
-        countMap[p.pallet_number] = (countMap[p.pallet_number] || 0) + 1;
+      // Include all unique pallets from colis
+      p.uniquePallets.forEach(pallet => {
+        if (pallet) {
+          countMap[pallet] = (countMap[pallet] || 0) + 1;
+        }
+      });
+      // Also check product default pallet if no coli pallets
+      if (p.uniquePallets.length === 0 && p.pallet_number?.trim()) {
+        countMap[p.pallet_number.trim()] = (countMap[p.pallet_number.trim()] || 0) + 1;
       }
     });
     return Object.entries(countMap)
@@ -289,11 +298,13 @@ export function CountingView() {
         (filterLocation === '__empty__' && productLocations.length === 0) ||
         productLocations.includes(filterLocation);
       
-      // Fixed pallet filter - handle null/undefined and "no pallet" option  
-      const productPallet = product.pallet_number?.trim() || '';
+      // Pallet filter - check uniquePallets array (coli pallets) and product default
+      const productPallets = product.uniquePallets.length > 0 
+        ? product.uniquePallets 
+        : (product.pallet_number?.trim() ? [product.pallet_number.trim()] : []);
       const matchesPallet = filterPallet === 'all' || 
-        (filterPallet === '__empty__' && !productPallet) ||
-        (productPallet === filterPallet);
+        (filterPallet === '__empty__' && productPallets.length === 0) ||
+        productPallets.includes(filterPallet);
       
       // Category filter
       const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
