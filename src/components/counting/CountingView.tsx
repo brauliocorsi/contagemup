@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags, MapPin, Box, X, Download } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Search, Plus, Filter, Package, AlertCircle, CheckCircle2, Tags, MapPin, Box, X, Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { StockDistribution } from '@/types/stock';
+import * as XLSX from 'xlsx';
 
 const STORAGE_KEY = 'counting_selected_session';
 const PREFERRED_SESSION_NAME = 'Inventário 2026';
@@ -594,6 +595,162 @@ export function CountingView() {
     toast.success(`${complete.length} produtos completos exportados`);
   }, [filteredProducts, getColisDistribution]);
 
+  // Helper function to export to Excel
+  const exportToExcel = useCallback((data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    
+    // Auto-size columns
+    const colWidths = data[0].map((_, colIndex) => {
+      const maxLength = Math.max(...data.map(row => String(row[colIndex] || '').length));
+      return { wch: Math.min(Math.max(maxLength + 2, 10), 50) };
+    });
+    worksheet['!cols'] = colWidths;
+    
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, filename);
+  }, []);
+
+  // Export filtered report to Excel
+  const exportFilteredReportExcel = useCallback(() => {
+    if (filteredProducts.length === 0) {
+      toast.error('Nenhum produto para exportar');
+      return;
+    }
+
+    const headers = [
+      'Código', 'Nome', 'Categoria', 'Localização', 'Palete',
+      'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes'
+    ];
+
+    const rows = filteredProducts.map(product => {
+      const status = product.completeSets > 0
+        ? (product.hasPartialProduct ? 'Completo + Pendente' : 'Completo')
+        : (product.status === 'not_counted' ? 'Não Contado' : 'Incompleto');
+      
+      const locations = product.uniqueLocations.length > 0 
+        ? product.uniqueLocations.join(', ') 
+        : (product.location || '-');
+      
+      const pallets = product.uniquePallets.length > 0 
+        ? product.uniquePallets.join(', ') 
+        : (product.pallet_number || '-');
+
+      return [
+        product.code, product.name, product.category, locations, pallets,
+        product.total_colis, product.completeSets, getColisDistribution(product),
+        status, getMissingColisInfo(product)
+      ];
+    });
+
+    const totalComplete = filteredProducts.filter(p => p.completeSets > 0 && !p.hasPartialProduct).length;
+    const totalIncomplete = filteredProducts.filter(p => p.hasPartialProduct || (p.completeSets === 0 && p.status !== 'not_counted')).length;
+    const totalNotCounted = filteredProducts.filter(p => p.status === 'not_counted').length;
+    const totalSets = filteredProducts.reduce((sum, p) => sum + p.completeSets, 0);
+
+    const summaryRows: (string | number)[][] = [
+      [],
+      ['RESUMO'],
+      ['Total Produtos', filteredProducts.length],
+      ['Produtos Completos', totalComplete],
+      ['Produtos Incompletos', totalIncomplete],
+      ['Não Contados', totalNotCounted],
+      ['Total Sets Completos', totalSets],
+      [],
+      ['Filtros Aplicados'],
+      ['Status', filterStatus !== 'all' ? filterStatus : 'Todos'],
+      ['Categoria', filterCategory !== 'all' ? filterCategory : 'Todas'],
+      ['Localização', filterLocation !== 'all' ? (filterLocation === '__empty__' ? 'Sem localização' : filterLocation) : 'Todas'],
+      ['Palete', filterPallet !== 'all' ? (filterPallet === '__empty__' ? 'Sem palete' : filterPallet) : 'Todos'],
+      ['Pesquisa', searchTerm || '-']
+    ];
+
+    const allData = [headers, ...rows, ...summaryRows];
+    exportToExcel(allData, `relatorio_contagem_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Contagem');
+    toast.success(`${filteredProducts.length} produtos exportados para Excel`);
+  }, [filteredProducts, filterStatus, filterCategory, filterLocation, filterPallet, searchTerm, getColisDistribution, getMissingColisInfo, exportToExcel]);
+
+  // Export incomplete products to Excel
+  const exportIncompleteReportExcel = useCallback(() => {
+    const incomplete = filteredProducts.filter(p => p.hasPartialProduct || (p.total_colis > 1 && p.colisDetails.length > 0));
+    
+    const rows = incomplete
+      .filter(product => {
+        if (product.total_colis <= 1) return false;
+        const missingInfo = getMissingColisInfo(product);
+        return missingInfo !== '-' || product.hasPartialProduct;
+      })
+      .map(product => {
+        const locations = product.uniqueLocations.length > 0 
+          ? product.uniqueLocations.join(', ') 
+          : (product.location || '-');
+        
+        const pallets = product.uniquePallets.length > 0 
+          ? product.uniquePallets.join(', ') 
+          : (product.pallet_number || '-');
+
+        const missingInfo = getMissingColisInfo(product);
+        const details = product.hasPartialProduct 
+          ? 'Tem pendências' 
+          : (missingInfo !== '-' ? 'Colis em falta' : '-');
+
+        return [
+          product.code, product.name, product.category, locations, pallets,
+          product.total_colis, product.completeSets, getColisDistribution(product),
+          missingInfo, details
+        ];
+      });
+
+    if (rows.length === 0) {
+      toast.info('Todos os produtos estão completos!');
+      return;
+    }
+
+    const headers = [
+      'Código', 'Nome', 'Categoria', 'Localização', 'Palete',
+      'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Colis Faltantes', 'Detalhes'
+    ];
+
+    exportToExcel([headers, ...rows], `produtos_incompletos_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Incompletos');
+    toast.success(`${rows.length} produtos incompletos exportados para Excel`);
+  }, [filteredProducts, getColisDistribution, getMissingColisInfo, exportToExcel]);
+
+  // Export complete products to Excel
+  const exportCompleteReportExcel = useCallback(() => {
+    const complete = filteredProducts.filter(p => p.completeSets > 0 && !p.hasPartialProduct);
+    
+    if (complete.length === 0) {
+      toast.info('Nenhum produto 100% completo para exportar');
+      return;
+    }
+
+    const headers = [
+      'Código', 'Nome', 'Categoria', 'Localização', 'Palete',
+      'Colis/Set', 'Sets Completos', 'Distribuição Colis'
+    ];
+
+    const rows = complete.map(product => {
+      const locations = product.uniqueLocations.length > 0 
+        ? product.uniqueLocations.join(', ') 
+        : (product.location || '-');
+      
+      const pallets = product.uniquePallets.length > 0 
+        ? product.uniquePallets.join(', ') 
+        : (product.pallet_number || '-');
+
+      return [
+        product.code, product.name, product.category, locations, pallets,
+        product.total_colis, product.completeSets, getColisDistribution(product)
+      ];
+    });
+
+    const totalSets = complete.reduce((sum, p) => sum + p.completeSets, 0);
+    const summaryRow: (string | number)[] = ['TOTAL', '', '', '', '', complete.length + ' produtos', totalSets + ' sets', ''];
+
+    exportToExcel([headers, ...rows, [], summaryRow], `produtos_completos_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Completos');
+    toast.success(`${complete.length} produtos completos exportados para Excel`);
+  }, [filteredProducts, getColisDistribution, exportToExcel]);
+
   if (productsLoading || sessionsLoading || categoriesLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -859,20 +1016,52 @@ export function CountingView() {
                 Exportar
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={exportFilteredReport}>
-                <Package className="h-4 w-4 mr-2" />
-                Relatório Completo ({filteredProducts.length} produtos)
-              </DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-64 bg-background border shadow-lg z-50">
+              {/* CSV Exports */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="bg-background border shadow-lg z-50">
+                  <DropdownMenuItem onClick={exportFilteredReport}>
+                    <Package className="h-4 w-4 mr-2" />
+                    Relatório Completo ({filteredProducts.length})
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportCompleteReport}>
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                    Só Completos ({completeProducts.filter(p => !p.hasPartialProduct).length})
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportIncompleteReport}>
+                    <AlertCircle className="h-4 w-4 mr-2 text-amber-600" />
+                    Só Incompletos
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={exportCompleteReport}>
-                <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
-                Só Completos ({completeProducts.filter(p => !p.hasPartialProduct).length})
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportIncompleteReport}>
-                <AlertCircle className="h-4 w-4 mr-2 text-amber-600" />
-                Só Incompletos (com colis em falta)
-              </DropdownMenuItem>
+              
+              {/* Excel Exports */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                  Exportar Excel
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="bg-background border shadow-lg z-50">
+                  <DropdownMenuItem onClick={exportFilteredReportExcel}>
+                    <Package className="h-4 w-4 mr-2" />
+                    Relatório Completo ({filteredProducts.length})
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportCompleteReportExcel}>
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                    Só Completos ({completeProducts.filter(p => !p.hasPartialProduct).length})
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportIncompleteReportExcel}>
+                    <AlertCircle className="h-4 w-4 mr-2 text-amber-600" />
+                    Só Incompletos
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
