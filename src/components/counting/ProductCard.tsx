@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { ProductWithCounts, ColisDetail, StockDistribution } from '@/types/stock';
+import { ProductWithCounts, ColisDetail, StockDistribution, Product } from '@/types/stock';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil, History, Clock, ChevronDown, ChevronUp, Split, Merge } from 'lucide-react';
+import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil, History, Clock, ChevronDown, ChevronUp, Split, Merge, AlertOctagon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProductHistoryPopover } from './ProductHistoryPopover';
 import { CountHistoryPopover } from './CountHistoryPopover';
 import { SplitStockDialog } from './SplitStockDialog';
 import { LocationSelect } from './LocationSelect';
 import { PalletSelect } from './PalletSelect';
+import { DamageReportDialog } from '@/components/damages/DamageReportDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,16 @@ interface ProductCardProps {
   onCodeChange?: (productId: string, newCode: string) => Promise<boolean>;
   onSplitStock?: (productId: string, colisNumber: number, distributions: StockDistribution[]) => Promise<boolean>;
   onMergeStock?: (productId: string, colisNumber: number, location: string, pallet: string) => Promise<boolean>;
+  onReportDamage?: (data: {
+    product_id: string;
+    quantity: number;
+    colis_number?: number;
+    damage_type: string;
+    description?: string;
+    location?: string;
+    pallet_number?: string;
+  }) => Promise<unknown>;
+  damagedStock?: number;
   colisNames?: Record<string, string> | null;
   sessionId?: string;
 }
@@ -57,6 +68,8 @@ export function ProductCard({
   onCodeChange,
   onSplitStock,
   onMergeStock,
+  onReportDamage,
+  damagedStock = 0,
   colisNames,
   sessionId
 }: ProductCardProps) {
@@ -69,6 +82,7 @@ export function ProductCard({
   const [colisPallets, setColisPallets] = useState<Record<number, string>>({});
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [selectedColisForSplit, setSelectedColisForSplit] = useState<ColisDetail | null>(null);
+  const [damageDialogOpen, setDamageDialogOpen] = useState(false);
 
   const getStatusIcon = () => {
     if (product.completeSets > 0) {
@@ -332,6 +346,43 @@ export function ProductCard({
               </div>
             </div>
             <div className="flex flex-col items-end gap-1">
+              {/* Damage badge and button */}
+              <div className="flex items-center gap-1">
+                {damagedStock > 0 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="destructive" className="flex items-center gap-1">
+                          <AlertOctagon className="h-3 w-3" />
+                          {damagedStock} avaria{damagedStock > 1 ? 's' : ''}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{damagedStock} unidade(s) em avaria</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {onReportDamage && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => setDamageDialogOpen(true)}
+                        >
+                          <AlertOctagon className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Reportar avaria</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
               {product.completeSets > 0 && (
                 <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
                   {product.completeSets} Completo{product.completeSets > 1 ? 's' : ''}
@@ -682,6 +733,16 @@ export function ProductCard({
           colisName={getColisName(selectedColisForSplit.colis_number)}
           colisDetail={selectedColisForSplit}
           onSave={handleSplitSave}
+        />
+      )}
+
+      {/* Damage report dialog */}
+      {onReportDamage && (
+        <DamageReportDialog
+          open={damageDialogOpen}
+          onOpenChange={setDamageDialogOpen}
+          product={product as unknown as Product}
+          onSubmit={onReportDamage}
         />
       )}
     </>

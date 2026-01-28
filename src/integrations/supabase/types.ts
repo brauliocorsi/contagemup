@@ -309,12 +309,75 @@ export type Database = {
           },
         ]
       }
+      product_damages: {
+        Row: {
+          colis_number: number | null
+          created_at: string
+          damage_type: string
+          description: string | null
+          id: string
+          location: string | null
+          pallet_number: string | null
+          product_id: string
+          quantity: number
+          reported_by: string | null
+          resolution_notes: string | null
+          resolution_type: string | null
+          resolved_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          colis_number?: number | null
+          created_at?: string
+          damage_type: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          pallet_number?: string | null
+          product_id: string
+          quantity?: number
+          reported_by?: string | null
+          resolution_notes?: string | null
+          resolution_type?: string | null
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          colis_number?: number | null
+          created_at?: string
+          damage_type?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          pallet_number?: string | null
+          product_id?: string
+          quantity?: number
+          reported_by?: string | null
+          resolution_notes?: string | null
+          resolution_type?: string | null
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_damages_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category: string
           code: string
           created_at: string
           current_stock: number
+          damaged_stock: number
           description: string | null
           id: string
           location: string | null
@@ -329,6 +392,7 @@ export type Database = {
           code: string
           created_at?: string
           current_stock?: number
+          damaged_stock?: number
           description?: string | null
           id?: string
           location?: string | null
@@ -343,6 +407,7 @@ export type Database = {
           code?: string
           created_at?: string
           current_stock?: number
+          damaged_stock?: number
           description?: string | null
           id?: string
           location?: string | null

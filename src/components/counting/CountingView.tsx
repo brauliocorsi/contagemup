@@ -3,6 +3,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { useCounting } from '@/hooks/useCounting';
 import { useSessions } from '@/hooks/useSessions';
 import { useCategories } from '@/hooks/useCategories';
+import { useDamages } from '@/hooks/useDamages';
 import { ProductCard } from './ProductCard';
 import { CountingSummary } from './CountingSummary';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,7 @@ export function CountingView() {
   const { products, loading: productsLoading, updateProduct, fetchProducts } = useProducts();
   const { sessions, loading: sessionsLoading, createSession } = useSessions();
   const { categories, loading: categoriesLoading } = useCategories();
+  const { reportDamage, getDamagesForProduct } = useDamages();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(() => {
     // Try to restore from localStorage
     return localStorage.getItem(STORAGE_KEY);
@@ -1103,6 +1105,8 @@ export function CountingView() {
                 onCodeChange={handleCodeChange}
                 onSplitStock={handleSplitStock}
                 onMergeStock={handleMergeStock}
+                onReportDamage={reportDamage}
+                damagedStock={getDamagesForProduct(product.id).reduce((sum, d) => sum + d.quantity, 0)}
                 colisNames={categoryColisNamesMap[product.category]}
                 sessionId={selectedSessionId || undefined}
               />
@@ -1135,6 +1139,8 @@ export function CountingView() {
                   onCodeChange={handleCodeChange}
                   onSplitStock={handleSplitStock}
                   onMergeStock={handleMergeStock}
+                  onReportDamage={reportDamage}
+                  damagedStock={getDamagesForProduct(product.id).reduce((sum, d) => sum + d.quantity, 0)}
                   colisNames={categoryColisNamesMap[product.category]}
                   sessionId={selectedSessionId || undefined}
                 />
@@ -1168,6 +1174,8 @@ export function CountingView() {
                   onCodeChange={handleCodeChange}
                   onSplitStock={handleSplitStock}
                   onMergeStock={handleMergeStock}
+                  onReportDamage={reportDamage}
+                  damagedStock={getDamagesForProduct(product.id).reduce((sum, d) => sum + d.quantity, 0)}
                   colisNames={categoryColisNamesMap[product.category]}
                   sessionId={selectedSessionId || undefined}
                 />
