@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ProductForm } from './ProductForm';
 import { ProductEditForm } from './ProductEditForm';
 import { ProductHistoryDialog } from './ProductHistoryDialog';
+import { ProductMovementHistoryDialog } from './ProductMovementHistoryDialog';
 import { ProductColisDetailsDialog } from './ProductColisDetailsDialog';
 import { ImportProducts } from './ImportProducts';
 import { BulkMinStockDialog } from './BulkMinStockDialog';
@@ -18,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ResizableTableProvider, ResizableHeaderCell, ResizableCell } from '@/components/ui/resizable-table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { classifyLocation } from '@/lib/locationUtils';
 import { cn } from '@/lib/utils';
@@ -77,6 +78,7 @@ export function ProductsView() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+  const [movementHistoryProduct, setMovementHistoryProduct] = useState<Product | null>(null);
   const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [bulkMinStockOpen, setBulkMinStockOpen] = useState(false);
@@ -971,7 +973,7 @@ export function ProductsView() {
                             ) : '-'}
                           </ResizableCell>
                         )}
-                        <TableCell className="text-right w-36">
+                        <TableCell className="text-right w-44">
                           <div className="flex items-center justify-end gap-1">
                             <Button 
                               variant="ghost" 
@@ -984,8 +986,16 @@ export function ProductsView() {
                             <Button 
                               variant="ghost" 
                               size="icon"
+                              onClick={() => setMovementHistoryProduct(product)}
+                              title="Ver movimentações"
+                            >
+                              <ArrowRightLeft className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
                               onClick={() => setHistoryProduct(product)}
-                              title="Ver histórico"
+                              title="Ver histórico de alterações"
                             >
                               <History className="h-4 w-4" />
                             </Button>
@@ -1047,13 +1057,24 @@ export function ProductsView() {
         />
       )}
 
-      {/* Product History Dialog */}
+      {/* Product History Dialog (alterações de campos) */}
       {historyProduct && (
         <ProductHistoryDialog
           productId={historyProduct.id}
           productName={historyProduct.name}
           open={!!historyProduct}
           onOpenChange={(open) => !open && setHistoryProduct(null)}
+        />
+      )}
+
+      {/* Product Movement History Dialog (movimentações de stock) */}
+      {movementHistoryProduct && (
+        <ProductMovementHistoryDialog
+          productId={movementHistoryProduct.id}
+          productName={movementHistoryProduct.name}
+          productCode={movementHistoryProduct.code}
+          open={!!movementHistoryProduct}
+          onOpenChange={(open) => !open && setMovementHistoryProduct(null)}
         />
       )}
 
