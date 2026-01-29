@@ -133,31 +133,8 @@ export function useCounting(sessionId: string | null) {
         counted_by: user?.id
       });
 
-      // Sync with product stock - increment current_stock by 1
-      const { data: product } = await supabase
-        .from('products')
-        .select('current_stock, name, min_stock')
-        .eq('id', productId)
-        .maybeSingle();
-
-      if (product) {
-        const newStock = (product.current_stock || 0) + 1;
-        
-        await supabase
-          .from('products')
-          .update({ current_stock: newStock })
-          .eq('id', productId);
-
-        // Register stock movement
-        await supabase.from('stock_movements').insert({
-          product_id: productId,
-          movement_type: 'entrada',
-          quantity: 1,
-          reason: 'Contagem - Sessão',
-          reference: sessionId,
-          created_by: user?.id
-        });
-      }
+      // NOTE: O trigger sync_product_stock sincroniza automaticamente o current_stock
+      // quando a tabela counts é atualizada. Não é necessário atualizar manualmente.
     }
     
     return success;
@@ -186,7 +163,10 @@ export function useCounting(sessionId: string | null) {
         counted_by: user?.id
       });
 
-      // Sync with product stock - decrement current_stock by 1
+      // NOTE: O trigger sync_product_stock sincroniza automaticamente o current_stock
+      // quando a tabela counts é atualizada. Não é necessário atualizar manualmente.
+      
+      // Check for stock alerts based on new count
       const { data: product } = await supabase
         .from('products')
         .select('current_stock, name, min_stock')
@@ -194,24 +174,8 @@ export function useCounting(sessionId: string | null) {
         .maybeSingle();
 
       if (product) {
-        const newStock = Math.max(0, (product.current_stock || 0) - 1);
-        
-        await supabase
-          .from('products')
-          .update({ current_stock: newStock })
-          .eq('id', productId);
-
-        // Register stock movement
-        await supabase.from('stock_movements').insert({
-          product_id: productId,
-          movement_type: 'saida',
-          quantity: 1,
-          reason: 'Contagem - Sessão',
-          reference: sessionId,
-          created_by: user?.id
-        });
-
-        // Check for stock alerts
+        // After trigger updates, check the new stock level
+        const newStock = product.current_stock || 0;
         if (newStock === 0) {
           toast({
             title: 'Produto Esgotado',
