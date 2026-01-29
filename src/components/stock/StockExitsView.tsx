@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { TrendingDown, History, AlertTriangle, ClipboardList } from 'lucide-react';
+import { TrendingDown, History, AlertTriangle, ClipboardList, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -308,24 +308,10 @@ export function StockExitsView() {
             </p>
           </div>
 
-          {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column - Input Methods */}
-            <div className="space-y-4">
-              <StockUploadSection
-                onFileParsed={setParsedItems}
-                parseFile={parseStockFile}
-                isProcessing={isProcessing}
-                movementType="saida"
-              />
-
-              {parsedItems.length > 0 && (
-                <ParsedItemsPreview
-                  items={parsedItems}
-                  onClear={() => setParsedItems([])}
-                />
-              )}
-
+          {/* Main Content - Stacked Layout for better product visibility */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Left/Main Column - Manual Selection (takes 2 cols on xl) */}
+            <div className="xl:col-span-2 space-y-4">
               <ManualStockSection
                 cart={cart}
                 onAddToCart={handleAddToCart}
@@ -333,6 +319,29 @@ export function StockExitsView() {
                 onRemoveFromCart={handleRemoveFromCart}
                 movementType="saida"
               />
+
+              {/* Collapsible Upload Section */}
+              <details className="group">
+                <summary className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors py-2">
+                  <Upload className="h-4 w-4" />
+                  <span>Importar de ficheiro CSV/Excel</span>
+                  <span className="text-xs">(clique para expandir)</span>
+                </summary>
+                <div className="mt-2 space-y-4">
+                  <StockUploadSection
+                    onFileParsed={setParsedItems}
+                    parseFile={parseStockFile}
+                    isProcessing={isProcessing}
+                    movementType="saida"
+                  />
+                  {parsedItems.length > 0 && (
+                    <ParsedItemsPreview
+                      items={parsedItems}
+                      onClear={() => setParsedItems([])}
+                    />
+                  )}
+                </div>
+              </details>
             </div>
 
             {/* Right Column - Confirmation */}
