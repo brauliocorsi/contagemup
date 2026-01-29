@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { 
   Package, ClipboardList, History, BarChart3, Tags, Scale, 
   TrendingUp, TrendingDown, Warehouse, AlertTriangle, AlertOctagon,
-  ChevronDown
+  ChevronDown, Settings
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -42,6 +42,7 @@ const endTabs = [
   { id: 'reconciliation', label: 'Separação', icon: Scale },
   { id: 'warehouse', label: 'Armazém', icon: Warehouse },
   { id: 'reports', label: 'Relatórios', icon: BarChart3 },
+  { id: 'settings', label: 'Configurações', icon: Settings },
 ];
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
