@@ -17,6 +17,8 @@ import { useStockMovements, MovementItem, ParsedCSVItem } from '@/hooks/useStock
 import { usePickingHistory } from '@/hooks/usePickingHistory';
 import { useDetailedPickingData } from '@/hooks/useDetailedPickingData';
 import { useProducts } from '@/hooks/useProducts';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { StockUploadSection, ParsedItemsPreview } from './StockUploadSection';
 import { ManualStockSection } from './ManualStockSection';
 import { StockHistoryTable } from './StockHistoryTable';
@@ -37,11 +39,11 @@ const EXIT_REASONS = [
 ];
 
 export function StockExitsView() {
+  const queryClient = useQueryClient();
   const {
     movements,
     isLoading,
     isProcessing,
-    registerBulkMovements,
     parseStockFile,
     deleteMovement,
   } = useStockMovements('saida');
@@ -209,6 +211,7 @@ export function StockExitsView() {
     if (detailedPickingItems.length === 0) return;
 
     // Create picking session with location details
+    // NOTA: O picking JÁ É uma saída - não criar stock_movement duplicado
     const pickingSessionItems = detailedPickingItems.flatMap(item => {
       // Get the first coli with location data for the session record
       const firstColi = item.colisDetails.find(c => c.location) || item.colisDetails[0];
@@ -226,6 +229,7 @@ export function StockExitsView() {
       };
     });
 
+    // Criar sessão de picking (que já regista a saída como 'picking' no histórico)
     await createSession.mutateAsync({
       reference: reference || undefined,
       reason: reason || undefined,
@@ -233,21 +237,35 @@ export function StockExitsView() {
       items: pickingSessionItems,
     });
 
-    // Then register the stock movements
-    const movementItems = detailedPickingItems.map(item => ({
-      product_id: item.product_id,
-      product_code: item.product_code,
-      product_name: item.product_name,
-      quantity: item.quantity,
-    }));
+    // Actualizar o stock na tabela counts (o trigger sincroniza current_stock)
+    // Não criar stock_movement - o picking_items já serve como auditoria
+    for (const item of detailedPickingItems) {
+      // Buscar count existente para o produto (colis 1)
+      const { data: existingCount } = await supabase
+        .from('counts')
+        .select('id, quantity')
+        .eq('product_id', item.product_id)
+        .eq('colis_number', 1)
+        .order('counted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    await registerBulkMovements.mutateAsync({
-      items: movementItems,
-      type: 'saida',
-      reason: reason || undefined,
-      reference: reference || undefined,
-      notes: notes || undefined,
-    });
+      const currentQty = existingCount?.quantity || 0;
+      const newQty = Math.max(0, currentQty - item.quantity);
+
+      if (existingCount) {
+        await supabase
+          .from('counts')
+          .update({ quantity: newQty, updated_at: new Date().toISOString() })
+          .eq('id', existingCount.id);
+      }
+    }
+
+    // Invalidar queries para atualizar UI
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({ queryKey: ['counts'] });
+
+    toast.success(`${detailedPickingItems.length} saídas registadas com sucesso.`);
 
     // Reset form
     setParsedItems([]);
@@ -387,10 +405,10 @@ export function StockExitsView() {
                         variant="destructive"
                         className="flex-1 gap-2"
                         onClick={handleValidateAndConfirm}
-                        disabled={allItems.length === 0 || registerBulkMovements.isPending || createSession.isPending}
+                        disabled={allItems.length === 0 || createSession.isPending}
                       >
                         <ClipboardList className="h-4 w-4" />
-                        {(registerBulkMovements.isPending || createSession.isPending) ? 'A registar...' : 'Ver Picking'}
+                        {createSession.isPending ? 'A registar...' : 'Ver Picking'}
                       </Button>
                     </div>
                   </div>
@@ -434,7 +452,7 @@ export function StockExitsView() {
         reason={reason}
         notes={notes}
         onConfirm={handleFinalConfirm}
-        isLoading={registerBulkMovements.isPending || createSession.isPending || isLoadingPickingData}
+        isLoading={createSession.isPending || isLoadingPickingData}
       />
     </>
   );
