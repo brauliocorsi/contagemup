@@ -39,6 +39,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   category: 120,
   colis: 80,
   stock: 100,
+  damages: 100,
   totalUnits: 100,
   lastCount: 140,
   colisLocations: 180,
@@ -47,7 +48,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   actions: 120,
 };
 
-type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'pallet';
+type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'damages' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'pallet';
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   code: 'Código',
@@ -55,6 +56,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   category: 'Categoria',
   colis: 'Colis',
   stock: 'Stock (Sets)',
+  damages: 'Avarias',
   totalUnits: 'Total Unidades',
   lastCount: 'Última Contagem',
   colisLocations: 'Colis/Localização',
@@ -62,7 +64,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   pallet: 'Palete',
 };
 
-const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'totalUnits', 'lastCount', 'colisLocations', 'location', 'pallet'];
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'damages', 'totalUnits', 'lastCount', 'colisLocations', 'location', 'pallet'];
 
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
@@ -749,6 +751,14 @@ export function ProductsView() {
                           </span>
                         </ResizableHeaderCell>
                       )}
+                      {isColumnVisible('damages') && (
+                        <ResizableHeaderCell columnId="damages" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                            Avarias
+                          </span>
+                        </ResizableHeaderCell>
+                      )}
                       {isColumnVisible('totalUnits') && (
                         <ResizableHeaderCell columnId="totalUnits" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
                           Unidades
@@ -819,6 +829,21 @@ export function ProductsView() {
                               product.min_stock, 
                               product.total_colis,
                               lastCount?.colisLocations?.map(c => ({ colisNumber: c.colisNumber, quantity: c.quantity }))
+                            )}
+                          </ResizableCell>
+                        )}
+                        {isColumnVisible('damages') && (
+                          <ResizableCell columnId="damages" className="p-2 align-middle">
+                            {(product.damaged_stock ?? 0) > 0 ? (
+                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                {product.damaged_stock} un.
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1">
+                                <CheckCircle className="h-3 w-3" />
+                                0
+                              </Badge>
                             )}
                           </ResizableCell>
                         )}
