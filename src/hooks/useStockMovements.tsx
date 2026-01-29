@@ -4,9 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 
-// ID da sessão de sistema para movimentos administrativos
-const SYSTEM_SESSION_ID = 'a0000000-0000-0000-0000-000000000001';
-
 export interface StockMovement {
   id: string;
   product_id: string;
@@ -68,6 +65,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
   });
 
   // Register single movement
+  // O trigger sync_stock_on_movement actualiza automaticamente o current_stock
   const registerMovement = useMutation({
     mutationFn: async ({
       productId,
@@ -86,7 +84,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Insert movement (para histórico/auditoria)
+      // Insert movement - o trigger actualiza automaticamente o current_stock
       const { error: movementError } = await supabase
         .from('stock_movements')
         .insert({
@@ -100,42 +98,6 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
         });
 
       if (movementError) throw movementError;
-
-      // Actualizar a tabela counts (o trigger sync_product_stock sincroniza o current_stock)
-      const { data: existingCount } = await supabase
-        .from('counts')
-        .select('id, quantity')
-        .eq('product_id', productId)
-        .eq('colis_number', 1)
-        .order('counted_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const currentQty = existingCount?.quantity || 0;
-      const newQty = type === 'entrada' 
-        ? currentQty + quantity 
-        : Math.max(0, currentQty - quantity);
-
-      if (existingCount) {
-        const { error: countError } = await supabase
-          .from('counts')
-          .update({ quantity: newQty, updated_at: new Date().toISOString() })
-          .eq('id', existingCount.id);
-
-        if (countError) throw countError;
-      } else {
-        // Criar novo count na sessão de sistema
-        const { error: countError } = await supabase
-          .from('counts')
-          .insert({
-            session_id: SYSTEM_SESSION_ID,
-            product_id: productId,
-            colis_number: 1,
-            quantity: newQty,
-          });
-
-        if (countError) throw countError;
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
@@ -151,6 +113,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
   });
 
   // Register bulk movements
+  // O trigger sync_stock_on_movement actualiza automaticamente o current_stock
   const registerBulkMovements = useMutation({
     mutationFn: async ({
       items,
@@ -167,7 +130,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Insert all movements
+      // Insert all movements - o trigger actualiza automaticamente o current_stock
       const movements = items.map((item) => ({
         product_id: item.product_id,
         movement_type: type,
@@ -184,57 +147,27 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
 
       if (movementError) throw movementError;
 
-      // Actualizar cada produto na tabela counts (o trigger sincroniza current_stock)
+      // Verificar alertas de stock baixo (apenas para saídas)
       const lowStockProducts: string[] = [];
       const outOfStockProducts: string[] = [];
 
-      for (const item of items) {
-        // Buscar count existente
-        const { data: existingCount } = await supabase
-          .from('counts')
-          .select('id, quantity')
-          .eq('product_id', item.product_id)
-          .eq('colis_number', 1)
-          .order('counted_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const currentQty = existingCount?.quantity || 0;
-        const newQty = type === 'entrada' 
-          ? currentQty + item.quantity 
-          : Math.max(0, currentQty - item.quantity);
-
-        if (existingCount) {
-          await supabase
-            .from('counts')
-            .update({ quantity: newQty, updated_at: new Date().toISOString() })
-            .eq('id', existingCount.id);
-        } else {
-          await supabase
-            .from('counts')
-            .insert({
-              session_id: SYSTEM_SESSION_ID,
-              product_id: item.product_id,
-              colis_number: 1,
-              quantity: newQty,
-            });
-        }
-
-        // Check for low stock alerts (only on exits)
-        if (type === 'saida') {
+      if (type === 'saida') {
+        // Aguardar um momento para o trigger processar
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verificar stock actualizado dos produtos
+        for (const item of items) {
           const { data: product } = await supabase
             .from('products')
-            .select('min_stock, name')
+            .select('min_stock, name, current_stock')
             .eq('id', item.product_id)
             .maybeSingle();
 
           if (product) {
             const minStock = product.min_stock ?? 5;
-            // Nota: newQty é a quantidade do colis 1, mas para alertas precisamos do stock total
-            // O trigger vai atualizar o current_stock, então vamos verificar depois
-            if (newQty <= 0) {
+            if (product.current_stock <= 0) {
               outOfStockProducts.push(product.name);
-            } else if (newQty <= minStock) {
+            } else if (product.current_stock <= minStock) {
               lowStockProducts.push(product.name);
             }
           }
@@ -390,32 +323,10 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
   };
 
   // Delete movement
+  // O trigger sync_stock_on_movement actualiza automaticamente o current_stock ao apagar
   const deleteMovement = useMutation({
     mutationFn: async (movement: StockMovement) => {
-      // Reverter a alteração na tabela counts
-      const { data: existingCount } = await supabase
-        .from('counts')
-        .select('id, quantity')
-        .eq('product_id', movement.product_id)
-        .eq('colis_number', 1)
-        .order('counted_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingCount) {
-        const stockChange = movement.movement_type === 'entrada' 
-          ? -movement.quantity 
-          : movement.quantity;
-        
-        const newQty = Math.max(0, existingCount.quantity + stockChange);
-
-        await supabase
-          .from('counts')
-          .update({ quantity: newQty, updated_at: new Date().toISOString() })
-          .eq('id', existingCount.id);
-      }
-
-      // Delete the movement record
+      // Apagar o movimento - o trigger actualiza automaticamente o current_stock
       const { error } = await supabase
         .from('stock_movements')
         .delete()
