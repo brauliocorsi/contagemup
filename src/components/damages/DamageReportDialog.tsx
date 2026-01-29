@@ -107,14 +107,14 @@ export function DamageReportDialog({
               <div className="space-y-2">
                 <Label htmlFor="colisNumber">Coli Afetado</Label>
                 <Select
-                  value={colisNumber?.toString() || ''}
-                  onValueChange={(v) => setColisNumber(v ? parseInt(v) : undefined)}
+                  value={colisNumber?.toString() || 'none'}
+                  onValueChange={(v) => setColisNumber(v === 'none' ? undefined : parseInt(v))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecionar" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Não especificado</SelectItem>
+                    <SelectItem value="none">Não especificado</SelectItem>
                     {Array.from({ length: product.total_colis }, (_, i) => i + 1).map((num) => (
                       <SelectItem key={num} value={num.toString()}>
                         Coli {num}
