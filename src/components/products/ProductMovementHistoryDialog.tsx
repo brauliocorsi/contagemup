@@ -156,8 +156,8 @@ export function ProductMovementHistoryDialog({
   const filteredMovements = useMemo(() => {
     return {
       all: movements,
-      entradas: movements.filter(m => m.type === 'entrada'),
-      saidas: movements.filter(m => m.type === 'saida' || m.type === 'picking'),
+      entradas: movements.filter(m => m.type === 'entrada' || m.type === 'contagem_inc'),
+      saidas: movements.filter(m => m.type === 'saida' || m.type === 'picking' || m.type === 'contagem_dec'),
       contagens: movements.filter(m => m.type === 'contagem_inc' || m.type === 'contagem_dec'),
     };
   }, [movements]);
