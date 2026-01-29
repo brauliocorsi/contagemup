@@ -752,7 +752,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      recalculate_all_stock: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
