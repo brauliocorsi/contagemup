@@ -9,7 +9,6 @@ import { ReportsView } from '@/components/reports/ReportsView';
 import { ReconciliationView } from '@/components/reconciliation/ReconciliationView';
 import { StockEntriesView } from '@/components/stock/StockEntriesView';
 import { StockExitsView } from '@/components/stock/StockExitsView';
-import { StockAlertsPanel } from '@/components/stock/StockAlertsPanel';
 import { StockAlertsView } from '@/components/stock/StockAlertsView';
 import { WarehouseMapView } from '@/components/warehouse/WarehouseMapView';
 import { DamagesView } from '@/components/damages/DamagesView';
@@ -26,13 +25,6 @@ export default function Dashboard() {
       <Header onNavigateToProducts={handleNavigateToProducts} />
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="container py-4">
-        {/* Stock Alerts Panel - shown on counting tab */}
-        {activeTab === 'counting' && (
-          <div className="mb-4">
-            <StockAlertsPanel onNavigateToProduct={handleNavigateToProducts} maxItems={5} />
-          </div>
-        )}
-        
         {activeTab === 'counting' && <CountingView />}
         {activeTab === 'products' && <ProductsView />}
         {activeTab === 'categories' && <CategoriesView />}
