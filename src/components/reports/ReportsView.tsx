@@ -17,6 +17,7 @@ import { ProductDetailsDialog } from './ProductDetailsDialog';
 import { ReportsCharts } from './ReportsCharts';
 import { StockMovementsReport } from './StockMovementsReport';
 import { CountingMovementsReport } from './CountingMovementsReport';
+import { StockIntegrityReport } from './StockIntegrityReport';
 import { ColisDispersionCard } from './ColisDispersionCard';
 import { WarehouseMap } from './WarehouseMap';
 
@@ -207,6 +208,9 @@ export function ReportsView() {
 
   return (
     <div className="p-4 space-y-4">
+      {/* Stock Integrity Report */}
+      <StockIntegrityReport />
+
       {/* Counting Movements Report */}
       <CountingMovementsReport />
 
