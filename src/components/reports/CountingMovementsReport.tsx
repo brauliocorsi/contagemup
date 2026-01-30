@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
-import { Calendar as CalendarIcon, FileDown, Search, X, ClipboardList, User, ArrowUpDown, ArrowUp, ArrowDown, Plus, Minus, BarChart3, Trophy } from 'lucide-react';
+import { Calendar as CalendarIcon, FileDown, Search, X, ClipboardList, User, ArrowUpDown, ArrowUp, ArrowDown, Plus, Minus, BarChart3, Trophy, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,7 @@ interface CountingLog {
   products?: {
     code: string;
     name: string;
+    damaged_stock?: number;
   };
   counting_sessions?: {
     name: string;
@@ -84,7 +85,7 @@ export function CountingMovementsReport() {
           .from('count_logs')
           .select(`
             *,
-            products (code, name),
+            products (code, name, damaged_stock),
             counting_sessions (name)
           `)
           .order('created_at', { ascending: false })
@@ -225,6 +226,16 @@ export function CountingMovementsReport() {
     const totalDecrements = decrements.reduce((sum, l) => sum + Math.abs(l.quantity_after - l.quantity_before), 0);
     
     const uniqueUsers = [...new Set(filteredLogs.filter(l => l.counted_by).map(l => l.counted_by))].length;
+    
+    // Damage statistics from unique products in logs
+    const uniqueProducts = new Map<string, { damaged_stock: number }>();
+    filteredLogs.forEach(l => {
+      if (l.products && !uniqueProducts.has(l.product_id)) {
+        uniqueProducts.set(l.product_id, { damaged_stock: l.products.damaged_stock || 0 });
+      }
+    });
+    const productsWithDamages = [...uniqueProducts.values()].filter(p => p.damaged_stock > 0).length;
+    const totalDamagedUnits = [...uniqueProducts.values()].reduce((sum, p) => sum + p.damaged_stock, 0);
 
     return {
       totalOperations: filteredLogs.length,
@@ -234,6 +245,8 @@ export function CountingMovementsReport() {
       totalDecrements,
       balance: totalIncrements - totalDecrements,
       uniqueUsers,
+      productsWithDamages,
+      totalDamagedUnits,
     };
   }, [filteredLogs]);
 
@@ -479,7 +492,7 @@ export function CountingMovementsReport() {
             </div>
 
             {/* Stats Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               <div className="bg-muted/50 rounded-lg p-3">
                 <p className="text-sm text-muted-foreground">Total Operações</p>
                 <p className="text-2xl font-bold">{stats.totalOperations}</p>
@@ -504,6 +517,16 @@ export function CountingMovementsReport() {
                 <p className="text-sm text-purple-600 dark:text-purple-400">Funcionários</p>
                 <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{stats.uniqueUsers}</p>
                 <p className="text-xs text-muted-foreground">únicos</p>
+              </div>
+              <div className="bg-orange-50 dark:bg-orange-950 rounded-lg p-3">
+                <p className="text-sm text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Prod. c/ Avarias
+                </p>
+                <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{stats.productsWithDamages}</p>
+                {stats.totalDamagedUnits > 0 && (
+                  <p className="text-xs text-muted-foreground">{stats.totalDamagedUnits} un. danificadas</p>
+                )}
               </div>
             </div>
 
