@@ -1,100 +1,130 @@
 
-# Plano: Aplicar Regras de Stock nos Relatórios
+# Plano: Entradas e Saídas por Colis
 
-## Objetivo
-Atualizar todos os relatórios para incluir informações de **avarias (damaged_stock)** de forma consistente, garantindo que todos os componentes de relatório reflitam o estado real do inventário.
+## Problema Identificado
 
-## Análise do Estado Atual
+O sistema atual tem duas fontes de verdade separadas:
 
-Os relatórios atualmente **não mostram informações de avarias**:
-1. **StockIntegrityReport** - Verifica apenas `current_stock` vs cálculo de counts
-2. **StockMovementsReport** - Mostra entradas/saídas, sem coluna de avarias
-3. **CountingMovementsReport** - Mostra contagens, sem indicador de avarias
-4. **ReportsView (Sessão Tab)** - Estatísticas não incluem avarias
-5. **CountingSummary** - Não tem estatísticas de avarias
-6. **DamagesView** - Já tem avarias (é o relatório dedicado)
+| Tabela | Finalidade | Reflectido em |
+|--------|-----------|---------------|
+| `counts` | Contagem física de cada colis | Ícones no ProductCard |
+| `stock_movements` | Entradas administrativas | current_stock (via trigger) |
+| `picking_items` | Saídas de picking | current_stock (via trigger) |
 
-## Alterações Planeadas
+**Exemplo concreto**:
+- Sistema Elevatório: `counts` = 10, `entradas` = 100
+- `current_stock` = 110 (correcto via trigger)
+- Ícones de contagem mostram: **10** (incorrecto - deveria mostrar 110)
 
-### 1. StockIntegrityReport.tsx
-**Objetivo**: Incluir avarias na verificação de integridade
+## Solução: Unificar Entradas/Saídas na Tabela `counts`
 
-- Adicionar coluna `damaged_stock` na query de produtos
-- Mostrar estatísticas de avarias no painel de saúde do sistema
-- Adicionar indicador visual de produtos com avarias na lista de discrepâncias
-- Nova card de resumo: "Produtos com Avarias"
+### Nova Abordagem
 
-### 2. StockMovementsReport.tsx  
-**Objetivo**: Contextualizar movimentos com stock danificado
+Quando o utilizador regista uma **entrada** ou **saída**, o sistema irá:
+1. Atualizar a quantidade em `counts` para **cada colis** do produto
+2. Manter `stock_movements` apenas para auditoria/histórico (opcional)
 
-- Adicionar coluna "Avarias" na tabela de movimentos (mostrar badge se produto tem avarias ativas)
-- No resumo estatístico, adicionar card "Produtos c/ Avarias"
-- Exportar CSV com coluna de avarias
+### Alterações Necessárias
 
-### 3. ReportsView.tsx (Aba Sessão)
-**Objetivo**: Adicionar estatísticas de avarias ao relatório de sessão
+#### 1. Migração de Base de Dados
+- Permitir `session_id` NULL na tabela `counts` para movimentos administrativos
+- OU criar uma sessão especial "Movimentos Administrativos"
 
-- Adicionar card de "Unidades Avariadas" no resumo
-- Adicionar coluna "Avarias" na tabela de produtos
-- Incluir avarias no export CSV
-
-### 4. CountingSummary.tsx
-**Objetivo**: Mostrar totais de avarias no resumo de contagem
-
-- Adicionar novo stat card "Avarias" com ícone AlertTriangle vermelho
-- Mostrar total de produtos com avarias e unidades danificadas
-
-### 5. CountingMovementsReport.tsx
-**Objetivo**: Contextualizar contagens com informação de avarias
-
-- No resumo estatístico, adicionar indicador de "Produtos c/ Avarias Ativas"
-
----
-
-## Detalhes Técnicos
-
-### Dados Necessários
-Todos os componentes precisarão de acesso ao `damaged_stock` dos produtos:
-```typescript
-// Query existente expandida:
-.select('id, code, name, total_colis, current_stock, damaged_stock')
+```sql
+ALTER TABLE counts ALTER COLUMN session_id DROP NOT NULL;
 ```
 
-### Padrão Visual Consistente
-- **Badge de avaria**: `<Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">` com ícone AlertTriangle
-- **Cor primária avarias**: `text-red-600` / `bg-red-50`
-- **Card de estatística**: Ícone AlertTriangle + fundo vermelho claro
+#### 2. Atualizar `StockEntriesView.tsx`
+No `handleConfirm`, após registar em `stock_movements`:
 
-### Ficheiros a Modificar
-1. `src/components/reports/StockIntegrityReport.tsx`
-2. `src/components/reports/StockMovementsReport.tsx`
-3. `src/components/reports/ReportsView.tsx`
-4. `src/components/counting/CountingSummary.tsx`
-5. `src/components/reports/CountingMovementsReport.tsx`
-
-### Alterações de Query no StockIntegrityReport
 ```typescript
-// Linha 53-55 - Adicionar damaged_stock
-const { data: products, error: productsError } = await supabase
-  .from('products')
-  .select('id, code, name, total_colis, current_stock, damaged_stock')
-  .order('name');
-```
+for (const item of allItems) {
+  const product = products.find(p => p.id === item.product_id);
+  const totalColis = product?.total_colis || 1;
+  
+  // Atualizar TODOS os colis do produto
+  for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
+    // Buscar count existente
+    const existingCount = await supabase
+      .from('counts')
+      .select('id, quantity')
+      .eq('product_id', item.product_id)
+      .eq('colis_number', colisNumber)
+      .maybeSingle();
 
-### Nova Interface IntegrityCheck
-```typescript
-interface IntegrityCheck {
-  // ... campos existentes
-  damagedStock: number; // Novo campo
+    const currentQty = existingCount?.quantity || 0;
+    const newQty = currentQty + item.quantity;
+
+    if (existingCount) {
+      await supabase.from('counts')
+        .update({ quantity: newQty })
+        .eq('id', existingCount.id);
+    } else {
+      // Criar novo count sem sessão (administrativo)
+      await supabase.from('counts').insert({
+        product_id: item.product_id,
+        colis_number: colisNumber,
+        quantity: item.quantity,
+        session_id: null, // Movimento administrativo
+      });
+    }
+  }
 }
 ```
 
-### Nova Estatística Global (StockIntegrityReport)
+#### 3. Atualizar `StockExitsView.tsx`
+Já decrementa `counts` para colis 1. Expandir para **todos os colis**:
+
 ```typescript
-// Adicionar ao stats
-const totalDamagedUnits = products.reduce((sum, p) => sum + (p.damaged_stock || 0), 0);
-const productsWithDamages = products.filter(p => (p.damaged_stock || 0) > 0).length;
+for (const item of detailedPickingItems) {
+  const product = products.find(p => p.id === item.product_id);
+  const totalColis = product?.total_colis || 1;
+  
+  // Decrementar TODOS os colis do produto
+  for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
+    const existingCount = await supabase
+      .from('counts')
+      .select('id, quantity')
+      .eq('product_id', item.product_id)
+      .eq('colis_number', colisNumber)
+      .maybeSingle();
+
+    if (existingCount) {
+      const newQty = Math.max(0, existingCount.quantity - item.quantity);
+      await supabase.from('counts')
+        .update({ quantity: newQty })
+        .eq('id', existingCount.id);
+    }
+  }
+}
 ```
 
-## Consistência nos Exports
-Todos os exports CSV/Excel devem incluir uma coluna "Avarias" para os produtos que tenham `damaged_stock > 0`.
+#### 4. Simplificar Trigger de Stock (Opcional)
+Após unificar, o `current_stock` pode ser calculado apenas dos `counts` + `picking`:
+- Base = mínimo(counts por colis)
+- - picking
+
+Mas podemos manter o trigger atual que já funciona.
+
+## Impacto nos Sets Completos
+
+Para produtos com múltiplos colis, as entradas incrementarão **todos os colis igualmente**, garantindo que os sets completos aumentam proporcionalmente.
+
+| Antes | Depois (entrada +5) |
+|-------|---------------------|
+| Colis 1: 10, Colis 2: 10, Colis 3: 8 | Colis 1: 15, Colis 2: 15, Colis 3: 13 |
+| Sets completos: 8 | Sets completos: 13 |
+
+## Ficheiros a Modificar
+
+1. **Migração SQL**: Permitir `session_id` NULL em `counts`
+2. **`src/components/stock/StockEntriesView.tsx`**: Atualizar counts ao registar entrada
+3. **`src/components/stock/StockExitsView.tsx`**: Decrementar todos os colis (já decrementa colis 1)
+4. **`src/hooks/useProducts.tsx`**: Buscar dados de produto para obter `total_colis`
+
+## Consistência Visual
+
+Após implementação:
+- Ícones de contagem = `current_stock` (ambos reflectem a mesma realidade)
+- Sets completos calculados corretamente
+- Entradas/saídas afectam todos os colis uniformemente
