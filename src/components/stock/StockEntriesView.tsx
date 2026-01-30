@@ -12,6 +12,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useStockMovements, MovementItem, ParsedCSVItem } from '@/hooks/useStockMovements';
+import { useProducts } from '@/hooks/useProducts';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { StockUploadSection, ParsedItemsPreview } from './StockUploadSection';
 import { ManualStockSection } from './ManualStockSection';
 import { StockHistoryTable } from './StockHistoryTable';
@@ -26,6 +30,7 @@ const ENTRY_REASONS = [
 ];
 
 export function StockEntriesView() {
+  const queryClient = useQueryClient();
   const {
     movements,
     isLoading,
@@ -35,11 +40,14 @@ export function StockEntriesView() {
     deleteMovement,
   } = useStockMovements('entrada');
 
+  const { products } = useProducts();
+
   const [parsedItems, setParsedItems] = useState<ParsedCSVItem[]>([]);
   const [cart, setCart] = useState<MovementItem[]>([]);
   const [reason, setReason] = useState<string>('');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Combine CSV items and manual cart
   const allItems: MovementItem[] = [
@@ -82,21 +90,77 @@ export function StockEntriesView() {
 
   const handleConfirm = async () => {
     if (allItems.length === 0) return;
+    
+    setIsSubmitting(true);
 
-    await registerBulkMovements.mutateAsync({
-      items: allItems,
-      type: 'entrada',
-      reason: reason || undefined,
-      reference: reference || undefined,
-      notes: notes || undefined,
-    });
+    try {
+      // 1. Registar em stock_movements para auditoria
+      await registerBulkMovements.mutateAsync({
+        items: allItems,
+        type: 'entrada',
+        reason: reason || undefined,
+        reference: reference || undefined,
+        notes: notes || undefined,
+      });
 
-    // Reset form
-    setParsedItems([]);
-    setCart([]);
-    setReason('');
-    setReference('');
-    setNotes('');
+      // 2. Atualizar counts para TODOS os colis de cada produto
+      for (const item of allItems) {
+        const product = products.find(p => p.id === item.product_id);
+        const totalColis = product?.total_colis || 1;
+
+        // Atualizar cada colis do produto
+        for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
+          // Buscar count existente para este colis
+          const { data: existingCount } = await supabase
+            .from('counts')
+            .select('id, quantity')
+            .eq('product_id', item.product_id)
+            .eq('colis_number', colisNumber)
+            .order('counted_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const currentQty = existingCount?.quantity || 0;
+          const newQty = currentQty + item.quantity;
+
+          if (existingCount) {
+            // Atualizar count existente
+            await supabase
+              .from('counts')
+              .update({ quantity: newQty, updated_at: new Date().toISOString() })
+              .eq('id', existingCount.id);
+          } else {
+            // Criar novo count sem sessão (movimento administrativo)
+            await supabase.from('counts').insert({
+              product_id: item.product_id,
+              colis_number: colisNumber,
+              quantity: item.quantity,
+              session_id: null, // Movimento administrativo
+              location: product?.location || null,
+              pallet_number: product?.pallet_number || null,
+            });
+          }
+        }
+      }
+
+      // 3. Invalidar queries para atualizar UI
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['counts'] });
+
+      toast.success(`${allItems.length} entrada(s) registada(s) com sucesso.`);
+
+      // Reset form
+      setParsedItems([]);
+      setCart([]);
+      setReason('');
+      setReference('');
+      setNotes('');
+    } catch (error) {
+      console.error('Erro ao registar entradas:', error);
+      toast.error('Erro ao registar entradas');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClearAll = () => {
@@ -215,9 +279,9 @@ export function StockEntriesView() {
                   <Button
                     className="flex-1 bg-green-600 hover:bg-green-700"
                     onClick={handleConfirm}
-                    disabled={allItems.length === 0 || registerBulkMovements.isPending}
+                    disabled={allItems.length === 0 || isSubmitting}
                   >
-                    {registerBulkMovements.isPending ? 'A registar...' : 'Confirmar Entradas'}
+                    {isSubmitting ? 'A registar...' : 'Confirmar Entradas'}
                   </Button>
                 </div>
               </div>
