@@ -132,7 +132,7 @@ export type Database = {
           pallet_number: string | null
           product_id: string
           quantity: number
-          session_id: string
+          session_id: string | null
           updated_at: string
         }
         Insert: {
@@ -144,7 +144,7 @@ export type Database = {
           pallet_number?: string | null
           product_id: string
           quantity?: number
-          session_id: string
+          session_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -156,7 +156,7 @@ export type Database = {
           pallet_number?: string | null
           product_id?: string
           quantity?: number
-          session_id?: string
+          session_id?: string | null
           updated_at?: string
         }
         Relationships: [

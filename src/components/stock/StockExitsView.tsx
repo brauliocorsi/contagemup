@@ -237,27 +237,32 @@ export function StockExitsView() {
       items: pickingSessionItems,
     });
 
-    // Actualizar o stock na tabela counts (o trigger sincroniza current_stock)
+    // Actualizar o stock na tabela counts para TODOS os colis do produto
     // Não criar stock_movement - o picking_items já serve como auditoria
     for (const item of detailedPickingItems) {
-      // Buscar count existente para o produto (colis 1)
-      const { data: existingCount } = await supabase
-        .from('counts')
-        .select('id, quantity')
-        .eq('product_id', item.product_id)
-        .eq('colis_number', 1)
-        .order('counted_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const product = products.find(p => p.id === item.product_id);
+      const totalColis = product?.total_colis || 1;
 
-      const currentQty = existingCount?.quantity || 0;
-      const newQty = Math.max(0, currentQty - item.quantity);
-
-      if (existingCount) {
-        await supabase
+      // Decrementar TODOS os colis do produto
+      for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
+        const { data: existingCount } = await supabase
           .from('counts')
-          .update({ quantity: newQty, updated_at: new Date().toISOString() })
-          .eq('id', existingCount.id);
+          .select('id, quantity')
+          .eq('product_id', item.product_id)
+          .eq('colis_number', colisNumber)
+          .order('counted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingCount) {
+          const currentQty = existingCount.quantity || 0;
+          const newQty = Math.max(0, currentQty - item.quantity);
+
+          await supabase
+            .from('counts')
+            .update({ quantity: newQty, updated_at: new Date().toISOString() })
+            .eq('id', existingCount.id);
+        }
       }
     }
 
