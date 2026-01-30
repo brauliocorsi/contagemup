@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Calendar as CalendarIcon, FileDown, TrendingUp, TrendingDown, Search, Filter, X, User } from 'lucide-react';
+import { Calendar as CalendarIcon, FileDown, TrendingUp, TrendingDown, Search, Filter, X, User, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -173,6 +173,16 @@ export function StockMovementsReport() {
     const totalEntries = entries.reduce((sum, m) => sum + m.quantity, 0);
     const totalExits = exits.reduce((sum, m) => sum + m.quantity, 0);
     const balance = totalEntries - totalExits;
+    
+    // Damage statistics from unique products in movements
+    const uniqueProducts = new Map<string, { damaged_stock: number }>();
+    filteredMovements.forEach(m => {
+      if (m.products && !uniqueProducts.has(m.product_id)) {
+        uniqueProducts.set(m.product_id, { damaged_stock: m.products.damaged_stock || 0 });
+      }
+    });
+    const productsWithDamages = [...uniqueProducts.values()].filter(p => p.damaged_stock > 0).length;
+    const totalDamagedUnits = [...uniqueProducts.values()].reduce((sum, p) => sum + p.damaged_stock, 0);
 
     return {
       totalMovements: filteredMovements.length,
@@ -181,6 +191,8 @@ export function StockMovementsReport() {
       totalEntries,
       totalExits,
       balance,
+      productsWithDamages,
+      totalDamagedUnits,
     };
   }, [filteredMovements]);
 
@@ -365,7 +377,7 @@ export function StockMovementsReport() {
             </div>
 
             {/* Stats Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="bg-muted/50 rounded-lg p-3">
                 <p className="text-sm text-muted-foreground">Total Movimentos</p>
                 <p className="text-2xl font-bold">{stats.totalMovements}</p>
@@ -385,6 +397,16 @@ export function StockMovementsReport() {
                 <p className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
                   {stats.balance > 0 ? '+' : ''}{stats.balance}
                 </p>
+              </div>
+              <div className="bg-orange-50 rounded-lg p-3">
+                <p className="text-sm text-orange-600 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Prod. c/ Avarias
+                </p>
+                <p className="text-2xl font-bold text-orange-700">{stats.productsWithDamages}</p>
+                {stats.totalDamagedUnits > 0 && (
+                  <p className="text-xs text-muted-foreground">{stats.totalDamagedUnits} un. danificadas</p>
+                )}
               </div>
             </div>
 

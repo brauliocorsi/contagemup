@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter, MapPin, Box, Eye, Activity, ClipboardList, ShieldCheck } from 'lucide-react';
+import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter, MapPin, Box, Eye, Activity, ClipboardList, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
@@ -52,13 +52,19 @@ export function ReportsView() {
       // Sum all colis quantities
       return sum + p.counts.reduce((countSum, c) => countSum + c.quantity, 0);
     }, 0);
+    
+    // Damage statistics
+    const productsWithDamages = productsWithCounts.filter(p => (p.damaged_stock || 0) > 0).length;
+    const totalDamagedUnits = productsWithCounts.reduce((sum, p) => sum + (p.damaged_stock || 0), 0);
 
     return {
       totalProducts: productsWithCounts.length,
       complete: withAnyComplete.length,
       incomplete: withPending.length,
       totalSets,
-      totalUnits
+      totalUnits,
+      productsWithDamages,
+      totalDamagedUnits
     };
   }, [productsWithCounts]);
 
@@ -115,7 +121,7 @@ export function ReportsView() {
   const exportToCSV = () => {
     if (filteredProducts.length === 0) return;
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Nº Palete', 'Total Colis', 'Sets Completos', 'Unidades', 'Status', 'Colis Faltantes'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Nº Palete', 'Total Colis', 'Sets Completos', 'Unidades', 'Avarias', 'Status', 'Colis Faltantes'];
     const rows = filteredProducts.map(p => {
       const unidades = p.counts.reduce((sum, c) => sum + c.quantity, 0);
       const statusLabel = p.completeSets > 0
@@ -133,6 +139,7 @@ export function ReportsView() {
         p.total_colis,
         p.completeSets,
         unidades,
+        p.damaged_stock || 0,
         statusLabel,
         faltantes
       ];
@@ -248,7 +255,7 @@ export function ReportsView() {
           ) : (
             <>
               {/* Stats summary - mais compacto */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                 <Card className="p-3">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-muted-foreground" />
@@ -291,6 +298,18 @@ export function ReportsView() {
                     <div>
                       <p className="text-lg font-bold text-primary">{stats.totalUnits}</p>
                       <p className="text-xs text-muted-foreground">Unidades</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    <div>
+                      <p className="text-lg font-bold text-orange-600">{stats.productsWithDamages}</p>
+                      <p className="text-xs text-muted-foreground">Com Avarias</p>
+                      {stats.totalDamagedUnits > 0 && (
+                        <p className="text-xs text-muted-foreground">{stats.totalDamagedUnits} un.</p>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -351,6 +370,7 @@ export function ReportsView() {
                           <TableHead className="text-xs">Categoria</TableHead>
                           <TableHead className="text-xs">Sets</TableHead>
                           <TableHead className="text-xs">Unidades</TableHead>
+                          <TableHead className="text-xs">Avarias</TableHead>
                           <TableHead className="text-xs">Status</TableHead>
                           <TableHead className="text-xs w-16">Ações</TableHead>
                         </TableRow>
@@ -367,6 +387,16 @@ export function ReportsView() {
                               </TableCell>
                               <TableCell className="font-bold text-xs">{product.completeSets}</TableCell>
                               <TableCell className="font-bold text-xs text-primary">{totalUnits}</TableCell>
+                              <TableCell>
+                                {(product.damaged_stock || 0) > 0 ? (
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 text-[10px] gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {product.damaged_stock}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
                               <TableCell>
                                 {product.completeSets > 0 && !product.hasPartialProduct && (
                                   <Badge className="bg-green-100 text-green-800 text-[10px]">OK</Badge>

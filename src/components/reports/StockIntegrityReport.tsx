@@ -31,6 +31,7 @@ interface IntegrityCheck {
   calculatedStock: number;
   difference: number;
   status: 'ok' | 'mismatch' | 'warning';
+  damagedStock: number;
 }
 
 interface IntegrityStats {
@@ -39,6 +40,8 @@ interface IntegrityStats {
   mismatchCount: number;
   warningCount: number;
   lastCheck: Date | null;
+  totalDamagedUnits: number;
+  productsWithDamages: number;
 }
 
 export function StockIntegrityReport() {
@@ -52,7 +55,7 @@ export function StockIntegrityReport() {
       // Fetch all products
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('id, code, name, total_colis, current_stock')
+        .select('id, code, name, total_colis, current_stock, damaged_stock')
         .order('name');
 
       if (productsError) throw productsError;
@@ -104,6 +107,7 @@ export function StockIntegrityReport() {
           calculatedStock,
           difference,
           status,
+          damagedStock: product.damaged_stock || 0,
         };
       });
 
@@ -113,6 +117,8 @@ export function StockIntegrityReport() {
         mismatchCount: checks.filter(c => c.status === 'mismatch').length,
         warningCount: checks.filter(c => c.status === 'warning').length,
         lastCheck: new Date(),
+        totalDamagedUnits: products.reduce((sum, p) => sum + (p.damaged_stock || 0), 0),
+        productsWithDamages: products.filter(p => (p.damaged_stock || 0) > 0).length,
       };
 
       setLastCheckTime(new Date());
@@ -185,6 +191,7 @@ export function StockIntegrityReport() {
         'Stock Calculado': c.calculatedStock,
         'Diferença': c.difference,
         'Estado': c.status === 'mismatch' ? 'Erro' : 'Aviso',
+        'Avarias': c.damagedStock,
       }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -247,7 +254,7 @@ export function StockIntegrityReport() {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Health Score */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <Card className="md:col-span-2">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -296,6 +303,19 @@ export function StockIntegrityReport() {
               <p className="text-sm text-muted-foreground">Erros</p>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <AlertTriangle className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-orange-600">{stats?.productsWithDamages || 0}</p>
+              <p className="text-sm text-muted-foreground">Com Avarias</p>
+              {(stats?.totalDamagedUnits || 0) > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats?.totalDamagedUnits} un. danificadas
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Issues List */}
@@ -317,11 +337,17 @@ export function StockIntegrityReport() {
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                         <span className="font-mono text-sm font-medium">{item.code}</span>
                         {item.totalColis > 1 && (
                           <Badge variant="outline" className="text-xs">
                             {item.totalColis} colis
+                          </Badge>
+                        )}
+                        {item.damagedStock > 0 && (
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 text-xs gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            {item.damagedStock} avariado{item.damagedStock > 1 ? 's' : ''}
                           </Badge>
                         )}
                       </div>

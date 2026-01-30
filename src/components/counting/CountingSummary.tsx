@@ -14,6 +14,10 @@ export function CountingSummary({ products }: CountingSummaryProps) {
 
   const totalCompleteSets = products.reduce((sum, p) => sum + p.completeSets, 0);
   const totalPartialProducts = products.filter(p => p.hasPartialProduct).length;
+  
+  // Damage statistics
+  const productsWithDamages = products.filter(p => (p.damaged_stock || 0) > 0).length;
+  const totalDamagedUnits = products.reduce((sum, p) => sum + (p.damaged_stock || 0), 0);
 
   const stats = [
     {
@@ -45,6 +49,13 @@ export function CountingSummary({ products }: CountingSummaryProps) {
       value: notCounted,
       icon: ClipboardList,
       color: 'text-muted-foreground bg-muted'
+    },
+    {
+      label: 'Com Avarias',
+      value: productsWithDamages,
+      subValue: totalDamagedUnits > 0 ? `${totalDamagedUnits} un.` : undefined,
+      icon: AlertTriangle,
+      color: 'text-red-600 bg-red-100'
     }
   ];
 
@@ -54,7 +65,7 @@ export function CountingSummary({ products }: CountingSummaryProps) {
         <CardTitle className="text-lg">Resumo da Contagem</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {stats.map((stat) => (
             <div
               key={stat.label}
@@ -66,6 +77,9 @@ export function CountingSummary({ products }: CountingSummaryProps) {
               <div>
                 <p className="text-2xl font-bold">{stat.value}</p>
                 <p className="text-xs text-muted-foreground">{stat.label}</p>
+                {'subValue' in stat && stat.subValue && (
+                  <p className="text-xs text-muted-foreground">{stat.subValue}</p>
+                )}
               </div>
             </div>
           ))}

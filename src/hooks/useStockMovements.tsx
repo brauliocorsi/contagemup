@@ -17,6 +17,7 @@ export interface StockMovement {
   products?: {
     code: string;
     name: string;
+    damaged_stock: number;
   };
 }
 
@@ -49,7 +50,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
         .from('stock_movements')
         .select(`
           *,
-          products (code, name)
+          products (code, name, damaged_stock)
         `)
         .order('created_at', { ascending: false })
         .limit(100);
