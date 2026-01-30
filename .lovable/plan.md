@@ -1,203 +1,100 @@
 
-# Plano: Unificar Sistema de Stock - Movimentos Afectam Counts
+# Plano: Aplicar Regras de Stock nos Relatórios
 
-## Problema Diagnosticado
+## Objetivo
+Atualizar todos os relatórios para incluir informações de **avarias (damaged_stock)** de forma consistente, garantindo que todos os componentes de relatório reflitam o estado real do inventário.
 
-O sistema actualmente tem **dois mecanismos conflituantes** de gestão de stock:
+## Análise do Estado Atual
 
-### Arquitectura Actual (Problemática)
+Os relatórios atualmente **não mostram informações de avarias**:
+1. **StockIntegrityReport** - Verifica apenas `current_stock` vs cálculo de counts
+2. **StockMovementsReport** - Mostra entradas/saídas, sem coluna de avarias
+3. **CountingMovementsReport** - Mostra contagens, sem indicador de avarias
+4. **ReportsView (Sessão Tab)** - Estatísticas não incluem avarias
+5. **CountingSummary** - Não tem estatísticas de avarias
+6. **DamagesView** - Já tem avarias (é o relatório dedicado)
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                    SISTEMA ACTUAL                               │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  [Contagem]                    [Entradas/Saídas]               │
-│      │                              │                           │
-│      ▼                              ▼                           │
-│  ┌─────────┐                  ┌──────────────────┐             │
-│  │ counts  │──trigger──►      │ stock_movements  │             │
-│  └────┬────┘           │      └────────┬─────────┘             │
-│       │                │               │                        │
-│       │          sync_product_stock    │ (tenta atualizar)     │
-│       │                │               │                        │
-│       ▼                ▼               ▼                        │
-│  ┌─────────────────────────────────────────┐                   │
-│  │     products.current_stock              │                   │
-│  │     (SOBRESCRITO pelo trigger!)         │                   │
-│  └─────────────────────────────────────────┘                   │
-│                                                                 │
-│  RESULTADO: Entradas/Saídas são IGNORADAS!                     │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Alterações Planeadas
 
-### Evidência do Problema (ES5)
-- Counts: 5 unidades
-- Movimentos: +9 entradas, -6 saídas (net: +3)
-- Stock esperado: 5 + 3 = 8 unidades
-- Stock actual: 5 unidades (só usa counts!)
-- Stock físico: 4 unidades
+### 1. StockIntegrityReport.tsx
+**Objetivo**: Incluir avarias na verificação de integridade
 
----
+- Adicionar coluna `damaged_stock` na query de produtos
+- Mostrar estatísticas de avarias no painel de saúde do sistema
+- Adicionar indicador visual de produtos com avarias na lista de discrepâncias
+- Nova card de resumo: "Produtos com Avarias"
 
-## Solução Proposta
+### 2. StockMovementsReport.tsx  
+**Objetivo**: Contextualizar movimentos com stock danificado
 
-Unificar o sistema fazendo com que **todos os movimentos de stock actualizem a tabela `counts`**, permitindo que o trigger seja a única fonte de verdade.
+- Adicionar coluna "Avarias" na tabela de movimentos (mostrar badge se produto tem avarias ativas)
+- No resumo estatístico, adicionar card "Produtos c/ Avarias"
+- Exportar CSV com coluna de avarias
 
-### Nova Arquitectura
+### 3. ReportsView.tsx (Aba Sessão)
+**Objetivo**: Adicionar estatísticas de avarias ao relatório de sessão
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                    SISTEMA CORRIGIDO                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  [Contagem]                    [Entradas/Saídas]               │
-│      │                              │                           │
-│      │                              │                           │
-│      ▼                              ▼                           │
-│  ┌─────────────────────────────────────────┐                   │
-│  │              counts                      │                   │
-│  │  (ÚNICA fonte de verdade para stock)    │                   │
-│  └────────────────────┬────────────────────┘                   │
-│                       │                                         │
-│               trigger sync_product_stock                        │
-│                       │                                         │
-│                       ▼                                         │
-│  ┌─────────────────────────────────────────┐                   │
-│  │     products.current_stock              │                   │
-│  │     (Sempre sincronizado!)              │                   │
-│  └─────────────────────────────────────────┘                   │
-│                                                                 │
-│  ┌─────────────────────────────────────────┐                   │
-│  │     stock_movements                      │                   │
-│  │     (Histórico/Auditoria apenas)        │                   │
-│  └─────────────────────────────────────────┘                   │
-│                                                                 │
-│  RESULTADO: Entradas/Saídas reflectidas no stock!              │
-└─────────────────────────────────────────────────────────────────┘
-```
+- Adicionar card de "Unidades Avariadas" no resumo
+- Adicionar coluna "Avarias" na tabela de produtos
+- Incluir avarias no export CSV
+
+### 4. CountingSummary.tsx
+**Objetivo**: Mostrar totais de avarias no resumo de contagem
+
+- Adicionar novo stat card "Avarias" com ícone AlertTriangle vermelho
+- Mostrar total de produtos com avarias e unidades danificadas
+
+### 5. CountingMovementsReport.tsx
+**Objetivo**: Contextualizar contagens com informação de avarias
+
+- No resumo estatístico, adicionar indicador de "Produtos c/ Avarias Ativas"
 
 ---
 
-## Alterações Necessárias
+## Detalhes Técnicos
 
-### 1. Modificar `useStockMovements.tsx`
-
-Quando uma entrada/saída é registada, actualizar a tabela `counts` em vez de `products.current_stock`:
-
-**Lógica actual (a remover):**
+### Dados Necessários
+Todos os componentes precisarão de acesso ao `damaged_stock` dos produtos:
 ```typescript
-// Linhas 101-117 e 179-184
-const { error: updateError } = await supabase
+// Query existente expandida:
+.select('id, code, name, total_colis, current_stock, damaged_stock')
+```
+
+### Padrão Visual Consistente
+- **Badge de avaria**: `<Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">` com ícone AlertTriangle
+- **Cor primária avarias**: `text-red-600` / `bg-red-50`
+- **Card de estatística**: Ícone AlertTriangle + fundo vermelho claro
+
+### Ficheiros a Modificar
+1. `src/components/reports/StockIntegrityReport.tsx`
+2. `src/components/reports/StockMovementsReport.tsx`
+3. `src/components/reports/ReportsView.tsx`
+4. `src/components/counting/CountingSummary.tsx`
+5. `src/components/reports/CountingMovementsReport.tsx`
+
+### Alterações de Query no StockIntegrityReport
+```typescript
+// Linha 53-55 - Adicionar damaged_stock
+const { data: products, error: productsError } = await supabase
   .from('products')
-  .update({ current_stock: newStock })
-  .eq('id', productId);
+  .select('id, code, name, total_colis, current_stock, damaged_stock')
+  .order('name');
 ```
 
-**Nova lógica:**
+### Nova Interface IntegrityCheck
 ```typescript
-// Buscar count existente para o produto (colis 1)
-const { data: existingCount } = await supabase
-  .from('counts')
-  .select('id, quantity, session_id')
-  .eq('product_id', productId)
-  .eq('colis_number', 1)
-  .order('counted_at', { ascending: false })
-  .limit(1)
-  .maybeSingle();
-
-// Calcular nova quantidade
-const currentQty = existingCount?.quantity || 0;
-const newQty = type === 'entrada' 
-  ? currentQty + quantity 
-  : Math.max(0, currentQty - quantity);
-
-// Actualizar ou criar count
-if (existingCount) {
-  await supabase
-    .from('counts')
-    .update({ quantity: newQty })
-    .eq('id', existingCount.id);
-} else {
-  // Criar sessão de sistema se não existir
-  // Inserir novo count
+interface IntegrityCheck {
+  // ... campos existentes
+  damagedStock: number; // Novo campo
 }
 ```
 
-### 2. Modificar `useCounting.tsx`
-
-Remover a duplicação de lógica - o incremento/decremento já actualiza `counts`, não precisa também actualizar `products` nem criar `stock_movements`:
-
-**Remover das funções `incrementCount` e `decrementCount`:**
-- Linhas 136-159: Atualização manual de `current_stock` e criação de `stock_movement`
-- Linhas 189-212: Idem para decrement
-
-O trigger já cuida da sincronização automaticamente!
-
-### 3. Criar Sessão de Sistema para Movimentos
-
-Criar uma sessão "permanente" para agrupar os movimentos administrativos:
-
-```sql
--- Criar sessão de sistema (uma única vez)
-INSERT INTO counting_sessions (name, category, status)
-VALUES ('Sistema - Movimentos Administrativos', 'Todas', 'active')
-ON CONFLICT DO NOTHING;
+### Nova Estatística Global (StockIntegrityReport)
+```typescript
+// Adicionar ao stats
+const totalDamagedUnits = products.reduce((sum, p) => sum + (p.damaged_stock || 0), 0);
+const productsWithDamages = products.filter(p => (p.damaged_stock || 0) > 0).length;
 ```
 
-### 4. Limpar Dados Históricos
-
-Remover movimentos duplicados "Contagem - Sessão" que só confundem o histórico:
-
-```sql
--- Remover movimentos redundantes criados pela contagem
-DELETE FROM stock_movements 
-WHERE reason = 'Contagem - Sessão';
-```
-
-### 5. Sincronizar Stock Existente
-
-Ajustar o stock dos produtos que têm movimentos não contabilizados:
-
-```sql
--- Para cada produto, somar os movimentos administrativos (não Contagem)
--- e adicionar ao count existente
-```
-
----
-
-## Ficheiros a Modificar
-
-| Ficheiro | Alteração |
-|----------|-----------|
-| `src/hooks/useStockMovements.tsx` | Actualizar `counts` em vez de `products.current_stock` |
-| `src/hooks/useCounting.tsx` | Remover actualização manual de stock e criação de movements |
-| Migração SQL | Limpar dados e criar sessão de sistema |
-
----
-
-## Resultado Esperado
-
-Após implementação:
-
-1. **Entradas manuais** → Incrementam `counts` → Trigger sincroniza `current_stock`
-2. **Saídas manuais** → Decrementam `counts` → Trigger sincroniza `current_stock`
-3. **Incrementos na contagem** → Incrementam `counts` → Trigger sincroniza (sem duplicar movements)
-4. **Decrementos na contagem** → Decrementam `counts` → Trigger sincroniza (sem duplicar movements)
-5. **stock_movements** → Registo de auditoria apenas, sem afectar stock
-
-### Cálculo Correto do ES5:
-- Counts actuais: 5
-- Movimentos administrativos: +4 (Compra) - 2 (Vendas) = +2
-- Novo counts: 5 + 2 = 7
-- Ajuste para realidade física (4): necessário corrigir manualmente para 4
-
----
-
-## Ordem de Implementação
-
-1. Migração DB: Criar sessão de sistema e limpar movements duplicados
-2. Modificar `useCounting.tsx`: Remover duplicação de lógica
-3. Modificar `useStockMovements.tsx`: Actualizar counts em vez de products
-4. Sincronizar dados existentes
-5. Testar fluxo completo
+## Consistência nos Exports
+Todos os exports CSV/Excel devem incluir uma coluna "Avarias" para os produtos que tenham `damaged_stock > 0`.
