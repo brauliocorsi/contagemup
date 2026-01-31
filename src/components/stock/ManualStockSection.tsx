@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Search, Plus, Minus, X, ShoppingCart, AlertTriangle, Layers, Package } from 'lucide-react';
+import { Search, Plus, Minus, X, ShoppingCart, AlertTriangle, Layers, Package, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { useProducts } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import { MovementItem } from '@/hooks/useStockMovements';
+import { OrderNumberEntrySelector, OrderNumberExitSelector } from './OrderNumberSelector';
+import { OrderNumberEntry } from '@/types/stock';
 import { cn } from '@/lib/utils';
 
 interface ManualStockSectionProps {
@@ -24,6 +27,7 @@ interface ProductWithInput {
   id: string;
   code: string;
   name: string;
+  category: string;
   current_stock: number;
   total_colis: number;
 }
@@ -42,10 +46,21 @@ export function ManualStockSection({
   movementType,
   stockOverrides,
 }: ManualStockSectionProps) {
-  const { products } = useProducts();
+  const { products, fetchProducts } = useProducts();
+  const { categories } = useCategories();
   const [search, setSearch] = useState('');
   const [inputStates, setInputStates] = useState<Record<string, ProductInputState>>({});
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
+  const [orderNumberProduct, setOrderNumberProduct] = useState<string | null>(null);
+
+  // Map of category name -> requires_order_number
+  const categoriesRequiringOrder = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    categories.forEach(cat => {
+      map[cat.name] = cat.requires_order_number || false;
+    });
+    return map;
+  }, [categories]);
 
   // Create stock map for quick lookup
   const stockMap = useMemo(() => {
@@ -178,6 +193,8 @@ export function ManualStockSection({
                       const totalColis = product.total_colis || 1;
                       const isExpanded = expandedProduct === product.id;
                       const state = getInputState(product.id, totalColis);
+                      const requiresOrder = categoriesRequiringOrder[product.category] || false;
+                      const isOrderNumberExpanded = orderNumberProduct === product.id;
 
                       return (
                         <>
@@ -192,9 +209,17 @@ export function ManualStockSection({
                               {product.code}
                             </TableCell>
                             <TableCell className="max-w-[200px]">
-                              <span className="truncate block" title={product.name}>
-                                {product.name}
-                              </span>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="truncate block" title={product.name}>
+                                  {product.name}
+                                </span>
+                                {requiresOrder && (
+                                  <Badge variant="outline" className="text-xs w-fit gap-1 bg-amber-50 text-amber-700 border-amber-300">
+                                    <ClipboardList className="h-2.5 w-2.5" />
+                                    Nº Enc.
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge 
@@ -274,7 +299,17 @@ export function ManualStockSection({
                             </TableCell>
                             <TableCell>
                               {!inCart && (
-                                totalColis === 1 ? (
+                                requiresOrder ? (
+                                  <Button
+                                    size="sm"
+                                    variant={isOrderNumberExpanded ? "default" : "ghost"}
+                                    className="h-7 px-2 gap-1"
+                                    onClick={() => setOrderNumberProduct(isOrderNumberExpanded ? null : product.id)}
+                                    disabled={movementType === 'saida' && stock === 0}
+                                  >
+                                    <ClipboardList className="h-3 w-3" />
+                                  </Button>
+                                ) : totalColis === 1 ? (
                                   <Button
                                     size="sm"
                                     variant="ghost"
@@ -298,6 +333,50 @@ export function ManualStockSection({
                               )}
                             </TableCell>
                           </TableRow>
+                          
+                          {/* Expanded row for order number input (entries) */}
+                          {isOrderNumberExpanded && movementType === 'entrada' && (
+                            <TableRow key={`${product.id}-order`} className="bg-amber-50/50">
+                              <TableCell colSpan={6} className="p-3">
+                                <OrderNumberEntrySelector
+                                  productId={product.id}
+                                  productCode={product.code}
+                                  productName={product.name}
+                                  totalColis={totalColis}
+                                  onOrderAdded={() => {
+                                    setOrderNumberProduct(null);
+                                    fetchProducts();
+                                  }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          
+                          {/* Expanded row for order number selection (exits) */}
+                          {isOrderNumberExpanded && movementType === 'saida' && (
+                            <TableRow key={`${product.id}-order-exit`} className="bg-amber-50/50">
+                              <TableCell colSpan={6} className="p-3">
+                                <OrderNumberExitSelector
+                                  productId={product.id}
+                                  productCode={product.code}
+                                  productName={product.name}
+                                  totalColis={totalColis}
+                                  onAddToCart={(orderEntry: OrderNumberEntry) => {
+                                    // Add to cart with order number reference
+                                    onAddToCart({
+                                      product_id: product.id,
+                                      product_code: product.code,
+                                      product_name: product.name,
+                                      quantity: 1, // Each order = 1 complete set
+                                      orderNumber: orderEntry.order_number,
+                                      isCompleteSet: true,
+                                    });
+                                    setOrderNumberProduct(null);
+                                  }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          )}
                           
                           {/* Expanded row for multi-colis products */}
                           {isExpanded && !inCart && totalColis > 1 && (

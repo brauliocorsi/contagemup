@@ -32,6 +32,8 @@ export interface MovementItem {
   colisQuantities?: Record<number, number>;
   // Info adicional para display
   totalColis?: number;
+  // Número de encomenda (para categorias que exigem)
+  orderNumber?: string;
 }
 
 export interface ParsedCSVItem {

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil, History, Clock, ChevronDown, ChevronUp, Split, Merge, AlertOctagon } from 'lucide-react';
+import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil, History, Clock, ChevronDown, ChevronUp, Split, Merge, AlertOctagon, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProductHistoryPopover } from './ProductHistoryPopover';
 import { CountHistoryPopover } from './CountHistoryPopover';
@@ -12,6 +12,7 @@ import { SplitStockDialog } from './SplitStockDialog';
 import { LocationSelect } from './LocationSelect';
 import { PalletSelect } from './PalletSelect';
 import { DamageReportDialog } from '@/components/damages/DamageReportDialog';
+import { OrderNumberEntrySelector } from '@/components/stock/OrderNumberSelector';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +52,7 @@ interface ProductCardProps {
   damagedStock?: number;
   colisNames?: Record<string, string> | null;
   sessionId?: string;
+  requiresOrderNumber?: boolean;
 }
 
 export function ProductCard({ 
@@ -71,7 +73,8 @@ export function ProductCard({
   onReportDamage,
   damagedStock = 0,
   colisNames,
-  sessionId
+  sessionId,
+  requiresOrderNumber = false
 }: ProductCardProps) {
   // Global location/pallet removed - each coli manages its own
   const [localCode, setLocalCode] = useState(product.code);
@@ -293,6 +296,16 @@ export function ProductCard({
                 </div>
                 <div className="flex items-center gap-1 mt-1 flex-wrap">
                   <Badge variant="outline" className="text-xs">{product.category}</Badge>
+                  {/* Order Number Required indicator */}
+                  {requiresOrderNumber && (
+                    <Badge 
+                      variant="outline" 
+                      className="text-xs flex items-center gap-0.5 bg-amber-50 text-amber-700 border-amber-300"
+                    >
+                      <ClipboardList className="h-2.5 w-2.5" />
+                      Nº Encomenda
+                    </Badge>
+                  )}
                   {/* Quick location/pallet summary badges */}
                   {product.uniqueLocations.length > 0 && (
                     <Badge 
@@ -422,6 +435,20 @@ export function ProductCard({
           )}
         </CardHeader>
         <CardContent>
+          {/* If category requires order number, show special interface */}
+          {requiresOrderNumber ? (
+            <OrderNumberEntrySelector
+              productId={product.id}
+              productCode={product.code}
+              productName={product.name}
+              totalColis={product.total_colis}
+              location={product.uniqueLocations[0] || product.location || undefined}
+              palletNumber={product.uniquePallets[0] || product.palletNumber || undefined}
+              onOrderAdded={() => {
+                // The component handles the refetch internally
+              }}
+            />
+          ) : (
           <div className="grid gap-2">
             {Array.from({ length: product.total_colis }, (_, i) => i + 1).map((colisNum) => {
               const colisDetail = getColisDetail(colisNum);
@@ -673,6 +700,7 @@ export function ProductCard({
               );
             })}
           </div>
+          )}
 
           {/* Add/Remove colis buttons */}
           {(onAddColi || onRemoveColi) && (
