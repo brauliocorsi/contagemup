@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { useProductChanges } from '@/hooks/useProductChanges';
@@ -12,21 +13,17 @@ import { ProductMovementHistoryDialog } from './ProductMovementHistoryDialog';
 import { ProductColisDetailsDialog } from './ProductColisDetailsDialog';
 import { ImportProducts } from './ImportProducts';
 import { BulkMinStockDialog } from './BulkMinStockDialog';
+import { VirtualizedProductRow } from './VirtualizedProductRow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ResizableTableProvider, ResizableHeaderCell, ResizableCell } from '@/components/ui/resizable-table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft, ShoppingBag } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { classifyLocation } from '@/lib/locationUtils';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Product } from '@/types/stock';
 import { format } from 'date-fns';
@@ -89,6 +86,9 @@ export function ProductsView() {
   const [bulkMinStockOpen, setBulkMinStockOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(new Set(DEFAULT_VISIBLE_COLUMNS));
 
+  // Ref for virtualization
+  const parentRef = useRef<HTMLDivElement>(null);
+
   const toggleColumn = (column: ColumnKey) => {
     setVisibleColumns(prev => {
       const newSet = new Set(prev);
@@ -133,105 +133,6 @@ export function ProductsView() {
     if (stock <= 0) return 'out_of_stock';
     if (stock <= minStock) return 'low_stock';
     return 'in_stock';
-  };
-
-  const getStockBadge = (stock: number, minStock: number = 5, totalColis: number = 1, colisDistribution?: { colisNumber: number; quantity: number }[]) => {
-    const status = getStockStatus(stock, minStock);
-    
-    // Calculate incomplete units if we have distribution data
-    let incompleteUnits = 0;
-    let totalUnits = 0;
-    if (colisDistribution && colisDistribution.length > 0 && totalColis > 1) {
-      totalUnits = colisDistribution.reduce((sum, c) => sum + c.quantity, 0);
-      const unitsInCompleteSets = stock * totalColis;
-      incompleteUnits = totalUnits - unitsInCompleteSets;
-    }
-    
-    const hasIncomplete = incompleteUnits > 0;
-    
-    const badgeContent = (badgeClassName: string, dotClassName: string) => (
-      <div className="flex flex-col gap-0.5">
-        <div className="flex items-center gap-1">
-          <Badge variant="outline" className={cn("gap-1", badgeClassName)}>
-            <span className={cn("w-1.5 h-1.5 rounded-full", dotClassName)} />
-            {stock} {stock === 1 ? 'set' : 'sets'}
-          </Badge>
-          {hasIncomplete && (
-            <Badge variant="outline" className="gap-0.5 px-1.5 py-0 h-5 bg-orange-50 text-orange-600 border-orange-300 text-[10px]">
-              +{incompleteUnits}
-            </Badge>
-          )}
-        </div>
-        {totalColis > 1 && (
-          <span className="text-[10px] text-muted-foreground">({totalColis} colis/set)</span>
-        )}
-      </div>
-    );
-
-    // Determine badge styles based on status
-    let badgeClassName: string;
-    let dotClassName: string;
-    
-    if (stock <= 0) {
-      badgeClassName = "bg-slate-100 text-slate-500 border-slate-300";
-      dotClassName = "bg-slate-400";
-    } else if (status === 'low_stock') {
-      badgeClassName = "bg-yellow-50 text-yellow-700 border-yellow-300";
-      dotClassName = "bg-yellow-500";
-    } else {
-      badgeClassName = "bg-green-50 text-green-700 border-green-200";
-      dotClassName = "bg-green-500";
-    }
-
-    // If we have colis distribution data, wrap in tooltip
-    if (colisDistribution && colisDistribution.length > 0 && totalColis > 1) {
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help">
-                {badgeContent(badgeClassName, dotClassName)}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              <p className="font-medium mb-1">Distribuição por Coli:</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-                {colisDistribution.map((coli) => {
-                  const excess = coli.quantity - stock;
-                  return (
-                    <div key={coli.colisNumber} className="flex justify-between gap-2">
-                      <span className="text-muted-foreground">Coli {coli.colisNumber}:</span>
-                      <span className={cn("font-medium", excess > 0 && "text-orange-600")}>
-                        {coli.quantity} un.
-                        {excess > 0 && <span className="text-orange-500 ml-1">(+{excess})</span>}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-2 pt-2 border-t space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total unidades:</span>
-                  <span className="font-medium">{totalUnits}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-green-600">Sets completos:</span>
-                  <span className="font-medium text-green-600">{stock}</span>
-                </div>
-                {incompleteUnits > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-orange-600">Unidades incompletas:</span>
-                    <span className="font-medium text-orange-600">{incompleteUnits}</span>
-                  </div>
-                )}
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-
-    return badgeContent(badgeClassName, dotClassName);
   };
 
   const existingCategoryNames = categories.map(c => c.name);
@@ -296,6 +197,14 @@ export function ProductsView() {
     
     return result;
   }, [products, searchTerm, filterCountStatus, filterStockStatus, filterOrderStatus, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
+
+  // Virtualizer for products table
+  const rowVirtualizer = useVirtualizer({
+    count: filteredProducts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 60,
+    overscan: 5,
+  });
 
   // Count stats for filter
   const countStats = useMemo(() => {
@@ -724,392 +633,182 @@ export function ProductsView() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <ResizableTableProvider defaultWidths={DEFAULT_COLUMN_WIDTHS}>
-              <div className="overflow-x-auto">
-                <Table className="table-fixed">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
-                          onCheckedChange={toggleAllSelection}
-                          aria-label="Selecionar todos"
+            {/* Virtualized Table */}
+            <div className="overflow-x-auto">
+              {/* Header */}
+              <div className="flex items-center border-b bg-muted/50 sticky top-0 z-10">
+                <div className="flex-shrink-0 p-2" style={{ width: '48px' }}>
+                  <Checkbox
+                    checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                    onCheckedChange={toggleAllSelection}
+                    aria-label="Selecionar todos"
+                  />
+                </div>
+                {isColumnVisible('code') && (
+                  <div 
+                    className="p-2 cursor-pointer hover:bg-muted/50 select-none font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.code}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.code}px` }}
+                    onClick={() => handleSort('code')}
+                  >
+                    <span className="flex items-center">
+                      Código
+                      {getSortIcon('code')}
+                    </span>
+                  </div>
+                )}
+                {isColumnVisible('name') && (
+                  <div 
+                    className="p-2 cursor-pointer hover:bg-muted/50 select-none font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.name}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.name}px` }}
+                    onClick={() => handleSort('name')}
+                  >
+                    <span className="flex items-center">
+                      Nome
+                      {getSortIcon('name')}
+                    </span>
+                  </div>
+                )}
+                {isColumnVisible('category') && (
+                  <div 
+                    className="p-2 cursor-pointer hover:bg-muted/50 select-none font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.category}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.category}px` }}
+                    onClick={() => handleSort('category')}
+                  >
+                    <span className="flex items-center">
+                      Categoria
+                      {getSortIcon('category')}
+                    </span>
+                  </div>
+                )}
+                {isColumnVisible('colis') && (
+                  <div 
+                    className="p-2 font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.colis}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.colis}px` }}
+                  >
+                    Colis
+                  </div>
+                )}
+                {isColumnVisible('stock') && (
+                  <div 
+                    className="p-2 cursor-pointer hover:bg-muted/50 select-none font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.stock}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.stock}px` }}
+                    onClick={() => handleSort('stock')}
+                  >
+                    <span className="flex items-center">
+                      Sets
+                      {getSortIcon('stock')}
+                    </span>
+                  </div>
+                )}
+                {isColumnVisible('damages') && (
+                  <div 
+                    className="p-2 font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.damages}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.damages}px` }}
+                  >
+                    <span className="flex items-center gap-1">
+                      <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                      Avarias
+                    </span>
+                  </div>
+                )}
+                {isColumnVisible('totalUnits') && (
+                  <div 
+                    className="p-2 font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.totalUnits}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.totalUnits}px` }}
+                  >
+                    Unidades
+                  </div>
+                )}
+                {isColumnVisible('lastCount') && (
+                  <div 
+                    className="p-2 cursor-pointer hover:bg-muted/50 select-none font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.lastCount}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.lastCount}px` }}
+                    onClick={() => handleSort('lastCount')}
+                  >
+                    <span className="flex items-center">
+                      Última Contagem
+                      {getSortIcon('lastCount')}
+                    </span>
+                  </div>
+                )}
+                {isColumnVisible('colisLocations') && (
+                  <div 
+                    className="p-2 font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.colisLocations}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.colisLocations}px` }}
+                  >
+                    Colis/Localização
+                  </div>
+                )}
+                {isColumnVisible('location') && (
+                  <div 
+                    className="p-2 font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.location}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.location}px` }}
+                  >
+                    Localização
+                  </div>
+                )}
+                {isColumnVisible('pallet') && (
+                  <div 
+                    className="p-2 font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.pallet}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.pallet}px` }}
+                  >
+                    Palete
+                  </div>
+                )}
+                <div className="flex-shrink-0 p-2 font-medium text-muted-foreground text-sm text-right" style={{ width: '144px' }}>
+                  Ações
+                </div>
+              </div>
+
+              {/* Virtualized Body */}
+              <div
+                ref={parentRef}
+                className="overflow-y-auto"
+                style={{ height: 'calc(100vh - 400px)', minHeight: '400px', maxHeight: '700px' }}
+              >
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const product = filteredProducts[virtualRow.index];
+                    const lastCount = lastCounts[product.id];
+                    return (
+                      <div
+                        key={product.id}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        <VirtualizedProductRow
+                          product={product}
+                          lastCount={lastCount || null}
+                          isSelected={selectedProducts.has(product.id)}
+                          hasOrders={productIdsWithOrders.has(product.id)}
+                          orderStats={getOrderStats(product.id)}
+                          visibleColumns={visibleColumns}
+                          columnWidths={DEFAULT_COLUMN_WIDTHS}
+                          onToggleSelection={toggleProductSelection}
+                          onEdit={setEditingProduct}
+                          onViewDetails={setDetailsProduct}
+                          onViewHistory={setHistoryProduct}
+                          onViewMovements={setMovementHistoryProduct}
+                          onDelete={deleteProduct}
                         />
-                      </TableHead>
-                      {isColumnVisible('code') && (
-                        <ResizableHeaderCell 
-                          columnId="code"
-                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
-                          onClick={() => handleSort('code')}
-                        >
-                          <span className="flex items-center">
-                            Código
-                            {getSortIcon('code')}
-                          </span>
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('name') && (
-                        <ResizableHeaderCell 
-                          columnId="name"
-                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
-                          onClick={() => handleSort('name')}
-                        >
-                          <span className="flex items-center">
-                            Nome
-                            {getSortIcon('name')}
-                          </span>
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('category') && (
-                        <ResizableHeaderCell 
-                          columnId="category"
-                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
-                          onClick={() => handleSort('category')}
-                        >
-                          <span className="flex items-center">
-                            Categoria
-                            {getSortIcon('category')}
-                          </span>
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('colis') && (
-                        <ResizableHeaderCell columnId="colis" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
-                          Colis
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('stock') && (
-                        <ResizableHeaderCell 
-                          columnId="stock"
-                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
-                          onClick={() => handleSort('stock')}
-                        >
-                          <span className="flex items-center">
-                            Sets
-                            {getSortIcon('stock')}
-                          </span>
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('damages') && (
-                        <ResizableHeaderCell columnId="damages" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
-                            Avarias
-                          </span>
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('totalUnits') && (
-                        <ResizableHeaderCell columnId="totalUnits" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
-                          Unidades
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('lastCount') && (
-                        <ResizableHeaderCell 
-                          columnId="lastCount"
-                          className="cursor-pointer hover:bg-muted/50 select-none h-10 px-2 text-left align-middle font-medium text-muted-foreground"
-                          onClick={() => handleSort('lastCount')}
-                        >
-                          <span className="flex items-center">
-                            Última Contagem
-                            {getSortIcon('lastCount')}
-                          </span>
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('colisLocations') && (
-                        <ResizableHeaderCell columnId="colisLocations" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
-                          Colis/Localização
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('location') && (
-                        <ResizableHeaderCell columnId="location" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
-                          Localização
-                        </ResizableHeaderCell>
-                      )}
-                      {isColumnVisible('pallet') && (
-                        <ResizableHeaderCell columnId="pallet" className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">
-                          Palete
-                        </ResizableHeaderCell>
-                      )}
-                      <TableHead className="text-right w-36">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                  {filteredProducts.map(product => {
-                      const lastCount = lastCounts[product.id];
-                      return (
-                      <TableRow key={product.id} className={selectedProducts.has(product.id) ? 'bg-primary/5' : ''}>
-                        <TableCell className="w-12">
-                          <Checkbox
-                            checked={selectedProducts.has(product.id)}
-                            onCheckedChange={() => toggleProductSelection(product.id)}
-                            aria-label={`Selecionar ${product.name}`}
-                          />
-                        </TableCell>
-                        {isColumnVisible('code') && (
-                          <ResizableCell columnId="code" className="p-2 align-middle font-mono">{product.code}</ResizableCell>
-                        )}
-                        {isColumnVisible('name') && (
-                          <ResizableCell columnId="name" className="p-2 align-middle font-medium" title={product.name}>
-                            <div className="flex flex-col gap-0.5">
-                              <span>{product.name}</span>
-                              {productIdsWithOrders.has(product.id) && (
-                                <Badge variant="outline" className="text-[10px] w-fit bg-amber-50 text-amber-700 border-amber-300 gap-0.5">
-                                  <ClipboardList className="h-2.5 w-2.5" />
-                                  {getOrderStats(product.id)?.order_count || 0} enc.
-                                </Badge>
-                              )}
-                            </div>
-                          </ResizableCell>
-                        )}
-                        {isColumnVisible('category') && (
-                          <ResizableCell columnId="category" className="p-2 align-middle">
-                            <Badge variant="outline">{product.category}</Badge>
-                          </ResizableCell>
-                        )}
-                        {isColumnVisible('colis') && (
-                          <ResizableCell columnId="colis" className="p-2 align-middle">
-                            <Badge variant="secondary">{product.total_colis}</Badge>
-                          </ResizableCell>
-                        )}
-                        {isColumnVisible('stock') && (
-                          <ResizableCell columnId="stock" className="p-2 align-middle">
-                            {getStockBadge(
-                              product.current_stock, 
-                              product.min_stock, 
-                              product.total_colis,
-                              lastCount?.colisLocations?.map(c => ({ colisNumber: c.colisNumber, quantity: c.quantity }))
-                            )}
-                          </ResizableCell>
-                        )}
-                        {isColumnVisible('damages') && (
-                          <ResizableCell columnId="damages" className="p-2 align-middle">
-                            {(product.damaged_stock ?? 0) > 0 ? (
-                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 gap-1">
-                                <AlertTriangle className="h-3 w-3" />
-                                {product.damaged_stock} un.
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1">
-                                <CheckCircle className="h-3 w-3" />
-                                0
-                              </Badge>
-                            )}
-                          </ResizableCell>
-                        )}
-                        {isColumnVisible('totalUnits') && (
-                          <ResizableCell columnId="totalUnits" className="p-2 align-middle">
-                            <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
-                              {lastCount?.totalQuantity ?? 0} un.
-                            </Badge>
-                          </ResizableCell>
-                        )}
-                        {isColumnVisible('lastCount') && (
-                          <ResizableCell columnId="lastCount" className="p-2 align-middle">
-                            {lastCount ? (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="flex items-center gap-1 cursor-help">
-                                      <ClipboardList className="h-3 w-3 text-muted-foreground" />
-                                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                        {lastCount.totalQuantity} un.
-                                      </Badge>
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="font-medium">{lastCount.sessionName}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {format(new Date(lastCount.countedAt), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </ResizableCell>
-                        )}
-                        {isColumnVisible('colisLocations') && (
-                          <ResizableCell columnId="colisLocations" className="p-2 align-middle">
-                            {lastCount && lastCount.colisLocations.length > 0 ? (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex flex-wrap gap-0.5 max-w-[200px]">
-                                      {/* Split indicator */}
-                                      {lastCount.hasSplitColis && (
-                                        <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 text-blue-700 border-blue-300">
-                                          <Split className="h-2.5 w-2.5" />
-                                          {lastCount.splitColisCount} div.
-                                        </Badge>
-                                      )}
-                                      {/* Location Badge */}
-                                      {lastCount.uniqueLocations.length > 0 ? (
-                                        lastCount.uniqueLocations.length === 1 ? (
-                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                            <MapPin className="h-2.5 w-2.5" />
-                                            {lastCount.uniqueLocations[0]}
-                                          </Badge>
-                                        ) : (
-                                          <Badge variant="outline" className="text-xs flex items-center gap-1 bg-orange-50 text-orange-700 border-orange-300">
-                                            <MapPin className="h-2.5 w-2.5" />
-                                            {lastCount.uniqueLocations.length} locais
-                                          </Badge>
-                                        )
-                                      ) : null}
-                                      {/* Pallet Badge */}
-                                      {lastCount.uniquePallets.length > 0 && (
-                                        lastCount.uniquePallets.length === 1 ? (
-                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                            <Box className="h-2.5 w-2.5" />
-                                            {lastCount.uniquePallets[0]}
-                                          </Badge>
-                                        ) : (
-                                          <Badge variant="outline" className="text-xs flex items-center gap-1 bg-purple-50 text-purple-700 border-purple-300">
-                                            <Box className="h-2.5 w-2.5" />
-                                            {lastCount.uniquePallets.length} paletes
-                                          </Badge>
-                                        )
-                                      )}
-                                      {lastCount.uniqueLocations.length === 0 && lastCount.uniquePallets.length === 0 && !lastCount.hasSplitColis && (
-                                        <span className="text-xs text-muted-foreground">-</span>
-                                      )}
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-[400px]">
-                                    <p className="font-medium mb-2">Detalhes por Coli:</p>
-                                    <div className="space-y-1 text-xs">
-                                      {lastCount.colisLocations.map(c => {
-                                        const locInfo = classifyLocation(c.location);
-                                        const splitEntry = lastCount.splitEntries.find(s => s.colisNumber === c.colisNumber);
-                                        return (
-                                          <div key={c.colisNumber} className={cn(
-                                            "flex items-center gap-2 p-1 rounded",
-                                            splitEntry ? "bg-blue-50 border border-blue-200" : "bg-muted/50"
-                                          )}>
-                                            <span className="font-mono font-medium w-6">C{c.colisNumber}</span>
-                                            {splitEntry && (
-                                              <Badge variant="outline" className="text-[10px] px-1 py-0 bg-blue-100 text-blue-700 border-blue-300">
-                                                <Split className="h-2 w-2 mr-0.5" />
-                                                {splitEntry.entries.length}
-                                              </Badge>
-                                            )}
-                                            <span className="text-muted-foreground">→</span>
-                                            <div className="flex items-center gap-1 flex-1">
-                                              <MapPin className="h-2.5 w-2.5 text-muted-foreground" />
-                                              <span>{c.location || 'Sem local'}</span>
-                                              <Badge variant="outline" className={`text-[10px] px-1 py-0 ${locInfo.color}`}>
-                                                {locInfo.shortLabel}
-                                              </Badge>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                              <Box className="h-2.5 w-2.5 text-muted-foreground" />
-                                              <span>{c.palletNumber || '-'}</span>
-                                            </div>
-                                            <Badge variant="secondary" className="text-[10px]">
-                                              {c.quantity}
-                                            </Badge>
-                                          </div>
-                                        );
-                                      })}
-                                      {lastCount.hasSplitColis && (
-                                        <p className="text-blue-600 mt-2 pt-2 border-t">
-                                          <Split className="h-3 w-3 inline mr-1" />
-                                          {lastCount.splitColisCount} coli(s) dividido(s) em múltiplas localizações
-                                        </p>
-                                      )}
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </ResizableCell>
-                        )}
-                        {isColumnVisible('location') && (
-                          <ResizableCell columnId="location" className="p-2 align-middle">
-                            {product.location ? (
-                              <span className="flex items-center gap-1 text-muted-foreground">
-                                <MapPin className="h-3 w-3 flex-shrink-0" />
-                                <span className="truncate">{product.location}</span>
-                              </span>
-                            ) : '-'}
-                          </ResizableCell>
-                        )}
-                        {isColumnVisible('pallet') && (
-                          <ResizableCell columnId="pallet" className="p-2 align-middle">
-                            {product.pallet_number ? (
-                              <span className="flex items-center gap-1 text-muted-foreground">
-                                <Box className="h-3 w-3 flex-shrink-0" />
-                                <span className="truncate">{product.pallet_number}</span>
-                              </span>
-                            ) : '-'}
-                          </ResizableCell>
-                        )}
-                        <TableCell className="text-right w-44">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => setDetailsProduct(product)}
-                              title="Ver detalhes"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => setMovementHistoryProduct(product)}
-                              title="Ver movimentações"
-                            >
-                              <ArrowRightLeft className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => setHistoryProduct(product)}
-                              title="Ver histórico de alterações"
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => setEditingProduct(product)}
-                              title="Editar"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title="Eliminar">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Eliminar produto?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Esta ação não pode ser revertida. O produto "{product.name}" será permanentemente eliminado.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteProduct(product.id)}>
-                                    Eliminar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                      </div>
                     );
                   })}
-                  </TableBody>
-                </Table>
+                </div>
               </div>
-            </ResizableTableProvider>
+            </div>
           </CardContent>
         </Card>
       )}
