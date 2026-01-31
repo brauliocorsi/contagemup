@@ -91,14 +91,15 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
   const addOrderNumber = async (
     orderNumber: string,
     location?: string | null,
-    palletNumber?: string | null
+    palletNumber?: string | null,
+    addAsComplete: boolean = true // NEW: Option to add empty or complete
   ): Promise<OrderNumberEntry | null> => {
     if (!productId) return null;
 
-    // Create colis_status with all colis marked as true
+    // Create colis_status based on addAsComplete flag
     const colisStatus: Record<string, boolean> = {};
     for (let i = 1; i <= totalColis; i++) {
-      colisStatus[i.toString()] = true;
+      colisStatus[i.toString()] = addAsComplete; // true for complete, false for empty
     }
 
     try {
@@ -122,36 +123,42 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
         throw error;
       }
 
-      // SYNC: Increment counts for each coli (+1)
-      for (let i = 1; i <= totalColis; i++) {
-        const { data: existingCount } = await supabase
-          .from('counts')
-          .select('id, quantity')
-          .eq('product_id', productId)
-          .eq('colis_number', i)
-          .maybeSingle();
+      // SYNC: Only increment counts if adding as complete
+      if (addAsComplete) {
+        for (let i = 1; i <= totalColis; i++) {
+          const { data: existingCount } = await supabase
+            .from('counts')
+            .select('id, quantity')
+            .eq('product_id', productId)
+            .eq('colis_number', i)
+            .maybeSingle();
 
-        if (existingCount) {
-          await supabase
-            .from('counts')
-            .update({ quantity: existingCount.quantity + 1, updated_at: new Date().toISOString() })
-            .eq('id', existingCount.id);
-        } else {
-          await supabase
-            .from('counts')
-            .insert({ 
-              product_id: productId, 
-              colis_number: i, 
-              quantity: 1, 
-              location: location || null, 
-              pallet_number: palletNumber || null 
-            });
+          if (existingCount) {
+            await supabase
+              .from('counts')
+              .update({ quantity: existingCount.quantity + 1, updated_at: new Date().toISOString() })
+              .eq('id', existingCount.id);
+          } else {
+            await supabase
+              .from('counts')
+              .insert({ 
+                product_id: productId, 
+                colis_number: i, 
+                quantity: 1, 
+                location: location || null, 
+                pallet_number: palletNumber || null 
+              });
+          }
         }
       }
+      // If adding as empty, no counts are updated - operator will mark colis manually
 
       const entry = mapToOrderNumberEntry(data, totalColis);
       setOrderNumbers(prev => [entry, ...prev]);
-      toast.success('Número de encomenda adicionado');
+      toast.success(addAsComplete 
+        ? 'Encomenda adicionada (completa)' 
+        : 'Encomenda adicionada (marcar colis manualmente)'
+      );
       return entry;
     } catch (error) {
       console.error('Error adding order number:', error);
