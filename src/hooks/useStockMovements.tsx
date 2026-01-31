@@ -26,6 +26,12 @@ export interface MovementItem {
   product_code: string;
   product_name: string;
   quantity: number;
+  // Indica se é set completo ou entrada por colis individual
+  isCompleteSet?: boolean;
+  // Para modo individual, quantidade por colis: { 1: 5, 2: 3, 3: 0 }
+  colisQuantities?: Record<number, number>;
+  // Info adicional para display
+  totalColis?: number;
 }
 
 export interface ParsedCSVItem {

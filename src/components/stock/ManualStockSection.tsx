@@ -1,15 +1,15 @@
-import { useState, useMemo } from 'react';
-import { Search, Plus, Minus, X, ShoppingCart, AlertTriangle } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Search, Plus, Minus, X, ShoppingCart, AlertTriangle, Layers, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Label } from '@/components/ui/label';
 import { useProducts } from '@/hooks/useProducts';
 import { MovementItem } from '@/hooks/useStockMovements';
 import { cn } from '@/lib/utils';
-import { useQueryClient } from '@tanstack/react-query';
 
 interface ManualStockSectionProps {
   cart: MovementItem[];
@@ -17,7 +17,21 @@ interface ManualStockSectionProps {
   onUpdateQuantity: (productId: string, quantity: number) => void;
   onRemoveFromCart: (productId: string) => void;
   movementType: 'entrada' | 'saida';
-  stockOverrides?: Record<string, number>; // Allow passing stock from parent
+  stockOverrides?: Record<string, number>;
+}
+
+interface ProductWithInput {
+  id: string;
+  code: string;
+  name: string;
+  current_stock: number;
+  total_colis: number;
+}
+
+interface ProductInputState {
+  quantity: number;
+  isCompleteSet: boolean;
+  colisQuantities: Record<number, number>;
 }
 
 export function ManualStockSection({
@@ -30,9 +44,10 @@ export function ManualStockSection({
 }: ManualStockSectionProps) {
   const { products } = useProducts();
   const [search, setSearch] = useState('');
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [inputStates, setInputStates] = useState<Record<string, ProductInputState>>({});
+  const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
 
-  // Create stock map for quick lookup - use overrides if provided
+  // Create stock map for quick lookup
   const stockMap = useMemo(() => {
     return products.reduce((acc, p) => {
       acc[p.id] = stockOverrides?.[p.id] ?? p.current_stock ?? 0;
@@ -62,15 +77,55 @@ export function ManualStockSection({
 
   const cartProductIds = new Set(cart.map(item => item.product_id));
 
-  const handleAddToCart = (product: { id: string; code: string; name: string }) => {
-    const quantity = quantities[product.id] || 1;
+  const getInputState = (productId: string, totalColis: number): ProductInputState => {
+    if (inputStates[productId]) return inputStates[productId];
+    return {
+      quantity: 1,
+      isCompleteSet: true,
+      colisQuantities: Array.from({ length: totalColis }, (_, i) => [i + 1, 0]).reduce(
+        (acc, [k, v]) => ({ ...acc, [k as number]: v as number }), {}
+      ),
+    };
+  };
+
+  const updateInputState = (productId: string, updates: Partial<ProductInputState>) => {
+    setInputStates(prev => ({
+      ...prev,
+      [productId]: {
+        ...getInputState(productId, products.find(p => p.id === productId)?.total_colis || 1),
+        ...updates,
+      },
+    }));
+  };
+
+  const handleAddToCart = (product: ProductWithInput) => {
+    const state = getInputState(product.id, product.total_colis);
+    
+    // Calculate quantity based on mode
+    let finalQuantity = state.quantity;
+    if (!state.isCompleteSet) {
+      // For individual mode, quantity is min of all colis (complete sets that can be formed)
+      const minColi = Math.min(...Object.values(state.colisQuantities));
+      finalQuantity = minColi;
+    }
+    
     onAddToCart({
       product_id: product.id,
       product_code: product.code,
       product_name: product.name,
-      quantity,
+      quantity: finalQuantity,
+      isCompleteSet: state.isCompleteSet,
+      colisQuantities: state.isCompleteSet ? undefined : state.colisQuantities,
+      totalColis: product.total_colis,
     });
-    setQuantities(prev => ({ ...prev, [product.id]: 1 }));
+    
+    // Reset input state
+    setInputStates(prev => {
+      const newState = { ...prev };
+      delete newState[product.id];
+      return newState;
+    });
+    setExpandedProduct(null);
   };
 
   const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -79,6 +134,11 @@ export function ManualStockSection({
   const hasStockErrors = movementType === 'saida' && cart.some(
     item => item.quantity > (stockMap[item.product_id] || 0)
   );
+
+  const toggleProductExpand = (productId: string, totalColis: number) => {
+    if (totalColis === 1) return; // Don't expand single-coli products
+    setExpandedProduct(prev => prev === productId ? null : productId);
+  };
 
   return (
     <div className="space-y-4">
@@ -106,96 +166,277 @@ export function ManualStockSection({
                       <TableHead className="w-[120px]">Código</TableHead>
                       <TableHead>Nome</TableHead>
                       <TableHead className="w-[80px] text-center">Stock</TableHead>
-                      <TableHead className="w-[150px] text-right">Quantidade</TableHead>
+                      <TableHead className="w-[80px] text-center">Colis</TableHead>
+                      <TableHead className="w-[180px] text-right">Quantidade</TableHead>
                       <TableHead className="w-[60px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredProducts.map((product) => {
                       const inCart = cartProductIds.has(product.id);
-                      const qty = quantities[product.id] || 1;
                       const stock = product.current_stock ?? 0;
+                      const totalColis = product.total_colis || 1;
+                      const isExpanded = expandedProduct === product.id;
+                      const state = getInputState(product.id, totalColis);
 
                       return (
-                        <TableRow 
-                          key={product.id}
-                          className={cn(
-                            inCart && "bg-muted/50",
-                            movementType === 'saida' && stock === 0 && "opacity-50"
-                          )}
-                        >
-                          <TableCell className="font-mono font-medium">
-                            {product.code}
-                          </TableCell>
-                          <TableCell className="max-w-[200px]">
-                            <span className="truncate block" title={product.name}>
-                              {product.name}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge 
-                              variant={stock > 0 ? "secondary" : "outline"}
-                              className={cn(stock === 0 && "text-muted-foreground")}
-                            >
-                              {stock}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {inCart ? (
-                              <Badge variant="default" className="ml-auto">No carrinho</Badge>
-                            ) : (
-                              <div className="flex items-center justify-end gap-1">
-                                <div className="flex items-center border rounded-md bg-background">
+                        <>
+                          <TableRow 
+                            key={product.id}
+                            className={cn(
+                              inCart && "bg-muted/50",
+                              movementType === 'saida' && stock === 0 && "opacity-50"
+                            )}
+                          >
+                            <TableCell className="font-mono font-medium">
+                              {product.code}
+                            </TableCell>
+                            <TableCell className="max-w-[200px]">
+                              <span className="truncate block" title={product.name}>
+                                {product.name}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge 
+                                variant={stock > 0 ? "secondary" : "outline"}
+                                className={cn(stock === 0 && "text-muted-foreground")}
+                              >
+                                {stock}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {totalColis > 1 ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 gap-1"
+                                  onClick={() => toggleProductExpand(product.id, totalColis)}
+                                >
+                                  <Package className="h-3 w-3" />
+                                  {totalColis}
+                                </Button>
+                              ) : (
+                                <span className="text-muted-foreground">1</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {inCart ? (
+                                <Badge variant="default" className="ml-auto">No carrinho</Badge>
+                              ) : totalColis === 1 ? (
+                                <div className="flex items-center justify-end gap-1">
+                                  <div className="flex items-center border rounded-md bg-background">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => updateInputState(product.id, { 
+                                        quantity: Math.max(1, state.quantity - 1) 
+                                      })}
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </Button>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={state.quantity}
+                                      onChange={(e) => updateInputState(product.id, { 
+                                        quantity: Math.max(1, parseInt(e.target.value) || 1) 
+                                      })}
+                                      className="h-7 w-12 text-center border-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => updateInputState(product.id, { 
+                                        quantity: state.quantity + 1 
+                                      })}
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end gap-1">
+                                  {state.isCompleteSet ? (
+                                    <Badge variant="outline" className="gap-1">
+                                      <Layers className="h-3 w-3" />
+                                      {state.quantity} sets
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="gap-1">
+                                      <Package className="h-3 w-3" />
+                                      Individual
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {!inCart && (
+                                totalColis === 1 ? (
                                   <Button
+                                    size="sm"
                                     variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => setQuantities(prev => ({
-                                      ...prev,
-                                      [product.id]: Math.max(1, (prev[product.id] || 1) - 1)
-                                    }))}
+                                    className="h-7 w-7 p-0"
+                                    onClick={() => handleAddToCart(product)}
+                                    disabled={movementType === 'saida' && stock === 0}
                                   >
-                                    <Minus className="h-3 w-3" />
+                                    <Plus className="h-4 w-4" />
                                   </Button>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={qty}
-                                    onChange={(e) => setQuantities(prev => ({
-                                      ...prev,
-                                      [product.id]: Math.max(1, parseInt(e.target.value) || 1)
-                                    }))}
-                                    className="h-7 w-12 text-center border-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  />
+                                ) : (
                                   <Button
+                                    size="sm"
                                     variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => setQuantities(prev => ({
-                                      ...prev,
-                                      [product.id]: (prev[product.id] || 1) + 1
-                                    }))}
+                                    className="h-7 w-7 p-0"
+                                    onClick={() => toggleProductExpand(product.id, totalColis)}
+                                    disabled={movementType === 'saida' && stock === 0}
                                   >
-                                    <Plus className="h-3 w-3" />
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                )
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          
+                          {/* Expanded row for multi-colis products */}
+                          {isExpanded && !inCart && totalColis > 1 && (
+                            <TableRow key={`${product.id}-expanded`} className="bg-muted/20">
+                              <TableCell colSpan={6} className="p-3">
+                                <div className="space-y-3">
+                                  {/* Mode Toggle */}
+                                  <div className="flex gap-2">
+                                    <Button
+                                      type="button"
+                                      variant={state.isCompleteSet ? "default" : "outline"}
+                                      size="sm"
+                                      className="gap-2"
+                                      onClick={() => updateInputState(product.id, { isCompleteSet: true })}
+                                    >
+                                      <Layers className="h-4 w-4" />
+                                      Set Completo
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant={!state.isCompleteSet ? "default" : "outline"}
+                                      size="sm"
+                                      className="gap-2"
+                                      onClick={() => updateInputState(product.id, { isCompleteSet: false })}
+                                    >
+                                      <Package className="h-4 w-4" />
+                                      Colis Individual
+                                    </Button>
+                                  </div>
+
+                                  {/* Set Completo Mode */}
+                                  {state.isCompleteSet && (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <Label className="text-sm">Quantidade de sets:</Label>
+                                        <div className="flex items-center border rounded-md bg-background">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7"
+                                            onClick={() => updateInputState(product.id, { 
+                                              quantity: Math.max(1, state.quantity - 1) 
+                                            })}
+                                          >
+                                            <Minus className="h-3 w-3" />
+                                          </Button>
+                                          <Input
+                                            type="number"
+                                            min="1"
+                                            value={state.quantity}
+                                            onChange={(e) => updateInputState(product.id, { 
+                                              quantity: Math.max(1, parseInt(e.target.value) || 1) 
+                                            })}
+                                            className="h-7 w-14 text-center border-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                          />
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7"
+                                            onClick={() => updateInputState(product.id, { 
+                                              quantity: state.quantity + 1 
+                                            })}
+                                          >
+                                            <Plus className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Preview */}
+                                      <div className="flex flex-wrap gap-1">
+                                        {Array.from({ length: totalColis }, (_, i) => (
+                                          <Badge key={i} variant="secondary" className="text-xs">
+                                            Coli {i + 1}: {state.quantity} un.
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                      <p className="text-xs text-primary font-medium">
+                                        {movementType === 'entrada' ? 'Sets a adicionar' : 'Sets a retirar'}: {state.quantity}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Colis Individual Mode */}
+                                  {!state.isCompleteSet && (
+                                    <div className="space-y-2">
+                                      <Label className="text-sm">Quantidade por coli:</Label>
+                                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        {Array.from({ length: totalColis }, (_, i) => {
+                                          const colisNumber = i + 1;
+                                          const qty = state.colisQuantities[colisNumber] || 0;
+                                          
+                                          return (
+                                            <div key={colisNumber} className="flex items-center gap-1">
+                                              <span className="text-xs text-muted-foreground w-12">Coli {colisNumber}:</span>
+                                              <Input
+                                                type="number"
+                                                min="0"
+                                                value={qty}
+                                                onChange={(e) => {
+                                                  const newColisQuantities = {
+                                                    ...state.colisQuantities,
+                                                    [colisNumber]: Math.max(0, parseInt(e.target.value) || 0),
+                                                  };
+                                                  updateInputState(product.id, { colisQuantities: newColisQuantities });
+                                                }}
+                                                className="h-7 w-14 text-center text-sm"
+                                              />
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                      
+                                      {/* Summary */}
+                                      <div className="text-xs text-muted-foreground">
+                                        <p>
+                                          Total de unidades: {Object.values(state.colisQuantities).reduce((a, b) => a + b, 0)} • 
+                                          Sets completos: <span className="text-primary font-medium">
+                                            {Math.min(...Object.values(state.colisQuantities))}
+                                          </span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Add button */}
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleAddToCart(product)}
+                                    disabled={movementType === 'saida' && stock === 0}
+                                    className={movementType === 'entrada' ? 'bg-green-600 hover:bg-green-700' : ''}
+                                  >
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Adicionar ao Carrinho
                                   </Button>
                                 </div>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {!inCart && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0"
-                                onClick={() => handleAddToCart(product)}
-                                disabled={movementType === 'saida' && stock === 0}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
                       );
                     })}
                   </TableBody>
@@ -240,6 +481,7 @@ export function ManualStockSection({
                 {cart.map((item) => {
                   const availableStock = stockMap[item.product_id] || 0;
                   const excedsStock = movementType === 'saida' && item.quantity > availableStock;
+                  const totalColis = item.totalColis || 1;
 
                   return (
                     <div
@@ -252,19 +494,36 @@ export function ManualStockSection({
                       <div className="flex-1 min-w-0">
                         <p className="font-mono text-sm font-medium">{item.product_code}</p>
                         <p className="text-xs text-muted-foreground truncate">{item.product_name}</p>
-                        {movementType === 'saida' && (
-                          <div className="flex items-center gap-1 mt-0.5">
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {totalColis > 1 && (
+                            <Badge variant="outline" className="text-xs gap-1">
+                              {item.isCompleteSet !== false ? (
+                                <>
+                                  <Layers className="h-3 w-3" />
+                                  {item.quantity} sets × {totalColis} colis
+                                </>
+                              ) : (
+                                <>
+                                  <Package className="h-3 w-3" />
+                                  Individual: {Object.entries(item.colisQuantities || {})
+                                    .map(([k, v]) => `C${k}:${v}`)
+                                    .join(' ')}
+                                </>
+                              )}
+                            </Badge>
+                          )}
+                          {movementType === 'saida' && (
                             <span className={cn(
                               "text-xs",
                               excedsStock ? "text-destructive font-medium" : "text-muted-foreground"
                             )}>
                               Stock: {availableStock} un.
                             </span>
-                            {excedsStock && (
-                              <AlertTriangle className="h-3 w-3 text-destructive" />
-                            )}
-                          </div>
-                        )}
+                          )}
+                          {excedsStock && (
+                            <AlertTriangle className="h-3 w-3 text-destructive" />
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2">
