@@ -148,6 +148,7 @@ function VirtualizedGrid({
             <div
               key={virtualRow.key}
               ref={rowVirtualizer.measureElement}
+              className="pb-6"
               style={{
                 position: 'absolute',
                 top: 0,
@@ -157,7 +158,7 @@ function VirtualizedGrid({
                 willChange: 'transform',
               }}
             >
-              <div className={`grid ${gridColsClass} gap-4 pr-2`}>
+              <div className={`grid ${gridColsClass} gap-6 pr-2`}>
                 {rowProducts.map((product) => (
                   <ProductCard
                     key={product.id}
