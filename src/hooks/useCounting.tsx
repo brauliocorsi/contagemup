@@ -496,6 +496,9 @@ export function useCounting(sessionId: string | null) {
       status = 'complete';
     }
 
+    // Calculate total excess parts (parts that don't form complete sets)
+    const totalExcessParts = maxQuantity - completeSets;
+
     return {
       ...product,
       counts: productCounts,
@@ -504,6 +507,7 @@ export function useCounting(sessionId: string | null) {
       excessColis,
       missingForNextComplete,
       hasPartialProduct,
+      totalExcessParts,
       location,
       palletNumber,
       status,

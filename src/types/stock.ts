@@ -77,6 +77,7 @@ export interface ProductWithCounts extends Product {
   excessColis: { colis_number: number; excess: number }[];
   missingForNextComplete: { colis_number: number; missing: number }[];
   hasPartialProduct: boolean;
+  totalExcessParts: number; // NEW: Total number of loose/excess parts
   location: string | null;
   palletNumber: string | null;
   status: 'complete' | 'incomplete' | 'excess' | 'not_counted';

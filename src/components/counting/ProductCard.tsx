@@ -401,9 +401,9 @@ export function ProductCard({
                   {product.completeSets} Completo{product.completeSets > 1 ? 's' : ''}
                 </Badge>
               )}
-              {product.hasPartialProduct && (
+              {product.hasPartialProduct && product.totalExcessParts > 0 && (
                 <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-                  1 Incompleto
+                  {product.totalExcessParts} Parte{product.totalExcessParts > 1 ? 's' : ''} Solta{product.totalExcessParts > 1 ? 's' : ''}
                 </Badge>
               )}
               {product.status === 'not_counted' && (
