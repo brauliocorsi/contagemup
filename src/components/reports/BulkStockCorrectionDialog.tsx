@@ -278,7 +278,7 @@ export function BulkStockCorrectionDialog({
           .from('product_changes')
           .insert({
             product_id: item.productId,
-            change_type: 'stock_correction',
+            change_type: 'updated',
             field_changed: 'current_stock',
             old_value: String(item.currentStock),
             new_value: String(item.targetStock),
