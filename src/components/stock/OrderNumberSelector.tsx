@@ -24,6 +24,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { LocationSelect } from '@/components/counting/LocationSelect';
+import { PalletSelect } from '@/components/counting/PalletSelect';
 
 interface OrderNumberExitSelectorProps {
   productId: string;
@@ -288,7 +290,7 @@ export function OrderNumberEntrySelector({
   onOrderAdded,
   onOrderDeleted,
 }: OrderNumberEntrySelectorProps) {
-  const { orderNumbers, loading, addOrderNumber, updateColisStatus, deleteOrderNumber, refetch } = useOrderNumbers(productId, totalColis);
+  const { orderNumbers, loading, addOrderNumber, updateColisStatus, updateOrderLocation, deleteOrderNumber, refetch } = useOrderNumbers(productId, totalColis);
   const [newOrderNumber, setNewOrderNumber] = useState('');
   const [adding, setAdding] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
@@ -331,6 +333,17 @@ export function OrderNumberEntrySelector({
     setUpdatingColis(`${orderId}-${colisNumber}`);
     await updateColisStatus(orderId, colisNumber, !currentValue);
     setUpdatingColis(null);
+    await refetch();
+    onOrderAdded(); // Refresh parent to show updated stock
+  };
+
+  const handleLocationChange = async (orderId: string, newLocation: string) => {
+    await updateOrderLocation(orderId, newLocation, null);
+    await refetch();
+  };
+
+  const handlePalletChange = async (orderId: string, newPallet: string) => {
+    await updateOrderLocation(orderId, null, newPallet);
     await refetch();
   };
 
@@ -404,6 +417,8 @@ export function OrderNumberEntrySelector({
                       isExpanded={expandedOrders.has(order.id)}
                       onToggleExpand={() => toggleOrderExpanded(order.id)}
                       onColisToggle={handleColisToggle}
+                      onLocationChange={handleLocationChange}
+                      onPalletChange={handlePalletChange}
                       onDelete={() => setDeleteConfirmOrder(order)}
                       updatingColis={updatingColis}
                       getColisName={getColisName}
@@ -428,6 +443,8 @@ export function OrderNumberEntrySelector({
                       isExpanded={expandedOrders.has(order.id)}
                       onToggleExpand={() => toggleOrderExpanded(order.id)}
                       onColisToggle={handleColisToggle}
+                      onLocationChange={handleLocationChange}
+                      onPalletChange={handlePalletChange}
                       onDelete={() => setDeleteConfirmOrder(order)}
                       updatingColis={updatingColis}
                       getColisName={getColisName}
@@ -486,6 +503,8 @@ interface OrderRowProps {
   isExpanded: boolean;
   onToggleExpand: () => void;
   onColisToggle: (orderId: string, colisNumber: number, currentValue: boolean) => void;
+  onLocationChange: (orderId: string, newLocation: string) => void;
+  onPalletChange: (orderId: string, newPallet: string) => void;
   onDelete: () => void;
   updatingColis: string | null;
   getColisName: (colisNumber: number) => string;
@@ -497,6 +516,8 @@ function OrderRow({
   isExpanded,
   onToggleExpand,
   onColisToggle,
+  onLocationChange,
+  onPalletChange,
   onDelete,
   updatingColis,
   getColisName,
@@ -563,49 +584,76 @@ function OrderRow({
 
         {/* Expandable colis list */}
         <CollapsibleContent>
-          <div className="border-t border-dashed px-3 py-2 space-y-1.5">
-            {Array.from({ length: totalColis }, (_, i) => {
-              const colisNum = i + 1;
-              const isPresent = order.colis_status[colisNum.toString()] ?? false;
-              const isUpdating = updatingColis === `${order.id}-${colisNum}`;
-              const colisName = getColisName(colisNum);
-              
-              return (
-                <div 
-                  key={colisNum}
-                  className={cn(
-                    "flex items-center gap-2 p-1.5 rounded",
-                    isPresent ? "bg-green-100/50" : "bg-red-100/50"
-                  )}
-                >
-                  <Checkbox
-                    id={`coli-${order.id}-${colisNum}`}
-                    checked={isPresent}
-                    disabled={isUpdating}
-                    onCheckedChange={() => onColisToggle(order.id, colisNum, isPresent)}
+          <div className="border-t border-dashed px-3 py-2 space-y-3">
+            {/* Editable location and pallet fields */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  Localização
+                </Label>
+                <LocationSelect
+                  value={order.location || ''}
+                  onValueChange={(value) => onLocationChange(order.id, value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  Palete
+                </Label>
+                <PalletSelect
+                  value={order.pallet_number || ''}
+                  onValueChange={(value) => onPalletChange(order.id, value)}
+                />
+              </div>
+            </div>
+            
+            {/* Colis checklist */}
+            <div className="space-y-1.5">
+              {Array.from({ length: totalColis }, (_, i) => {
+                const colisNum = i + 1;
+                const isPresent = order.colis_status[colisNum.toString()] ?? false;
+                const isUpdating = updatingColis === `${order.id}-${colisNum}`;
+                const colisName = getColisName(colisNum);
+                
+                return (
+                  <div 
+                    key={colisNum}
                     className={cn(
-                      isPresent 
-                        ? "border-green-600 data-[state=checked]:bg-green-600" 
-                        : "border-red-400"
-                    )}
-                  />
-                  <label 
-                    htmlFor={`coli-${order.id}-${colisNum}`}
-                    className={cn(
-                      "flex-1 text-sm cursor-pointer select-none",
-                      isPresent ? "text-green-800" : "text-red-800"
+                      "flex items-center gap-2 p-1.5 rounded",
+                      isPresent ? "bg-green-100/50" : "bg-red-100/50"
                     )}
                   >
-                    {colisName}
-                  </label>
-                  {isPresent ? (
-                    <Check className="h-3.5 w-3.5 text-green-600" />
-                  ) : (
-                    <X className="h-3.5 w-3.5 text-red-500" />
-                  )}
-                </div>
-              );
-            })}
+                    <Checkbox
+                      id={`coli-${order.id}-${colisNum}`}
+                      checked={isPresent}
+                      disabled={isUpdating}
+                      onCheckedChange={() => onColisToggle(order.id, colisNum, isPresent)}
+                      className={cn(
+                        isPresent 
+                          ? "border-green-600 data-[state=checked]:bg-green-600" 
+                          : "border-red-400"
+                      )}
+                    />
+                    <label 
+                      htmlFor={`coli-${order.id}-${colisNum}`}
+                      className={cn(
+                        "flex-1 text-sm cursor-pointer select-none",
+                        isPresent ? "text-green-800" : "text-red-800"
+                      )}
+                    >
+                      {colisName}
+                    </label>
+                    {isPresent ? (
+                      <Check className="h-3.5 w-3.5 text-green-600" />
+                    ) : (
+                      <X className="h-3.5 w-3.5 text-red-500" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </CollapsibleContent>
       </div>
