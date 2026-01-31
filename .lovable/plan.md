@@ -1,142 +1,152 @@
 
+# Plano: Botão "Set Completo" para Entradas e Saídas
 
-# Plano: Sincronizar Counts com Entradas Administrativas
+## Funcionalidade Solicitada
 
-## Problema Identificado
+Adicionar uma opção nas interfaces de Entradas e Saídas de stock para que, ao clicar num botão, o sistema preencha automaticamente todos os colis de um produto com a mesma quantidade, completando sets inteiros.
 
-Existe uma discrepância entre os "Sets Completos" mostrados em duas abas:
+## Comportamento Actual vs. Desejado
 
-| Aba | Fonte de Dados | Exemplo (Sistema Elevatório) |
-|-----|----------------|------------------------------|
-| Gestão de Produtos | `products.current_stock` | 104 sets |
-| Contagem | `counts.quantity` (sessão atual) | 7 sets |
+| Situação Actual | Situação Desejada |
+|-----------------|-------------------|
+| Operador seleciona quantidade (ex: 5) e adiciona produto | Operador pode escolher "5 Sets Completos" |
+| Sistema regista 5 unidades no total | Sistema preenche automaticamente colis 1: 5, colis 2: 5, colis 3: 5... |
+| Não há distinção entre colis | Cada colis recebe a mesma quantidade |
 
-### Causa Raiz
+## Interface Proposta
 
-O campo `current_stock` é calculado pelo trigger da base de dados usando a fórmula:
-```
-current_stock = SUM(counts) + SUM(stock_movements.entrada) - SUM(picking_items)
-```
-
-Mas a interface de **Contagem** calcula `completeSets` diretamente da tabela `counts`, ignorando:
-- Entradas administrativas (`stock_movements`)
-- Saídas de picking (`picking_items`)
-
-### Dados Concretos do Problema
-
-Para o produto "Sistema Elevatório 900N":
-- `counts.quantity` = 7 (contagem física)
-- `stock_movements` = 102 (entradas administrativas)  
-- `picking_items` = 5 (saídas)
-- `current_stock` = 104 (7 + 102 - 5) ✓
-
-A contagem mostra apenas "7 sets" porque ignora as 102 entradas administrativas.
-
----
-
-## Solução
-
-A solução implementada anteriormente (atualizar `counts` ao registar entradas/saídas) afeta apenas movimentos **futuros**. Para corrigir os dados **históricos**, precisamos de uma migração de sincronização.
-
-### Opção A: Migração de Dados (Recomendada)
-
-Criar um script que sincronize os `counts` existentes para refletir o `current_stock` actual:
-
-```sql
--- Para cada produto, ajustar counts para refletir current_stock
--- Isto garante que a contagem visual corresponde ao stock real
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│  Produto: Estante Lino Rodi (4 colis)         Stock: 10 sets        │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │  Quantidade: [__5__]                                            │ │
+│  │                                                                 │ │
+│  │  [ ✓ Set Completo ]  [ Colis Individual ]                      │ │
+│  │                                                                 │ │
+│  │  Preview:                                                       │ │
+│  │  • Coli 1: 5 un. | Coli 2: 5 un. | Coli 3: 5 un. | Coli 4: 5 un.│ │
+│  │  • Sets a adicionar: 5                                          │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│  [Adicionar ao Carrinho]                                             │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-**Lógica:**
-1. Para cada produto com `current_stock > counts_total`:
-   - Incrementar cada colis proporcionalmente
-   - A diferença vem das entradas administrativas anteriores
+Para produtos com `total_colis = 1`, o comportamento permanece inalterado.
 
-2. Para cada produto com `current_stock < counts_total`:
-   - Decrementar cada colis proporcionalmente
-   - A diferença vem do picking anterior
+## Alterações Técnicas
 
-### Opção B: Alterar Cálculo de completeSets (Alternativa)
+### 1. Actualizar Tipo MovementItem
 
-Modificar `useCounting.tsx` para usar `current_stock` em vez de calcular a partir dos counts:
+**Ficheiro**: `src/hooks/useStockMovements.tsx`
 
 ```typescript
-// Em vez de:
-const completeSets = Math.min(...quantities);
-
-// Usar:
-const completeSets = product.current_stock;
+export interface MovementItem {
+  product_id: string;
+  product_code: string;
+  product_name: string;
+  quantity: number;
+  // NOVO: Indica se é set completo ou entrada por colis individual
+  isCompleteSet?: boolean;
+  // NOVO: Para modo individual, quantidade por colis
+  colisQuantities?: Record<number, number>; // { 1: 5, 2: 3, 3: 0 }
+  // Info adicional para display
+  totalColis?: number;
+}
 ```
 
-**Problema:** Isto desalinha a visualização por colis (ícones) do valor de sets completos.
+### 2. Actualizar ManualStockSection
 
----
+**Ficheiro**: `src/components/stock/ManualStockSection.tsx`
 
-## Plano de Implementação (Opção A)
+Alterações:
+- Detectar produtos com `total_colis > 1`
+- Adicionar toggle "Set Completo" vs "Colis Individual"
+- Modo "Set Completo" (default): quantidade aplica-se a todos os colis
+- Modo "Colis Individual": mostra inputs separados por colis
+- Preview visual do que vai ser registado
 
-### Passo 1: Criar Função de Sincronização
+### 3. Actualizar StockEntriesView
 
-Criar uma função na base de dados que sincroniza os counts:
+**Ficheiro**: `src/components/stock/StockEntriesView.tsx`
 
-```sql
-CREATE OR REPLACE FUNCTION sync_counts_with_stock()
-RETURNS void AS $$
-DECLARE
-  product_row RECORD;
-  diff integer;
-  coli_increment integer;
-BEGIN
-  FOR product_row IN 
-    SELECT p.id, p.total_colis, p.current_stock,
-           COALESCE(SUM(c.quantity) / p.total_colis, 0) as avg_per_colis
-    FROM products p
-    LEFT JOIN counts c ON c.product_id = p.id
-    GROUP BY p.id
-  LOOP
-    -- Calcular diferença
-    diff := product_row.current_stock - product_row.avg_per_colis;
+Actualizar `handleConfirm` para:
+
+```typescript
+for (const item of allItems) {
+  const product = products.find(p => p.id === item.product_id);
+  const totalColis = product?.total_colis || 1;
+
+  for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
+    // Se é set completo, usar item.quantity para todos os colis
+    // Se é individual, usar item.colisQuantities[colisNumber]
+    const colisQty = item.isCompleteSet !== false 
+      ? item.quantity 
+      : (item.colisQuantities?.[colisNumber] || 0);
     
-    IF diff != 0 THEN
-      -- Atualizar cada colis
-      FOR i IN 1..product_row.total_colis LOOP
-        UPDATE counts 
-        SET quantity = GREATEST(0, quantity + diff)
-        WHERE product_id = product_row.id 
-        AND colis_number = i;
-      END LOOP;
-    END IF;
-  END LOOP;
-END;
-$$ LANGUAGE plpgsql;
+    // Buscar e actualizar count...
+  }
+}
 ```
 
-### Passo 2: Interface de Sincronização
+### 4. Actualizar StockExitsView
 
-Adicionar botão "Sincronizar Contagem" na interface que:
-1. Mostra preview das alterações
-2. Permite confirmar antes de aplicar
-3. Atualiza os counts para corresponder ao `current_stock`
+**Ficheiro**: `src/components/stock/StockExitsView.tsx`
 
-### Passo 3: Atualizar Trigger (Opcional)
+Mesma lógica de `handleFinalConfirm`:
+- Para saídas "Set Completo": decrementar todos os colis pela mesma quantidade
+- Validar que há stock suficiente em TODOS os colis
+- Preview mostra detalhes de cada colis
 
-Simplificar o trigger `sync_product_stock` para calcular `current_stock` apenas dos `counts`, já que as entradas/saídas agora atualizam diretamente os counts.
+### 5. Validação de Stock (Saídas)
 
----
+Para saídas em modo "Set Completo":
+- Verificar que o mínimo de todos os colis >= quantidade pedida
+- Se algum colis não tiver stock suficiente, mostrar erro específico
+
+```typescript
+// Validação para set completo
+const minColisStock = Math.min(...colisQuantities);
+if (requestedQty > minColisStock) {
+  // Erro: "Só há X sets completos disponíveis"
+}
+```
+
+## Fluxo de Dados
+
+```text
+ENTRADA/SAÍDA COM SET COMPLETO:
+
+Utilizador seleciona:     Sistema regista:
+┌─────────────────┐       ┌─────────────────────────────┐
+│ Produto: Estante│       │ counts:                     │
+│ Quantidade: 5   │ ────▶ │  - coli_1: +5               │
+│ [✓] Set Completo│       │  - coli_2: +5               │
+└─────────────────┘       │  - coli_3: +5               │
+                          │  - coli_4: +5               │
+                          │ current_stock: +5 sets      │
+                          └─────────────────────────────┘
+```
 
 ## Ficheiros a Modificar
 
-1. **Migração SQL** - Criar função de sincronização e executar uma vez
-2. **`src/components/stock/StockEntriesView.tsx`** - Verificar que a nova lógica está correcta
-3. **`src/components/reports/StockIntegrityReport.tsx`** - Adicionar botão de sincronização
-4. **`src/hooks/useCounting.tsx`** - (Opcional) Incluir counts de sessões anteriores
+| Ficheiro | Alteração |
+|----------|-----------|
+| `src/hooks/useStockMovements.tsx` | Adicionar campos `isCompleteSet`, `colisQuantities`, `totalColis` ao tipo |
+| `src/components/stock/ManualStockSection.tsx` | Toggle Set/Individual + inputs por colis |
+| `src/components/stock/StockEntriesView.tsx` | Lógica de confirmação por set/colis |
+| `src/components/stock/StockExitsView.tsx` | Validação e saída por set/colis |
 
----
+## Experiência do Utilizador
 
-## Impacto Esperado
+1. **Produtos simples (1 colis)**: Sem alterações, comportamento actual
+2. **Produtos multi-colis (default)**: Modo "Set Completo" activo por omissão
+3. **Opção de granularidade**: Operador pode mudar para modo individual se necessário
+4. **Feedback visual**: Preview claro do que vai ser registado em cada colis
 
-Após sincronização:
-- Gestão de Produtos: 104 sets ✓
-- Contagem: 104 sets ✓ (era 7)
+## Compatibilidade
 
-A visualização por colis irá mostrar uniformemente o stock real, permitindo identificar pendências reais vs diferenças históricas.
-
+- Produtos com `total_colis = 1`: Comportamento inalterado
+- Dados existentes: Não afectados, apenas novos movimentos usam a lógica
+- Carrinho misto: Suporta itens em modo set e individual simultaneamente
