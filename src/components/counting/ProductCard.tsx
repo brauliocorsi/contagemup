@@ -444,8 +444,12 @@ export function ProductCard({
               totalColis={product.total_colis}
               location={product.uniqueLocations[0] || product.location || undefined}
               palletNumber={product.uniquePallets[0] || product.palletNumber || undefined}
+              colisNames={colisNames}
               onOrderAdded={() => {
                 // The component handles the refetch internally
+              }}
+              onOrderDeleted={() => {
+                // Refresh after order is deleted
               }}
             />
           ) : (
