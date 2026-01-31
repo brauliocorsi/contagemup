@@ -126,19 +126,23 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
       // SYNC: Only increment counts if adding as complete
       if (addAsComplete) {
         for (let i = 1; i <= totalColis; i++) {
-          const { data: existingCount } = await supabase
+          // Buscar TODOS os registos para este coli (ordenados por quantidade descendente)
+          const { data: existingCounts } = await supabase
             .from('counts')
             .select('id, quantity')
             .eq('product_id', productId)
             .eq('colis_number', i)
-            .maybeSingle();
+            .order('quantity', { ascending: false });
 
-          if (existingCount) {
+          if (existingCounts && existingCounts.length > 0) {
+            // Incrementar o primeiro registo (maior quantidade)
+            const countToUpdate = existingCounts[0];
             await supabase
               .from('counts')
-              .update({ quantity: existingCount.quantity + 1, updated_at: new Date().toISOString() })
-              .eq('id', existingCount.id);
+              .update({ quantity: countToUpdate.quantity + 1, updated_at: new Date().toISOString() })
+              .eq('id', countToUpdate.id);
           } else {
+            // Criar novo registo se não existir nenhum
             await supabase
               .from('counts')
               .insert({ 
@@ -192,19 +196,33 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
 
       // SYNC: Update counts table for this coli
       const delta = isPresent ? 1 : -1;
-      const { data: existingCount } = await supabase
+      // Buscar TODOS os registos para este coli (ordenados por quantidade descendente)
+      const { data: existingCounts } = await supabase
         .from('counts')
         .select('id, quantity')
         .eq('product_id', order.product_id)
         .eq('colis_number', colisNumber)
-        .maybeSingle();
+        .order('quantity', { ascending: false });
 
-      if (existingCount) {
-        const newQty = Math.max(0, existingCount.quantity + delta);
-        await supabase
-          .from('counts')
-          .update({ quantity: newQty, updated_at: new Date().toISOString() })
-          .eq('id', existingCount.id);
+      if (existingCounts && existingCounts.length > 0) {
+        if (isPresent) {
+          // Incrementar o primeiro registo (maior quantidade)
+          const countToUpdate = existingCounts[0];
+          await supabase
+            .from('counts')
+            .update({ quantity: countToUpdate.quantity + 1, updated_at: new Date().toISOString() })
+            .eq('id', countToUpdate.id);
+        } else {
+          // Decrementar: encontrar primeiro registo com quantidade > 0
+          const countToUpdate = existingCounts.find(c => c.quantity > 0);
+          if (countToUpdate) {
+            const newQty = Math.max(0, countToUpdate.quantity - 1);
+            await supabase
+              .from('counts')
+              .update({ quantity: newQty, updated_at: new Date().toISOString() })
+              .eq('id', countToUpdate.id);
+          }
+        }
       } else if (isPresent) {
         // Only insert if marking as present and no count exists
         await supabase
@@ -326,19 +344,24 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
       // SYNC: Decrement counts for each present coli
       for (const [colisNum, isPresent] of Object.entries(order.colis_status)) {
         if (isPresent) {
-          const { data: existingCount } = await supabase
+          // Buscar TODOS os registos para este coli (ordenados por quantidade descendente)
+          const { data: existingCounts } = await supabase
             .from('counts')
             .select('id, quantity')
             .eq('product_id', order.product_id)
             .eq('colis_number', parseInt(colisNum))
-            .maybeSingle();
+            .order('quantity', { ascending: false });
 
-          if (existingCount) {
-            const newQty = Math.max(0, existingCount.quantity - 1);
-            await supabase
-              .from('counts')
-              .update({ quantity: newQty, updated_at: new Date().toISOString() })
-              .eq('id', existingCount.id);
+          if (existingCounts && existingCounts.length > 0) {
+            // Decrementar: encontrar primeiro registo com quantidade > 0
+            const countToUpdate = existingCounts.find(c => c.quantity > 0);
+            if (countToUpdate) {
+              const newQty = Math.max(0, countToUpdate.quantity - 1);
+              await supabase
+                .from('counts')
+                .update({ quantity: newQty, updated_at: new Date().toISOString() })
+                .eq('id', countToUpdate.id);
+            }
           }
         }
       }
@@ -426,19 +449,24 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
     try {
       // Decrement each coli's count
       for (let i = 1; i <= totalColis; i++) {
-        const { data: existingCount } = await supabase
+        // Buscar TODOS os registos para este coli (ordenados por quantidade descendente)
+        const { data: existingCounts } = await supabase
           .from('counts')
           .select('id, quantity')
           .eq('product_id', productId)
           .eq('colis_number', i)
-          .maybeSingle();
+          .order('quantity', { ascending: false });
 
-        if (existingCount && existingCount.quantity > 0) {
-          const newQty = Math.max(0, existingCount.quantity - quantity);
-          await supabase
-            .from('counts')
-            .update({ quantity: newQty, updated_at: new Date().toISOString() })
-            .eq('id', existingCount.id);
+        if (existingCounts && existingCounts.length > 0) {
+          // Encontrar primeiro registo com quantidade suficiente
+          const countToUpdate = existingCounts.find(c => c.quantity > 0);
+          if (countToUpdate) {
+            const newQty = Math.max(0, countToUpdate.quantity - quantity);
+            await supabase
+              .from('counts')
+              .update({ quantity: newQty, updated_at: new Date().toISOString() })
+              .eq('id', countToUpdate.id);
+          }
         }
       }
 
