@@ -110,6 +110,16 @@ export function StockEntriesView() {
 
         // Atualizar cada colis do produto
         for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
+          // Determinar quantidade para este colis
+          // Se é set completo (isCompleteSet !== false), usar item.quantity para todos os colis
+          // Se é individual, usar item.colisQuantities[colisNumber]
+          const colisQty = item.isCompleteSet !== false 
+            ? item.quantity 
+            : (item.colisQuantities?.[colisNumber] || 0);
+
+          // Só processar se há quantidade a adicionar
+          if (colisQty <= 0) continue;
+
           // Buscar count existente para este colis
           const { data: existingCount } = await supabase
             .from('counts')
@@ -121,7 +131,7 @@ export function StockEntriesView() {
             .maybeSingle();
 
           const currentQty = existingCount?.quantity || 0;
-          const newQty = currentQty + item.quantity;
+          const newQty = currentQty + colisQty;
 
           if (existingCount) {
             // Atualizar count existente
@@ -134,7 +144,7 @@ export function StockEntriesView() {
             await supabase.from('counts').insert({
               product_id: item.product_id,
               colis_number: colisNumber,
-              quantity: item.quantity,
+              quantity: colisQty,
               session_id: null, // Movimento administrativo
               location: product?.location || null,
               pallet_number: product?.pallet_number || null,

@@ -243,8 +243,20 @@ export function StockExitsView() {
       const product = products.find(p => p.id === item.product_id);
       const totalColis = product?.total_colis || 1;
 
-      // Decrementar TODOS os colis do produto
+      // Encontrar item original no carrinho para verificar modo set/individual
+      const cartItem = allItems.find(ci => ci.product_id === item.product_id);
+      const isCompleteSet = cartItem?.isCompleteSet !== false;
+
+      // Decrementar colis do produto
       for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
+        // Determinar quantidade a decrementar para este colis
+        const colisQty = isCompleteSet 
+          ? item.quantity 
+          : (cartItem?.colisQuantities?.[colisNumber] || 0);
+
+        // Só processar se há quantidade a remover
+        if (colisQty <= 0) continue;
+
         const { data: existingCount } = await supabase
           .from('counts')
           .select('id, quantity')
@@ -256,7 +268,7 @@ export function StockExitsView() {
 
         if (existingCount) {
           const currentQty = existingCount.quantity || 0;
-          const newQty = Math.max(0, currentQty - item.quantity);
+          const newQty = Math.max(0, currentQty - colisQty);
 
           await supabase
             .from('counts')
