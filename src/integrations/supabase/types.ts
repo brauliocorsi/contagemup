@@ -753,6 +753,7 @@ export type Database = {
     }
     Functions: {
       recalculate_all_stock: { Args: never; Returns: undefined }
+      sync_counts_with_current_stock: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

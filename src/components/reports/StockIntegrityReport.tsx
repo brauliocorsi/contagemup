@@ -128,53 +128,38 @@ export function StockIntegrityReport() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Sync mutation
-  const syncMutation = useMutation({
+  // Sync stock mutation (recalculates current_stock from counts)
+  const syncStockMutation = useMutation({
     mutationFn: async () => {
-      // Sync single-colis products
-      const { error: error1 } = await supabase.rpc('sync_single_colis_stock' as never);
-      
-      // For multi-colis, we need to do it manually since there's no RPC
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, total_colis')
-        .gt('total_colis', 1);
-
-      if (products) {
-        for (const product of products) {
-          const { data: counts } = await supabase
-            .from('counts')
-            .select('colis_number, quantity')
-            .eq('product_id', product.id);
-
-          if (counts) {
-            const colisQuantities: Record<number, number> = {};
-            for (let i = 1; i <= product.total_colis; i++) {
-              colisQuantities[i] = 0;
-            }
-            counts.forEach(c => {
-              if (colisQuantities[c.colis_number] !== undefined) {
-                colisQuantities[c.colis_number] += c.quantity;
-              }
-            });
-            const minQty = Math.min(...Object.values(colisQuantities));
-
-            await supabase
-              .from('products')
-              .update({ current_stock: minQty, updated_at: new Date().toISOString() })
-              .eq('id', product.id);
-          }
-        }
-      }
+      const { error } = await supabase.rpc('recalculate_all_stock');
+      if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Stock sincronizado com sucesso!');
+      toast.success('Stock recalculado com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['stock-integrity'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       refetch();
     },
     onError: (error) => {
-      toast.error('Erro ao sincronizar stock: ' + (error as Error).message);
+      toast.error('Erro ao recalcular stock: ' + (error as Error).message);
+    },
+  });
+
+  // Sync counts mutation (aligns counts with current_stock)
+  const syncCountsMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('sync_counts_with_current_stock');
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Contagens sincronizadas com o stock actual!');
+      queryClient.invalidateQueries({ queryKey: ['stock-integrity'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['counts'] });
+      refetch();
+    },
+    onError: (error) => {
+      toast.error('Erro ao sincronizar contagens: ' + (error as Error).message);
     },
   });
 
@@ -241,11 +226,22 @@ export function StockIntegrityReport() {
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => syncMutation.mutate()}
-                  disabled={syncMutation.isPending}
+                  variant="secondary"
+                  onClick={() => syncStockMutation.mutate()}
+                  disabled={syncStockMutation.isPending}
+                  title="Recalcula current_stock a partir dos counts"
                 >
                   <Database className="h-4 w-4 mr-2" />
-                  {syncMutation.isPending ? 'A sincronizar...' : 'Sincronizar'}
+                  {syncStockMutation.isPending ? 'A recalcular...' : 'Recalcular Stock'}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => syncCountsMutation.mutate()}
+                  disabled={syncCountsMutation.isPending}
+                  title="Sincroniza os counts para corresponder ao current_stock"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {syncCountsMutation.isPending ? 'A sincronizar...' : 'Sincronizar Contagens'}
                 </Button>
               </>
             )}
