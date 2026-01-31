@@ -106,6 +106,15 @@ export function CountingView() {
     return map;
   }, [categories]);
 
+  // Create a map of category name to requires_order_number for quick lookup
+  const categoriesRequiringOrder = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    categories.forEach(cat => {
+      map[cat.name] = cat.requires_order_number || false;
+    });
+    return map;
+  }, [categories]);
+
   const handleToggleCategory = (categoryName: string) => {
     setNewSessionCategories(prev => 
       prev.includes(categoryName) 
@@ -1109,6 +1118,7 @@ export function CountingView() {
                 damagedStock={getDamagesForProduct(product.id).reduce((sum, d) => sum + d.quantity, 0)}
                 colisNames={categoryColisNamesMap[product.category]}
                 sessionId={selectedSessionId || undefined}
+                requiresOrderNumber={categoriesRequiringOrder[product.category]}
               />
             ))}
           </div>
@@ -1143,6 +1153,7 @@ export function CountingView() {
                   damagedStock={getDamagesForProduct(product.id).reduce((sum, d) => sum + d.quantity, 0)}
                   colisNames={categoryColisNamesMap[product.category]}
                   sessionId={selectedSessionId || undefined}
+                  requiresOrderNumber={categoriesRequiringOrder[product.category]}
                 />
               ))}
             </div>
@@ -1178,6 +1189,7 @@ export function CountingView() {
                   damagedStock={getDamagesForProduct(product.id).reduce((sum, d) => sum + d.quantity, 0)}
                   colisNames={categoryColisNamesMap[product.category]}
                   sessionId={selectedSessionId || undefined}
+                  requiresOrderNumber={categoriesRequiringOrder[product.category]}
                 />
               ))}
             </div>
