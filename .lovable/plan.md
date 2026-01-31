@@ -1,196 +1,173 @@
 
-# Plano: Corrigir Lógica de Encomendas com Colis Individuais
+# Plano: Corrigir Remoção de Stock Genérico
 
-## Problema Identificado
+## Problemas Identificados
 
-Actualmente, quando se adiciona uma encomenda:
-1. O sistema marca **TODOS os colis como presentes** automaticamente (`colis_status: {"1": true, "2": true, ...}`)
-2. Incrementa +1 em counts para **TODOS os colis**
-
-Isto não reflecte a realidade onde encomendas podem chegar incompletas (faltando colis).
-
-## Solução Proposta
-
-### Fluxo Corrigido
-
+### Problema 1: Múltiplos registos por colis na tabela `counts`
+A tabela `counts` tem **múltiplos registos** para o mesmo produto/colis:
 ```text
-ADICIONAR ENCOMENDA (opção 1 - vazia):
-┌─────────────────────────────────────────────────────────────────────────┐
-│  Novo número: [_ENC-2024-005_______________] [+ Adicionar Vazia]        │
-│                                                                          │
-│  ↓ Cria encomenda com todos os colis DESMARCADOS                        │
-│  ↓ NÃO incrementa counts (stock não muda)                               │
-│  ↓ Operador marca cada coli à medida que recebe                         │
-│    └→ Marcar Coli 1: +1 no count do Coli 1                              │
-│    └→ Marcar Coli 2: +1 no count do Coli 2                              │
-│    └→ etc...                                                             │
-└─────────────────────────────────────────────────────────────────────────┘
-
-ADICIONAR ENCOMENDA (opção 2 - completa):
-┌─────────────────────────────────────────────────────────────────────────┐
-│  Novo número: [_ENC-2024-005_______________] [+ Adicionar Completa]     │
-│                                                                          │
-│  ↓ Cria encomenda com todos os colis MARCADOS (comportamento actual)    │
-│  ↓ Incrementa +1 para TODOS os colis                                    │
-│  ↓ Stock sobe imediatamente                                              │
-└─────────────────────────────────────────────────────────────────────────┘
+Cama Alice 190x140cm - Célia 2:
+  colis_number=1: 5 registos (quantidade total = 4)
+  colis_number=2: 1 registo  (quantidade total = 0)
 ```
 
-### Alterações Técnicas
+A função `removeGenericStock` usa `maybeSingle()` que só encontra **um registo** - pode encontrar um com `quantity=0` e não fazer nada!
 
-#### 1. `src/hooks/useOrderNumbers.tsx`
+### Problema 2: Trigger não considera colis da categoria
+O trigger `sync_product_stock` calcula o stock usando `product.total_colis` (que é **1** para este produto), mas a **categoria define 2 colis**. Resultado: stock mostra **4** quando deveria mostrar **0** (MIN entre coli 1 e coli 2).
 
-**Nova função `addOrderNumberEmpty`** - Adicionar encomenda SEM marcar colis:
+### Problema 3: Sessão de remoção
+Conforme o replay, o utilizador removeu uma **encomenda rastreada** (confirmou "Remover encomenda?"), não stock genérico. A remoção de encomendas decrementa os counts - mas como o trigger usa `total_colis=1`, só recalcula com base no coli 1.
+
+## Solução
+
+### Parte 1: Corrigir `removeGenericStock` em `useOrderNumbers.tsx`
+
+**De:**
 ```typescript
-const addOrderNumberEmpty = async (
-  orderNumber: string,
-  location?: string | null,
-  palletNumber?: string | null
-): Promise<OrderNumberEntry | null> => {
-  // Criar colis_status com TODOS os colis a false
-  const colisStatus: Record<string, boolean> = {};
-  for (let i = 1; i <= totalColis; i++) {
-    colisStatus[i.toString()] = false;
+const { data: existingCount } = await supabase
+  .from('counts')
+  .select('id, quantity')
+  .eq('product_id', productId)
+  .eq('colis_number', i)
+  .maybeSingle(); // PROBLEMA: só devolve 1 registo!
+```
+
+**Para:**
+```typescript
+// Buscar TODOS os registos para este coli e decrementar do primeiro com quantidade > 0
+const { data: existingCounts } = await supabase
+  .from('counts')
+  .select('id, quantity')
+  .eq('product_id', productId)
+  .eq('colis_number', i)
+  .order('quantity', { ascending: false }); // Maiores quantidades primeiro
+
+if (existingCounts && existingCounts.length > 0) {
+  // Encontrar primeiro registo com quantidade suficiente
+  const countToUpdate = existingCounts.find(c => c.quantity > 0);
+  if (countToUpdate) {
+    const newQty = Math.max(0, countToUpdate.quantity - quantity);
+    await supabase
+      .from('counts')
+      .update({ quantity: newQty, updated_at: new Date().toISOString() })
+      .eq('id', countToUpdate.id);
   }
-
-  // Insert na tabela stock_order_numbers
-  const { data, error } = await supabase
-    .from('stock_order_numbers')
-    .insert({
-      product_id: productId,
-      order_number: orderNumber.trim(),
-      colis_status: colisStatus, // TODOS false
-      location: location || null,
-      pallet_number: palletNumber || null
-    })
-    .select()
-    .single();
-
-  // NÃO incrementar counts - operador vai marcar manualmente
-  return entry;
-};
+}
 ```
 
-**Renomear `addOrderNumber` para `addOrderNumberComplete`** (manter comportamento actual):
-```typescript
-const addOrderNumberComplete = async (...) => {
-  // Mantém lógica actual: todos colis true + incrementa counts
-};
+### Parte 2: Actualizar trigger para considerar categoria
+
+O trigger `sync_product_stock` precisa consultar a categoria do produto para determinar o número real de colis:
+
+```sql
+-- Dentro do trigger sync_product_stock
+-- Buscar total_colis efectivo considerando a categoria
+SELECT 
+  p.total_colis,
+  COALESCE(jsonb_array_length(c.colis_names::jsonb), 0) as category_colis_count
+INTO product_total_colis, category_colis_count
+FROM products p
+LEFT JOIN categories c ON p.category = c.name
+WHERE p.id = affected_product_id;
+
+-- Usar o MAIOR valor
+effective_total_colis := GREATEST(product_total_colis, category_colis_count);
 ```
 
-#### 2. `src/components/stock/OrderNumberSelector.tsx`
+**Nota**: A coluna `colis_names` é JSONB com estrutura `{"1": "Cabeceira", "2": "Ilhargueiro"}`, então precisamos contar as chaves do objecto.
 
-**Actualizar `OrderNumberEntrySelector`**:
-```typescript
-// Adicionar toggle ou dois botões
-<div className="flex gap-2">
-  <Input
-    value={newOrderNumber}
-    onChange={(e) => setNewOrderNumber(e.target.value)}
-    placeholder="Novo número de encomenda..."
-  />
-  <Button
-    size="sm"
-    variant="outline"
-    onClick={() => handleAddEmpty()} // Adiciona vazia
-  >
-    + Vazia
-  </Button>
-  <Button
-    size="sm"
-    onClick={() => handleAddComplete()} // Adiciona completa
-  >
-    + Completa
-  </Button>
-</div>
-```
+### Parte 3: Corrigir sincronização em todas as funções
 
-Ou usar um **Switch/Toggle** mais elegante:
-```typescript
-const [addAsComplete, setAddAsComplete] = useState(true);
-
-<div className="flex items-center gap-2 text-xs">
-  <Switch 
-    checked={addAsComplete} 
-    onCheckedChange={setAddAsComplete} 
-  />
-  <span>{addAsComplete ? 'Adicionar como completa' : 'Adicionar vazia (marcar colis depois)'}</span>
-</div>
-```
-
-#### 3. Validação na Saída
-
-**Verificar se encomenda está completa antes de permitir saída**:
-```typescript
-// Em OrderNumberExitSelector
-const handleSelect = (order: OrderNumberEntry) => {
-  if (!order.is_complete) {
-    toast.error('Esta encomenda está incompleta. Complete todos os colis primeiro.');
-    return;
-  }
-  onAddToCart(order);
-};
-```
-
-#### 4. Garantir Sincronização na Remoção
-
-**Já implementado correctamente**: `deleteOrderNumber` decrementa counts apenas para colis marcados como presentes.
+As seguintes funções também usam `maybeSingle()` e precisam da mesma correcção:
+- `addOrderNumber` (linha ~98-110)
+- `updateColisStatus` (linha ~185-205)
+- `deleteOrderNumber` (linha ~330-355)
 
 ## Ficheiros a Modificar
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/hooks/useOrderNumbers.tsx` | Adicionar `addOrderNumberEmpty`, manter `addOrderNumber` como opção completa |
-| `src/components/stock/OrderNumberSelector.tsx` | UI com opção de adicionar vazia ou completa |
+| `src/hooks/useOrderNumbers.tsx` | Substituir `maybeSingle()` por query que busca todos os registos e decrementa do correcto |
+| Migração SQL | Actualizar trigger `sync_product_stock` para usar `GREATEST(product.total_colis, category.colis_count)` |
 
-## Interface Visual Proposta
+## Lógica Corrigida
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│  📋 Registar Nº Encomenda                                               │
-│  CAM-001 - Cama Oslo Queen                                              │
-├─────────────────────────────────────────────────────────────────────────┤
-│  Novo: [_ENC-2024-005_______________]                                   │
-│                                                                          │
-│  [◉ Todos colis presentes]  [○ Marcar colis depois]                     │
-│                                                                          │
-│  [+ Adicionar Encomenda]                                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│  Encomendas em stock (3):                                               │
-│                                                                          │
-│  ▼ ENC-2024-001  │ ✓ Completa │ A-01 │ PAL-001 │ [🗑️]                   │
-│    ├─ ☑ Coli 1 - Cabeceira                                              │
-│    ├─ ☑ Coli 2 - Estrado                                                │
-│    ├─ ☑ Coli 3 - Gavetas                                                │
-│    └─ ☑ Coli 4 - Pés                                                    │
-│                                                                          │
-│  ▼ ENC-2024-002  │ ⚠ 2/4 colis │ [🗑️]        ← INCOMPLETA              │
-│    ├─ ☑ Coli 1 - Cabeceira     +1 no count                             │
-│    ├─ ☑ Coli 2 - Estrado       +1 no count                             │
-│    ├─ ☐ Coli 3 - Gavetas       (ainda não chegou)                      │
-│    └─ ☐ Coli 4 - Pés           (ainda não chegou)                      │
-│                                                                          │
-│  ⚠ 1 encomenda incompleta                                               │
-└─────────────────────────────────────────────────────────────────────────┘
+removeGenericStock(1):
+  Para cada coli (1 a totalColis):
+    1. Buscar TODOS os registos de counts para este coli
+    2. Ordenar por quantidade descendente
+    3. Encontrar primeiro registo com quantity > 0
+    4. Decrementar esse registo
+    
+  → Trigger dispara automaticamente
+  → Recalcula current_stock = MIN(soma_coli_1, soma_coli_2, ...)
 ```
 
-## Comportamento Resumido
+## Secção Técnica
 
-| Acção | Efeito no Stock |
-|-------|-----------------|
-| Adicionar encomenda COMPLETA | +1 em TODOS os colis |
-| Adicionar encomenda VAZIA | Nenhum (stock não muda) |
-| Marcar coli como presente | +1 no count desse coli |
-| Desmarcar coli | -1 no count desse coli |
-| Remover encomenda | -1 para cada coli que estava marcado |
-| Saída de encomenda | Remove registo + -1 para cada coli (via picking) |
+### Query corrigida para counts
 
-## Sincronização de Sets Completos
+```typescript
+// Antes (ERRADO - só devolve 1 registo aleatório)
+.eq('colis_number', i).maybeSingle()
 
-O trigger `sync_product_stock` na base de dados já calcula correctamente:
-- Para produtos multi-coli: `current_stock = MIN(count_coli_1, count_coli_2, ..., count_coli_n)`
-- Só conta como set completo quando TODOS os colis têm quantidade suficiente
+// Depois (CORRECTO - busca todos e escolhe o certo)
+.eq('colis_number', i).order('quantity', { ascending: false })
+```
 
-Isto significa que:
-- Encomenda incompleta (ex: só 2 de 4 colis) NÃO aumenta sets completos
-- Quando o último coli da encomenda é marcado, o stock de sets sobe automaticamente
+### Trigger SQL actualizado
+
+```sql
+CREATE OR REPLACE FUNCTION public.sync_product_stock()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $function$
+DECLARE
+  affected_product_id uuid;
+  product_total_colis integer;
+  category_colis_count integer;
+  effective_total_colis integer;
+  -- ... resto das variáveis
+BEGIN
+  -- Buscar total_colis do produto E da categoria
+  SELECT 
+    p.total_colis,
+    COALESCE(
+      (SELECT count(*) FROM jsonb_object_keys(c.colis_names) as k), 
+      0
+    )::integer
+  INTO product_total_colis, category_colis_count
+  FROM products p
+  LEFT JOIN categories c ON p.category = c.name
+  WHERE p.id = affected_product_id;
+  
+  -- Usar o MAIOR valor
+  effective_total_colis := GREATEST(
+    COALESCE(product_total_colis, 1), 
+    COALESCE(category_colis_count, 0)
+  );
+  
+  -- Calcular MIN entre todos os colis
+  IF effective_total_colis <= 1 THEN
+    SELECT COALESCE(SUM(quantity), 0) INTO base_stock
+    FROM counts WHERE product_id = affected_product_id;
+  ELSE
+    min_qty := NULL;
+    FOR i IN 1..effective_total_colis LOOP
+      SELECT COALESCE(SUM(quantity), 0) INTO coli_qty
+      FROM counts
+      WHERE product_id = affected_product_id AND colis_number = i;
+      
+      IF min_qty IS NULL OR coli_qty < min_qty THEN
+        min_qty := coli_qty;
+      END IF;
+    END LOOP;
+    base_stock := COALESCE(min_qty, 0);
+  END IF;
+  
+  -- ... resto da lógica
+END;
+$function$;
+```
