@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { 
   Plus, Trash2, MapPin, Package, Check, X, ClipboardList, 
   ChevronDown, ChevronUp, AlertCircle, CheckCircle2 
@@ -293,6 +294,7 @@ export function OrderNumberEntrySelector({
   const { orderNumbers, loading, addOrderNumber, updateColisStatus, updateOrderLocation, deleteOrderNumber, refetch } = useOrderNumbers(productId, totalColis);
   const [newOrderNumber, setNewOrderNumber] = useState('');
   const [adding, setAdding] = useState(false);
+  const [addAsComplete, setAddAsComplete] = useState<'complete' | 'empty'>('complete');
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [deleteConfirmOrder, setDeleteConfirmOrder] = useState<OrderNumberEntry | null>(null);
   const [updatingColis, setUpdatingColis] = useState<string | null>(null);
@@ -301,7 +303,8 @@ export function OrderNumberEntrySelector({
     if (!newOrderNumber.trim()) return;
     
     setAdding(true);
-    const result = await addOrderNumber(newOrderNumber.trim(), location, palletNumber);
+    const isComplete = addAsComplete === 'complete';
+    const result = await addOrderNumber(newOrderNumber.trim(), location, palletNumber, isComplete);
     setAdding(false);
     
     if (result) {
@@ -379,23 +382,45 @@ export function OrderNumberEntrySelector({
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Add new order number */}
-          <div className="flex gap-2">
-            <Input
-              value={newOrderNumber}
-              onChange={(e) => setNewOrderNumber(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Novo número de encomenda..."
-              disabled={adding}
-            />
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleAdd}
-              disabled={adding || !newOrderNumber.trim()}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                value={newOrderNumber}
+                onChange={(e) => setNewOrderNumber(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Novo número de encomenda..."
+                disabled={adding}
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleAdd}
+                disabled={adding || !newOrderNumber.trim()}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Adicionar
+              </Button>
+            </div>
+            
+            {/* Option to add as complete or empty */}
+            <RadioGroup 
+              value={addAsComplete} 
+              onValueChange={(v) => setAddAsComplete(v as 'complete' | 'empty')}
+              className="flex gap-4"
             >
-              <Plus className="h-3 w-3 mr-1" />
-              Adicionar
-            </Button>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="complete" id="add-complete" />
+                <Label htmlFor="add-complete" className="text-xs font-normal cursor-pointer">
+                  Todos colis presentes
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="empty" id="add-empty" />
+                <Label htmlFor="add-empty" className="text-xs font-normal cursor-pointer text-muted-foreground">
+                  Marcar colis depois
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
 
           {/* Existing orders with expandable colis view */}
