@@ -353,6 +353,7 @@ export function ManualStockSection({
                                   productCode={product.code}
                                   productName={product.name}
                                   totalColis={totalColis}
+                                  currentStock={product.current_stock}
                                   colisNames={colisNames}
                                   onOrderAdded={() => {
                                     setOrderNumberProduct(null);

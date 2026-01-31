@@ -442,6 +442,7 @@ export function ProductCard({
               productCode={product.code}
               productName={product.name}
               totalColis={product.total_colis}
+              currentStock={product.current_stock}
               location={product.uniqueLocations[0] || product.location || undefined}
               palletNumber={product.uniquePallets[0] || product.palletNumber || undefined}
               colisNames={colisNames}
