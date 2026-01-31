@@ -1,152 +1,156 @@
 
-# Plano: Botão "Set Completo" para Entradas e Saídas
 
-## Funcionalidade Solicitada
+# Plano: Completar Sistema de Colis Incompletos e Relatórios
 
-Adicionar uma opção nas interfaces de Entradas e Saídas de stock para que, ao clicar num botão, o sistema preencha automaticamente todos os colis de um produto com a mesma quantidade, completando sets inteiros.
+## Estado Actual
 
-## Comportamento Actual vs. Desejado
+A base está implementada:
+- Toggle "Set Completo" / "Colis Individual" funciona
+- Entradas e saídas actualizam counts por colis
+- Sincronização de dados históricos existe
 
-| Situação Actual | Situação Desejada |
-|-----------------|-------------------|
-| Operador seleciona quantidade (ex: 5) e adiciona produto | Operador pode escolher "5 Sets Completos" |
-| Sistema regista 5 unidades no total | Sistema preenche automaticamente colis 1: 5, colis 2: 5, colis 3: 5... |
-| Não há distinção entre colis | Cada colis recebe a mesma quantidade |
+## O Que Falta Implementar
 
-## Interface Proposta
+### 1. Mostrar Colis Incompletos no CountingSummary
+
+**Ficheiro**: `src/components/counting/CountingSummary.tsx`
+
+Adicionar estatística de "Colis Excedentes" - partes que sobram e não formam sets:
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Produto: Estante Lino Rodi (4 colis)         Stock: 10 sets        │
-│                                                                      │
-│  ┌─────────────────────────────────────────────────────────────────┐ │
-│  │  Quantidade: [__5__]                                            │ │
-│  │                                                                 │ │
-│  │  [ ✓ Set Completo ]  [ Colis Individual ]                      │ │
-│  │                                                                 │ │
-│  │  Preview:                                                       │ │
-│  │  • Coli 1: 5 un. | Coli 2: 5 un. | Coli 3: 5 un. | Coli 4: 5 un.│ │
-│  │  • Sets a adicionar: 5                                          │ │
-│  └─────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
-│  [Adicionar ao Carrinho]                                             │
+│  Resumo da Contagem                                                  │
+│  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐
+│  │  120   │  │  450   │  │  98    │  │  12    │  │  10    │  │  25    │
+│  │ Total  │  │ Sets   │  │ 100%   │  │ Pend.  │  │ N/Cont │  │ Colis  │
+│  │Produtos│  │Completo│  │  OK    │  │        │  │        │  │Sobra   │ <-- NOVO
+│  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Para produtos com `total_colis = 1`, o comportamento permanece inalterado.
-
-## Alterações Técnicas
-
-### 1. Actualizar Tipo MovementItem
-
-**Ficheiro**: `src/hooks/useStockMovements.tsx`
-
+Lógica para calcular colis excedentes:
 ```typescript
-export interface MovementItem {
-  product_id: string;
-  product_code: string;
-  product_name: string;
-  quantity: number;
-  // NOVO: Indica se é set completo ou entrada por colis individual
-  isCompleteSet?: boolean;
-  // NOVO: Para modo individual, quantidade por colis
-  colisQuantities?: Record<number, number>; // { 1: 5, 2: 3, 3: 0 }
-  // Info adicional para display
-  totalColis?: number;
-}
+// Para cada produto multi-colis
+const excessColis = products.reduce((sum, p) => {
+  if (p.total_colis <= 1) return sum;
+  // Diferença entre max e min dos colis
+  const max = Math.max(...p.colisQuantities);
+  const min = Math.min(...p.colisQuantities); // = completeSets
+  return sum + (max - min) * p.total_colis;
+}, 0);
 ```
 
-### 2. Actualizar ManualStockSection
+### 2. Detalhe de Colis Incompletos no StockIntegrityReport
 
-**Ficheiro**: `src/components/stock/ManualStockSection.tsx`
+**Ficheiro**: `src/components/reports/StockIntegrityReport.tsx`
 
-Alterações:
-- Detectar produtos com `total_colis > 1`
-- Adicionar toggle "Set Completo" vs "Colis Individual"
-- Modo "Set Completo" (default): quantidade aplica-se a todos os colis
-- Modo "Colis Individual": mostra inputs separados por colis
-- Preview visual do que vai ser registado
+Adicionar secção que mostra produtos com colis desbalanceados:
 
-### 3. Actualizar StockEntriesView
-
-**Ficheiro**: `src/components/stock/StockEntriesView.tsx`
-
-Actualizar `handleConfirm` para:
-
-```typescript
-for (const item of allItems) {
-  const product = products.find(p => p.id === item.product_id);
-  const totalColis = product?.total_colis || 1;
-
-  for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
-    // Se é set completo, usar item.quantity para todos os colis
-    // Se é individual, usar item.colisQuantities[colisNumber]
-    const colisQty = item.isCompleteSet !== false 
-      ? item.quantity 
-      : (item.colisQuantities?.[colisNumber] || 0);
-    
-    // Buscar e actualizar count...
-  }
-}
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│  ⚠️ Produtos com Colis Desbalanceados (5)                           │
+│  ──────────────────────────────────────────────────────────────────  │
+│  │ EST-001 │ Estante Lino Rodi │ Coli1: 12 │ Coli2: 10 │ Coli3: 10 │ │
+│  │         │                   │    +2     │           │           │ │
+│  ├─────────┼───────────────────┼───────────┼───────────┼───────────┤ │
+│  │ CAM-002 │ Cama Articulada   │ Coli1: 8  │ Coli2: 5  │ Coli3: 8  │ │
+│  │         │                   │    +3     │   Base    │    +3     │ │
+│  └─────────┴───────────────────┴───────────┴───────────┴───────────┘ │
+│                                                                      │
+│  [Exportar Colis Incompletos]                                        │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4. Actualizar StockExitsView
+### 3. Validação de Stock por Colis nas Saídas
 
 **Ficheiro**: `src/components/stock/StockExitsView.tsx`
 
-Mesma lógica de `handleFinalConfirm`:
-- Para saídas "Set Completo": decrementar todos os colis pela mesma quantidade
-- Validar que há stock suficiente em TODOS os colis
-- Preview mostra detalhes de cada colis
-
-### 5. Validação de Stock (Saídas)
-
-Para saídas em modo "Set Completo":
-- Verificar que o mínimo de todos os colis >= quantidade pedida
-- Se algum colis não tiver stock suficiente, mostrar erro específico
+Para modo "Set Completo", validar que TODOS os colis têm stock suficiente:
 
 ```typescript
-// Validação para set completo
-const minColisStock = Math.min(...colisQuantities);
-if (requestedQty > minColisStock) {
-  // Erro: "Só há X sets completos disponíveis"
+// Buscar quantidade actual de cada colis
+const colisStockCheck = await Promise.all(
+  Array.from({ length: totalColis }, async (_, i) => {
+    const colisNumber = i + 1;
+    const { data } = await supabase
+      .from('counts')
+      .select('quantity')
+      .eq('product_id', productId)
+      .eq('colis_number', colisNumber);
+    return { colisNumber, stock: data?.reduce((s, c) => s + c.quantity, 0) || 0 };
+  })
+);
+
+const minStock = Math.min(...colisStockCheck.map(c => c.stock));
+if (requestedQty > minStock) {
+  // Erro: mostrar qual colis limita
 }
 ```
 
-## Fluxo de Dados
+### 4. Identificar Origem das Entradas na Contagem
+
+**Ficheiro**: `src/hooks/useCounting.tsx` + UI
+
+Diferenciar visualmente:
+- Contagens físicas (session_id não null)
+- Entradas administrativas (session_id null)
 
 ```text
-ENTRADA/SAÍDA COM SET COMPLETO:
-
-Utilizador seleciona:     Sistema regista:
-┌─────────────────┐       ┌─────────────────────────────┐
-│ Produto: Estante│       │ counts:                     │
-│ Quantidade: 5   │ ────▶ │  - coli_1: +5               │
-│ [✓] Set Completo│       │  - coli_2: +5               │
-└─────────────────┘       │  - coli_3: +5               │
-                          │  - coli_4: +5               │
-                          │ current_stock: +5 sets      │
-                          └─────────────────────────────┘
+Produto: Estante Lino Rodi
+┌─────────────────────────────────────────────────────┐
+│  Coli 1: 12 un.  │  Coli 2: 10 un.  │  Coli 3: 10 un.
+│  [📦 7 contagem] │  [📦 5 contagem] │  [📦 5 contagem]
+│  [📥 5 entrada ] │  [📥 5 entrada ] │  [📥 5 entrada]
+└─────────────────────────────────────────────────────┘
 ```
 
 ## Ficheiros a Modificar
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/hooks/useStockMovements.tsx` | Adicionar campos `isCompleteSet`, `colisQuantities`, `totalColis` ao tipo |
-| `src/components/stock/ManualStockSection.tsx` | Toggle Set/Individual + inputs por colis |
-| `src/components/stock/StockEntriesView.tsx` | Lógica de confirmação por set/colis |
-| `src/components/stock/StockExitsView.tsx` | Validação e saída por set/colis |
+| `src/components/counting/CountingSummary.tsx` | Adicionar estatística de colis excedentes |
+| `src/components/reports/StockIntegrityReport.tsx` | Secção de produtos desbalanceados |
+| `src/hooks/useCounting.tsx` | Buscar detalhes de origem (session vs admin) |
+| `src/components/counting/ProductCard.tsx` | Mostrar origem visual das quantidades |
+| `src/components/stock/StockExitsView.tsx` | Validação de stock por colis |
 
-## Experiência do Utilizador
+## Interface de Colis Desbalanceados
 
-1. **Produtos simples (1 colis)**: Sem alterações, comportamento actual
-2. **Produtos multi-colis (default)**: Modo "Set Completo" activo por omissão
-3. **Opção de granularidade**: Operador pode mudar para modo individual se necessário
-4. **Feedback visual**: Preview claro do que vai ser registado em cada colis
+Novo componente ou secção no relatório que mostra:
 
-## Compatibilidade
+1. **Lista de produtos** onde `max(colis) != min(colis)`
+2. **Detalhe por colis** mostrando quantidade e diferença
+3. **Sugestão de acção**: "Faltam 2 un. do Coli 2 para completar mais 2 sets"
+4. **Exportação**: Excel com lista de colis em falta
 
-- Produtos com `total_colis = 1`: Comportamento inalterado
-- Dados existentes: Não afectados, apenas novos movimentos usam a lógica
-- Carrinho misto: Suporta itens em modo set e individual simultaneamente
+## Fluxo de Validação de Saídas
+
+```text
+SAÍDA DE 5 SETS COMPLETOS:
+
+1. Utilizador seleciona produto e quantidade 5
+2. Sistema verifica stock de cada colis:
+   - Coli 1: 12 ✓ (>= 5)
+   - Coli 2: 10 ✓ (>= 5)
+   - Coli 3: 3  ✗ (< 5) ← BLOQUEIO
+
+3. Erro: "Só há 3 sets completos disponíveis (Coli 3 limita)"
+4. Opções:
+   - Ajustar para 3 sets
+   - Mudar para modo individual
+```
+
+## Resumo das Alterações
+
+### Fase 1: Estatísticas (Rápido)
+- Actualizar `CountingSummary` com contagem de colis excedentes
+- Adicionar secção de desbalanceamento no `StockIntegrityReport`
+
+### Fase 2: Validação de Saídas
+- Verificar stock por colis antes de permitir saída
+- Mostrar qual colis está a limitar
+
+### Fase 3: Rastreabilidade (Opcional)
+- Diferenciar contagens físicas de entradas administrativas
+- Mostrar origem na interface de contagem
+
