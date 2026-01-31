@@ -35,15 +35,18 @@ export function useCounting(sessionId: string | null) {
     staleTime: 30000, // Cache for 30 seconds
   });
 
-  // Fetch counts with react-query
+  // Fetch counts with react-query - include both session counts AND administrative counts (session_id IS NULL)
   const { data: counts = [], isLoading: countsLoading, refetch: refetchCounts } = useQuery({
     queryKey: ['counts', sessionId],
     queryFn: async () => {
       if (!sessionId) return [];
+      
+      // Fetch session-specific counts AND administrative counts (session_id IS NULL)
+      // This ensures we see the full stock picture including entries/exits
       const { data, error } = await supabase
         .from('counts')
         .select('*')
-        .eq('session_id', sessionId);
+        .or(`session_id.eq.${sessionId},session_id.is.null`);
       
       if (error) {
         toast({
