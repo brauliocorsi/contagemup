@@ -1,118 +1,109 @@
-import { useState, useEffect } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CountingSession } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
 
+const fetchSessionsFromDB = async (): Promise<CountingSession[]> => {
+  const { data, error } = await supabase
+    .from('counting_sessions')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data as CountingSession[]) || [];
+};
+
 export function useSessions() {
-  const [sessions, setSessions] = useState<CountingSession[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  const fetchSessions = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('counting_sessions')
-      .select('*')
-      .order('created_at', { ascending: false });
+  const { data: sessions = [], isLoading: loading } = useQuery({
+    queryKey: ['counting-sessions'],
+    queryFn: fetchSessionsFromDB,
+    staleTime: 2 * 60 * 1000, // 2 minutos
+    gcTime: 5 * 60 * 1000, // 5 minutos
+  });
 
-    if (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as sessões',
-        variant: 'destructive'
-      });
-    } else {
-      setSessions((data as CountingSession[]) || []);
-    }
-    setLoading(false);
-  };
+  const createMutation = useMutation({
+    mutationFn: async ({ name, category }: { name: string; category: string }) => {
+      if (!user) throw new Error('Utilizador não autenticado');
 
-  const createSession = async (name: string, category: string = 'Todas') => {
-    if (!user) return null;
+      const { data, error } = await supabase
+        .from('counting_sessions')
+        .insert({ name, category, created_by: user.id })
+        .select()
+        .single();
 
-    const { data, error } = await supabase
-      .from('counting_sessions')
-      .insert({ name, category, created_by: user.id })
-      .select()
-      .single();
-
-    if (error) {
+      if (error) throw error;
+      return data as CountingSession;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['counting-sessions'] });
+      toast({ title: 'Sucesso', description: 'Sessão criada com sucesso' });
+    },
+    onError: () => {
       toast({
         title: 'Erro',
         description: 'Não foi possível criar a sessão',
         variant: 'destructive'
       });
-      return null;
     }
+  });
 
-    toast({ title: 'Sucesso', description: 'Sessão criada com sucesso' });
-    await fetchSessions();
-    return data as CountingSession;
-  };
+  const completeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('counting_sessions')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', id);
 
-  const completeSession = async (id: string) => {
-    const { error } = await supabase
-      .from('counting_sessions')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', id);
-
-    if (error) {
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['counting-sessions'] });
+      toast({ title: 'Sucesso', description: 'Sessão completada' });
+    },
+    onError: () => {
       toast({
         title: 'Erro',
         description: 'Não foi possível completar a sessão',
         variant: 'destructive'
       });
-      return false;
     }
+  });
 
-    toast({ title: 'Sucesso', description: 'Sessão completada' });
-    await fetchSessions();
-    return true;
-  };
+  const cancelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('counting_sessions')
+        .update({ status: 'cancelled' })
+        .eq('id', id);
 
-  const cancelSession = async (id: string) => {
-    const { error } = await supabase
-      .from('counting_sessions')
-      .update({ status: 'cancelled' })
-      .eq('id', id);
-
-    if (error) {
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['counting-sessions'] });
+      toast({ title: 'Sucesso', description: 'Sessão cancelada' });
+    },
+    onError: () => {
       toast({
         title: 'Erro',
         description: 'Não foi possível cancelar a sessão',
         variant: 'destructive'
       });
-      return false;
     }
+  });
 
-    toast({ title: 'Sucesso', description: 'Sessão cancelada' });
-    await fetchSessions();
-    return true;
-  };
-
-  const deleteSession = async (id: string) => {
-    try {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
       // 1. Delete count_logs related to the session
-      const { error: logsError } = await supabase
-        .from('count_logs')
-        .delete()
-        .eq('session_id', id);
-
-      if (logsError) {
-        console.error('Error deleting count logs:', logsError);
-      }
+      await supabase.from('count_logs').delete().eq('session_id', id);
 
       // 2. Delete counts related to the session
-      const { error: countsError } = await supabase
-        .from('counts')
-        .delete()
-        .eq('session_id', id);
-
-      if (countsError) {
-        console.error('Error deleting counts:', countsError);
-      }
+      await supabase.from('counts').delete().eq('session_id', id);
 
       // 3. Get reconciliations for this session
       const { data: recs } = await supabase
@@ -123,25 +114,14 @@ export function useSessions() {
       // 4. Delete reconciliation items
       if (recs && recs.length > 0) {
         const recIds = recs.map(r => r.id);
-        const { error: itemsError } = await supabase
+        await supabase
           .from('reconciliation_items')
           .delete()
           .in('reconciliation_id', recIds);
-
-        if (itemsError) {
-          console.error('Error deleting reconciliation items:', itemsError);
-        }
       }
 
       // 5. Delete reconciliations
-      const { error: recsError } = await supabase
-        .from('reconciliations')
-        .delete()
-        .eq('session_id', id);
-
-      if (recsError) {
-        console.error('Error deleting reconciliations:', recsError);
-      }
+      await supabase.from('reconciliations').delete().eq('session_id', id);
 
       // 6. Delete the session itself
       const { error } = await supabase
@@ -149,32 +129,60 @@ export function useSessions() {
         .delete()
         .eq('id', id);
 
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível eliminar a sessão',
-          variant: 'destructive'
-        });
-        return false;
-      }
-
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['counting-sessions'] });
       toast({ title: 'Sucesso', description: 'Sessão eliminada definitivamente' });
-      await fetchSessions();
-      return true;
-    } catch (err) {
+    },
+    onError: (err) => {
       console.error('Error deleting session:', err);
       toast({
         title: 'Erro',
         description: 'Ocorreu um erro ao eliminar a sessão',
         variant: 'destructive'
       });
+    }
+  });
+
+  const fetchSessions = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['counting-sessions'] });
+  }, [queryClient]);
+
+  const createSession = useCallback(async (name: string, category: string = 'Todas') => {
+    try {
+      return await createMutation.mutateAsync({ name, category });
+    } catch {
+      return null;
+    }
+  }, [createMutation]);
+
+  const completeSession = useCallback(async (id: string) => {
+    try {
+      await completeMutation.mutateAsync(id);
+      return true;
+    } catch {
       return false;
     }
-  };
+  }, [completeMutation]);
 
-  useEffect(() => {
-    fetchSessions();
-  }, []);
+  const cancelSession = useCallback(async (id: string) => {
+    try {
+      await cancelMutation.mutateAsync(id);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [cancelMutation]);
+
+  const deleteSession = useCallback(async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [deleteMutation]);
 
   return {
     sessions,

@@ -7,7 +7,16 @@ import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000, // 2 minutos - dados ficam frescos por 2min
+      gcTime: 5 * 60 * 1000, // 5 minutos - garbage collection
+      refetchOnWindowFocus: false, // Desabilitar refresh automático ao focar janela
+      retry: 1, // Apenas 1 retry em caso de erro
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
