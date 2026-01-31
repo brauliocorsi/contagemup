@@ -113,9 +113,9 @@ function VirtualizedGrid({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    // Fallback only; the real height is measured via `measureElement`.
-    estimateSize: () => 360,
-    overscan: 3,
+    // Cards now have min-h-[280px] + max-h constraints, so ~300px is a good estimate
+    estimateSize: () => 300,
+    overscan: 2,
   });
 
   const gridColsClass =
