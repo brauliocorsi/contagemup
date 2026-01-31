@@ -21,6 +21,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          requires_order_number: boolean
           updated_at: string
         }
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          requires_order_number?: boolean
           updated_at?: string
         }
         Update: {
@@ -37,6 +39,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          requires_order_number?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -588,6 +591,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_order_numbers: {
+        Row: {
+          colis_status: Json
+          created_at: string
+          id: string
+          location: string | null
+          order_number: string
+          pallet_number: string | null
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          colis_status?: Json
+          created_at?: string
+          id?: string
+          location?: string | null
+          order_number: string
+          pallet_number?: string | null
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          colis_status?: Json
+          created_at?: string
+          id?: string
+          location?: string | null
+          order_number?: string
+          pallet_number?: string | null
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_order_numbers_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
