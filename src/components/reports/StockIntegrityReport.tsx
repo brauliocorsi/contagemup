@@ -15,8 +15,11 @@ import {
   Database,
   TrendingUp,
   TrendingDown,
-  Activity
+  Activity,
+  Layers,
+  MapPin
 } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -34,6 +37,18 @@ interface IntegrityCheck {
   damagedStock: number;
 }
 
+interface ColisImbalance {
+  productId: string;
+  code: string;
+  name: string;
+  totalColis: number;
+  colisQuantities: { colisNumber: number; quantity: number; excess: number }[];
+  minQuantity: number;
+  maxQuantity: number;
+  totalExcess: number;
+  locations: string[];
+}
+
 interface IntegrityStats {
   totalProducts: number;
   okCount: number;
@@ -42,6 +57,7 @@ interface IntegrityStats {
   lastCheck: Date | null;
   totalDamagedUnits: number;
   productsWithDamages: number;
+  imbalancedProducts: number;
 }
 
 export function StockIntegrityReport() {
@@ -60,25 +76,29 @@ export function StockIntegrityReport() {
 
       if (productsError) throw productsError;
 
-      // Fetch all counts
+      // Fetch all counts with location info
       const { data: counts, error: countsError } = await supabase
         .from('counts')
-        .select('product_id, colis_number, quantity');
+        .select('product_id, colis_number, quantity, location');
 
       if (countsError) throw countsError;
 
-      // Calculate expected stock for each product
-      const checks: IntegrityCheck[] = products.map(product => {
+      // Calculate expected stock for each product and detect imbalances
+      const checks: IntegrityCheck[] = [];
+      const imbalances: ColisImbalance[] = [];
+
+      products.forEach(product => {
         const productCounts = counts.filter(c => c.product_id === product.id);
         
         let calculatedStock: number;
+        const colisQuantities: Record<number, number> = {};
         
         if (product.total_colis <= 1) {
           // Single colis: sum all quantities
           calculatedStock = productCounts.reduce((sum, c) => sum + c.quantity, 0);
+          colisQuantities[1] = calculatedStock;
         } else {
           // Multi-colis: minimum across all colis numbers
-          const colisQuantities: Record<number, number> = {};
           for (let i = 1; i <= product.total_colis; i++) {
             colisQuantities[i] = 0;
           }
@@ -98,7 +118,7 @@ export function StockIntegrityReport() {
           status = Math.abs(difference) > 5 ? 'mismatch' : 'warning';
         }
 
-        return {
+        checks.push({
           productId: product.id,
           code: product.code,
           name: product.name,
@@ -108,7 +128,39 @@ export function StockIntegrityReport() {
           difference,
           status,
           damagedStock: product.damaged_stock || 0,
-        };
+        });
+
+        // Detect colis imbalances for multi-colis products
+        if (product.total_colis > 1) {
+          const quantities = Object.values(colisQuantities);
+          const minQty = Math.min(...quantities);
+          const maxQty = Math.max(...quantities);
+          
+          if (maxQty > minQty) {
+            // Get unique locations for this product
+            const locations = [...new Set(
+              productCounts
+                .filter(c => c.location)
+                .map(c => c.location!)
+            )];
+
+            imbalances.push({
+              productId: product.id,
+              code: product.code,
+              name: product.name,
+              totalColis: product.total_colis,
+              colisQuantities: Object.entries(colisQuantities).map(([num, qty]) => ({
+                colisNumber: parseInt(num),
+                quantity: qty,
+                excess: qty - minQty
+              })),
+              minQuantity: minQty,
+              maxQuantity: maxQty,
+              totalExcess: quantities.reduce((sum, qty) => sum + (qty - minQty), 0),
+              locations
+            });
+          }
+        }
       });
 
       const stats: IntegrityStats = {
@@ -119,11 +171,12 @@ export function StockIntegrityReport() {
         lastCheck: new Date(),
         totalDamagedUnits: products.reduce((sum, p) => sum + (p.damaged_stock || 0), 0),
         productsWithDamages: products.filter(p => (p.damaged_stock || 0) > 0).length,
+        imbalancedProducts: imbalances.length,
       };
 
       setLastCheckTime(new Date());
 
-      return { checks, stats };
+      return { checks, stats, imbalances };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -186,8 +239,31 @@ export function StockIntegrityReport() {
     toast.success('Relatório exportado!');
   };
 
+  const handleExportImbalances = () => {
+    if (!integrityData?.imbalances) return;
+
+    const exportData = integrityData.imbalances.flatMap(item => 
+      item.colisQuantities.map(coli => ({
+        'Código': item.code,
+        'Nome': item.name,
+        'Coli': `Coli ${coli.colisNumber}`,
+        'Quantidade': coli.quantity,
+        'Excedente': coli.excess > 0 ? `+${coli.excess}` : '-',
+        'Sets Completos': item.minQuantity,
+        'Localizações': item.locations.join(', ') || '-'
+      }))
+    );
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Colis Incompletos');
+    XLSX.writeFile(wb, `colis_incompletos_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`);
+    toast.success('Relatório de colis incompletos exportado!');
+  };
+
   const stats = integrityData?.stats;
   const issues = integrityData?.checks.filter(c => c.status !== 'ok') || [];
+  const imbalances = integrityData?.imbalances || [];
 
   const getHealthScore = () => {
     if (!stats) return 0;
@@ -379,13 +455,108 @@ export function StockIntegrityReport() {
               </div>
             </ScrollArea>
           </div>
-        ) : stats && (
+        ) : stats && issues.length === 0 && imbalances.length === 0 && (
           <div className="text-center py-8">
             <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-green-600">Sistema Íntegro!</h3>
             <p className="text-muted-foreground">
               Todos os {stats.totalProducts} produtos estão com o stock sincronizado corretamente.
             </p>
+          </div>
+        )}
+
+        {/* Colis Imbalances Section */}
+        {imbalances.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium flex items-center gap-2">
+                <Layers className="h-4 w-4 text-orange-600" />
+                Produtos com Colis Desbalanceados ({imbalances.length})
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportImbalances}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Colis Incompletos
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Produtos multi-colis onde as partes têm quantidades diferentes, impedindo a formação de sets completos.
+            </p>
+            <ScrollArea className="h-[400px] border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Sets Completos</TableHead>
+                    <TableHead>Detalhe por Colis</TableHead>
+                    <TableHead>Localização</TableHead>
+                    <TableHead>Acção Sugerida</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {imbalances.map((item) => (
+                    <TableRow key={item.productId}>
+                      <TableCell className="font-mono font-medium">{item.code}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{item.name}</TableCell>
+                      <TableCell>
+                        <Badge className="bg-green-100 text-green-800">
+                          {item.minQuantity} sets
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {item.colisQuantities.map((coli) => (
+                            <Badge
+                              key={coli.colisNumber}
+                              variant="outline"
+                              className={coli.excess > 0 
+                                ? "bg-orange-50 text-orange-700 border-orange-300" 
+                                : "bg-gray-50 text-gray-700"
+                              }
+                            >
+                              C{coli.colisNumber}: {coli.quantity}
+                              {coli.excess > 0 && (
+                                <span className="ml-1 text-orange-600">+{coli.excess}</span>
+                              )}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {item.locations.length > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-sm">
+                              {item.locations.length === 1 
+                                ? item.locations[0] 
+                                : `${item.locations.length} loc.`}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">
+                          {item.colisQuantities
+                            .filter(c => c.quantity === item.minQuantity && item.maxQuantity > item.minQuantity)
+                            .map(c => `Coli ${c.colisNumber}`)
+                            .slice(0, 2)
+                            .join(', ')}
+                          {item.colisQuantities.filter(c => c.quantity === item.minQuantity).length > 0 && (
+                            <span> precisa +{item.maxQuantity - item.minQuantity}</span>
+                          )}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
           </div>
         )}
 
