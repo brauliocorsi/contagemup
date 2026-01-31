@@ -17,13 +17,15 @@ import {
   TrendingDown,
   Activity,
   Layers,
-  MapPin
+  MapPin,
+  Wrench
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
+import { BulkStockCorrectionDialog } from './BulkStockCorrectionDialog';
 
 interface IntegrityCheck {
   productId: string;
@@ -63,6 +65,7 @@ interface IntegrityStats {
 export function StockIntegrityReport() {
   const queryClient = useQueryClient();
   const [lastCheckTime, setLastCheckTime] = useState<Date | null>(null);
+  const [showCorrectionDialog, setShowCorrectionDialog] = useState(false);
 
   // Fetch integrity data
   const { data: integrityData, isLoading, refetch } = useQuery({
@@ -302,6 +305,15 @@ export function StockIntegrityReport() {
                 </Button>
                 <Button
                   size="sm"
+                  variant="default"
+                  onClick={() => setShowCorrectionDialog(true)}
+                  title="Corrigir stock de múltiplos produtos"
+                >
+                  <Wrench className="h-4 w-4 mr-2" />
+                  Corrigir Stock
+                </Button>
+                <Button
+                  size="sm"
                   variant="secondary"
                   onClick={() => syncStockMutation.mutate()}
                   disabled={syncStockMutation.isPending}
@@ -312,6 +324,7 @@ export function StockIntegrityReport() {
                 </Button>
                 <Button
                   size="sm"
+                  variant="outline"
                   onClick={() => syncCountsMutation.mutate()}
                   disabled={syncCountsMutation.isPending}
                   title="Sincroniza os counts para corresponder ao current_stock"
@@ -567,6 +580,22 @@ export function StockIntegrityReport() {
           </div>
         )}
       </CardContent>
+
+      {/* Bulk Stock Correction Dialog */}
+      <BulkStockCorrectionDialog
+        open={showCorrectionDialog}
+        onOpenChange={setShowCorrectionDialog}
+        discrepancies={issues.map(item => ({
+          productId: item.productId,
+          code: item.code,
+          name: item.name,
+          totalColis: item.totalColis,
+          dbStock: item.dbStock,
+          calculatedStock: item.calculatedStock,
+          difference: item.difference,
+        }))}
+        onSuccess={() => refetch()}
+      />
     </Card>
   );
 }
