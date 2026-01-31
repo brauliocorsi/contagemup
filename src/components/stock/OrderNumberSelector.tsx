@@ -33,6 +33,7 @@ interface OrderNumberExitSelectorProps {
   productCode: string;
   productName: string;
   totalColis: number;
+  colisNames?: Record<string, string> | null;
   onAddToCart: (orderEntry: OrderNumberEntry) => void;
 }
 
@@ -40,9 +41,14 @@ export function OrderNumberExitSelector({
   productId,
   productCode,
   productName,
-  totalColis,
+  totalColis: productTotalColis,
+  colisNames,
   onAddToCart,
 }: OrderNumberExitSelectorProps) {
+  // Calculate effective total colis: use max between product's total_colis and category's colis_names count
+  const categoryColisCount = colisNames ? Object.keys(colisNames).length : 0;
+  const totalColis = Math.max(productTotalColis, categoryColisCount);
+
   const { orderNumbers, loading, verifyOrderNumber } = useOrderNumbers(productId, totalColis);
   const [searchValue, setSearchValue] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -108,10 +114,18 @@ export function OrderNumberExitSelector({
     }
   };
 
+  const getColisName = (colisNumber: number): string => {
+    if (colisNames && colisNames[colisNumber.toString()]) {
+      return colisNames[colisNumber.toString()];
+    }
+    return `Cóli ${colisNumber}`;
+  };
+
   const getColisStatusBadges = (order: OrderNumberEntry) => {
     return Array.from({ length: totalColis }, (_, i) => {
       const colisNum = i + 1;
       const isPresent = order.colis_status[colisNum.toString()];
+      const colisName = getColisName(colisNum);
       return (
         <span
           key={colisNum}
@@ -120,7 +134,7 @@ export function OrderNumberExitSelector({
             isPresent ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
           )}
         >
-          C{colisNum}
+          {colisName}
           {isPresent ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
         </span>
       );
@@ -284,13 +298,18 @@ export function OrderNumberEntrySelector({
   productId,
   productCode,
   productName,
-  totalColis,
+  totalColis: productTotalColis,
   location,
   palletNumber,
   colisNames,
   onOrderAdded,
   onOrderDeleted,
 }: OrderNumberEntrySelectorProps) {
+  // Calculate effective total colis: use max between product's total_colis and category's colis_names count
+  // This handles cases where product has total_colis=1 but category defines 2+ colis names
+  const categoryColisCount = colisNames ? Object.keys(colisNames).length : 0;
+  const totalColis = Math.max(productTotalColis, categoryColisCount);
+
   const { orderNumbers, loading, addOrderNumber, updateColisStatus, updateOrderLocation, deleteOrderNumber, refetch } = useOrderNumbers(productId, totalColis);
   const [newOrderNumber, setNewOrderNumber] = useState('');
   const [adding, setAdding] = useState(false);

@@ -62,6 +62,15 @@ export function ManualStockSection({
     return map;
   }, [categories]);
 
+  // Map of category name -> colis_names
+  const categoriesColisNames = useMemo(() => {
+    const map: Record<string, Record<string, string> | null> = {};
+    categories.forEach(cat => {
+      map[cat.name] = cat.colis_names as Record<string, string> | null;
+    });
+    return map;
+  }, [categories]);
+
   // Create stock map for quick lookup
   const stockMap = useMemo(() => {
     return products.reduce((acc, p) => {
@@ -194,6 +203,7 @@ export function ManualStockSection({
                       const isExpanded = expandedProduct === product.id;
                       const state = getInputState(product.id, totalColis);
                       const requiresOrder = categoriesRequiringOrder[product.category] || false;
+                      const colisNames = categoriesColisNames[product.category] || null;
                       const isOrderNumberExpanded = orderNumberProduct === product.id;
 
                       return (
@@ -343,6 +353,7 @@ export function ManualStockSection({
                                   productCode={product.code}
                                   productName={product.name}
                                   totalColis={totalColis}
+                                  colisNames={colisNames}
                                   onOrderAdded={() => {
                                     setOrderNumberProduct(null);
                                     fetchProducts();
@@ -361,6 +372,7 @@ export function ManualStockSection({
                                   productCode={product.code}
                                   productName={product.name}
                                   totalColis={totalColis}
+                                  colisNames={colisNames}
                                   onAddToCart={(orderEntry: OrderNumberEntry) => {
                                     // Add to cart with order number reference
                                     onAddToCart({
