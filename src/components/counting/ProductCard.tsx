@@ -252,17 +252,17 @@ export function ProductCard({
   return (
     <>
       <Card className={cn(
-        'transition-all',
+        'transition-all min-h-[280px] flex flex-col',
         product.hasPartialProduct && 'border-yellow-300 bg-yellow-50/50',
         !product.hasPartialProduct && product.completeSets > 0 && 'border-green-300 bg-green-50/50',
         product.status === 'not_counted' && 'border-muted'
       )}>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex-shrink-0">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              {getStatusIcon()}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex-shrink-0">{getStatusIcon()}</div>
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-base">{product.name}</CardTitle>
+                <CardTitle className="text-base line-clamp-1" title={product.name}>{product.name}</CardTitle>
                 <div className="flex items-center gap-1 mt-0.5">
                   <Hash className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                   {isEditingCode ? (
@@ -294,8 +294,8 @@ export function ProductCard({
                     </button>
                   </CountHistoryPopover>
                 </div>
-                <div className="flex items-center gap-1 mt-1 flex-wrap">
-                  <Badge variant="outline" className="text-xs">{product.category}</Badge>
+                <div className="flex items-center gap-1 mt-1 flex-wrap max-h-[52px] overflow-hidden">
+                  <Badge variant="outline" className="text-xs flex-shrink-0">{product.category}</Badge>
                   {/* Order Number Required indicator */}
                   {requiresOrderNumber && (
                     <Badge 
@@ -434,7 +434,7 @@ export function ProductCard({
             </div>
           )}
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 overflow-y-auto max-h-[300px]">
           {/* If category requires order number, show special interface */}
           {requiresOrderNumber ? (
             <OrderNumberEntrySelector
