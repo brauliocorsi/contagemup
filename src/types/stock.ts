@@ -105,3 +105,16 @@ export interface StockDistribution {
   location: string;
   pallet_number: string;
 }
+
+// Order number entry for products that require order tracking
+export interface OrderNumberEntry {
+  id: string;
+  product_id: string;
+  order_number: string;
+  colis_status: Record<string, boolean>; // {"1": true, "2": false, ...}
+  is_complete: boolean; // Computed: all colis are true
+  location: string | null;
+  pallet_number: string | null;
+  created_at: string;
+  updated_at: string;
+}

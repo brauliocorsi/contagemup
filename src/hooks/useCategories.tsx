@@ -8,6 +8,7 @@ export interface Category {
   name: string;
   description: string | null;
   colis_names: Record<string, string> | null;
+  requires_order_number: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +31,7 @@ function mapToCategory(row: {
   name: string;
   description: string | null;
   colis_names: Json | null;
+  requires_order_number: boolean;
   created_at: string;
   updated_at: string;
 }): Category {
@@ -64,14 +66,20 @@ export function useCategories() {
     fetchCategories();
   }, [fetchCategories]);
 
-  const createCategory = async (name: string, description?: string, colisNames?: Record<string, string> | null) => {
+  const createCategory = async (
+    name: string, 
+    description?: string, 
+    colisNames?: Record<string, string> | null,
+    requiresOrderNumber: boolean = false
+  ) => {
     try {
       const { data, error } = await supabase
         .from('categories')
         .insert({ 
           name: name.trim(), 
           description: description?.trim() || null,
-          colis_names: colisNames || null
+          colis_names: colisNames || null,
+          requires_order_number: requiresOrderNumber
         })
         .select()
         .single();
@@ -95,15 +103,27 @@ export function useCategories() {
     }
   };
 
-  const updateCategory = async (id: string, name: string, description?: string, colisNames?: Record<string, string> | null) => {
+  const updateCategory = async (
+    id: string, 
+    name: string, 
+    description?: string, 
+    colisNames?: Record<string, string> | null,
+    requiresOrderNumber?: boolean
+  ) => {
     try {
+      const updateData: Record<string, unknown> = { 
+        name: name.trim(), 
+        description: description?.trim() || null,
+        colis_names: colisNames !== undefined ? colisNames : null
+      };
+      
+      if (requiresOrderNumber !== undefined) {
+        updateData.requires_order_number = requiresOrderNumber;
+      }
+
       const { data, error } = await supabase
         .from('categories')
-        .update({ 
-          name: name.trim(), 
-          description: description?.trim() || null,
-          colis_names: colisNames !== undefined ? colisNames : null
-        })
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();

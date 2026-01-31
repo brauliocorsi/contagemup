@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Pencil, Trash2, Tags, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tags, X, ClipboardList } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface ColisNameEntry {
   colisNumber: string;
@@ -109,23 +110,26 @@ export function CategoriesView() {
     description: string;
     enableColisNames: boolean;
     colisNames: ColisNameEntry[];
+    requiresOrderNumber: boolean;
   } | null>(null);
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [enableNewColisNames, setEnableNewColisNames] = useState(false);
   const [newColisNames, setNewColisNames] = useState<ColisNameEntry[]>([]);
+  const [newRequiresOrderNumber, setNewRequiresOrderNumber] = useState(false);
 
   const resetCreateForm = () => {
     setNewName('');
     setNewDescription('');
     setEnableNewColisNames(false);
     setNewColisNames([]);
+    setNewRequiresOrderNumber(false);
   };
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
     const colisNamesRecord = enableNewColisNames ? convertToRecord(newColisNames) : null;
-    const result = await createCategory(newName, newDescription, colisNamesRecord);
+    const result = await createCategory(newName, newDescription, colisNamesRecord, newRequiresOrderNumber);
     if (result) {
       resetCreateForm();
       setIsCreateOpen(false);
@@ -141,7 +145,8 @@ export function CategoriesView() {
       editingCategory.id, 
       editingCategory.name, 
       editingCategory.description,
-      colisNamesRecord
+      colisNamesRecord,
+      editingCategory.requiresOrderNumber
     );
     if (result) {
       setEditingCategory(null);
@@ -159,7 +164,8 @@ export function CategoriesView() {
       name: category.name,
       description: category.description || '',
       enableColisNames: colisNames.length > 0,
-      colisNames: colisNames.length > 0 ? colisNames : []
+      colisNames: colisNames.length > 0 ? colisNames : [],
+      requiresOrderNumber: category.requires_order_number
     });
   };
 
@@ -231,8 +237,25 @@ export function CategoriesView() {
                 />
               </div>
               
-              <div className="border-t pt-4">
-                <div className="flex items-center space-x-2 mb-3">
+              <div className="border-t pt-4 space-y-4">
+                <div className="flex items-start space-x-2">
+                  <Checkbox
+                    id="requires-order-number"
+                    checked={newRequiresOrderNumber}
+                    onCheckedChange={(checked) => setNewRequiresOrderNumber(checked === true)}
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <Label htmlFor="requires-order-number" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4" />
+                      Exigir número de encomenda por unidade
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Cada unidade em stock precisará de um número de encomenda associado
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
                   <Checkbox
                     id="enable-colis-names"
                     checked={enableNewColisNames}
@@ -296,7 +319,17 @@ export function CategoriesView() {
               ) : (
                 categories.map(category => (
                   <TableRow key={category.id}>
-                    <TableCell className="font-medium">{category.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {category.name}
+                        {category.requires_order_number && (
+                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                            <ClipboardList className="h-3 w-3" />
+                            Nº Encomenda
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {category.description || '-'}
                     </TableCell>
@@ -348,8 +381,29 @@ export function CategoriesView() {
                                 />
                               </div>
                               
-                              <div className="border-t pt-4">
-                                <div className="flex items-center space-x-2 mb-3">
+                              <div className="border-t pt-4 space-y-4">
+                                <div className="flex items-start space-x-2">
+                                  <Checkbox
+                                    id="edit-requires-order-number"
+                                    checked={editingCategory?.requiresOrderNumber || false}
+                                    onCheckedChange={(checked) => {
+                                      setEditingCategory(prev => 
+                                        prev ? { ...prev, requiresOrderNumber: checked === true } : null
+                                      );
+                                    }}
+                                  />
+                                  <div className="grid gap-1.5 leading-none">
+                                    <Label htmlFor="edit-requires-order-number" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                                      <ClipboardList className="h-4 w-4" />
+                                      Exigir número de encomenda por unidade
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                      Cada unidade em stock precisará de um número de encomenda associado
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center space-x-2">
                                   <Checkbox
                                     id="edit-enable-colis-names"
                                     checked={editingCategory?.enableColisNames || false}
