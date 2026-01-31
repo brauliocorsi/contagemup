@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -13,7 +13,6 @@ interface CountingProductListProps {
   categoryColisNamesMap: Record<string, Record<string, string> | null>;
   categoriesRequiringOrder: Record<string, boolean>;
   getDamagesForProduct: (productId: string) => Array<{ quantity: number }>;
-  // Callbacks matching ProductCard props
   onIncrement: (productId: string, colisNumber: number) => void;
   onDecrement: (productId: string, colisNumber: number) => void;
   onIncrementAtLocation: (productId: string, colisNumber: number, countId: string) => void;
@@ -76,11 +75,23 @@ function VirtualizedGrid({
   emptyMessage,
 }: VirtualizedGridProps) {
   const parentRef = useRef<HTMLDivElement>(null);
-  
-  // Calculate columns based on container width
   const [columns, setColumns] = useState(3);
   
-  // Group products into rows
+  // Handle resize to adjust columns
+  const updateColumns = useCallback(() => {
+    const width = parentRef.current?.clientWidth || window.innerWidth;
+    if (width >= 1024) setColumns(3);
+    else if (width >= 768) setColumns(2);
+    else setColumns(1);
+  }, []);
+
+  useEffect(() => {
+    updateColumns();
+    window.addEventListener('resize', updateColumns);
+    return () => window.removeEventListener('resize', updateColumns);
+  }, [updateColumns]);
+  
+  // Group products into rows based on column count
   const rows = useMemo(() => {
     const result: ProductWithCounts[][] = [];
     for (let i = 0; i < products.length; i += columns) {
@@ -92,25 +103,9 @@ function VirtualizedGrid({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 280, // Estimated card height
+    estimateSize: () => 320,
     overscan: 3,
   });
-
-  // Handle resize to adjust columns
-  useMemo(() => {
-    if (typeof window === 'undefined') return;
-    
-    const handleResize = () => {
-      const width = parentRef.current?.clientWidth || window.innerWidth;
-      if (width >= 1024) setColumns(3);
-      else if (width >= 768) setColumns(2);
-      else setColumns(1);
-    };
-    
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   if (products.length === 0 && emptyMessage) {
     return (
