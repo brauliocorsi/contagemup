@@ -287,6 +287,7 @@ interface OrderNumberEntrySelectorProps {
   productCode: string;
   productName: string;
   totalColis: number;
+  currentStock: number; // Total stock from products table
   location?: string;
   palletNumber?: string;
   colisNames?: Record<string, string> | null;
@@ -299,6 +300,7 @@ export function OrderNumberEntrySelector({
   productCode,
   productName,
   totalColis: productTotalColis,
+  currentStock,
   location,
   palletNumber,
   colisNames,
@@ -387,27 +389,65 @@ export function OrderNumberEntrySelector({
   const completeOrders = orderNumbers.filter(o => o.is_complete);
   const incompleteOrders = orderNumbers.filter(o => !o.is_complete);
 
+  // Calculate tracked vs untracked stock
+  const trackedStock = completeOrders.length; // Complete orders = tracked units
+  const untrackedStock = Math.max(0, currentStock - trackedStock); // Generic stock without order numbers
+
   return (
     <>
       <Card className="border-blue-200 bg-blue-50/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <ClipboardList className="h-4 w-4 text-blue-600" />
-            Registar Nº Encomenda
+            Gestão de Stock por Encomenda
           </CardTitle>
           <p className="text-xs text-muted-foreground">
             {productCode} - {productName}
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Stock Summary */}
+          <div className="p-3 rounded-lg border bg-background space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Stock Total:</span>
+              <Badge variant="secondary" className="text-base font-bold">
+                {currentStock} un.
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                Com nº encomenda:
+              </span>
+              <span className="font-medium text-green-700">{trackedStock}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Package className="h-3.5 w-3.5 text-gray-500" />
+                Stock genérico:
+              </span>
+              <span className="font-medium text-gray-600">{untrackedStock}</span>
+            </div>
+            {incompleteOrders.length > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <AlertCircle className="h-3.5 w-3.5 text-yellow-600" />
+                  Encomendas incompletas:
+                </span>
+                <span className="font-medium text-yellow-700">{incompleteOrders.length}</span>
+              </div>
+            )}
+          </div>
+
           {/* Add new order number */}
           <div className="space-y-2">
+            <Label className="text-xs font-medium">Registar Nova Encomenda:</Label>
             <div className="flex gap-2">
               <Input
                 value={newOrderNumber}
                 onChange={(e) => setNewOrderNumber(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Novo número de encomenda..."
+                placeholder="Número de encomenda..."
                 disabled={adding}
               />
               <Button
@@ -446,7 +486,7 @@ export function OrderNumberEntrySelector({
           {!loading && orderNumbers.length > 0 && (
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">
-                Encomendas em stock ({orderNumbers.length}):
+                Encomendas registadas ({orderNumbers.length}):
               </Label>
               
               {/* Complete orders */}
