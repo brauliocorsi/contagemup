@@ -1,130 +1,142 @@
 
-# Plano: Entradas e Saídas por Colis
+
+# Plano: Sincronizar Counts com Entradas Administrativas
 
 ## Problema Identificado
 
-O sistema atual tem duas fontes de verdade separadas:
+Existe uma discrepância entre os "Sets Completos" mostrados em duas abas:
 
-| Tabela | Finalidade | Reflectido em |
-|--------|-----------|---------------|
-| `counts` | Contagem física de cada colis | Ícones no ProductCard |
-| `stock_movements` | Entradas administrativas | current_stock (via trigger) |
-| `picking_items` | Saídas de picking | current_stock (via trigger) |
+| Aba | Fonte de Dados | Exemplo (Sistema Elevatório) |
+|-----|----------------|------------------------------|
+| Gestão de Produtos | `products.current_stock` | 104 sets |
+| Contagem | `counts.quantity` (sessão atual) | 7 sets |
 
-**Exemplo concreto**:
-- Sistema Elevatório: `counts` = 10, `entradas` = 100
-- `current_stock` = 110 (correcto via trigger)
-- Ícones de contagem mostram: **10** (incorrecto - deveria mostrar 110)
+### Causa Raiz
 
-## Solução: Unificar Entradas/Saídas na Tabela `counts`
+O campo `current_stock` é calculado pelo trigger da base de dados usando a fórmula:
+```
+current_stock = SUM(counts) + SUM(stock_movements.entrada) - SUM(picking_items)
+```
 
-### Nova Abordagem
+Mas a interface de **Contagem** calcula `completeSets` diretamente da tabela `counts`, ignorando:
+- Entradas administrativas (`stock_movements`)
+- Saídas de picking (`picking_items`)
 
-Quando o utilizador regista uma **entrada** ou **saída**, o sistema irá:
-1. Atualizar a quantidade em `counts` para **cada colis** do produto
-2. Manter `stock_movements` apenas para auditoria/histórico (opcional)
+### Dados Concretos do Problema
 
-### Alterações Necessárias
+Para o produto "Sistema Elevatório 900N":
+- `counts.quantity` = 7 (contagem física)
+- `stock_movements` = 102 (entradas administrativas)  
+- `picking_items` = 5 (saídas)
+- `current_stock` = 104 (7 + 102 - 5) ✓
 
-#### 1. Migração de Base de Dados
-- Permitir `session_id` NULL na tabela `counts` para movimentos administrativos
-- OU criar uma sessão especial "Movimentos Administrativos"
+A contagem mostra apenas "7 sets" porque ignora as 102 entradas administrativas.
+
+---
+
+## Solução
+
+A solução implementada anteriormente (atualizar `counts` ao registar entradas/saídas) afeta apenas movimentos **futuros**. Para corrigir os dados **históricos**, precisamos de uma migração de sincronização.
+
+### Opção A: Migração de Dados (Recomendada)
+
+Criar um script que sincronize os `counts` existentes para refletir o `current_stock` actual:
 
 ```sql
-ALTER TABLE counts ALTER COLUMN session_id DROP NOT NULL;
+-- Para cada produto, ajustar counts para refletir current_stock
+-- Isto garante que a contagem visual corresponde ao stock real
 ```
 
-#### 2. Atualizar `StockEntriesView.tsx`
-No `handleConfirm`, após registar em `stock_movements`:
+**Lógica:**
+1. Para cada produto com `current_stock > counts_total`:
+   - Incrementar cada colis proporcionalmente
+   - A diferença vem das entradas administrativas anteriores
+
+2. Para cada produto com `current_stock < counts_total`:
+   - Decrementar cada colis proporcionalmente
+   - A diferença vem do picking anterior
+
+### Opção B: Alterar Cálculo de completeSets (Alternativa)
+
+Modificar `useCounting.tsx` para usar `current_stock` em vez de calcular a partir dos counts:
 
 ```typescript
-for (const item of allItems) {
-  const product = products.find(p => p.id === item.product_id);
-  const totalColis = product?.total_colis || 1;
-  
-  // Atualizar TODOS os colis do produto
-  for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
-    // Buscar count existente
-    const existingCount = await supabase
-      .from('counts')
-      .select('id, quantity')
-      .eq('product_id', item.product_id)
-      .eq('colis_number', colisNumber)
-      .maybeSingle();
+// Em vez de:
+const completeSets = Math.min(...quantities);
 
-    const currentQty = existingCount?.quantity || 0;
-    const newQty = currentQty + item.quantity;
-
-    if (existingCount) {
-      await supabase.from('counts')
-        .update({ quantity: newQty })
-        .eq('id', existingCount.id);
-    } else {
-      // Criar novo count sem sessão (administrativo)
-      await supabase.from('counts').insert({
-        product_id: item.product_id,
-        colis_number: colisNumber,
-        quantity: item.quantity,
-        session_id: null, // Movimento administrativo
-      });
-    }
-  }
-}
+// Usar:
+const completeSets = product.current_stock;
 ```
 
-#### 3. Atualizar `StockExitsView.tsx`
-Já decrementa `counts` para colis 1. Expandir para **todos os colis**:
+**Problema:** Isto desalinha a visualização por colis (ícones) do valor de sets completos.
 
-```typescript
-for (const item of detailedPickingItems) {
-  const product = products.find(p => p.id === item.product_id);
-  const totalColis = product?.total_colis || 1;
-  
-  // Decrementar TODOS os colis do produto
-  for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
-    const existingCount = await supabase
-      .from('counts')
-      .select('id, quantity')
-      .eq('product_id', item.product_id)
-      .eq('colis_number', colisNumber)
-      .maybeSingle();
+---
 
-    if (existingCount) {
-      const newQty = Math.max(0, existingCount.quantity - item.quantity);
-      await supabase.from('counts')
-        .update({ quantity: newQty })
-        .eq('id', existingCount.id);
-    }
-  }
-}
+## Plano de Implementação (Opção A)
+
+### Passo 1: Criar Função de Sincronização
+
+Criar uma função na base de dados que sincroniza os counts:
+
+```sql
+CREATE OR REPLACE FUNCTION sync_counts_with_stock()
+RETURNS void AS $$
+DECLARE
+  product_row RECORD;
+  diff integer;
+  coli_increment integer;
+BEGIN
+  FOR product_row IN 
+    SELECT p.id, p.total_colis, p.current_stock,
+           COALESCE(SUM(c.quantity) / p.total_colis, 0) as avg_per_colis
+    FROM products p
+    LEFT JOIN counts c ON c.product_id = p.id
+    GROUP BY p.id
+  LOOP
+    -- Calcular diferença
+    diff := product_row.current_stock - product_row.avg_per_colis;
+    
+    IF diff != 0 THEN
+      -- Atualizar cada colis
+      FOR i IN 1..product_row.total_colis LOOP
+        UPDATE counts 
+        SET quantity = GREATEST(0, quantity + diff)
+        WHERE product_id = product_row.id 
+        AND colis_number = i;
+      END LOOP;
+    END IF;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
 ```
 
-#### 4. Simplificar Trigger de Stock (Opcional)
-Após unificar, o `current_stock` pode ser calculado apenas dos `counts` + `picking`:
-- Base = mínimo(counts por colis)
-- - picking
+### Passo 2: Interface de Sincronização
 
-Mas podemos manter o trigger atual que já funciona.
+Adicionar botão "Sincronizar Contagem" na interface que:
+1. Mostra preview das alterações
+2. Permite confirmar antes de aplicar
+3. Atualiza os counts para corresponder ao `current_stock`
 
-## Impacto nos Sets Completos
+### Passo 3: Atualizar Trigger (Opcional)
 
-Para produtos com múltiplos colis, as entradas incrementarão **todos os colis igualmente**, garantindo que os sets completos aumentam proporcionalmente.
+Simplificar o trigger `sync_product_stock` para calcular `current_stock` apenas dos `counts`, já que as entradas/saídas agora atualizam diretamente os counts.
 
-| Antes | Depois (entrada +5) |
-|-------|---------------------|
-| Colis 1: 10, Colis 2: 10, Colis 3: 8 | Colis 1: 15, Colis 2: 15, Colis 3: 13 |
-| Sets completos: 8 | Sets completos: 13 |
+---
 
 ## Ficheiros a Modificar
 
-1. **Migração SQL**: Permitir `session_id` NULL em `counts`
-2. **`src/components/stock/StockEntriesView.tsx`**: Atualizar counts ao registar entrada
-3. **`src/components/stock/StockExitsView.tsx`**: Decrementar todos os colis (já decrementa colis 1)
-4. **`src/hooks/useProducts.tsx`**: Buscar dados de produto para obter `total_colis`
+1. **Migração SQL** - Criar função de sincronização e executar uma vez
+2. **`src/components/stock/StockEntriesView.tsx`** - Verificar que a nova lógica está correcta
+3. **`src/components/reports/StockIntegrityReport.tsx`** - Adicionar botão de sincronização
+4. **`src/hooks/useCounting.tsx`** - (Opcional) Incluir counts de sessões anteriores
 
-## Consistência Visual
+---
 
-Após implementação:
-- Ícones de contagem = `current_stock` (ambos reflectem a mesma realidade)
-- Sets completos calculados corretamente
-- Entradas/saídas afectam todos os colis uniformemente
+## Impacto Esperado
+
+Após sincronização:
+- Gestão de Produtos: 104 sets ✓
+- Contagem: 104 sets ✓ (era 7)
+
+A visualização por colis irá mostrar uniformemente o stock real, permitindo identificar pendências reais vs diferenças históricas.
+
