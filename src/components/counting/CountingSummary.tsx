@@ -1,6 +1,6 @@
 import { ProductWithCounts } from '@/types/stock';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, CheckCircle2, AlertCircle, AlertTriangle, ClipboardList } from 'lucide-react';
+import { Package, CheckCircle2, AlertTriangle, ClipboardList, Layers } from 'lucide-react';
 
 interface CountingSummaryProps {
   products: ProductWithCounts[];
@@ -18,6 +18,29 @@ export function CountingSummary({ products }: CountingSummaryProps) {
   // Damage statistics
   const productsWithDamages = products.filter(p => (p.damaged_stock || 0) > 0).length;
   const totalDamagedUnits = products.reduce((sum, p) => sum + (p.damaged_stock || 0), 0);
+
+  // Calculate excess colis (parts that don't form complete sets)
+  // For multi-colis products, count total excess parts across all products
+  const excessColisData = products.reduce((acc, p) => {
+    if (p.total_colis <= 1) return acc;
+    
+    // Get quantities per colis from colisDetails
+    const quantities = p.colisDetails.map(c => c.quantity);
+    if (quantities.length === 0) return acc;
+    
+    const minQty = Math.min(...quantities);
+    const maxQty = Math.max(...quantities);
+    
+    // If there's imbalance, count excess parts
+    if (maxQty > minQty) {
+      // Count products with imbalance
+      acc.productsWithExcess += 1;
+      // Sum up all excess parts (difference from min for each colis)
+      acc.totalExcessParts += quantities.reduce((sum, qty) => sum + (qty - minQty), 0);
+    }
+    
+    return acc;
+  }, { productsWithExcess: 0, totalExcessParts: 0 });
 
   const stats = [
     {
@@ -51,6 +74,13 @@ export function CountingSummary({ products }: CountingSummaryProps) {
       color: 'text-muted-foreground bg-muted'
     },
     {
+      label: 'Colis Excedentes',
+      value: excessColisData.productsWithExcess,
+      subValue: excessColisData.totalExcessParts > 0 ? `${excessColisData.totalExcessParts} partes` : undefined,
+      icon: Layers,
+      color: 'text-orange-600 bg-orange-100'
+    },
+    {
       label: 'Com Avarias',
       value: productsWithDamages,
       subValue: totalDamagedUnits > 0 ? `${totalDamagedUnits} un.` : undefined,
@@ -65,7 +95,7 @@ export function CountingSummary({ products }: CountingSummaryProps) {
         <CardTitle className="text-lg">Resumo da Contagem</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           {stats.map((stat) => (
             <div
               key={stat.label}

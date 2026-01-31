@@ -61,6 +61,7 @@ export function StockExitsView() {
   // Validation dialog state
   const [validationErrors, setValidationErrors] = useState<StockValidationError[]>([]);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
+  const [colisValidationMessage, setColisValidationMessage] = useState<string | null>(null);
   
   // Picking report dialog state
   const [showPickingReport, setShowPickingReport] = useState(false);
@@ -134,16 +135,66 @@ export function StockExitsView() {
     setCart(prev => prev.filter(item => item.product_id !== productId));
   }, []);
 
+  // Validate colis stock for complete sets
+  const validateColisStock = async (items: MovementItem[]): Promise<{ valid: boolean; message?: string }> => {
+    for (const item of items) {
+      // Only validate complete set mode for multi-colis products
+      if (item.isCompleteSet === false) continue;
+      
+      const product = products.find(p => p.id === item.product_id);
+      if (!product || product.total_colis <= 1) continue;
+      
+      // Fetch stock for each coli
+      const { data: counts } = await supabase
+        .from('counts')
+        .select('colis_number, quantity')
+        .eq('product_id', item.product_id);
+      
+      if (!counts) continue;
+      
+      // Calculate stock per coli
+      const colisStock: Record<number, number> = {};
+      for (let i = 1; i <= product.total_colis; i++) {
+        colisStock[i] = 0;
+      }
+      counts.forEach(c => {
+        if (colisStock[c.colis_number] !== undefined) {
+          colisStock[c.colis_number] += c.quantity;
+        }
+      });
+      
+      // Check if any coli has insufficient stock
+      for (let i = 1; i <= product.total_colis; i++) {
+        if (colisStock[i] < item.quantity) {
+          const minStock = Math.min(...Object.values(colisStock));
+          return {
+            valid: false,
+            message: `Produto "${item.product_name}" só tem ${minStock} sets completos disponíveis (Coli ${i} limita com ${colisStock[i]} un.). Pedido: ${item.quantity} sets.`
+          };
+        }
+      }
+    }
+    return { valid: true };
+  };
+
   // Validate and show picking report
-  const handleValidateAndConfirm = () => {
+  const handleValidateAndConfirm = async () => {
     if (allItems.length === 0) return;
 
-    // Check for stock validation errors
+    // Check for stock validation errors (total stock)
     if (hasStockErrors) {
       setValidationErrors(stockErrors);
       setShowValidationDialog(true);
       return;
     }
+    
+    // Check colis-level stock for complete sets
+    const colisValidation = await validateColisStock(allItems);
+    if (!colisValidation.valid) {
+      setColisValidationMessage(colisValidation.message || null);
+      return;
+    }
+    setColisValidationMessage(null);
 
     // All good, show picking report
     showPickingReportWithItems(allItems);
@@ -415,6 +466,19 @@ export function StockExitsView() {
                       <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-sm">
                         <AlertTriangle className="h-4 w-4 shrink-0" />
                         <span>{stockErrors.length} produto(s) com stock insuficiente</span>
+                      </div>
+                    )}
+
+                    {colisValidationMessage && (
+                      <div className="flex items-start gap-2 p-2 rounded-md bg-orange-100 text-orange-800 text-sm">
+                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium">Stock por colis insuficiente</p>
+                          <p className="text-xs mt-1">{colisValidationMessage}</p>
+                          <p className="text-xs mt-1 text-orange-600">
+                            Sugestão: Ajuste a quantidade ou mude para modo "Colis Individual".
+                          </p>
+                        </div>
                       </div>
                     )}
 
