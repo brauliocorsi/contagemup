@@ -392,14 +392,22 @@ export function useCounting(sessionId: string | null) {
   };
 
   // Memoized function to process a single product with counts
-  const getProductWithCounts = useCallback((product: Product): ProductWithCounts => {
+  // Now accepts optional categoryColisNames to calculate effective total colis
+  const getProductWithCounts = useCallback((
+    product: Product, 
+    categoryColisNames?: Record<string, string> | null
+  ): ProductWithCounts => {
     const productCounts = counts.filter(c => c.product_id === product.id);
+    
+    // Calculate effective total colis: use max between product's total_colis and category's colis count
+    const categoryColisCount = categoryColisNames ? Object.keys(categoryColisNames).length : 0;
+    const effectiveTotalColis = Math.max(product.total_colis, categoryColisCount);
     
     // Build colis details with location/pallet per coli - now supporting multiple locations per coli
     const colisDetails: ColisDetail[] = [];
     const colisQuantities: Record<number, number> = {};
     
-    for (let i = 1; i <= product.total_colis; i++) {
+    for (let i = 1; i <= effectiveTotalColis; i++) {
       // Get ALL counts for this colis number (may be multiple if split across locations)
       const countsForColi = productCounts.filter(c => c.colis_number === i);
       
@@ -460,7 +468,7 @@ export function useCounting(sessionId: string | null) {
     // Check if there's a partial product being formed (some colis have more than completeSets)
     const hasPartialProduct = maxQuantity > completeSets;
 
-    for (let i = 1; i <= product.total_colis; i++) {
+    for (let i = 1; i <= effectiveTotalColis; i++) {
       const qty = colisQuantities[i];
       
       // If this colis has less than max, it's incomplete for the partial product

@@ -197,8 +197,11 @@ export function CountingView() {
   }, [decrementCountAtLocation]);
 
   const productsWithCounts = useMemo(() => {
-    return products.map(p => getProductWithCounts(p));
-  }, [products, getProductWithCounts]);
+    return products.map(p => {
+      const categoryColisNames = categoryColisNamesMap[p.category] || null;
+      return getProductWithCounts(p, categoryColisNames);
+    });
+  }, [products, getProductWithCounts, categoryColisNamesMap]);
 
   // Get current session
   const currentSession = sessions.find(s => s.id === selectedSessionId);
