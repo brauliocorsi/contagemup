@@ -87,8 +87,18 @@ function VirtualizedGrid({
 
   useEffect(() => {
     updateColumns();
-    window.addEventListener('resize', updateColumns);
-    return () => window.removeEventListener('resize', updateColumns);
+
+    // Window resize doesn't catch layout changes (e.g. sidebar collapse).
+    // Use ResizeObserver to keep columns in sync with actual container width.
+    const el = parentRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver(() => {
+      updateColumns();
+    });
+    ro.observe(el);
+
+    return () => ro.disconnect();
   }, [updateColumns]);
   
   // Group products into rows based on column count
@@ -107,6 +117,9 @@ function VirtualizedGrid({
     estimateSize: () => 360,
     overscan: 3,
   });
+
+  const gridColsClass =
+    columns === 1 ? 'grid-cols-1' : columns === 2 ? 'grid-cols-2' : 'grid-cols-3';
 
   if (products.length === 0 && emptyMessage) {
     return (
@@ -144,7 +157,7 @@ function VirtualizedGrid({
                 willChange: 'transform',
               }}
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pr-2">
+              <div className={`grid ${gridColsClass} gap-4 pr-2`}>
                 {rowProducts.map((product) => (
                   <ProductCard
                     key={product.id}
