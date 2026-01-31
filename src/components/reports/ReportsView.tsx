@@ -9,13 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter, MapPin, Box, Eye, Activity, ClipboardList, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { FileDown, BarChart3, Package, AlertCircle, CheckCircle2, Tags, Filter, MapPin, Box, Eye, Activity, ClipboardList, ShieldCheck, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
 import { StockMovementsReport } from './StockMovementsReport';
 import { CountingMovementsReport } from './CountingMovementsReport';
 import { StockIntegrityReport } from './StockIntegrityReport';
+import { OrdersReport } from './OrdersReport';
 
 export function ReportsView() {
   const { products, loading: productsLoading } = useProducts();
@@ -184,7 +185,7 @@ export function ReportsView() {
       </div>
 
       <Tabs defaultValue="integrity" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="integrity" className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
             <span className="hidden sm:inline">Integridade</span>
@@ -192,6 +193,10 @@ export function ReportsView() {
           <TabsTrigger value="movements" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             <span className="hidden sm:inline">Movimentos</span>
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="flex items-center gap-2">
+            <ShoppingBag className="h-4 w-4" />
+            <span className="hidden sm:inline">Encomendas</span>
           </TabsTrigger>
           <TabsTrigger value="counting" className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4" />
@@ -211,6 +216,11 @@ export function ReportsView() {
         {/* Movimentos Tab */}
         <TabsContent value="movements" className="space-y-4">
           <StockMovementsReport />
+        </TabsContent>
+
+        {/* Encomendas Tab */}
+        <TabsContent value="orders" className="space-y-4">
+          <OrdersReport />
         </TabsContent>
 
         {/* Contagem Tab */}
