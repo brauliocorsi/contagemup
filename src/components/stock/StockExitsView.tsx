@@ -25,6 +25,7 @@ import { StockHistoryTable } from './StockHistoryTable';
 import { PickingHistoryView } from './PickingHistoryView';
 import { StockValidationDialog, StockValidationError } from './StockValidationDialog';
 import { PickingReportDialog } from './PickingReportDialog';
+import { removeOrderNumberAfterExit } from '@/hooks/useOrderNumbers';
 import { toast } from 'sonner';
 
 const EXIT_REASONS = [
@@ -289,7 +290,7 @@ export function StockExitsView() {
     });
 
     // Actualizar o stock na tabela counts para TODOS os colis do produto
-    // Não criar stock_movement - o picking_items já serve como auditoria
+    // E remover order numbers quando aplicável
     for (const item of detailedPickingItems) {
       const product = products.find(p => p.id === item.product_id);
       const totalColis = product?.total_colis || 1;
@@ -298,7 +299,27 @@ export function StockExitsView() {
       const cartItem = allItems.find(ci => ci.product_id === item.product_id);
       const isCompleteSet = cartItem?.isCompleteSet !== false;
 
-      // Decrementar colis do produto
+      // Se o item tem um orderNumber associado, remover da tabela stock_order_numbers
+      // A remoção da encomenda já decrementa os counts (feito em removeOrderNumberAfterExit)
+      if (cartItem?.orderNumber) {
+        const { data: orderEntry } = await supabase
+          .from('stock_order_numbers')
+          .select('id')
+          .eq('product_id', item.product_id)
+          .eq('order_number', cartItem.orderNumber)
+          .maybeSingle();
+
+        if (orderEntry) {
+          // Note: removeOrderNumberAfterExit only deletes the record, 
+          // it doesn't decrement counts (that's done by deleteOrderNumber in the hook)
+          // So we still need to decrement counts manually below
+          await removeOrderNumberAfterExit(orderEntry.id);
+        }
+      }
+
+      // Decrementar colis do produto (para itens sem orderNumber ou para backup)
+      // Para itens com orderNumber, isto ainda é necessário pois removeOrderNumberAfterExit
+      // não decrementa counts (a versão standalone)
       for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
         // Determinar quantidade a decrementar para este colis
         const colisQty = isCompleteSet 

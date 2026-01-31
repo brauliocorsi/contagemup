@@ -87,6 +87,7 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
   }, [fetchOrderNumbers]);
 
   // Add a new order number with all colis marked as present
+  // ALSO syncs counts table (+1 for each coli)
   const addOrderNumber = async (
     orderNumber: string,
     location?: string | null,
@@ -121,6 +122,33 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
         throw error;
       }
 
+      // SYNC: Increment counts for each coli (+1)
+      for (let i = 1; i <= totalColis; i++) {
+        const { data: existingCount } = await supabase
+          .from('counts')
+          .select('id, quantity')
+          .eq('product_id', productId)
+          .eq('colis_number', i)
+          .maybeSingle();
+
+        if (existingCount) {
+          await supabase
+            .from('counts')
+            .update({ quantity: existingCount.quantity + 1, updated_at: new Date().toISOString() })
+            .eq('id', existingCount.id);
+        } else {
+          await supabase
+            .from('counts')
+            .insert({ 
+              product_id: productId, 
+              colis_number: i, 
+              quantity: 1, 
+              location: location || null, 
+              pallet_number: palletNumber || null 
+            });
+        }
+      }
+
       const entry = mapToOrderNumberEntry(data, totalColis);
       setOrderNumbers(prev => [entry, ...prev]);
       toast.success('Número de encomenda adicionado');
@@ -133,6 +161,7 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
   };
 
   // Update colis status for a specific order number
+  // ALSO syncs counts table (+1 when marking present, -1 when marking absent)
   const updateColisStatus = async (
     orderId: string,
     colisNumber: number,
@@ -153,6 +182,32 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
         .eq('id', orderId);
 
       if (error) throw error;
+
+      // SYNC: Update counts table for this coli
+      const delta = isPresent ? 1 : -1;
+      const { data: existingCount } = await supabase
+        .from('counts')
+        .select('id, quantity')
+        .eq('product_id', order.product_id)
+        .eq('colis_number', colisNumber)
+        .maybeSingle();
+
+      if (existingCount) {
+        const newQty = Math.max(0, existingCount.quantity + delta);
+        await supabase
+          .from('counts')
+          .update({ quantity: newQty, updated_at: new Date().toISOString() })
+          .eq('id', existingCount.id);
+      } else if (isPresent) {
+        // Only insert if marking as present and no count exists
+        await supabase
+          .from('counts')
+          .insert({ 
+            product_id: order.product_id, 
+            colis_number: colisNumber, 
+            quantity: 1 
+          });
+      }
 
       // Update local state
       setOrderNumbers(prev => prev.map(o => {
@@ -178,22 +233,45 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
   };
 
   // Update location and pallet for an order number
+  // Passing null means "keep existing value", passing empty string means "clear"
   const updateOrderLocation = async (
     orderId: string,
     location: string | null,
     palletNumber: string | null
   ): Promise<boolean> => {
     try {
+      const order = orderNumbers.find(o => o.id === orderId);
+      if (!order) return false;
+
+      // Build update object - only include fields that were explicitly provided
+      const updateData: { location?: string | null; pallet_number?: string | null } = {};
+      
+      if (location !== null) {
+        updateData.location = location || null;
+      }
+      if (palletNumber !== null) {
+        updateData.pallet_number = palletNumber || null;
+      }
+
+      if (Object.keys(updateData).length === 0) return true;
+
       const { error } = await supabase
         .from('stock_order_numbers')
-        .update({ location, pallet_number: palletNumber })
+        .update(updateData)
         .eq('id', orderId);
 
       if (error) throw error;
 
-      setOrderNumbers(prev => prev.map(o => 
-        o.id === orderId ? { ...o, location, pallet_number: palletNumber } : o
-      ));
+      setOrderNumbers(prev => prev.map(o => {
+        if (o.id === orderId) {
+          return { 
+            ...o, 
+            location: location !== null ? (location || null) : o.location,
+            pallet_number: palletNumber !== null ? (palletNumber || null) : o.pallet_number
+          };
+        }
+        return o;
+      }));
 
       return true;
     } catch (error) {
@@ -231,8 +309,34 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
   };
 
   // Delete an order number (used when processing exit)
+  // ALSO syncs counts table (-1 for each present coli)
   const deleteOrderNumber = async (orderId: string): Promise<boolean> => {
     try {
+      // Find order to know which colis are present
+      const order = orderNumbers.find(o => o.id === orderId);
+      if (!order) return false;
+
+      // SYNC: Decrement counts for each present coli
+      for (const [colisNum, isPresent] of Object.entries(order.colis_status)) {
+        if (isPresent) {
+          const { data: existingCount } = await supabase
+            .from('counts')
+            .select('id, quantity')
+            .eq('product_id', order.product_id)
+            .eq('colis_number', parseInt(colisNum))
+            .maybeSingle();
+
+          if (existingCount) {
+            const newQty = Math.max(0, existingCount.quantity - 1);
+            await supabase
+              .from('counts')
+              .update({ quantity: newQty, updated_at: new Date().toISOString() })
+              .eq('id', existingCount.id);
+          }
+        }
+      }
+
+      // Delete the order number record
       const { error } = await supabase
         .from('stock_order_numbers')
         .delete()
