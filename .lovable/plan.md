@@ -1,183 +1,335 @@
 
-# Plano Completo: Sistema de Gestão de Stock com Colis e Encomendas
 
-## Análise do Estado Actual
+# Plano de Melhorias: Performance e Optimização do Sistema
 
-Após análise detalhada do código, o sistema já possui muitas das funcionalidades mencionadas, mas precisa de ajustes para funcionar de forma coesa. Aqui está o diagnóstico:
+## Diagnóstico Actual
 
-### O Que Já Existe
+Após análise detalhada do código, identifiquei as seguintes áreas críticas que afectam a performance:
 
-| Funcionalidade | Estado | Ficheiros |
-|---|---|---|
-| Rastreio por encomenda | ✅ Implementado | `useOrderNumbers.tsx`, `stock_order_numbers` |
-| Colis por categoria | ✅ Implementado | Categorias com `colis_names` |
-| Entradas com encomenda | ✅ Implementado | `StockEntriesView.tsx`, `OrderNumberEntrySelector` |
-| Saídas por encomenda | ✅ Parcial | `OrderNumberExitSelector` existe mas precisa melhorias |
-| Sets completos vs incompletos | ✅ Corrigido | Trigger `sync_product_stock` actualizado |
-| Localização por coli | ✅ Implementado | `SplitStockDialog`, `ColisDetail` |
-| Relatórios de movimentos | ✅ Básico | `StockMovementsReport`, `CountingMovementsReport` |
+| Área | Problema | Impacto |
+|------|----------|---------|
+| Carregamento inicial | Todos os componentes são carregados de uma só vez | Alto - lentidão ao abrir |
+| Hooks duplicados | Múltiplos hooks fazem as mesmas queries em paralelo | Alto - sobrecarga de rede |
+| Falta de memoização | Cálculos complexos recalculados em cada render | Médio - lags de UI |
+| Componentes grandes | ProductCard.tsx (783 linhas), CountingView (1212 linhas) | Médio - manutenção difícil |
+| Queries sem paginação | `useLastCounts` busca TODOS os counts | Alto - ~1400+ registros |
+| React-Query mal configurado | Alguns hooks usam `useState` + `useEffect` em vez de React-Query | Médio - cache ineficiente |
 
-### O Que Precisa Ser Feito
-
-| Ponto | Requisito | Acção |
-|---|---|---|
-| 7 | Aba de produtos com encomendas | ❌ **Criar** nova tab/filtro |
-| 8 | Pesquisa por nº encomenda nas saídas | ⚠️ **Melhorar** search |
-| 10 | Movimentação por coli nos relatórios | ⚠️ **Adicionar** detalhe |
-| 11 | Sets completos saídos nos relatórios | ⚠️ **Adicionar** métricas |
-| 9 | Fiabilidade stock em todo sistema | ⚠️ **Verificar** consistência |
+### Dados Actuais do Sistema:
+- **489 produtos** cadastrados
+- **1427 contagens** (counts)
+- **2 sessões** activas
+- **44 itens de picking**
 
 ---
 
-## Plano de Implementação
+## Fase 1: Optimização de Performance Crítica
 
-### Fase 1: Aba de Produtos com Encomendas (Ponto 7)
+### 1.1 Code Splitting e Lazy Loading (Impacto: Alto)
 
-Criar um novo filtro/tab na gestão de produtos para mostrar apenas produtos que têm encomendas associadas.
+Implementar carregamento preguiçoso para cada aba/view principal.
+
+**Ficheiros a modificar:**
+- `src/pages/Dashboard.tsx`
 
 **Alterações:**
-- `ProductsView.tsx`: Adicionar filtro "Com Encomendas" 
-- Criar query para buscar produtos com registos em `stock_order_numbers`
+```typescript
+// De:
+import { CountingView } from '@/components/counting/CountingView';
+import { ProductsView } from '@/components/products/ProductsView';
+// ... todos os imports
 
-**Visualização esperada:**
-```text
-[Todos] [Com Stock] [Sem Stock] [Com Encomendas] [Incompletos]
-                                    ↑ NOVO
+// Para:
+const CountingView = React.lazy(() => import('@/components/counting/CountingView'));
+const ProductsView = React.lazy(() => import('@/components/products/ProductsView'));
+// etc...
+
+// E envolver com Suspense:
+<Suspense fallback={<LoadingSkeleton />}>
+  {activeTab === 'counting' && <CountingView />}
+</Suspense>
 ```
 
-### Fase 2: Pesquisa por Nº Encomenda nas Saídas (Ponto 8)
-
-Melhorar a pesquisa na interface de saídas para permitir busca por número de encomenda.
-
-**Alterações:**
-- `ManualStockSection.tsx`: Expandir lógica de pesquisa
-- `StockExitsView.tsx`: Adicionar campo de busca dedicado para encomenda
-- Ao seleccionar encomenda, pré-seleccionar produto automaticamente
-
-**Fluxo esperado:**
-```text
-1. Utilizador digita "ENC-2024-001" no search
-2. Sistema mostra produtos que têm essa encomenda
-3. Ao clicar, expande automaticamente o selector de encomenda
-4. Utilizador confirma e adiciona ao carrinho
-```
-
-### Fase 3: Relatórios Detalhados por Coli (Pontos 10 e 11)
-
-Actualizar os relatórios existentes para incluir:
-- Movimentação discriminada por coli
-- Contagem de sets completos saídos
-- Resumo de encomendas processadas
-
-**Alterações em `StockMovementsReport.tsx`:**
-- Adicionar coluna "Sets Saídos" 
-- Adicionar filtro por categoria com colis
-- Mostrar breakdown por coli quando aplicável
-
-**Nova secção em relatórios:**
-```text
-┌──────────────────────────────────────────┐
-│ Resumo de Saídas por Sets                │
-├──────────────────────────────────────────┤
-│ Produto          │ Sets │ Colis Total    │
-│ Cama Boss 180    │  5   │ 10 (2x5)       │
-│ Cama Alice 140   │  3   │  6 (2x3)       │
-└──────────────────────────────────────────┘
-```
-
-**Alterações em `ReportsView.tsx`:**
-- Adicionar sub-tab "Encomendas" 
-- Mostrar encomendas processadas por período
-- Incluir status: entregue, pendente, parcial
-
-### Fase 4: Consistência do Stock (Ponto 9)
-
-Verificar que o stock é consistente em todas as interfaces:
-
-| Interface | Campo | Fonte |
-|---|---|---|
-| ProductsView | `current_stock` | `products.current_stock` |
-| CountingView | Sets completos | MIN(coli_1, coli_2, ...) calculado |
-| StockExitsView | Disponível | `products.current_stock` |
-| Relatórios | Total | `products.current_stock` |
-
-**Trigger já corrigido** para usar `GREATEST(product.total_colis, category.colis_count)`
-
-**Acção adicional:**
-- Adicionar validação em `StockExitsView` para verificar stock por coli antes de confirmar
-- Garantir que picking decrementa counts correctamente
+**Resultado esperado:** Redução de ~60% no tempo de carregamento inicial
 
 ---
 
-## Resumo Técnico das Alterações
+### 1.2 Refactoring de Hooks para React-Query (Impacto: Alto)
 
-### Ficheiros a Criar
+Migrar hooks que usam `useState` + `useEffect` para React-Query:
 
-| Ficheiro | Descrição |
-|---|---|
-| `src/components/products/OrderedProductsFilter.tsx` | Componente de filtro para produtos com encomendas |
-| `src/hooks/useProductsWithOrders.tsx` | Hook para buscar produtos com encomendas activas |
+**Hooks a refactorizar:**
+| Hook | Problema | Solução |
+|------|----------|---------|
+| `useCategories` | Usa useState/useEffect | Migrar para useQuery |
+| `useSessions` | Usa useState/useEffect | Migrar para useQuery |
+| `useLastCounts` | Busca TODOS os dados sem paginação | Adicionar paginação + useQuery |
 
-### Ficheiros a Modificar
+**Exemplo de refactoring para `useCategories.tsx`:**
+```typescript
+// De:
+const [categories, setCategories] = useState<Category[]>([]);
+const [loading, setLoading] = useState(true);
 
-| Ficheiro | Alterações |
-|---|---|
-| `src/components/products/ProductsView.tsx` | Adicionar filtro "Com Encomendas", expandir coluna de info |
-| `src/components/stock/ManualStockSection.tsx` | Pesquisa por nº encomenda, resultado com highlight |
-| `src/components/stock/StockExitsView.tsx` | Campo dedicado para busca por encomenda |
-| `src/components/reports/StockMovementsReport.tsx` | Coluna sets, breakdown por coli, secção resumo |
-| `src/components/reports/ReportsView.tsx` | Adicionar tab/secção de encomendas processadas |
-| `src/components/layout/Navigation.tsx` | (Opcional) Adicionar item "Encomendas" se preferir tab dedicada |
+useEffect(() => {
+  fetchCategories();
+}, []);
 
-### Consultas SQL Necessárias
-
-**Produtos com encomendas:**
-```sql
-SELECT DISTINCT p.* 
-FROM products p
-INNER JOIN stock_order_numbers son ON p.id = son.product_id
-WHERE EXISTS (
-  SELECT 1 FROM stock_order_numbers 
-  WHERE product_id = p.id
-)
+// Para:
+const { data: categories = [], isLoading: loading } = useQuery({
+  queryKey: ['categories'],
+  queryFn: async () => {
+    const { data, error } = await supabase.from('categories').select('*').order('name');
+    if (error) throw error;
+    return (data || []).map(mapToCategory);
+  },
+  staleTime: 5 * 60 * 1000, // 5 minutos - categorias mudam raramente
+});
 ```
 
-**Encomendas por período:**
-```sql
-SELECT 
-  p.code, p.name, son.order_number, 
-  son.colis_status, son.created_at
-FROM stock_order_numbers son
-JOIN products p ON son.product_id = p.id
-WHERE son.created_at BETWEEN $1 AND $2
-ORDER BY son.created_at DESC
+**Resultado esperado:** Cache eficiente, menos requisições duplicadas
+
+---
+
+### 1.3 Paginação e Virtualização (Impacto: Alto)
+
+**Problema actual:** A lista de produtos carrega todos os 489 produtos de uma vez.
+
+**Solução - Virtualização:**
+```typescript
+// Instalar: npm install @tanstack/react-virtual
+
+// Em ProductsView.tsx:
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+const rowVirtualizer = useVirtualizer({
+  count: filteredProducts.length,
+  getScrollElement: () => parentRef.current,
+  estimateSize: () => 60, // altura estimada de cada linha
+});
+```
+
+**Solução - Paginação no useLastCounts:**
+```typescript
+// Buscar apenas counts da sessão activa, não todos
+const { data: counts } = await supabase
+  .from('counts')
+  .select('...')
+  .eq('session_id', activeSessionId) // FILTRAR!
+  .order('counted_at', { ascending: false });
 ```
 
 ---
 
-## Checklist de Validação
+### 1.4 Memoização Agressiva (Impacto: Médio-Alto)
 
-Após implementação, verificar:
+**Componentes a optimizar:**
+- `ProductCard` - calcular dados derivados uma vez
+- `CountingView` - memoizar filteredProducts e productsWithCounts
+- `ProductsView` - memoizar cálculos de stock
 
-- [ ] Produtos de encomenda mostram colis e encomendas associadas (Ponto 1)
-- [ ] Colis completos (stock + encomendas) contam como stock (Ponto 2)
-- [ ] Colis incompletos mostram como "X Partes Soltas" (Ponto 3)
-- [ ] Cada coli tem localização visível e editável (Pontos 4 e 5)
-- [ ] Entradas podem ser por coli individual ou set completo (Ponto 6)
-- [ ] Filtro "Com Encomendas" funciona em ProductsView (Ponto 7)
-- [ ] Pesquisa por nº encomenda funciona em Saídas (Ponto 8)
-- [ ] Stock consistente em todas as interfaces (Ponto 9)
-- [ ] Relatórios mostram movimentação por coli (Ponto 10)
-- [ ] Relatórios mostram sets completos saídos (Ponto 11)
-- [ ] Lógica de caixas/partes funciona end-to-end (Ponto 12)
+**Exemplo:**
+```typescript
+// Em ProductCard.tsx, memoizar cálculos:
+const derivedData = useMemo(() => ({
+  statusIcon: getStatusIcon(),
+  missingDescription: getMissingDescription(),
+  colisDetails: product.colisDetails,
+}), [product.completeSets, product.hasPartialProduct, product.missingForNextComplete]);
+```
+
+---
+
+## Fase 2: Refactoring de Código
+
+### 2.1 Dividir Componentes Grandes
+
+| Ficheiro | Linhas | Acção |
+|----------|--------|-------|
+| `CountingView.tsx` | 1212 | Dividir em 4-5 componentes |
+| `ProductCard.tsx` | 783 | Extrair sub-componentes |
+| `ProductsView.tsx` | 1173 | Extrair tabela e filtros |
+| `ManualStockSection.tsx` | 781 | Extrair lógica de carrinho |
+
+**Estrutura proposta para CountingView:**
+```text
+CountingView/
+├── index.tsx (main container, ~200 linhas)
+├── CountingFilters.tsx
+├── CountingProductList.tsx
+├── CountingExportMenu.tsx
+├── hooks/
+│   └── useCountingFilters.ts
+└── CountingSessionSelector.tsx
+```
+
+---
+
+### 2.2 Criar Hook de Estado Global para Sessão
+
+**Problema:** `selectedSessionId` é gerido localmente e passado via props.
+
+**Solução:** Criar contexto de sessão:
+```typescript
+// src/contexts/SessionContext.tsx
+export const SessionProvider = ({ children }) => {
+  const [sessionId, setSessionId] = useState(() => 
+    localStorage.getItem('counting_selected_session')
+  );
+  // ... lógica centralizada
+};
+
+export const useSessionContext = () => useContext(SessionContext);
+```
+
+---
+
+## Fase 3: Optimização de Base de Dados
+
+### 3.1 Criar Índices Optimizados
+
+```sql
+-- Índices para melhorar queries frequentes
+CREATE INDEX IF NOT EXISTS idx_counts_product_session 
+  ON counts(product_id, session_id);
+
+CREATE INDEX IF NOT EXISTS idx_counts_session_counted_at 
+  ON counts(session_id, counted_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_products_category 
+  ON products(category);
+
+CREATE INDEX IF NOT EXISTS idx_stock_order_numbers_order_number 
+  ON stock_order_numbers(order_number);
+```
+
+### 3.2 Optimizar Trigger `sync_product_stock`
+
+O trigger actual faz múltiplas queries por produto. Pode ser optimizado para usar uma única query agregada.
+
+---
+
+## Fase 4: UX e Polimento
+
+### 4.1 Loading States Melhorados
+
+- Skeleton loaders específicos por secção
+- Indicadores de progresso durante operações longas
+- Cache optimista para operações CRUD
+
+### 4.2 Prefetching Inteligente
+
+```typescript
+// Pré-carregar dados quando utilizador passa mouse sobre aba
+const handleTabHover = (tab: string) => {
+  queryClient.prefetchQuery({
+    queryKey: ['tab-data', tab],
+    queryFn: () => fetchTabData(tab),
+  });
+};
+```
+
+### 4.3 Debounce em Pesquisas
+
+```typescript
+// Já existe em ManualStockSection (300ms)
+// Aplicar também em ProductsView e CountingView
+const debouncedSearch = useDebouncedValue(searchTerm, 300);
+```
+
+---
+
+## Resumo de Ficheiros a Modificar
+
+| Ficheiro | Tipo de Alteração |
+|----------|-------------------|
+| `src/pages/Dashboard.tsx` | Lazy loading |
+| `src/hooks/useCategories.tsx` | Migrar para React-Query |
+| `src/hooks/useSessions.tsx` | Migrar para React-Query |
+| `src/hooks/useLastCounts.tsx` | Paginação + React-Query |
+| `src/components/counting/CountingView.tsx` | Dividir componente |
+| `src/components/products/ProductsView.tsx` | Virtualização + memoização |
+| `src/components/counting/ProductCard.tsx` | Dividir + memoização |
+| Migração SQL | Índices |
 
 ---
 
 ## Ordem de Implementação Sugerida
 
-1. **Fase 1** - Filtro "Com Encomendas" (impacto imediato, fácil)
-2. **Fase 2** - Pesquisa por encomenda nas saídas (melhora operação diária)
-3. **Fase 3** - Relatórios detalhados (visibilidade completa)
-4. **Fase 4** - Validação de consistência (qualidade de dados)
+1. **Semana 1: Quick Wins**
+   - Lazy loading no Dashboard
+   - Memoização nos componentes principais
+   - Debounce em pesquisas
 
-Tempo estimado: 3-4 sessões de implementação
+2. **Semana 2: Hooks**
+   - Migrar useCategories para React-Query
+   - Migrar useSessions para React-Query
+   - Optimizar useLastCounts com filtro de sessão
+
+3. **Semana 3: Refactoring**
+   - Dividir CountingView
+   - Dividir ProductCard
+   - Criar SessionContext
+
+4. **Semana 4: Base de Dados**
+   - Criar índices
+   - Optimizar triggers
+   - Testes de carga
+
+---
+
+## Métricas de Sucesso
+
+| Métrica | Actual (estimado) | Objectivo |
+|---------|-------------------|-----------|
+| Tempo de carregamento inicial | ~3-5s | < 1s |
+| Time to Interactive | ~5s | < 2s |
+| Re-renders por acção | Múltiplos | Mínimo necessário |
+| Tamanho do bundle inicial | ~500KB | < 200KB |
+
+---
+
+## Secção Técnica Detalhada
+
+### Configuração React-Query Optimizada
+
+```typescript
+// src/App.tsx
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutos
+      gcTime: 10 * 60 * 1000, // 10 minutos (antes era cacheTime)
+      refetchOnWindowFocus: false, // Desabilitar refresh automático
+      retry: 1, // Apenas 1 retry em caso de erro
+    },
+  },
+});
+```
+
+### Estrutura de Lazy Loading
+
+```typescript
+// src/pages/Dashboard.tsx
+import React, { Suspense, lazy } from 'react';
+
+const CountingView = lazy(() => import('@/components/counting/CountingView').then(m => ({ default: m.CountingView })));
+const ProductsView = lazy(() => import('@/components/products/ProductsView').then(m => ({ default: m.ProductsView })));
+// ... outros imports lazy
+
+const ViewLoader = () => (
+  <div className="p-4 space-y-4">
+    <Skeleton className="h-10 w-64" />
+    <Skeleton className="h-32 w-full" />
+    <Skeleton className="h-64 w-full" />
+  </div>
+);
+
+// No render:
+<Suspense fallback={<ViewLoader />}>
+  {activeTab === 'counting' && <CountingView />}
+  {activeTab === 'products' && <ProductsView />}
+  {/* ... */}
+</Suspense>
+```
+
