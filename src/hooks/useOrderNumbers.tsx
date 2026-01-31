@@ -370,6 +370,87 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
     return orderNumbers.filter(o => !o.is_complete);
   };
 
+  // Convert existing generic stock to tracked order (does NOT increment counts)
+  // This is used when assigning an order number to stock that was already counted
+  const convertStockToOrder = async (
+    orderNumber: string,
+    location?: string | null,
+    palletNumber?: string | null
+  ): Promise<OrderNumberEntry | null> => {
+    if (!productId) return null;
+
+    // Create colis_status with ALL colis marked as present
+    const colisStatus: Record<string, boolean> = {};
+    for (let i = 1; i <= totalColis; i++) {
+      colisStatus[i.toString()] = true;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('stock_order_numbers')
+        .insert({
+          product_id: productId,
+          order_number: orderNumber.trim(),
+          colis_status: colisStatus,
+          location: location || null,
+          pallet_number: palletNumber || null
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('Este número de encomenda já existe para este produto');
+          return null;
+        }
+        throw error;
+      }
+
+      // NO counts increment - we're just labeling existing stock
+      const entry = mapToOrderNumberEntry(data, totalColis);
+      setOrderNumbers(prev => [entry, ...prev]);
+      toast.success('Stock genérico convertido em encomenda rastreada');
+      return entry;
+    } catch (error) {
+      console.error('Error converting stock to order:', error);
+      toast.error('Erro ao converter stock');
+      return null;
+    }
+  };
+
+  // Remove generic stock (decrement counts without touching order numbers)
+  // This reduces the stock by 1 unit for products without order tracking
+  const removeGenericStock = async (quantity: number = 1): Promise<boolean> => {
+    if (!productId) return false;
+
+    try {
+      // Decrement each coli's count
+      for (let i = 1; i <= totalColis; i++) {
+        const { data: existingCount } = await supabase
+          .from('counts')
+          .select('id, quantity')
+          .eq('product_id', productId)
+          .eq('colis_number', i)
+          .maybeSingle();
+
+        if (existingCount && existingCount.quantity > 0) {
+          const newQty = Math.max(0, existingCount.quantity - quantity);
+          await supabase
+            .from('counts')
+            .update({ quantity: newQty, updated_at: new Date().toISOString() })
+            .eq('id', existingCount.id);
+        }
+      }
+
+      toast.success(`${quantity} unidade(s) de stock genérico removida(s)`);
+      return true;
+    } catch (error) {
+      console.error('Error removing generic stock:', error);
+      toast.error('Erro ao remover stock genérico');
+      return false;
+    }
+  };
+
   return {
     orderNumbers,
     loading,
@@ -380,6 +461,8 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
     deleteOrderNumber,
     getCompleteOrders,
     getIncompleteOrders,
+    convertStockToOrder,
+    removeGenericStock,
     refetch: fetchOrderNumbers
   };
 }

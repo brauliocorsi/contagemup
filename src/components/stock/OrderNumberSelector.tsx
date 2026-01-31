@@ -10,10 +10,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { 
   Plus, Trash2, MapPin, Package, Check, X, ClipboardList, 
-  ChevronDown, ChevronUp, AlertCircle, CheckCircle2 
+  ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Minus, ArrowRightLeft
 } from 'lucide-react';
 import { useOrderNumbers } from '@/hooks/useOrderNumbers';
 import { OrderNumberEntry } from '@/types/stock';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -312,12 +313,17 @@ export function OrderNumberEntrySelector({
   const categoryColisCount = colisNames ? Object.keys(colisNames).length : 0;
   const totalColis = Math.max(productTotalColis, categoryColisCount);
 
-  const { orderNumbers, loading, addOrderNumber, updateColisStatus, updateOrderLocation, deleteOrderNumber, refetch } = useOrderNumbers(productId, totalColis);
+  const { orderNumbers, loading, addOrderNumber, updateColisStatus, updateOrderLocation, deleteOrderNumber, convertStockToOrder, removeGenericStock, refetch } = useOrderNumbers(productId, totalColis);
   const [newOrderNumber, setNewOrderNumber] = useState('');
+  const [convertOrderNumber, setConvertOrderNumber] = useState('');
   const [adding, setAdding] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [removingGeneric, setRemovingGeneric] = useState(false);
+  const [showConvertInput, setShowConvertInput] = useState(false);
   const [addAsComplete, setAddAsComplete] = useState<'complete' | 'empty'>('complete');
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [deleteConfirmOrder, setDeleteConfirmOrder] = useState<OrderNumberEntry | null>(null);
+  const [removeGenericConfirm, setRemoveGenericConfirm] = useState(false);
   const [updatingColis, setUpdatingColis] = useState<string | null>(null);
 
   const handleAdd = async () => {
@@ -334,10 +340,49 @@ export function OrderNumberEntrySelector({
     }
   };
 
+  const handleConvert = async () => {
+    if (!convertOrderNumber.trim()) {
+      toast.error('Introduza um número de encomenda');
+      return;
+    }
+    if (untrackedStock <= 0) {
+      toast.error('Não há stock genérico para converter');
+      return;
+    }
+    
+    setConverting(true);
+    const result = await convertStockToOrder(convertOrderNumber.trim(), location, palletNumber);
+    setConverting(false);
+    
+    if (result) {
+      setConvertOrderNumber('');
+      setShowConvertInput(false);
+      onOrderAdded();
+    }
+  };
+
+  const handleRemoveGeneric = async () => {
+    setRemovingGeneric(true);
+    const success = await removeGenericStock(1);
+    setRemovingGeneric(false);
+    setRemoveGenericConfirm(false);
+    
+    if (success) {
+      onOrderAdded();
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAdd();
+    }
+  };
+
+  const handleConvertKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleConvert();
     }
   };
 
@@ -426,8 +471,65 @@ export function OrderNumberEntrySelector({
                 <Package className="h-3.5 w-3.5 text-gray-500" />
                 Stock genérico:
               </span>
-              <span className="font-medium text-gray-600">{untrackedStock}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-600">{untrackedStock}</span>
+                {untrackedStock > 0 && (
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setShowConvertInput(!showConvertInput)}
+                      title="Atribuir nº encomenda a stock existente"
+                    >
+                      <ArrowRightLeft className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                      onClick={() => setRemoveGenericConfirm(true)}
+                      title="Remover 1 unidade de stock genérico"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
+            
+            {/* Convert stock input */}
+            {showConvertInput && untrackedStock > 0 && (
+              <div className="mt-2 p-2 rounded border border-amber-200 bg-amber-50/50 space-y-2">
+                <Label className="text-xs text-amber-800">
+                  Converter 1 unidade de stock genérico em encomenda rastreada:
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={convertOrderNumber}
+                    onChange={(e) => setConvertOrderNumber(e.target.value)}
+                    onKeyDown={handleConvertKeyDown}
+                    placeholder="Nº encomenda..."
+                    disabled={converting}
+                    className="h-8 text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleConvert}
+                    disabled={converting || !convertOrderNumber.trim()}
+                    className="h-8"
+                  >
+                    <ArrowRightLeft className="h-3 w-3 mr-1" />
+                    Converter
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Isto NÃO altera a quantidade total - apenas associa um nº encomenda a stock já existente.
+                </p>
+              </div>
+            )}
+            
             {incompleteOrders.length > 0 && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1">
@@ -571,6 +673,30 @@ export function OrderNumberEntrySelector({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove generic stock confirmation dialog */}
+      <AlertDialog open={removeGenericConfirm} onOpenChange={setRemoveGenericConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover stock genérico?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem a certeza que deseja remover <strong>1 unidade</strong> de stock genérico (sem nº encomenda)?
+              <br /><br />
+              Esta acção reduz o stock total em 1 unidade. Use quando precisa corrigir contagens erradas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveGeneric}
+              disabled={removingGeneric}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {removingGeneric ? 'A remover...' : 'Remover 1 unidade'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
