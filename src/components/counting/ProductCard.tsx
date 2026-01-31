@@ -81,11 +81,18 @@ export function ProductCard({
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [expandedColis, setExpandedColis] = useState<Set<number>>(new Set());
+  const [showAllColis, setShowAllColis] = useState(false);
   const [colisLocations, setColisLocations] = useState<Record<number, string>>({});
   const [colisPallets, setColisPallets] = useState<Record<number, string>>({});
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [selectedColisForSplit, setSelectedColisForSplit] = useState<ColisDetail | null>(null);
   const [damageDialogOpen, setDamageDialogOpen] = useState(false);
+  
+  // For products with many colis, show only first few by default
+  const COLIS_PREVIEW_LIMIT = 4;
+  const hasManyColis = product.total_colis > COLIS_PREVIEW_LIMIT;
+  const visibleColisCount = showAllColis ? product.total_colis : Math.min(product.total_colis, COLIS_PREVIEW_LIMIT);
+  const hiddenColisCount = product.total_colis - COLIS_PREVIEW_LIMIT;
 
   const getStatusIcon = () => {
     if (product.completeSets > 0) {
@@ -454,256 +461,284 @@ export function ProductCard({
               }}
             />
           ) : (
-          <div className="grid gap-2">
-            {Array.from({ length: product.total_colis }, (_, i) => i + 1).map((colisNum) => {
-              const colisDetail = getColisDetail(colisNum);
-              const quantity = colisDetail?.quantity || 0;
-              const isMissing = isColisMissing(colisNum);
-              const missingCount = getMissingCount(colisNum);
-              const isExcess = isColisExcess(colisNum);
-              const colisName = getColisName(colisNum);
-              const isExpanded = expandedColis.has(colisNum);
-              const colisLocation = getColisLocation(colisNum);
-              const colisPallet = getColisPallet(colisNum);
-              const locDiff = hasLocationDifferent(colisNum);
-              const palDiff = hasPalletDifferent(colisNum);
-              const hasMultipleLocationsForColi = colisDetail?.hasMultipleLocations || false;
-              const locationEntries = colisDetail?.locationEntries || [];
-              
-              return (
-                <div
-                  key={colisNum}
-                  className={cn(
-                    'rounded-lg border',
-                    isMissing && 'border-yellow-300 bg-yellow-100',
-                    isExcess && !isMissing && 'border-green-300 bg-green-100',
-                    !isMissing && !isExcess && 'bg-muted/30'
-                  )}
-                >
-                  {/* Main coli row */}
-                  <div className="flex items-center justify-between p-2">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <button
-                        onClick={() => toggleColisExpanded(colisNum)}
-                        className="p-0.5 rounded hover:bg-muted/50 transition-colors"
-                      >
-                        {isExpanded ? (
-                          <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </button>
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-sm">
-                            Coli {colisNum}/{product.total_colis}
-                          </span>
-                          {colisName && (
-                            <span className="text-muted-foreground text-xs truncate">
-                              - {colisName}
+          <div className="space-y-2">
+            {/* Colis grid - compact for many colis */}
+            <div className={cn(
+              "grid gap-2",
+              hasManyColis && !showAllColis && "gap-1.5"
+            )}>
+              {Array.from({ length: visibleColisCount }, (_, i) => i + 1).map((colisNum) => {
+                const colisDetail = getColisDetail(colisNum);
+                const quantity = colisDetail?.quantity || 0;
+                const isMissing = isColisMissing(colisNum);
+                const missingCount = getMissingCount(colisNum);
+                const isExcess = isColisExcess(colisNum);
+                const colisName = getColisName(colisNum);
+                const isExpanded = expandedColis.has(colisNum);
+                const colisLocation = getColisLocation(colisNum);
+                const colisPallet = getColisPallet(colisNum);
+                const locDiff = hasLocationDifferent(colisNum);
+                const palDiff = hasPalletDifferent(colisNum);
+                const hasMultipleLocationsForColi = colisDetail?.hasMultipleLocations || false;
+                const locationEntries = colisDetail?.locationEntries || [];
+                
+                return (
+                  <div
+                    key={colisNum}
+                    className={cn(
+                      'rounded-lg border',
+                      isMissing && 'border-yellow-300 bg-yellow-100',
+                      isExcess && !isMissing && 'border-green-300 bg-green-100',
+                      !isMissing && !isExcess && 'bg-muted/30'
+                    )}
+                  >
+                    {/* Main coli row */}
+                    <div className="flex items-center justify-between p-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <button
+                          onClick={() => toggleColisExpanded(colisNum)}
+                          className="p-0.5 rounded hover:bg-muted/50 transition-colors"
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium text-sm">
+                              Coli {colisNum}/{product.total_colis}
+                            </span>
+                            {colisName && (
+                              <span className="text-muted-foreground text-xs truncate max-w-[80px]">
+                                - {colisName}
+                              </span>
+                            )}
+                            {hasMultipleLocationsForColi && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                      <Badge variant="outline" className="text-xs h-5 gap-1 text-blue-600 border-blue-300">
+                                        <Split className="h-3 w-3" />
+                                        {locationEntries.filter(e => e.quantity > 0).length}
+                                      </Badge>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="font-medium mb-1">Dividido em {locationEntries.filter(e => e.quantity > 0).length} localizações:</p>
+                                    {locationEntries.filter(e => e.quantity > 0).map((entry, i) => (
+                                      <p key={i} className="text-sm">
+                                        {entry.quantity}un em {entry.location || 'Sem localização'}
+                                      </p>
+                                    ))}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {(locDiff || palDiff) && !hasMultipleLocationsForColi && !isExpanded && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                      <AlertCircle className="h-3 w-3 text-orange-500" />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {locDiff && <p>📍 {colisLocation || 'Sem localização'}</p>}
+                                    {palDiff && <p>📦 {colisPallet || 'Sem palete'}</p>}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                          {isMissing && (
+                            <span className="text-xs text-yellow-700">
+                              Falta {missingCount} unidade{missingCount > 1 ? 's' : ''}
                             </span>
                           )}
-                          {hasMultipleLocationsForColi && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex">
-                                    <Badge variant="outline" className="text-xs h-5 gap-1 text-blue-600 border-blue-300">
-                                      <Split className="h-3 w-3" />
-                                      {locationEntries.filter(e => e.quantity > 0).length}
-                                    </Badge>
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="font-medium mb-1">Dividido em {locationEntries.filter(e => e.quantity > 0).length} localizações:</p>
-                                  {locationEntries.filter(e => e.quantity > 0).map((entry, i) => (
-                                    <p key={i} className="text-sm">
-                                      {entry.quantity}un em {entry.location || 'Sem localização'}
-                                    </p>
-                                  ))}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                          {(locDiff || palDiff) && !hasMultipleLocationsForColi && !isExpanded && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex">
-                                    <AlertCircle className="h-3 w-3 text-orange-500" />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {locDiff && <p>📍 {colisLocation || 'Sem localização'}</p>}
-                                  {palDiff && <p>📦 {colisPallet || 'Sem palete'}</p>}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                          {isExcess && !isMissing && (
+                            <span className="text-xs text-green-700">
+                              OK
+                            </span>
                           )}
                         </div>
-                        {isMissing && (
-                          <span className="text-xs text-yellow-700">
-                            Falta {missingCount} unidade{missingCount > 1 ? 's' : ''}
-                          </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* Split button when quantity > 0 */}
+                        {quantity > 0 && onSplitStock && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => openSplitDialog(colisNum)}
+                                >
+                                  <Split className="h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Dividir em localizações</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
-                        {isExcess && !isMissing && (
-                          <span className="text-xs text-green-700">
-                            OK
-                          </span>
+                        {/* Merge button when split across locations */}
+                        {hasMultipleLocationsForColi && onMergeStock && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleMergeStock(colisNum)}
+                                >
+                                  <Merge className="h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Unificar em 1 localização</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onDecrement(product.id, colisNum)}
+                          disabled={quantity === 0}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center font-bold text-lg">{quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onIncrement(product.id, colisNum)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {/* Split button when quantity > 0 */}
-                      {quantity > 0 && onSplitStock && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => openSplitDialog(colisNum)}
-                              >
-                                <Split className="h-3.5 w-3.5 text-muted-foreground" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Dividir em localizações</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                      {/* Merge button when split across locations */}
-                      {hasMultipleLocationsForColi && onMergeStock && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => handleMergeStock(colisNum)}
-                              >
-                                <Merge className="h-3.5 w-3.5 text-muted-foreground" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Unificar em 1 localização</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => onDecrement(product.id, colisNum)}
-                        disabled={quantity === 0}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-8 text-center font-bold text-lg">{quantity}</span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => onIncrement(product.id, colisNum)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
 
-                  {/* Expanded details */}
-                  {isExpanded && (
-                    <div className="px-2 pb-2 pt-0 border-t border-dashed space-y-2">
-                      {/* Show location entries if split */}
-                      {hasMultipleLocationsForColi ? (
-                        <div className="space-y-1.5">
-                          <p className="text-xs font-medium text-muted-foreground pt-1">Distribuição por localização:</p>
-                          {locationEntries.filter(e => e.quantity > 0).map((entry, idx) => (
-                            <div 
-                              key={entry.countId || idx} 
-                              className="flex items-center justify-between p-1.5 rounded bg-blue-50 border border-blue-100"
-                            >
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <MapPin className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                                <span className="text-xs truncate">{entry.location || 'Sem localização'}</span>
-                                {entry.pallet_number && (
-                                  <>
-                                    <Box className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                                    <span className="text-xs truncate">{entry.pallet_number}</span>
-                                  </>
-                                )}
+                    {/* Expanded details */}
+                    {isExpanded && (
+                      <div className="px-2 pb-2 pt-0 border-t border-dashed space-y-2">
+                        {/* Show location entries if split */}
+                        {hasMultipleLocationsForColi ? (
+                          <div className="space-y-1.5">
+                            <p className="text-xs font-medium text-muted-foreground pt-1">Distribuição por localização:</p>
+                            {locationEntries.filter(e => e.quantity > 0).map((entry, idx) => (
+                              <div 
+                                key={entry.countId || idx} 
+                                className="flex items-center justify-between p-1.5 rounded bg-blue-50 border border-blue-100"
+                              >
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <MapPin className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                                  <span className="text-xs truncate">{entry.location || 'Sem localização'}</span>
+                                  {entry.pallet_number && (
+                                    <>
+                                      <Box className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                                      <span className="text-xs truncate">{entry.pallet_number}</span>
+                                    </>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {onDecrementAtLocation && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => onDecrementAtLocation(product.id, colisNum, entry.countId)}
+                                      disabled={entry.quantity === 0}
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                  <span className="w-6 text-center font-bold text-sm">{entry.quantity}</span>
+                                  {onIncrementAtLocation && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => onIncrementAtLocation(product.id, colisNum, entry.countId)}
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1">
-                                {onDecrementAtLocation && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => onDecrementAtLocation(product.id, colisNum, entry.countId)}
-                                    disabled={entry.quantity === 0}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
+                            ))}
+                          </div>
+                        ) : (
+                          <>
+                            {/* Per-coli location with Select */}
+                            <div className="flex items-center gap-1.5 pt-1">
+                              <LocationSelect
+                                value={colisLocations[colisNum] ?? colisLocation ?? ''}
+                                onValueChange={(newLoc) => {
+                                  setColisLocations(prev => ({ ...prev, [colisNum]: newLoc }));
+                                  if (onColisLocationChange) {
+                                    onColisLocationChange(product.id, colisNum, newLoc);
+                                  }
+                                }}
+                                placeholder="Selecionar localização..."
+                                className={cn(
+                                  "flex-1 h-7 text-xs",
+                                  locDiff && "border-orange-300 bg-orange-50"
                                 )}
-                                <span className="w-6 text-center font-bold text-sm">{entry.quantity}</span>
-                                {onIncrementAtLocation && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => onIncrementAtLocation(product.id, colisNum, entry.countId)}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </div>
+                              />
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <>
-                          {/* Per-coli location with Select */}
-                          <div className="flex items-center gap-1.5 pt-1">
-                            <LocationSelect
-                              value={colisLocations[colisNum] ?? colisLocation ?? ''}
-                              onValueChange={(newLoc) => {
-                                setColisLocations(prev => ({ ...prev, [colisNum]: newLoc }));
-                                if (onColisLocationChange) {
-                                  onColisLocationChange(product.id, colisNum, newLoc);
-                                }
-                              }}
-                              placeholder="Selecionar localização..."
-                              className={cn(
-                                "flex-1 h-7 text-xs",
-                                locDiff && "border-orange-300 bg-orange-50"
-                              )}
-                            />
-                          </div>
 
-                          {/* Per-coli pallet with Select */}
-                          <div className="flex items-center gap-1.5">
-                            <PalletSelect
-                              value={colisPallets[colisNum] ?? colisPallet ?? ''}
-                              onValueChange={(newPal) => {
-                                setColisPallets(prev => ({ ...prev, [colisNum]: newPal }));
-                                if (onColisPalletChange) {
-                                  onColisPalletChange(product.id, colisNum, newPal);
-                                }
-                              }}
-                              placeholder="Selecionar palete..."
-                              className={cn(
-                                "flex-1 h-7 text-xs",
-                                palDiff && "border-orange-300 bg-orange-50"
-                              )}
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                            {/* Per-coli pallet with Select */}
+                            <div className="flex items-center gap-1.5">
+                              <PalletSelect
+                                value={colisPallets[colisNum] ?? colisPallet ?? ''}
+                                onValueChange={(newPal) => {
+                                  setColisPallets(prev => ({ ...prev, [colisNum]: newPal }));
+                                  if (onColisPalletChange) {
+                                    onColisPalletChange(product.id, colisNum, newPal);
+                                  }
+                                }}
+                                placeholder="Selecionar palete..."
+                                className={cn(
+                                  "flex-1 h-7 text-xs",
+                                  palDiff && "border-orange-300 bg-orange-50"
+                                )}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Show more/less button for products with many colis */}
+            {hasManyColis && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-muted-foreground hover:text-foreground"
+                onClick={() => setShowAllColis(!showAllColis)}
+              >
+                {showAllColis ? (
+                  <>
+                    <ChevronUp className="h-4 w-4 mr-1" />
+                    Mostrar menos
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                    Ver mais {hiddenColisCount} colis
+                  </>
+                )}
+              </Button>
+            )}
           </div>
           )}
 
