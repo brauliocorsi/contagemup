@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Search, Plus, Minus, X, ShoppingCart, AlertTriangle, Layers, Package, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { MovementItem } from '@/hooks/useStockMovements';
 import { OrderNumberEntrySelector, OrderNumberExitSelector } from './OrderNumberSelector';
 import { OrderNumberEntry } from '@/types/stock';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface ManualStockSectionProps {
@@ -52,6 +53,48 @@ export function ManualStockSection({
   const [inputStates, setInputStates] = useState<Record<string, ProductInputState>>({});
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [orderNumberProduct, setOrderNumberProduct] = useState<string | null>(null);
+  const [orderSearchResults, setOrderSearchResults] = useState<Array<{
+    product_id: string;
+    order_number: string;
+    colis_status: Record<string, boolean>;
+  }>>([]);
+  const [isSearchingOrders, setIsSearchingOrders] = useState(false);
+
+  // Search for order numbers when term looks like an order number
+  useEffect(() => {
+    const searchOrders = async () => {
+      const term = search.trim();
+      // Only search orders if we're in exit mode and term has 3+ characters
+      if (movementType !== 'saida' || term.length < 3) {
+        setOrderSearchResults([]);
+        return;
+      }
+
+      setIsSearchingOrders(true);
+      try {
+        const { data, error } = await supabase
+          .from('stock_order_numbers')
+          .select('product_id, order_number, colis_status')
+          .ilike('order_number', `%${term}%`)
+          .limit(20);
+
+        if (error) throw error;
+        setOrderSearchResults((data || []).map(d => ({
+          product_id: d.product_id,
+          order_number: d.order_number,
+          colis_status: d.colis_status as Record<string, boolean> || {},
+        })));
+      } catch (error) {
+        console.error('Error searching orders:', error);
+        setOrderSearchResults([]);
+      } finally {
+        setIsSearchingOrders(false);
+      }
+    };
+
+    const debounce = setTimeout(searchOrders, 300);
+    return () => clearTimeout(debounce);
+  }, [search, movementType]);
 
   // Map of category name -> requires_order_number
   const categoriesRequiringOrder = useMemo(() => {
@@ -79,6 +122,12 @@ export function ManualStockSection({
     }, {} as Record<string, number>);
   }, [products, stockOverrides]);
 
+  // Get products that have matching orders (for order search)
+  const productsWithMatchingOrders = useMemo(() => {
+    if (orderSearchResults.length === 0) return new Set<string>();
+    return new Set(orderSearchResults.map(o => o.product_id));
+  }, [orderSearchResults]);
+
   const filteredProducts = useMemo(() => {
     const term = search.toLowerCase().trim();
     
@@ -90,6 +139,27 @@ export function ManualStockSection({
     }
     
     if (!term) return [];
+
+    // If we have order search results, prioritize those products
+    if (movementType === 'saida' && orderSearchResults.length > 0) {
+      // Get products that match the order search
+      const orderMatchedProducts = products.filter(p => productsWithMatchingOrders.has(p.id));
+      // Also include products that match by code/name
+      const codeNameMatched = products.filter(p => 
+        !productsWithMatchingOrders.has(p.id) && (
+          p.code.toLowerCase().includes(term) || 
+          p.name.toLowerCase().includes(term)
+        )
+      );
+      return [...orderMatchedProducts, ...codeNameMatched].sort((a, b) => {
+        // Prioritize order matches
+        const aHasOrder = productsWithMatchingOrders.has(a.id);
+        const bHasOrder = productsWithMatchingOrders.has(b.id);
+        if (aHasOrder && !bHasOrder) return -1;
+        if (!aHasOrder && bHasOrder) return 1;
+        return a.code.localeCompare(b.code);
+      });
+    }
     
     return products
       .filter(p => 
@@ -97,7 +167,7 @@ export function ManualStockSection({
         p.name.toLowerCase().includes(term)
       )
       .sort((a, b) => a.code.localeCompare(b.code));
-  }, [products, search, movementType]);
+  }, [products, search, movementType, orderSearchResults, productsWithMatchingOrders]);
 
   const cartProductIds = new Set(cart.map(item => item.product_id));
 
@@ -175,11 +245,33 @@ export function ManualStockSection({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input
-            placeholder="Pesquisar por código ou nome..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className="relative">
+            <Input
+              placeholder={movementType === 'saida' 
+                ? "Pesquisar por código, nome ou nº de encomenda..." 
+                : "Pesquisar por código ou nome..."
+              }
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-3"
+            />
+            {isSearchingOrders && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+
+          {/* Order search results hint */}
+          {movementType === 'saida' && orderSearchResults.length > 0 && (
+            <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-md">
+              <ClipboardList className="h-4 w-4" />
+              <span>
+                {orderSearchResults.length} encomenda(s) encontrada(s) - 
+                produtos com encomendas aparecem primeiro
+              </span>
+            </div>
+          )}
 
           {filteredProducts.length > 0 && (
             <div className="border rounded-lg overflow-hidden">
@@ -205,6 +297,10 @@ export function ManualStockSection({
                       const requiresOrder = categoriesRequiringOrder[product.category] || false;
                       const colisNames = categoriesColisNames[product.category] || null;
                       const isOrderNumberExpanded = orderNumberProduct === product.id;
+                      
+                      // Check if this product has matching orders from search
+                      const matchingOrders = orderSearchResults.filter(o => o.product_id === product.id);
+                      const hasMatchingOrders = matchingOrders.length > 0;
 
                       return (
                         <>
@@ -212,7 +308,8 @@ export function ManualStockSection({
                             key={product.id}
                             className={cn(
                               inCart && "bg-muted/50",
-                              movementType === 'saida' && stock === 0 && "opacity-50"
+                              movementType === 'saida' && stock === 0 && "opacity-50",
+                              hasMatchingOrders && "bg-amber-50/50 border-l-2 border-l-amber-400"
                             )}
                           >
                             <TableCell className="font-mono font-medium">
@@ -228,6 +325,24 @@ export function ManualStockSection({
                                     <ClipboardList className="h-2.5 w-2.5" />
                                     Nº Enc.
                                   </Badge>
+                                )}
+                                {hasMatchingOrders && (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {matchingOrders.slice(0, 3).map(o => (
+                                      <Badge 
+                                        key={o.order_number} 
+                                        variant="secondary" 
+                                        className="text-[10px] bg-amber-100 text-amber-800 border-amber-300"
+                                      >
+                                        {o.order_number}
+                                      </Badge>
+                                    ))}
+                                    {matchingOrders.length > 3 && (
+                                      <Badge variant="outline" className="text-[10px]">
+                                        +{matchingOrders.length - 3}
+                                      </Badge>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </TableCell>

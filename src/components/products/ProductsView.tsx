@@ -3,6 +3,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { useProductChanges } from '@/hooks/useProductChanges';
 import { useLastCounts } from '@/hooks/useLastCounts';
+import { useProductsWithOrders } from '@/hooks/useProductsWithOrders';
 import { useToast } from '@/hooks/use-toast';
 import { ProductForm } from './ProductForm';
 import { ProductEditForm } from './ProductEditForm';
@@ -19,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ResizableTableProvider, ResizableHeaderCell, ResizableCell } from '@/components/ui/resizable-table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft, ShoppingBag } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { classifyLocation } from '@/lib/locationUtils';
 import { cn } from '@/lib/utils';
@@ -71,11 +72,13 @@ export function ProductsView() {
   const { categories, createCategory, refetch: refetchCategories } = useCategories();
   const { logChange, logMultipleChanges } = useProductChanges();
   const { lastCounts } = useLastCounts();
+  const { productIdsWithOrders, getOrderStats, loading: ordersLoading } = useProductsWithOrders();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
   const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [filterOrderStatus, setFilterOrderStatus] = useState<'all' | 'with_orders' | 'without_orders'>('all');
   const [sortColumn, setSortColumn] = useState<'code' | 'name' | 'category' | 'stock' | 'lastCount' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -251,8 +254,15 @@ export function ProductsView() {
       const matchesStockStatus = 
         filterStockStatus === 'all' ||
         filterStockStatus === stockStatus;
+
+      // Filter by order status
+      const hasOrders = productIdsWithOrders.has(product.id);
+      const matchesOrderStatus =
+        filterOrderStatus === 'all' ||
+        (filterOrderStatus === 'with_orders' && hasOrders) ||
+        (filterOrderStatus === 'without_orders' && !hasOrders);
       
-      return matchesSearch && matchesCountStatus && matchesStockStatus;
+      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus;
     });
 
     // Apply sorting
@@ -285,7 +295,7 @@ export function ProductsView() {
     }
     
     return result;
-  }, [products, searchTerm, filterCountStatus, filterStockStatus, lastCounts, sortColumn, sortDirection]);
+  }, [products, searchTerm, filterCountStatus, filterStockStatus, filterOrderStatus, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
 
   // Count stats for filter
   const countStats = useMemo(() => {
@@ -301,6 +311,13 @@ export function ProductsView() {
     const outOfStock = products.filter(p => getStockStatus(p.current_stock, p.min_stock) === 'out_of_stock').length;
     return { inStock, lowStock, outOfStock };
   }, [products]);
+
+  // Order stats for filter
+  const orderStats = useMemo(() => {
+    const withOrders = products.filter(p => productIdsWithOrders.has(p.id)).length;
+    const withoutOrders = products.length - withOrders;
+    return { withOrders, withoutOrders };
+  }, [products, productIdsWithOrders]);
 
   const exportLastCounts = () => {
     const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Última Quantidade', 'Sessão', 'Data Contagem'];
@@ -586,6 +603,27 @@ export function ProductsView() {
             </SelectItem>
           </SelectContent>
         </Select>
+        <Select value={filterOrderStatus} onValueChange={(v) => setFilterOrderStatus(v as typeof filterOrderStatus)}>
+          <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterOrderStatus !== 'all' ? 'border-amber-500 bg-amber-50 text-amber-700' : ''}`}>
+            <ShoppingBag className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Encomendas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="with_orders">
+              <span className="flex items-center gap-2">
+                <ClipboardList className="h-3 w-3 text-amber-600" />
+                Com encomendas ({orderStats.withOrders})
+              </span>
+            </SelectItem>
+            <SelectItem value="without_orders">
+              <span className="flex items-center gap-2">
+                <Package className="h-3 w-3 text-muted-foreground" />
+                Sem encomendas ({orderStats.withoutOrders})
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="whitespace-nowrap">
@@ -810,7 +848,17 @@ export function ProductsView() {
                           <ResizableCell columnId="code" className="p-2 align-middle font-mono">{product.code}</ResizableCell>
                         )}
                         {isColumnVisible('name') && (
-                          <ResizableCell columnId="name" className="p-2 align-middle font-medium" title={product.name}>{product.name}</ResizableCell>
+                          <ResizableCell columnId="name" className="p-2 align-middle font-medium" title={product.name}>
+                            <div className="flex flex-col gap-0.5">
+                              <span>{product.name}</span>
+                              {productIdsWithOrders.has(product.id) && (
+                                <Badge variant="outline" className="text-[10px] w-fit bg-amber-50 text-amber-700 border-amber-300 gap-0.5">
+                                  <ClipboardList className="h-2.5 w-2.5" />
+                                  {getOrderStats(product.id)?.order_count || 0} enc.
+                                </Badge>
+                              )}
+                            </div>
+                          </ResizableCell>
                         )}
                         {isColumnVisible('category') && (
                           <ResizableCell columnId="category" className="p-2 align-middle">
