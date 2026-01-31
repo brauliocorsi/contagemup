@@ -103,7 +103,8 @@ function VirtualizedGrid({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 320,
+    // Fallback only; the real height is measured via `measureElement`.
+    estimateSize: () => 360,
     overscan: 3,
   });
 
@@ -133,13 +134,14 @@ function VirtualizedGrid({
           return (
             <div
               key={virtualRow.key}
+              ref={rowVirtualizer.measureElement}
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: `${virtualRow.size}px`,
-                transform: `translateY(${virtualRow.start}px)`,
+                transform: `translate3d(0, ${virtualRow.start}px, 0)`,
+                willChange: 'transform',
               }}
             >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pr-2">
