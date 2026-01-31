@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
@@ -41,82 +42,87 @@ function mapToCategory(row: {
   };
 }
 
+const fetchCategoriesFromDB = async (): Promise<Category[]> => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .order('name');
+
+  if (error) throw error;
+  return (data || []).map(mapToCategory);
+};
+
 export function useCategories() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchCategories = useCallback(async () => {
-    try {
+  const { data: categories = [], isLoading: loading } = useQuery({
+    queryKey: ['categories'],
+    queryFn: fetchCategoriesFromDB,
+    staleTime: 5 * 60 * 1000, // 5 minutos - categorias mudam raramente
+    gcTime: 10 * 60 * 1000, // 10 minutos
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async ({
+      name,
+      description,
+      colisNames,
+      requiresOrderNumber
+    }: {
+      name: string;
+      description?: string;
+      colisNames?: Record<string, string> | null;
+      requiresOrderNumber?: boolean;
+    }) => {
       const { data, error } = await supabase
         .from('categories')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setCategories((data || []).map(mapToCategory));
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast.error('Erro ao carregar categorias');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
-
-  const createCategory = async (
-    name: string, 
-    description?: string, 
-    colisNames?: Record<string, string> | null,
-    requiresOrderNumber: boolean = false
-  ) => {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .insert({ 
-          name: name.trim(), 
+        .insert({
+          name: name.trim(),
           description: description?.trim() || null,
           colis_names: colisNames || null,
-          requires_order_number: requiresOrderNumber
+          requires_order_number: requiresOrderNumber ?? false
         })
         .select()
         .single();
 
       if (error) {
         if (error.code === '23505') {
-          toast.error('Já existe uma categoria com este nome');
-          return null;
+          throw new Error('Já existe uma categoria com este nome');
         }
         throw error;
       }
 
-      const mappedData = mapToCategory(data);
-      setCategories(prev => [...prev, mappedData].sort((a, b) => a.name.localeCompare(b.name)));
+      return mapToCategory(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
       toast.success('Categoria criada com sucesso');
-      return mappedData;
-    } catch (error) {
-      console.error('Error creating category:', error);
-      toast.error('Erro ao criar categoria');
-      return null;
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erro ao criar categoria');
     }
-  };
+  });
 
-  const updateCategory = async (
-    id: string, 
-    name: string, 
-    description?: string, 
-    colisNames?: Record<string, string> | null,
-    requiresOrderNumber?: boolean
-  ) => {
-    try {
-      const updateData: Record<string, unknown> = { 
-        name: name.trim(), 
+  const updateMutation = useMutation({
+    mutationFn: async ({
+      id,
+      name,
+      description,
+      colisNames,
+      requiresOrderNumber
+    }: {
+      id: string;
+      name: string;
+      description?: string;
+      colisNames?: Record<string, string> | null;
+      requiresOrderNumber?: boolean;
+    }) => {
+      const updateData: Record<string, unknown> = {
+        name: name.trim(),
         description: description?.trim() || null,
         colis_names: colisNames !== undefined ? colisNames : null
       };
-      
+
       if (requiresOrderNumber !== undefined) {
         updateData.requires_order_number = requiresOrderNumber;
       }
@@ -130,31 +136,27 @@ export function useCategories() {
 
       if (error) {
         if (error.code === '23505') {
-          toast.error('Já existe uma categoria com este nome');
-          return false;
+          throw new Error('Já existe uma categoria com este nome');
         }
         throw error;
       }
 
-      const mappedData = mapToCategory(data);
-      setCategories(prev => 
-        prev.map(c => c.id === id ? mappedData : c).sort((a, b) => a.name.localeCompare(b.name))
-      );
+      return mapToCategory(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
       toast.success('Categoria atualizada com sucesso');
-      return true;
-    } catch (error) {
-      console.error('Error updating category:', error);
-      toast.error('Erro ao atualizar categoria');
-      return false;
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erro ao atualizar categoria');
     }
-  };
+  });
 
-  const deleteCategory = async (id: string) => {
-    try {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
       const category = categories.find(c => c.id === id);
       if (category?.name === 'Geral') {
-        toast.error('Não é possível excluir a categoria padrão');
-        return false;
+        throw new Error('Não é possível excluir a categoria padrão');
       }
 
       const { error } = await supabase
@@ -163,16 +165,57 @@ export function useCategories() {
         .eq('id', id);
 
       if (error) throw error;
-
-      setCategories(prev => prev.filter(c => c.id !== id));
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
       toast.success('Categoria excluída com sucesso');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erro ao excluir categoria');
+    }
+  });
+
+  const createCategory = useCallback(async (
+    name: string,
+    description?: string,
+    colisNames?: Record<string, string> | null,
+    requiresOrderNumber: boolean = false
+  ) => {
+    try {
+      return await createMutation.mutateAsync({ name, description, colisNames, requiresOrderNumber });
+    } catch {
+      return null;
+    }
+  }, [createMutation]);
+
+  const updateCategory = useCallback(async (
+    id: string,
+    name: string,
+    description?: string,
+    colisNames?: Record<string, string> | null,
+    requiresOrderNumber?: boolean
+  ) => {
+    try {
+      await updateMutation.mutateAsync({ id, name, description, colisNames, requiresOrderNumber });
       return true;
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      toast.error('Erro ao excluir categoria');
+    } catch {
       return false;
     }
-  };
+  }, [updateMutation]);
+
+  const deleteCategory = useCallback(async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [deleteMutation]);
+
+  const refetch = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['categories'] });
+  }, [queryClient]);
 
   return {
     categories,
@@ -180,6 +223,6 @@ export function useCategories() {
     createCategory,
     updateCategory,
     deleteCategory,
-    refetch: fetchCategories
+    refetch
   };
 }

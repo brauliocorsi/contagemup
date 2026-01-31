@@ -1,18 +1,39 @@
-import { useState } from 'react';
+import { useState, Suspense, lazy } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Navigation } from '@/components/layout/Navigation';
-import { CountingView } from '@/components/counting/CountingView';
-import { ProductsView } from '@/components/products/ProductsView';
-import { CategoriesView } from '@/components/categories/CategoriesView';
-import { SessionsView } from '@/components/sessions/SessionsView';
-import { ReportsView } from '@/components/reports/ReportsView';
-import { ReconciliationView } from '@/components/reconciliation/ReconciliationView';
-import { StockEntriesView } from '@/components/stock/StockEntriesView';
-import { StockExitsView } from '@/components/stock/StockExitsView';
-import { StockAlertsView } from '@/components/stock/StockAlertsView';
-import { WarehouseMapView } from '@/components/warehouse/WarehouseMapView';
-import { DamagesView } from '@/components/damages/DamagesView';
-import { SettingsView } from '@/components/settings/SettingsView';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Lazy loading - cada view é carregada apenas quando necessária
+const CountingView = lazy(() => import('@/components/counting/CountingView').then(m => ({ default: m.CountingView })));
+const ProductsView = lazy(() => import('@/components/products/ProductsView').then(m => ({ default: m.ProductsView })));
+const CategoriesView = lazy(() => import('@/components/categories/CategoriesView').then(m => ({ default: m.CategoriesView })));
+const SessionsView = lazy(() => import('@/components/sessions/SessionsView').then(m => ({ default: m.SessionsView })));
+const ReportsView = lazy(() => import('@/components/reports/ReportsView').then(m => ({ default: m.ReportsView })));
+const ReconciliationView = lazy(() => import('@/components/reconciliation/ReconciliationView').then(m => ({ default: m.ReconciliationView })));
+const StockEntriesView = lazy(() => import('@/components/stock/StockEntriesView').then(m => ({ default: m.StockEntriesView })));
+const StockExitsView = lazy(() => import('@/components/stock/StockExitsView').then(m => ({ default: m.StockExitsView })));
+const StockAlertsView = lazy(() => import('@/components/stock/StockAlertsView').then(m => ({ default: m.StockAlertsView })));
+const WarehouseMapView = lazy(() => import('@/components/warehouse/WarehouseMapView').then(m => ({ default: m.WarehouseMapView })));
+const DamagesView = lazy(() => import('@/components/damages/DamagesView').then(m => ({ default: m.DamagesView })));
+const SettingsView = lazy(() => import('@/components/settings/SettingsView').then(m => ({ default: m.SettingsView })));
+
+// Loading skeleton component
+function ViewLoader() {
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-10 w-32" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+      </div>
+      <Skeleton className="h-96" />
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('counting');
@@ -26,18 +47,20 @@ export default function Dashboard() {
       <Header onNavigateToProducts={handleNavigateToProducts} />
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="container py-4">
-        {activeTab === 'counting' && <CountingView />}
-        {activeTab === 'products' && <ProductsView />}
-        {activeTab === 'categories' && <CategoriesView />}
-        {activeTab === 'sessions' && <SessionsView />}
-        {activeTab === 'entries' && <StockEntriesView />}
-        {activeTab === 'exits' && <StockExitsView />}
-        {activeTab === 'alerts' && <StockAlertsView />}
-        {activeTab === 'damages' && <DamagesView />}
-        {activeTab === 'reconciliation' && <ReconciliationView />}
-        {activeTab === 'warehouse' && <WarehouseMapView />}
-        {activeTab === 'reports' && <ReportsView />}
-        {activeTab === 'settings' && <SettingsView />}
+        <Suspense fallback={<ViewLoader />}>
+          {activeTab === 'counting' && <CountingView />}
+          {activeTab === 'products' && <ProductsView />}
+          {activeTab === 'categories' && <CategoriesView />}
+          {activeTab === 'sessions' && <SessionsView />}
+          {activeTab === 'entries' && <StockEntriesView />}
+          {activeTab === 'exits' && <StockExitsView />}
+          {activeTab === 'alerts' && <StockAlertsView />}
+          {activeTab === 'damages' && <DamagesView />}
+          {activeTab === 'reconciliation' && <ReconciliationView />}
+          {activeTab === 'warehouse' && <WarehouseMapView />}
+          {activeTab === 'reports' && <ReportsView />}
+          {activeTab === 'settings' && <SettingsView />}
+        </Suspense>
       </main>
     </div>
   );
