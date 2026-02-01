@@ -74,24 +74,44 @@ export function useCounting(sessionId: string | null) {
 
   // Função auxiliar para buscar count fresco da BD (evita race condition)
   const fetchFreshCount = async (productId: string, colisNumber: number) => {
-    const { data } = await supabase
+    // Primeiro tentar buscar com session_id específico
+    let query = supabase
       .from('counts')
-      .select('id, quantity, location, pallet_number')
+      .select('id, quantity, location, pallet_number, session_id')
       .eq('product_id', productId)
-      .eq('colis_number', colisNumber)
-      .or(`session_id.eq.${sessionId},session_id.is.null`)
+      .eq('colis_number', colisNumber);
+    
+    // Se temos sessionId, buscar esse OU administrativo (null)
+    if (sessionId) {
+      query = query.or(`session_id.eq.${sessionId},session_id.is.null`);
+    } else {
+      query = query.is('session_id', null);
+    }
+    
+    const { data, error } = await query
       .order('counted_at', { ascending: false })
       .limit(1)
       .maybeSingle();
+    
+    if (error) {
+      console.error('Erro ao buscar count:', error);
+      return null;
+    }
     
     return data;
   };
 
   const updateCount = async (productId: string, colisNumber: number, quantity: number) => {
-    if (!sessionId || !user) return false;
+    console.log('updateCount chamado:', { productId, colisNumber, quantity, sessionId, userId: user?.id });
+    
+    if (!sessionId || !user) {
+      console.log('updateCount: sessionId ou user em falta', { sessionId, user: !!user });
+      return false;
+    }
 
     // Buscar count fresco da BD para evitar stale cache
     const freshCount = await fetchFreshCount(productId, colisNumber);
+    console.log('freshCount encontrado:', freshCount);
 
     if (freshCount) {
       const { error } = await supabase
@@ -100,6 +120,7 @@ export function useCounting(sessionId: string | null) {
         .eq('id', freshCount.id);
 
       if (error) {
+        console.error('Erro ao actualizar count:', error);
         toast({
           title: 'Erro',
           description: 'Não foi possível atualizar a contagem',
@@ -107,7 +128,9 @@ export function useCounting(sessionId: string | null) {
         });
         return false;
       }
+      console.log('Count actualizado com sucesso');
     } else {
+      console.log('Inserindo novo count');
       const { error } = await supabase
         .from('counts')
         .insert({
@@ -119,6 +142,7 @@ export function useCounting(sessionId: string | null) {
         });
 
       if (error) {
+        console.error('Erro ao inserir count:', error);
         // Se o erro for de constraint única, tentar update
         if (error.code === '23505') {
           // Registo foi criado por outro processo, tentar update
