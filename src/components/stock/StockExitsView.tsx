@@ -263,7 +263,9 @@ export function StockExitsView() {
     if (detailedPickingItems.length === 0) return;
 
     // Create picking session with location details
-    // NOTA: O picking JÁ É uma saída - não criar stock_movement duplicado
+    // NOTA: O trigger sync_stock_on_picking calcula automaticamente:
+    // current_stock = base_stock (counts) - picking_items
+    // NÃO devemos decrementar os counts manualmente, senão duplicamos a saída!
     const pickingSessionItems = detailedPickingItems.flatMap(item => {
       // Get the first coli with location data for the session record
       const firstColi = item.colisDetails.find(c => c.location) || item.colisDetails[0];
@@ -281,7 +283,10 @@ export function StockExitsView() {
       };
     });
 
-    // Criar sessão de picking (que já regista a saída como 'picking' no histórico)
+    // Criar sessão de picking
+    // O trigger sync_stock_on_picking irá automaticamente:
+    // 1. Inserir os picking_items
+    // 2. Recalcular current_stock = base_stock - SUM(picking_items)
     await createSession.mutateAsync({
       reference: reference || undefined,
       reason: reason || undefined,
@@ -289,18 +294,10 @@ export function StockExitsView() {
       items: pickingSessionItems,
     });
 
-    // Actualizar o stock na tabela counts para TODOS os colis do produto
-    // E remover order numbers quando aplicável
+    // Remover order numbers quando aplicável (sem decrementar counts!)
     for (const item of detailedPickingItems) {
-      const product = products.find(p => p.id === item.product_id);
-      const totalColis = product?.total_colis || 1;
-
-      // Encontrar item original no carrinho para verificar modo set/individual
       const cartItem = allItems.find(ci => ci.product_id === item.product_id);
-      const isCompleteSet = cartItem?.isCompleteSet !== false;
-
-      // Se o item tem um orderNumber associado, remover da tabela stock_order_numbers
-      // A remoção da encomenda já decrementa os counts (feito em removeOrderNumberAfterExit)
+      
       if (cartItem?.orderNumber) {
         const { data: orderEntry } = await supabase
           .from('stock_order_numbers')
@@ -310,42 +307,7 @@ export function StockExitsView() {
           .maybeSingle();
 
         if (orderEntry) {
-          // Note: removeOrderNumberAfterExit only deletes the record, 
-          // it doesn't decrement counts (that's done by deleteOrderNumber in the hook)
-          // So we still need to decrement counts manually below
           await removeOrderNumberAfterExit(orderEntry.id);
-        }
-      }
-
-      // Decrementar colis do produto (para itens sem orderNumber ou para backup)
-      // Para itens com orderNumber, isto ainda é necessário pois removeOrderNumberAfterExit
-      // não decrementa counts (a versão standalone)
-      for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
-        // Determinar quantidade a decrementar para este colis
-        const colisQty = isCompleteSet 
-          ? item.quantity 
-          : (cartItem?.colisQuantities?.[colisNumber] || 0);
-
-        // Só processar se há quantidade a remover
-        if (colisQty <= 0) continue;
-
-        const { data: existingCount } = await supabase
-          .from('counts')
-          .select('id, quantity')
-          .eq('product_id', item.product_id)
-          .eq('colis_number', colisNumber)
-          .order('counted_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (existingCount) {
-          const currentQty = existingCount.quantity || 0;
-          const newQty = Math.max(0, currentQty - colisQty);
-
-          await supabase
-            .from('counts')
-            .update({ quantity: newQty, updated_at: new Date().toISOString() })
-            .eq('id', existingCount.id);
         }
       }
     }
