@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CountingSession, Count, Product, ProductWithCounts, ColisDetail, StockDistribution } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
