@@ -39,27 +39,47 @@ export function useCounting(sessionId: string | null) {
   });
 
   // Fetch counts with react-query - include both session counts AND administrative counts (session_id IS NULL)
+  // IMPORTANT: Supabase has a default limit of 1000 rows. We need to fetch all counts.
   const { data: counts = [], isLoading: countsLoading, refetch: refetchCounts } = useQuery({
     queryKey: ['counts', sessionId],
     queryFn: async () => {
       if (!sessionId) return [];
       
-      // Fetch session-specific counts AND administrative counts (session_id IS NULL)
-      // This ensures we see the full stock picture including entries/exits
-      const { data, error } = await supabase
-        .from('counts')
-        .select('*')
-        .or(`session_id.eq.${sessionId},session_id.is.null`);
+      // Fetch ALL counts for this session - no limit
+      // Use range to bypass the 1000 row default limit
+      const allCounts: Count[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
       
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível carregar as contagens',
-          variant: 'destructive'
-        });
-        return [];
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('counts')
+          .select('*')
+          .or(`session_id.eq.${sessionId},session_id.is.null`)
+          .range(from, from + pageSize - 1);
+        
+        if (error) {
+          console.error('Erro ao buscar counts:', error);
+          toast({
+            title: 'Erro',
+            description: 'Não foi possível carregar as contagens',
+            variant: 'destructive'
+          });
+          return allCounts;
+        }
+        
+        if (data && data.length > 0) {
+          allCounts.push(...(data as Count[]));
+          from += pageSize;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
       }
-      return (data as Count[]) || [];
+      
+      console.log(`Carregados ${allCounts.length} counts para sessão ${sessionId}`);
+      return allCounts;
     },
     enabled: !!sessionId,
     staleTime: 5000, // Cache for 5 seconds
