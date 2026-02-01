@@ -259,13 +259,14 @@ export function StockExitsView() {
   };
 
   // Final confirmation after picking report
+  // Final confirmation after picking report
   const handleFinalConfirm = async () => {
     if (detailedPickingItems.length === 0) return;
 
     // Create picking session with location details
-    // NOTA: O trigger sync_stock_on_picking calcula automaticamente:
-    // current_stock = base_stock (counts) - picking_items
-    // NÃO devemos decrementar os counts manualmente, senão duplicamos a saída!
+    // NOTA: O picking decrementa os counts directamente (inventário físico)
+    // O trigger sync_stock_on_picking NÃO subtrai picking da fórmula
+    // Fórmula: current_stock = MIN(counts) APENAS
     const pickingSessionItems = detailedPickingItems.flatMap(item => {
       // Get the first coli with location data for the session record
       const firstColi = item.colisDetails.find(c => c.location) || item.colisDetails[0];
@@ -283,10 +284,7 @@ export function StockExitsView() {
       };
     });
 
-    // Criar sessão de picking
-    // O trigger sync_stock_on_picking irá automaticamente:
-    // 1. Inserir os picking_items
-    // 2. Recalcular current_stock = base_stock - SUM(picking_items)
+    // Criar sessão de picking (registo para auditoria)
     await createSession.mutateAsync({
       reference: reference || undefined,
       reason: reason || undefined,
@@ -294,10 +292,17 @@ export function StockExitsView() {
       items: pickingSessionItems,
     });
 
-    // Remover order numbers quando aplicável (sem decrementar counts!)
+    // Decrementar o stock físico na tabela counts para TODOS os colis
+    // Esta é a única forma de reduzir o stock - o trigger apenas lê os counts
     for (const item of detailedPickingItems) {
+      const product = products.find(p => p.id === item.product_id);
+      const totalColis = product?.total_colis || 1;
+
+      // Encontrar item original no carrinho para verificar modo set/individual
       const cartItem = allItems.find(ci => ci.product_id === item.product_id);
-      
+      const isCompleteSet = cartItem?.isCompleteSet !== false;
+
+      // Se o item tem um orderNumber associado, remover da tabela stock_order_numbers
       if (cartItem?.orderNumber) {
         const { data: orderEntry } = await supabase
           .from('stock_order_numbers')
@@ -308,6 +313,44 @@ export function StockExitsView() {
 
         if (orderEntry) {
           await removeOrderNumberAfterExit(orderEntry.id);
+        }
+      }
+
+      // Decrementar cada colis do produto
+      for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
+        // Determinar quantidade a decrementar para este colis
+        const colisQty = isCompleteSet 
+          ? item.quantity 
+          : (cartItem?.colisQuantities?.[colisNumber] || 0);
+
+        // Só processar se há quantidade a remover
+        if (colisQty <= 0) continue;
+
+        // Buscar todos os counts para este produto/colis e decrementar do primeiro com stock
+        const { data: existingCounts } = await supabase
+          .from('counts')
+          .select('id, quantity')
+          .eq('product_id', item.product_id)
+          .eq('colis_number', colisNumber)
+          .gt('quantity', 0)
+          .order('quantity', { ascending: false });
+
+        if (existingCounts && existingCounts.length > 0) {
+          let remainingToDeduct = colisQty;
+          
+          for (const count of existingCounts) {
+            if (remainingToDeduct <= 0) break;
+            
+            const deductFromThis = Math.min(count.quantity, remainingToDeduct);
+            const newQty = count.quantity - deductFromThis;
+            
+            await supabase
+              .from('counts')
+              .update({ quantity: newQty, updated_at: new Date().toISOString() })
+              .eq('id', count.id);
+            
+            remainingToDeduct -= deductFromThis;
+          }
         }
       }
     }
