@@ -1,185 +1,195 @@
 
+# Correcção do Bug: Não Consegue Adicionar Colis na Contagem
 
-# Ferramenta de Correcção de Stock em Massa
+## Problema Identificado
 
-## Objectivo
+Ao clicar no botão "+" para adicionar unidades ao produto "teste", o sistema cria **registos duplicados** em vez de actualizar o registo existente. Isto causa:
 
-Criar uma ferramenta segura e auditável que permita corrigir múltiplos produtos de uma só vez, com:
-- Pré-visualização das alterações antes de confirmar
-- Registo de auditoria completo
-- Opção de importar correcções via ficheiro
-- Validação de dados e confirmação do utilizador
+1. **22 registos duplicados** para o mesmo coli (colis_number: 1)
+2. Cada registo com quantity: 1
+3. O stock aparece como 8 (soma dos registos) mas a contagem visual mostra incorrectamente
 
----
-
-## Interface Proposta
-
-A nova ferramenta será adicionada ao **Relatório de Integridade** (tab "Integridade") como um novo botão "Corrigir Stock".
-
-### Fluxo do Utilizador
+**Causa Raiz**: Race condition no código
 
 ```text
-1. Utilizador clica em "Corrigir Stock"
-2. Abre um diálogo com duas opções:
-   - Corrigir produtos com discrepâncias (auto-detectados)
-   - Importar lista de correcções (CSV/Excel)
-3. Vê pré-visualização: stock actual → stock novo
-4. Confirma e escolhe o motivo ("Ajuste de inventário")
-5. Sistema actualiza counts e regista em stock_movements
-6. Toast de sucesso + refresh dos dados
+1. Utilizador clica em "+" rapidamente
+2. incrementCount() verifica lista local counts (em cache)
+3. Como a cache ainda não actualizou, cada clique pensa que não existe count
+4. Resultado: múltiplos INSERTs em vez de UPDATEs
 ```
 
 ---
 
-## Componentes a Criar
+## Solução: Múltiplas Correcções
 
-### 1. `BulkStockCorrectionDialog.tsx`
+### Correcção 1: Usar UPSERT em vez de INSERT/UPDATE
 
-Diálogo principal com:
-- Tabs: "Discrepâncias" | "Importar"
-- Tabela com produtos a corrigir
-- Coluna de "stock actual" e "stock correcto"
-- Input para alterar valores individualmente
-- Checkbox para seleccionar/desseleccionar produtos
-- Resumo: X produtos, total de ajustes
-- Botões: Cancelar | Confirmar Correcções
+Modificar `updateCount` para usar `upsert` com constraint única na base de dados, evitando duplicados.
 
-### 2. Integração no `StockIntegrityReport.tsx`
+### Correcção 2: Protecção contra cliques rápidos (debounce)
 
-- Adicionar botão "Corrigir Stock" na barra de acções
-- Passar lista de discrepâncias para o diálogo
+Adicionar estado de "a processar" para bloquear cliques múltiplos enquanto a operação anterior não terminou.
 
----
+### Correcção 3: Adicionar constraint única na BD (recomendado)
 
-## Lógica de Correcção (Segura)
+Criar uma constraint ou índice único para prevenir duplicados a nível de base de dados:
+- `(product_id, colis_number, session_id)` deve ser único
+- Usar `ON CONFLICT` para fazer update automático
 
-Para cada produto seleccionado:
+### Correcção 4: Limpar dados corrompidos
 
-```text
-1. Calcular diferença: novo_stock - stock_actual
-2. Se diferença > 0: criar stock_movement tipo "entrada"
-3. Se diferença < 0: criar stock_movement tipo "saida"
-4. Actualizar tabela counts para TODOS os colis (igual ao novo_stock)
-5. Registar em product_changes (auditoria)
-```
-
-### Vantagens desta abordagem:
-- ✅ Auditoria completa (stock_movements)
-- ✅ Triggers recalculam current_stock automaticamente
-- ✅ Histórico preservado
-- ✅ Reversível via histórico
+Criar script para consolidar os 22 registos duplicados num único registo correcto.
 
 ---
 
-## Ficheiros a Criar/Modificar
+## Ficheiros a Modificar
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/components/reports/BulkStockCorrectionDialog.tsx` | **NOVO** - Diálogo de correcção em massa |
-| `src/components/reports/StockIntegrityReport.tsx` | Adicionar botão e integração do diálogo |
+| `src/hooks/useCounting.tsx` | Usar UPSERT + estado de loading por operação |
+| `Migração SQL` | Adicionar constraint única e limpar duplicados |
 
 ---
 
 ## Detalhes Técnicos
 
-### Estrutura do Diálogo
-
-```tsx
-interface CorrectionItem {
-  productId: string;
-  code: string;
-  name: string;
-  currentStock: number;   // Stock actual (da BD)
-  targetStock: number;    // Stock correcto (input do user)
-  difference: number;     // targetStock - currentStock
-  selected: boolean;      // Para seleccionar/desseleccionar
-}
-```
-
-### Fluxo de Importação
-
-O ficheiro CSV/Excel deve ter colunas:
-- `codigo` ou `code`
-- `stock` ou `quantidade`
-
-O sistema valida cada linha, mostra erros, e permite corrigir antes de confirmar.
-
-### Lógica de Actualização
+### Alteração no useCounting.tsx
 
 ```typescript
-// Para cada produto seleccionado
-for (const item of selectedItems) {
-  const difference = item.targetStock - item.currentStock;
+// Adicionar estado para prevenir cliques rápidos
+const [pendingOperations, setPendingOperations] = useState<Set<string>>(new Set());
+
+const incrementCount = async (productId: string, colisNumber: number) => {
+  const operationKey = `${productId}-${colisNumber}`;
   
-  if (difference === 0) continue; // Sem alteração
-
-  // 1. Registar movimento (auditoria)
-  await supabase.from('stock_movements').insert({
-    product_id: item.productId,
-    movement_type: difference > 0 ? 'entrada' : 'saida',
-    quantity: Math.abs(difference),
-    reason: 'Ajuste de inventário',
-    notes: `Correcção em massa: ${item.currentStock} → ${item.targetStock}`,
-  });
-
-  // 2. Actualizar counts para todos os colis
-  for (let colis = 1; colis <= product.total_colis; colis++) {
-    // Upsert no count com o novo valor
-    await supabase.from('counts')
-      .upsert({
-        product_id: item.productId,
-        colis_number: colis,
-        quantity: item.targetStock,
-        session_id: null, // Administrativo
-      });
+  // Prevenir cliques rápidos
+  if (pendingOperations.has(operationKey)) {
+    return false;
   }
-}
+  
+  setPendingOperations(prev => new Set(prev).add(operationKey));
+  
+  try {
+    // Usar busca directa na BD para evitar stale cache
+    const { data: freshCount } = await supabase
+      .from('counts')
+      .select('id, quantity')
+      .eq('product_id', productId)
+      .eq('colis_number', colisNumber)
+      .eq('session_id', sessionId)
+      .maybeSingle();
+    
+    const oldQuantity = freshCount?.quantity || 0;
+    const newQuantity = oldQuantity + 1;
+    
+    if (freshCount) {
+      // UPDATE existente
+      await supabase
+        .from('counts')
+        .update({ quantity: newQuantity, counted_by: user.id })
+        .eq('id', freshCount.id);
+    } else {
+      // INSERT novo
+      await supabase
+        .from('counts')
+        .insert({
+          session_id: sessionId,
+          product_id: productId,
+          colis_number: colisNumber,
+          quantity: 1,
+          counted_by: user.id
+        });
+    }
+    
+    invalidateCounts();
+    return true;
+  } finally {
+    setPendingOperations(prev => {
+      const next = new Set(prev);
+      next.delete(operationKey);
+      return next;
+    });
+  }
+};
 ```
 
-### Segurança
+### Migração SQL
 
-- Todos os movimentos registados em `stock_movements`
-- Notas indicam que foi "Correcção em massa"
-- Utilizador autenticado registado em `created_by`
-- Confirmação obrigatória antes de executar
+```sql
+-- 1. Consolidar duplicados (manter maior quantidade por combinação)
+WITH duplicates AS (
+  SELECT product_id, colis_number, session_id, 
+         SUM(quantity) as total_qty,
+         MIN(id) as keep_id
+  FROM counts
+  GROUP BY product_id, colis_number, session_id
+  HAVING COUNT(*) > 1
+)
+UPDATE counts c
+SET quantity = d.total_qty
+FROM duplicates d
+WHERE c.id = d.keep_id;
+
+-- 2. Remover registos duplicados (manter apenas o primeiro)
+DELETE FROM counts
+WHERE id NOT IN (
+  SELECT MIN(id)
+  FROM counts
+  GROUP BY product_id, colis_number, session_id
+);
+
+-- 3. Criar índice único para prevenir futuros duplicados
+CREATE UNIQUE INDEX IF NOT EXISTS idx_counts_unique_product_colis_session 
+ON counts (product_id, colis_number, COALESCE(session_id, '00000000-0000-0000-0000-000000000000'));
+```
 
 ---
 
-## Interface Visual
+## Fluxo de Correcção
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│  Correcção de Stock em Massa                              [X]  │
-├─────────────────────────────────────────────────────────────────┤
-│  [ Discrepâncias ]  [ Importar Ficheiro ]                       │
-├─────────────────────────────────────────────────────────────────┤
-│  ☑ Seleccionar todos (15 produtos)                              │
-│                                                                 │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ ☑  FER2 - Baliza para sistema elevatório                  │ │
-│  │    Stock BD: 1232    →    Stock Correcto: [1037]  (-195)  │ │
-│  ├────────────────────────────────────────────────────────────┤ │
-│  │ ☑  FER1 - Amortecedor de sistema elevatório               │ │
-│  │    Stock BD: 760     →    Stock Correcto: [570]   (-190)  │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ─────────────────────────────────────────────────────────────  │
-│  15 produtos seleccionados | Total: -450 unidades               │
-│                                                                 │
-│  ⚠️ Esta acção irá criar movimentos de stock e actualizar       │
-│     as contagens. Todas as alterações ficam registadas.         │
-│                                                                 │
-│              [ Cancelar ]          [ Confirmar Correcções ]     │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────┐
+│   Utilizador clica + │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Operação pendente?  │──── Sim ──▶ Ignorar clique
+└──────────┬───────────┘
+           │ Não
+           ▼
+┌──────────────────────┐
+│  Marcar como pendente│
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Buscar count fresco │
+│  (directo da BD)     │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Existe registo?     │──── Não ──▶ INSERT novo
+└──────────┬───────────┘
+           │ Sim
+           ▼
+┌──────────────────────┐
+│  UPDATE quantidade   │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Limpar pendente     │
+│  Invalidar cache     │
+└──────────────────────┘
 ```
 
 ---
 
 ## Resultado Esperado
 
-- Ferramenta integrada no relatório de Integridade
-- Permite corrigir múltiplos produtos de uma só vez
-- Cria registo de auditoria para cada alteração
-- Preserva histórico e permite reversão
-- Suporta importação de ficheiro para correcções em massa
-
+- Clicar em "+" incrementa correctamente a quantidade
+- Clicar rapidamente não cria duplicados
+- Dados corrompidos são limpos
+- Sistema fica mais robusto para o futuro
