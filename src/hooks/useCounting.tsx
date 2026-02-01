@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CountingSession, Count, Product, ProductWithCounts, ColisDetail, StockDistribution } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
@@ -9,6 +9,9 @@ export function useCounting(sessionId: string | null) {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Estado para prevenir cliques rápidos (race condition fix)
+  const pendingOperationsRef = useRef<Set<string>>(new Set());
 
   // Fetch session with react-query
   const { data: session = null, isLoading: sessionLoading } = useQuery({
@@ -69,18 +72,32 @@ export function useCounting(sessionId: string | null) {
     queryClient.invalidateQueries({ queryKey: ['counts', sessionId] });
   }, [queryClient, sessionId]);
 
+  // Função auxiliar para buscar count fresco da BD (evita race condition)
+  const fetchFreshCount = async (productId: string, colisNumber: number) => {
+    const { data } = await supabase
+      .from('counts')
+      .select('id, quantity, location, pallet_number')
+      .eq('product_id', productId)
+      .eq('colis_number', colisNumber)
+      .or(`session_id.eq.${sessionId},session_id.is.null`)
+      .order('counted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    return data;
+  };
+
   const updateCount = async (productId: string, colisNumber: number, quantity: number) => {
     if (!sessionId || !user) return false;
 
-    const existingCount = counts.find(
-      c => c.product_id === productId && c.colis_number === colisNumber
-    );
+    // Buscar count fresco da BD para evitar stale cache
+    const freshCount = await fetchFreshCount(productId, colisNumber);
 
-    if (existingCount) {
+    if (freshCount) {
       const { error } = await supabase
         .from('counts')
-        .update({ quantity, counted_by: user.id })
-        .eq('id', existingCount.id);
+        .update({ quantity, counted_by: user.id, updated_at: new Date().toISOString() })
+        .eq('id', freshCount.id);
 
       if (error) {
         toast({
@@ -102,12 +119,33 @@ export function useCounting(sessionId: string | null) {
         });
 
       if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível registar a contagem',
-          variant: 'destructive'
-        });
-        return false;
+        // Se o erro for de constraint única, tentar update
+        if (error.code === '23505') {
+          // Registo foi criado por outro processo, tentar update
+          const retryCount = await fetchFreshCount(productId, colisNumber);
+          if (retryCount) {
+            const { error: retryError } = await supabase
+              .from('counts')
+              .update({ quantity, counted_by: user.id, updated_at: new Date().toISOString() })
+              .eq('id', retryCount.id);
+            
+            if (retryError) {
+              toast({
+                title: 'Erro',
+                description: 'Não foi possível registar a contagem',
+                variant: 'destructive'
+              });
+              return false;
+            }
+          }
+        } else {
+          toast({
+            title: 'Erro',
+            description: 'Não foi possível registar a contagem',
+            variant: 'destructive'
+          });
+          return false;
+        }
       }
     }
 
@@ -116,85 +154,104 @@ export function useCounting(sessionId: string | null) {
   };
 
   const incrementCount = async (productId: string, colisNumber: number) => {
-    const existingCount = counts.find(
-      c => c.product_id === productId && c.colis_number === colisNumber
-    );
-    const oldQuantity = existingCount?.quantity || 0;
-    const newQuantity = oldQuantity + 1;
+    const operationKey = `inc-${productId}-${colisNumber}`;
     
-    const success = await updateCount(productId, colisNumber, newQuantity);
-    
-    if (success && sessionId) {
-      // Log the count operation
-      await supabase.from('count_logs').insert({
-        product_id: productId,
-        session_id: sessionId,
-        colis_number: colisNumber,
-        operation: 'increment',
-        quantity_before: oldQuantity,
-        quantity_after: newQuantity,
-        counted_by: user?.id
-      });
-
-      // NOTE: O trigger sync_product_stock sincroniza automaticamente o current_stock
-      // quando a tabela counts é atualizada. Não é necessário atualizar manualmente.
+    // Prevenir cliques rápidos - usar ref para evitar re-renders
+    if (pendingOperationsRef.current.has(operationKey)) {
+      console.log('Operação já em progresso, ignorando clique');
+      return false;
     }
     
-    return success;
+    pendingOperationsRef.current.add(operationKey);
+    
+    try {
+      // Buscar count fresco directamente da BD
+      const freshCount = await fetchFreshCount(productId, colisNumber);
+      const oldQuantity = freshCount?.quantity || 0;
+      const newQuantity = oldQuantity + 1;
+      
+      const success = await updateCount(productId, colisNumber, newQuantity);
+      
+      if (success && sessionId) {
+        // Log the count operation
+        await supabase.from('count_logs').insert({
+          product_id: productId,
+          session_id: sessionId,
+          colis_number: colisNumber,
+          operation: 'increment',
+          quantity_before: oldQuantity,
+          quantity_after: newQuantity,
+          counted_by: user?.id
+        });
+      }
+      
+      return success;
+    } finally {
+      pendingOperationsRef.current.delete(operationKey);
+    }
   };
 
   const decrementCount = async (productId: string, colisNumber: number) => {
-    const existingCount = counts.find(
-      c => c.product_id === productId && c.colis_number === colisNumber
-    );
-    const oldQuantity = existingCount?.quantity || 0;
-    const newQuantity = Math.max(0, oldQuantity - 1);
+    const operationKey = `dec-${productId}-${colisNumber}`;
     
-    if (newQuantity === oldQuantity) return true; // No change needed
-    
-    const success = await updateCount(productId, colisNumber, newQuantity);
-    
-    if (success && sessionId) {
-      // Log the count operation
-      await supabase.from('count_logs').insert({
-        product_id: productId,
-        session_id: sessionId,
-        colis_number: colisNumber,
-        operation: 'decrement',
-        quantity_before: oldQuantity,
-        quantity_after: newQuantity,
-        counted_by: user?.id
-      });
-
-      // NOTE: O trigger sync_product_stock sincroniza automaticamente o current_stock
-      // quando a tabela counts é atualizada. Não é necessário atualizar manualmente.
-      
-      // Check for stock alerts based on new count
-      const { data: product } = await supabase
-        .from('products')
-        .select('current_stock, name, min_stock')
-        .eq('id', productId)
-        .maybeSingle();
-
-      if (product) {
-        // After trigger updates, check the new stock level
-        const newStock = product.current_stock || 0;
-        if (newStock === 0) {
-          toast({
-            title: 'Produto Esgotado',
-            description: `${product.name} está sem stock!`,
-            variant: 'destructive'
-          });
-        } else if (newStock <= (product.min_stock || 5)) {
-          toast({
-            title: 'Stock Baixo',
-            description: `${product.name} está com stock baixo (${newStock})`,
-          });
-        }
-      }
+    // Prevenir cliques rápidos
+    if (pendingOperationsRef.current.has(operationKey)) {
+      console.log('Operação já em progresso, ignorando clique');
+      return false;
     }
     
-    return success;
+    pendingOperationsRef.current.add(operationKey);
+    
+    try {
+      // Buscar count fresco directamente da BD
+      const freshCount = await fetchFreshCount(productId, colisNumber);
+      const oldQuantity = freshCount?.quantity || 0;
+      const newQuantity = Math.max(0, oldQuantity - 1);
+      
+      if (newQuantity === oldQuantity) return true; // No change needed
+      
+      const success = await updateCount(productId, colisNumber, newQuantity);
+      
+      if (success && sessionId) {
+        // Log the count operation
+        await supabase.from('count_logs').insert({
+          product_id: productId,
+          session_id: sessionId,
+          colis_number: colisNumber,
+          operation: 'decrement',
+          quantity_before: oldQuantity,
+          quantity_after: newQuantity,
+          counted_by: user?.id
+        });
+
+        // Check for stock alerts based on new count
+        const { data: product } = await supabase
+          .from('products')
+          .select('current_stock, name, min_stock')
+          .eq('id', productId)
+          .maybeSingle();
+
+        if (product) {
+          const newStock = product.current_stock || 0;
+          if (newStock === 0) {
+            toast({
+              title: 'Produto Esgotado',
+              description: `${product.name} está sem stock!`,
+              variant: 'destructive'
+            });
+          } else if (newStock <= (product.min_stock || 5)) {
+            toast({
+              title: 'Stock Baixo',
+              description: `${product.name} está com stock baixo (${newStock})`,
+            });
+          }
+        }
+      }
+      
+      return success;
+    } finally {
+      pendingOperationsRef.current.delete(operationKey);
+    }
   };
 
   const updateLocation = async (productId: string, location: string) => {
