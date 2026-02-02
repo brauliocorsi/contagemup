@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { StockUploadSection, ParsedItemsPreview } from './StockUploadSection';
 import { ManualStockSection } from './ManualStockSection';
 import { StockHistoryTable } from './StockHistoryTable';
+import { EntryLocationDialog, ExistingLocation, EntryDestination } from './EntryLocationDialog';
 
 const ENTRY_REASONS = [
   'Compra',
@@ -48,6 +49,14 @@ export function StockEntriesView() {
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Entry location dialog state
+  const [showEntryLocationDialog, setShowEntryLocationDialog] = useState(false);
+  const [entryLocationItem, setEntryLocationItem] = useState<{
+    item: MovementItem;
+    existingLocations: ExistingLocation[];
+  } | null>(null);
+  const [pendingEntryDestinations, setPendingEntryDestinations] = useState<Map<string, EntryDestination>>(new Map());
 
   // Combine CSV items and manual cart
   const allItems: MovementItem[] = [
@@ -88,9 +97,103 @@ export function StockEntriesView() {
     setCart(prev => prev.filter(item => item.product_id !== productId));
   }, []);
 
+  // Check if items need location selection (products with multiple existing locations)
+  const checkForMultipleLocations = async (items: MovementItem[]): Promise<Array<{
+    item: MovementItem;
+    existingLocations: ExistingLocation[];
+  }>> => {
+    const itemsNeedingSelection: Array<{
+      item: MovementItem;
+      existingLocations: ExistingLocation[];
+    }> = [];
+
+    for (const item of items) {
+      // Skip items that already have destination selected
+      if (pendingEntryDestinations.has(item.product_id)) continue;
+
+      // Fetch counts with locations for this product
+      const { data: counts } = await supabase
+        .from('counts')
+        .select('location, pallet_number, quantity')
+        .eq('product_id', item.product_id)
+        .gt('quantity', 0);
+
+      if (!counts || counts.length === 0) continue;
+
+      // Get unique locations
+      const locationMap = new Map<string, ExistingLocation>();
+      counts.forEach(c => {
+        if (!c.location) return;
+        const key = `${c.location}|${c.pallet_number || ''}`;
+        const existing = locationMap.get(key);
+        if (existing) {
+          existing.quantity += c.quantity;
+        } else {
+          locationMap.set(key, {
+            location: c.location,
+            pallet: c.pallet_number,
+            quantity: c.quantity,
+          });
+        }
+      });
+
+      const uniqueLocations = Array.from(locationMap.values());
+      
+      // If product has multiple locations, ask where to add
+      if (uniqueLocations.length > 1) {
+        itemsNeedingSelection.push({
+          item,
+          existingLocations: uniqueLocations,
+        });
+      }
+    }
+
+    return itemsNeedingSelection;
+  };
+
+  // Handle entry location selection
+  const handleEntryLocationConfirm = async (destination: EntryDestination) => {
+    if (!entryLocationItem) return;
+
+    // Store destination for this product
+    setPendingEntryDestinations(prev => {
+      const newMap = new Map(prev);
+      newMap.set(entryLocationItem.item.product_id, destination);
+      return newMap;
+    });
+
+    setShowEntryLocationDialog(false);
+    setEntryLocationItem(null);
+
+    // Check if there are more items needing selection
+    const remainingItems = await checkForMultipleLocations(allItems);
+    if (remainingItems.length > 0) {
+      const nextItem = remainingItems[0];
+      setEntryLocationItem(nextItem);
+      setShowEntryLocationDialog(true);
+    } else {
+      // All selections done, proceed with confirmation
+      await executeEntries();
+    }
+  };
+
   const handleConfirm = async () => {
     if (allItems.length === 0) return;
     
+    // Check if any items need location selection
+    const itemsNeedingSelection = await checkForMultipleLocations(allItems);
+    if (itemsNeedingSelection.length > 0) {
+      const firstItem = itemsNeedingSelection[0];
+      setEntryLocationItem(firstItem);
+      setShowEntryLocationDialog(true);
+      return;
+    }
+
+    // No location selection needed, proceed directly
+    await executeEntries();
+  };
+
+  const executeEntries = async () => {
     setIsSubmitting(true);
 
     try {
@@ -108,11 +211,14 @@ export function StockEntriesView() {
         const product = products.find(p => p.id === item.product_id);
         const totalColis = product?.total_colis || 1;
 
+        // Check if we have a specific destination for this product
+        const destination = pendingEntryDestinations.get(item.product_id);
+        const targetLocation = destination?.location || product?.location || null;
+        const targetPallet = destination?.pallet || product?.pallet_number || null;
+
         // Atualizar cada colis do produto
         for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
           // Determinar quantidade para este colis
-          // Se é set completo (isCompleteSet !== false), usar item.quantity para todos os colis
-          // Se é individual, usar item.colisQuantities[colisNumber]
           const colisQty = item.isCompleteSet !== false 
             ? item.quantity 
             : (item.colisQuantities?.[colisNumber] || 0);
@@ -120,12 +226,13 @@ export function StockEntriesView() {
           // Só processar se há quantidade a adicionar
           if (colisQty <= 0) continue;
 
-          // Buscar count existente para este colis
+          // Buscar count existente para este colis NA LOCALIZAÇÃO ESPECÍFICA
           const { data: existingCount } = await supabase
             .from('counts')
             .select('id, quantity')
             .eq('product_id', item.product_id)
             .eq('colis_number', colisNumber)
+            .eq('location', targetLocation || '')
             .order('counted_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -140,14 +247,14 @@ export function StockEntriesView() {
               .update({ quantity: newQty, updated_at: new Date().toISOString() })
               .eq('id', existingCount.id);
           } else {
-            // Criar novo count sem sessão (movimento administrativo)
+            // Criar novo count com localização específica
             await supabase.from('counts').insert({
               product_id: item.product_id,
               colis_number: colisNumber,
               quantity: colisQty,
               session_id: null, // Movimento administrativo
-              location: product?.location || null,
-              pallet_number: product?.pallet_number || null,
+              location: targetLocation,
+              pallet_number: targetPallet,
             });
           }
         }
@@ -165,6 +272,7 @@ export function StockEntriesView() {
       setReason('');
       setReference('');
       setNotes('');
+      setPendingEntryDestinations(new Map());
     } catch (error) {
       console.error('Erro ao registar entradas:', error);
       toast.error('Erro ao registar entradas');
@@ -179,134 +287,152 @@ export function StockEntriesView() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-green-600" />
-          Entradas de Stock
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Registe entradas de produtos no inventário
-        </p>
-      </div>
-
-      {/* Main Content - Stacked Layout for better product visibility */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left/Main Column - Manual Selection (takes 2 cols on xl) */}
-        <div className="xl:col-span-2 space-y-4">
-          <ManualStockSection
-            cart={cart}
-            onAddToCart={handleAddToCart}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveFromCart={handleRemoveFromCart}
-            movementType="entrada"
-          />
-
-          {/* Collapsible Upload Section */}
-          <details className="group">
-            <summary className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors py-2">
-              <Upload className="h-4 w-4" />
-              <span>Importar de ficheiro CSV/Excel</span>
-              <span className="text-xs">(clique para expandir)</span>
-            </summary>
-            <div className="mt-2 space-y-4">
-              <StockUploadSection
-                onFileParsed={setParsedItems}
-                parseFile={parseStockFile}
-                isProcessing={isProcessing}
-                movementType="entrada"
-              />
-              {parsedItems.length > 0 && (
-                <ParsedItemsPreview
-                  items={parsedItems}
-                  onClear={() => setParsedItems([])}
-                />
-              )}
-            </div>
-          </details>
+    <>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-green-600" />
+            Entradas de Stock
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Registe entradas de produtos no inventário
+          </p>
         </div>
 
-        {/* Right Column - Confirmation */}
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              <div className="space-y-2">
-                <Label>Motivo</Label>
-                <Select value={reason} onValueChange={setReason}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um motivo..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ENTRY_REASONS.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Main Content - Stacked Layout for better product visibility */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Left/Main Column - Manual Selection (takes 2 cols on xl) */}
+          <div className="xl:col-span-2 space-y-4">
+            <ManualStockSection
+              cart={cart}
+              onAddToCart={handleAddToCart}
+              onUpdateQuantity={handleUpdateQuantity}
+              onRemoveFromCart={handleRemoveFromCart}
+              movementType="entrada"
+            />
 
-              <div className="space-y-2">
-                <Label>Referência (opcional)</Label>
-                <Input
-                  placeholder="Ex: PO-2024-001, Nota fiscal..."
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
+            {/* Collapsible Upload Section */}
+            <details className="group">
+              <summary className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors py-2">
+                <Upload className="h-4 w-4" />
+                <span>Importar de ficheiro CSV/Excel</span>
+                <span className="text-xs">(clique para expandir)</span>
+              </summary>
+              <div className="mt-2 space-y-4">
+                <StockUploadSection
+                  onFileParsed={setParsedItems}
+                  parseFile={parseStockFile}
+                  isProcessing={isProcessing}
+                  movementType="entrada"
                 />
+                {parsedItems.length > 0 && (
+                  <ParsedItemsPreview
+                    items={parsedItems}
+                    onClear={() => setParsedItems([])}
+                  />
+                )}
               </div>
+            </details>
+          </div>
 
-              <div className="space-y-2">
-                <Label>Notas (opcional)</Label>
-                <Input
-                  placeholder="Observações adicionais..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
+          {/* Right Column - Confirmation */}
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <div className="space-y-2">
+                  <Label>Motivo</Label>
+                  <Select value={reason} onValueChange={setReason}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um motivo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ENTRY_REASONS.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="pt-4 border-t space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total de itens:</span>
-                  <span className="font-medium">{allItems.length} produtos</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total de unidades:</span>
-                  <span className="font-medium">
-                    {allItems.reduce((sum, i) => sum + i.quantity, 0)} un.
-                  </span>
+                <div className="space-y-2">
+                  <Label>Referência (opcional)</Label>
+                  <Input
+                    placeholder="Ex: PO-2024-001, Nota fiscal..."
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                  />
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleClearAll}
-                    disabled={allItems.length === 0}
-                  >
-                    Limpar
-                  </Button>
-                  <Button
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                    onClick={handleConfirm}
-                    disabled={allItems.length === 0 || isSubmitting}
-                  >
-                    {isSubmitting ? 'A registar...' : 'Confirmar Entradas'}
-                  </Button>
+                <div className="space-y-2">
+                  <Label>Notas (opcional)</Label>
+                  <Input
+                    placeholder="Observações adicionais..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+
+                <div className="pt-4 border-t space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total de itens:</span>
+                    <span className="font-medium">{allItems.length} produtos</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total de unidades:</span>
+                    <span className="font-medium">
+                      {allItems.reduce((sum, i) => sum + i.quantity, 0)} un.
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={handleClearAll}
+                      disabled={allItems.length === 0}
+                    >
+                      Limpar
+                    </Button>
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      onClick={handleConfirm}
+                      disabled={allItems.length === 0 || isSubmitting}
+                    >
+                      {isSubmitting ? 'A registar...' : 'Confirmar Entradas'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
+
+        {/* History */}
+        <StockHistoryTable
+          movements={movements}
+          isLoading={isLoading}
+          onDelete={(m) => deleteMovement.mutate(m)}
+          movementType="entrada"
+        />
       </div>
 
-      {/* History */}
-      <StockHistoryTable
-        movements={movements}
-        isLoading={isLoading}
-        onDelete={(m) => deleteMovement.mutate(m)}
-        movementType="entrada"
-      />
-    </div>
+      {/* Entry Location Dialog */}
+      {entryLocationItem && (
+        <EntryLocationDialog
+          open={showEntryLocationDialog}
+          onOpenChange={(open) => {
+            setShowEntryLocationDialog(open);
+            if (!open) setEntryLocationItem(null);
+          }}
+          productName={entryLocationItem.item.product_name}
+          productCode={entryLocationItem.item.product_code}
+          quantity={entryLocationItem.item.quantity}
+          existingLocations={entryLocationItem.existingLocations}
+          onConfirm={handleEntryLocationConfirm}
+        />
+      )}
+    </>
   );
 }

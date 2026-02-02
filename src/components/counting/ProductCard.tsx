@@ -602,24 +602,45 @@ export function ProductCard({
                             </Tooltip>
                           </TooltipProvider>
                         )}
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onDecrement(product.id, colisNum)}
-                          disabled={quantity === 0}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="w-8 text-center font-bold text-lg">{quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onIncrement(product.id, colisNum)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                      {/* Master buttons - disabled when coli is split across multiple locations */}
+                        {hasMultipleLocationsForColi ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-2 px-2 py-1 rounded bg-orange-50 border border-orange-200">
+                                  <AlertCircle className="h-4 w-4 text-orange-500" />
+                                  <span className="text-sm font-medium text-orange-700">{quantity}</span>
+                                  <span className="text-xs text-orange-600">dividido</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Este coli está dividido em {locationEntries.filter(e => e.quantity > 0).length} localizações.</p>
+                                <p className="text-muted-foreground">Use os controlos por localização abaixo.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => onDecrement(product.id, colisNum)}
+                              disabled={quantity === 0}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center font-bold text-lg">{quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => onIncrement(product.id, colisNum)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
 

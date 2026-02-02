@@ -25,6 +25,7 @@ import { StockHistoryTable } from './StockHistoryTable';
 import { PickingHistoryView } from './PickingHistoryView';
 import { StockValidationDialog, StockValidationError } from './StockValidationDialog';
 import { PickingReportDialog } from './PickingReportDialog';
+import { LocationSelectionDialog, LocationSelection, ColisLocationData } from './LocationSelectionDialog';
 import { removeOrderNumberAfterExit } from '@/hooks/useOrderNumbers';
 import { toast } from 'sonner';
 
@@ -67,6 +68,15 @@ export function StockExitsView() {
   // Picking report dialog state
   const [showPickingReport, setShowPickingReport] = useState(false);
   const [itemsForPicking, setItemsForPicking] = useState<MovementItem[]>([]);
+  
+  // Location selection dialog state for split colis
+  const [showLocationSelection, setShowLocationSelection] = useState(false);
+  const [locationSelectionItem, setLocationSelectionItem] = useState<{
+    item: MovementItem;
+    colisData: ColisLocationData[];
+    totalColis: number;
+  } | null>(null);
+  const [pendingLocationSelections, setPendingLocationSelections] = useState<Map<string, LocationSelection[]>>(new Map());
 
   // Create stock map for validation
   const stockMap = useMemo(() => {
@@ -197,8 +207,114 @@ export function StockExitsView() {
     }
     setColisValidationMessage(null);
 
+    // Check for split colis that need location selection
+    const itemsNeedingLocationSelection = await checkForSplitColis(allItems);
+    if (itemsNeedingLocationSelection.length > 0) {
+      // Process first item that needs location selection
+      const firstItem = itemsNeedingLocationSelection[0];
+      setLocationSelectionItem(firstItem);
+      setShowLocationSelection(true);
+      return;
+    }
+
     // All good, show picking report
     showPickingReportWithItems(allItems);
+  };
+
+  // Check for products with colis split across multiple locations
+  const checkForSplitColis = async (items: MovementItem[]): Promise<Array<{
+    item: MovementItem;
+    colisData: ColisLocationData[];
+    totalColis: number;
+  }>> => {
+    const itemsNeedingSelection: Array<{
+      item: MovementItem;
+      colisData: ColisLocationData[];
+      totalColis: number;
+    }> = [];
+
+    for (const item of items) {
+      // Skip items that already have location selections
+      if (pendingLocationSelections.has(item.product_id)) continue;
+
+      const product = products.find(p => p.id === item.product_id);
+      const totalColis = product?.total_colis || 1;
+
+      // Fetch counts with locations
+      const { data: counts } = await supabase
+        .from('counts')
+        .select('id, colis_number, quantity, location, pallet_number')
+        .eq('product_id', item.product_id)
+        .gt('quantity', 0);
+
+      if (!counts || counts.length === 0) continue;
+
+      // Group by colis_number
+      const colisCounts: Record<number, typeof counts> = {};
+      counts.forEach(c => {
+        if (!colisCounts[c.colis_number]) {
+          colisCounts[c.colis_number] = [];
+        }
+        colisCounts[c.colis_number].push(c);
+      });
+
+      // Check if any colis has multiple locations with stock
+      const dividedColisData: ColisLocationData[] = [];
+      
+      for (let i = 1; i <= totalColis; i++) {
+        const colisEntries = colisCounts[i] || [];
+        const entriesWithStock = colisEntries.filter(e => e.quantity > 0);
+        
+        if (entriesWithStock.length > 1) {
+          // This colis is divided
+          dividedColisData.push({
+            colisNumber: i,
+            entries: entriesWithStock.map(e => ({
+              countId: e.id,
+              quantity: e.quantity,
+              location: e.location,
+              pallet_number: e.pallet_number,
+            })),
+          });
+        }
+      }
+
+      if (dividedColisData.length > 0) {
+        itemsNeedingSelection.push({
+          item,
+          colisData: dividedColisData,
+          totalColis,
+        });
+      }
+    }
+
+    return itemsNeedingSelection;
+  };
+
+  // Handle location selection confirmation
+  const handleLocationSelectionConfirm = async (selections: LocationSelection[]) => {
+    if (!locationSelectionItem) return;
+
+    // Store selections for this product
+    setPendingLocationSelections(prev => {
+      const newMap = new Map(prev);
+      newMap.set(locationSelectionItem.item.product_id, selections);
+      return newMap;
+    });
+
+    setShowLocationSelection(false);
+    setLocationSelectionItem(null);
+
+    // Check if there are more items needing selection
+    const remainingItems = await checkForSplitColis(allItems);
+    if (remainingItems.length > 0) {
+      const nextItem = remainingItems[0];
+      setLocationSelectionItem(nextItem);
+      setShowLocationSelection(true);
+    } else {
+      // All selections done, show picking report
+      showPickingReportWithItems(allItems);
+    }
   };
   
   // Show picking report with prepared items
@@ -317,6 +433,9 @@ export function StockExitsView() {
       }
 
       // Decrementar cada colis do produto
+      // Verificar se temos selecções de localização guardadas para este produto
+      const locationSelections = pendingLocationSelections.get(item.product_id);
+
       for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
         // Determinar quantidade a decrementar para este colis
         const colisQty = isCompleteSet 
@@ -326,30 +445,55 @@ export function StockExitsView() {
         // Só processar se há quantidade a remover
         if (colisQty <= 0) continue;
 
-        // Buscar todos os counts para este produto/colis e decrementar do primeiro com stock
-        const { data: existingCounts } = await supabase
-          .from('counts')
-          .select('id, quantity')
-          .eq('product_id', item.product_id)
-          .eq('colis_number', colisNumber)
-          .gt('quantity', 0)
-          .order('quantity', { ascending: false });
-
-        if (existingCounts && existingCounts.length > 0) {
-          let remainingToDeduct = colisQty;
-          
-          for (const count of existingCounts) {
-            if (remainingToDeduct <= 0) break;
+        // Se temos selecções de localização específicas para este colis, usar essas
+        const colisSelections = locationSelections?.filter(s => s.colisNumber === colisNumber);
+        
+        if (colisSelections && colisSelections.length > 0) {
+          // Usar as selecções específicas do utilizador
+          for (const selection of colisSelections) {
+            if (selection.quantityToDeduct <= 0) continue;
             
-            const deductFromThis = Math.min(count.quantity, remainingToDeduct);
-            const newQty = count.quantity - deductFromThis;
-            
-            await supabase
+            // Buscar o count específico
+            const { data: countData } = await supabase
               .from('counts')
-              .update({ quantity: newQty, updated_at: new Date().toISOString() })
-              .eq('id', count.id);
+              .select('id, quantity')
+              .eq('id', selection.countId)
+              .single();
             
-            remainingToDeduct -= deductFromThis;
+            if (countData) {
+              const newQty = Math.max(0, countData.quantity - selection.quantityToDeduct);
+              await supabase
+                .from('counts')
+                .update({ quantity: newQty, updated_at: new Date().toISOString() })
+                .eq('id', selection.countId);
+            }
+          }
+        } else {
+          // Comportamento padrão: buscar counts e decrementar do primeiro com stock
+          const { data: existingCounts } = await supabase
+            .from('counts')
+            .select('id, quantity')
+            .eq('product_id', item.product_id)
+            .eq('colis_number', colisNumber)
+            .gt('quantity', 0)
+            .order('quantity', { ascending: false });
+
+          if (existingCounts && existingCounts.length > 0) {
+            let remainingToDeduct = colisQty;
+            
+            for (const count of existingCounts) {
+              if (remainingToDeduct <= 0) break;
+              
+              const deductFromThis = Math.min(count.quantity, remainingToDeduct);
+              const newQty = count.quantity - deductFromThis;
+              
+              await supabase
+                .from('counts')
+                .update({ quantity: newQty, updated_at: new Date().toISOString() })
+                .eq('id', count.id);
+              
+              remainingToDeduct -= deductFromThis;
+            }
           }
         }
       }
@@ -369,6 +513,8 @@ export function StockExitsView() {
     setNotes('');
     setShowPickingReport(false);
     setItemsForPicking([]);
+    // Clear location selections
+    setPendingLocationSelections(new Map());
   };
 
   const handleClearAll = () => {
@@ -570,6 +716,23 @@ export function StockExitsView() {
         onConfirm={handleFinalConfirm}
         isLoading={createSession.isPending || isLoadingPickingData}
       />
+
+      {/* Location Selection Dialog for split colis */}
+      {locationSelectionItem && (
+        <LocationSelectionDialog
+          open={showLocationSelection}
+          onOpenChange={(open) => {
+            setShowLocationSelection(open);
+            if (!open) setLocationSelectionItem(null);
+          }}
+          productName={locationSelectionItem.item.product_name}
+          productCode={locationSelectionItem.item.product_code}
+          quantitySets={locationSelectionItem.item.quantity}
+          totalColis={locationSelectionItem.totalColis}
+          colisData={locationSelectionItem.colisData}
+          onConfirm={handleLocationSelectionConfirm}
+        />
+      )}
     </>
   );
 }
