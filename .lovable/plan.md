@@ -1,250 +1,234 @@
 
+# Reestruturação de Relatórios e Sistema de Conferência de Localizações
 
-# Melhoria Visual: Selecção de Localização por Coli
+## Resumo
 
-## Objectivo
-
-Melhorar a apresentação visual dos colis nos dialogs de entrada e saída de stock para que o utilizador tenha informação clara e intuitiva sobre cada coli quando precisa seleccionar localizações.
-
----
-
-## Situação Actual
-
-Actualmente os dialogs mostram os colis de forma simples:
-- "Coli 1/2" sem nome descritivo
-- Cards de localização pequenos e pouco diferenciados
-- Falta de hierarquia visual entre colis
+Simplificar a estrutura de relatórios actual (5 abas) para uma interface mais focada (3 abas), adicionar rastreabilidade de utilizadores em todas as operações, e criar um novo sistema de conferência de stock por localização.
 
 ---
 
-## Proposta de Melhoria
+## Parte 1: Nova Estrutura de Relatórios
 
-### Novo Design Visual para Cada Coli
+### Antes (5 abas)
+- Integridade
+- Movimentos
+- Encomendas
+- Contagem
+- Sessão
+
+### Depois (3 abas)
+1. **Movimentos** - Relatório unificado de todas as operações
+2. **Stock** - Produtos completos, incompletos e avarias
+3. **Conferência** - Histórico de conferências de localização
+
+---
+
+## Parte 2: Relatório Unificado de Movimentos
+
+### Fontes de Dados Unificadas
+
+| Tipo | Origem | Classificação |
+|------|--------|---------------|
+| Entrada manual | `stock_movements` | Entrada |
+| Saída manual | `stock_movements` | Saída |
+| Incremento contagem | `count_logs` | Adição |
+| Decremento contagem | `count_logs` | Remoção |
+| Picking | `picking_items` | Saída |
+
+### Filtros Disponíveis
+- **Tipo de movimento**: Todos / Entradas / Saídas / Adições / Remoções
+- **Período**: Data início e fim
+- **Pesquisa**: Código, nome do produto, utilizador
+- **Funcionário**: Filtro por quem executou
+
+### Colunas da Tabela
+| Data/Hora | Tipo | Produto | Quantidade | Funcionário | Origem | Notas |
+
+### Indicadores Visuais
+- Entradas/Adições: Verde com seta para cima
+- Saídas/Remoções: Vermelho com seta para baixo
+- Badge com origem (Manual, Contagem, Picking)
+
+---
+
+## Parte 3: Relatório de Stock
+
+### Secção 1 - Produtos Completos
+Tabela com produtos que têm stock disponível:
+- Código, Nome, Categoria
+- Sets Completos
+- Total de Unidades
+- Localizações
+
+### Secção 2 - Produtos Incompletos
+Tabela com produtos desbalanceados (colis em falta):
+- Código, Nome
+- Sets Mínimos vs Máximos
+- Colis em falta (com nomes)
+- Excedentes
+
+### Secção 3 - Avarias
+Resumo integrado de avarias activas:
+- Produtos afetados
+- Unidades danificadas
+- Tipos de dano
+
+### Exportação
+- Excel/CSV com todas as secções em separadores
+
+---
+
+## Parte 4: Sistema de Conferência de Localizações
+
+### Nova Tabela na Base de Dados
+
+```sql
+CREATE TABLE location_audits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  locations TEXT[] NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_by UUID REFERENCES auth.users(id),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE location_audit_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  audit_id UUID REFERENCES location_audits(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id),
+  product_code TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  location TEXT NOT NULL,
+  pallet_number TEXT,
+  colis_number INTEGER,
+  expected_quantity INTEGER NOT NULL,
+  counted_quantity INTEGER,
+  difference INTEGER,
+  status TEXT DEFAULT 'pending',
+  counted_by UUID,
+  counted_at TIMESTAMPTZ,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### Fluxo de Trabalho
 
 ```text
-┌──────────────────────────────────────────────────────────────────┐
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  📦 COLI 1 de 2 - Cabeceira                    [2/3 ✓]     │  │
-│  │  ─────────────────────────────────────────────────────────  │  │
-│  │                                                             │  │
-│  │  ○ 📍 B3-01  |  📦 PLT-052  |  6 un. disponível       [+]  │  │
-│  │                                                             │  │
-│  │  ● 📍 C12-02  |  📦 PLT-089  |  3 un. disponível      [2] │  │
-│  │                                                  ↑ retirar  │  │
-│  └────────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  📦 COLI 2 de 2 - Ilhargueiro                  [0/3 ⚠]     │  │
-│  │  ─────────────────────────────────────────────────────────  │  │
-│  │                                                             │  │
-│  │  ● 📍 B3-01  |  📦 PLT-052  |  3 un. disponível      [3]  │  │
-│  │                                                             │  │
-│  │  ○ 📍 C12-02  |              |  3 un. disponível       [+] │  │
-│  │                 sem palete                                  │  │
-│  └────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  1. CRIAR       │     │  2. EXECUTAR    │     │  3. RELATÓRIO   │
+│  CONFERÊNCIA    │────▶│  CONFERÊNCIA    │────▶│  DIFERENÇAS     │
+│                 │     │                 │     │                 │
+│  - Selecionar   │     │  - Lista de     │     │  - Comparar     │
+│    localizações │     │    produtos     │     │    esperado vs  │
+│  - Dar nome     │     │  - Contar cada  │     │    contado      │
+│                 │     │    um           │     │  - Exportar     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
-### Elementos Visuais a Implementar
+### Interface: Criar Conferência
 
-1. **Card por Coli com Destaque**
-   - Fundo colorido diferenciado por estado (verde = completo, laranja = pendente)
-   - Header proeminente com número do coli e nome descritivo
-   - Badge de progresso (X/Y seleccionado)
+No mapa do armazém ou lista de localizações:
+- Checkbox para seleccionar múltiplas localizações
+- Botão "Iniciar Conferência"
+- Dialog para dar nome à conferência
 
-2. **Nome do Coli**
-   - Exibir o nome da categoria (ex: "Cabeceira", "Ilhargueiro", "Base") quando disponível
-   - Derivado da configuração da categoria (`colis_names`)
+### Interface: Executar Conferência
 
-3. **Cards de Localização Melhorados**
-   - Ícones coloridos e maiores
-   - Separação clara entre localização e palete
-   - Indicador visual claro de "sem palete" quando aplicável
-   - Quantidade disponível bem destacada
+Tela dedicada estilo "picking":
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  CONFERÊNCIA: "Rua A - Fev 2026"           Progresso: 5/12  │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  📍 A1-01  |  📦 PLT-032                              │  │
+│  ├────────────────────────────────────────────────────────┤  │
+│  │                                                        │  │
+│  │  Produto: CAMA-001 - Cama Casal Premium               │  │
+│  │  Coli: 1/3 - Base                                     │  │
+│  │                                                        │  │
+│  │  Esperado: 5 unidades                                 │  │
+│  │                                                        │  │
+│  │  Contado:  [    5    ]  ✓ Confirmar                   │  │
+│  │                                                        │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  📍 A1-01  |  📦 PLT-032                              │  │
+│  ├────────────────────────────────────────────────────────┤  │
+│  │  Produto: MESA-005 - Mesa Jantar 6 Lugares            │  │
+│  │  Esperado: 3 unidades                                 │  │
+│  │                                                        │  │
+│  │  Contado:  [    2    ]  ✓ Confirmar   ⚠ Diferença    │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  [← Anterior]                              [Próximo →]       │
+│                                                              │
+│  [Finalizar Conferência]                                     │
+└──────────────────────────────────────────────────────────────┘
+```
 
-4. **Indicadores de Estado**
-   - Checkmark verde quando coli está completo
-   - Aviso laranja quando falta seleccionar
-   - Números de progresso sempre visíveis
+### Interface: Relatório de Conferência
+
+Após finalizar, mostrar:
+- Resumo: Total conferido, Correctos, Com diferença
+- Tabela de diferenças com filtro
+- Exportar para Excel
 
 ---
 
-## Detalhes Técnicos
+## Parte 5: Rastreabilidade de Utilizadores
 
-### Modificação 1: LocationSelectionDialog.tsx (Saídas)
+### Dados Já Rastreados
+- `stock_movements.created_by` - Entradas/Saídas manuais
+- `count_logs.counted_by` - Operações de contagem
+- `picking_sessions.created_by` - Sessões de picking
+- `product_damages.reported_by` - Reportes de avaria
 
-**Estrutura proposta para cada coli:**
-
-```tsx
-// Header do coli com design destacado
-<div className="rounded-lg border-2 overflow-hidden mb-4">
-  {/* Header colorido */}
-  <div className={cn(
-    "px-4 py-3 flex items-center justify-between",
-    isColisComplete 
-      ? "bg-green-50 border-b-2 border-green-200" 
-      : "bg-amber-50 border-b-2 border-amber-200"
-  )}>
-    <div className="flex items-center gap-3">
-      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-        <Package className="h-5 w-5 text-primary" />
-      </div>
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-lg">
-            Coli {colisNumber}
-          </span>
-          <span className="text-muted-foreground">
-            de {totalColis}
-          </span>
-        </div>
-        {colisName && (
-          <span className="text-sm text-muted-foreground">
-            {colisName}
-          </span>
-        )}
-      </div>
-    </div>
-    
-    {/* Badge de progresso */}
-    <Badge className={cn(
-      "text-base px-3 py-1",
-      isColisComplete 
-        ? "bg-green-600" 
-        : "bg-amber-500"
-    )}>
-      {isColisComplete ? (
-        <><Check className="h-4 w-4 mr-1.5" /> {selected}/{needed}</>
-      ) : (
-        <><AlertCircle className="h-4 w-4 mr-1.5" /> {selected}/{needed}</>
-      )}
-    </Badge>
-  </div>
-  
-  {/* Corpo com opções de localização */}
-  <div className="p-3 space-y-2 bg-white">
-    {entries.map(entry => (
-      <LocationCard entry={entry} ... />
-    ))}
-  </div>
-</div>
-```
-
-**Card de localização melhorado:**
-
-```tsx
-<div className={cn(
-  "p-4 rounded-lg border-2 cursor-pointer transition-all",
-  isSelected 
-    ? "border-primary bg-primary/5 shadow-sm" 
-    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-)}>
-  <div className="flex items-center justify-between">
-    {/* Info da localização */}
-    <div className="flex items-center gap-4">
-      {/* Ícone de localização */}
-      <div className={cn(
-        "h-10 w-10 rounded-lg flex items-center justify-center",
-        entry.location ? "bg-blue-100" : "bg-gray-100"
-      )}>
-        <MapPin className={cn(
-          "h-5 w-5",
-          entry.location ? "text-blue-600" : "text-gray-400"
-        )} />
-      </div>
-      
-      {/* Detalhes */}
-      <div className="space-y-0.5">
-        <div className="font-medium text-base">
-          {entry.location || 'Sem localização'}
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          {entry.pallet_number ? (
-            <span className="flex items-center gap-1">
-              <Box className="h-3.5 w-3.5" />
-              {entry.pallet_number}
-            </span>
-          ) : (
-            <span className="italic text-gray-400">Sem palete</span>
-          )}
-        </div>
-      </div>
-    </div>
-    
-    {/* Quantidade e input */}
-    <div className="flex items-center gap-3">
-      <Badge variant="secondary" className="text-sm px-2.5 py-1">
-        {entry.quantity} disponível
-      </Badge>
-      
-      {isSelected && (
-        <div className="flex items-center gap-2 bg-white rounded-md border px-2 py-1">
-          <Label className="text-xs font-medium text-muted-foreground">
-            Retirar:
-          </Label>
-          <Input
-            type="number"
-            min="1"
-            max={entry.quantity}
-            value={selection.quantity}
-            className="h-8 w-16 text-center font-semibold"
-          />
-        </div>
-      )}
-    </div>
-  </div>
-</div>
-```
-
-### Modificação 2: EntryLocationDialog.tsx (Entradas)
-
-**Adicionar suporte para colis_names e melhorar visualização:**
-
-```tsx
-// Props expandidas para incluir nome do coli
-interface EntryLocationDialogProps {
-  // ... props existentes ...
-  totalColis?: number;
-  currentColisNumber?: number;
-  colisName?: string | null;
-}
-
-// Header melhorado
-<DialogHeader>
-  <DialogTitle className="flex items-center gap-3">
-    <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-      <Plus className="h-5 w-5 text-green-600" />
-    </div>
-    <div>
-      <span>Destino da Entrada</span>
-      {totalColis && totalColis > 1 && (
-        <div className="text-sm font-normal text-muted-foreground mt-0.5">
-          Coli {currentColisNumber} de {totalColis}
-          {colisName && <span className="ml-1">- {colisName}</span>}
-        </div>
-      )}
-    </div>
-  </DialogTitle>
-</DialogHeader>
-```
+### Melhorias Necessárias
+Garantir que todos os registos mostram o nome do utilizador:
+- Carregar nomes de `profiles` para exibição
+- Adicionar coluna "Funcionário" em todas as tabelas
 
 ---
+
+## Ficheiros a Criar
+
+| Ficheiro | Descrição |
+|----------|-----------|
+| `src/components/reports/UnifiedMovementsReport.tsx` | Relatório unificado de movimentos |
+| `src/components/reports/StockStatusReport.tsx` | Relatório de stock (completos/incompletos/avarias) |
+| `src/components/reports/AuditReportsView.tsx` | Lista de conferências realizadas |
+| `src/components/audit/CreateAuditDialog.tsx` | Dialog para criar conferência |
+| `src/components/audit/AuditExecutionView.tsx` | Tela de execução da conferência |
+| `src/components/audit/AuditResultsDialog.tsx` | Resultados e diferenças |
+| `src/hooks/useLocationAudits.tsx` | Hook para gestão de conferências |
 
 ## Ficheiros a Modificar
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/components/stock/LocationSelectionDialog.tsx` | Redesign visual completo com cards destacados por coli, nomes descritivos, ícones maiores e indicadores de progresso melhorados |
-| `src/components/stock/EntryLocationDialog.tsx` | Adicionar suporte para exibir nome do coli, melhorar visualização das opções de localização |
+| `src/components/reports/ReportsView.tsx` | Reestruturar para 3 abas |
+| `src/components/warehouse/WarehouseMapView.tsx` | Adicionar aba "Conferência" |
+| `src/components/warehouse/InteractiveWarehouseMap.tsx` | Adicionar selecção multi-localização |
+| `src/pages/Dashboard.tsx` | Adicionar rota para execução de conferência |
+| `src/components/layout/Navigation.tsx` | Opcional: Adicionar acesso rápido a conferências activas |
+
+## Migração de Base de Dados
+
+Criar tabelas `location_audits` e `location_audit_items` com políticas RLS apropriadas para utilizadores autenticados.
 
 ---
 
-## Resultado Esperado
+## Resultado Final
 
-1. **Hierarquia visual clara** - Cada coli num card separado e bem identificado
-2. **Nomes descritivos** - "Cabeceira", "Ilhargueiro", etc. quando configurados na categoria
-3. **Ícones intuitivos** - Maiores e coloridos para fácil identificação
-4. **Indicadores de progresso** - O utilizador sabe imediatamente o que já seleccionou e o que falta
-5. **Distinção "sem palete"** - Texto claro quando não há palete, em vez de vazio
-6. **Feedback de estado** - Cards mudam de cor quando completos (verde) ou pendentes (laranja)
-
+1. **Relatórios simplificados** - De 5 para 3 abas focadas
+2. **Visão unificada de movimentos** - Todas as operações num só lugar
+3. **Rastreabilidade completa** - Sempre visível quem fez cada operação
+4. **Sistema de conferência** - Workflow completo para auditar localizações
+5. **Comparação automática** - Esperado vs Contado com diferenças destacadas
