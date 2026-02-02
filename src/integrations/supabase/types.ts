@@ -179,6 +179,117 @@ export type Database = {
           },
         ]
       }
+      location_audit_items: {
+        Row: {
+          audit_id: string
+          colis_number: number | null
+          counted_at: string | null
+          counted_by: string | null
+          counted_quantity: number | null
+          created_at: string
+          difference: number | null
+          expected_quantity: number
+          id: string
+          location: string
+          notes: string | null
+          pallet_number: string | null
+          product_code: string
+          product_id: string | null
+          product_name: string
+          status: string
+        }
+        Insert: {
+          audit_id: string
+          colis_number?: number | null
+          counted_at?: string | null
+          counted_by?: string | null
+          counted_quantity?: number | null
+          created_at?: string
+          difference?: number | null
+          expected_quantity?: number
+          id?: string
+          location: string
+          notes?: string | null
+          pallet_number?: string | null
+          product_code: string
+          product_id?: string | null
+          product_name: string
+          status?: string
+        }
+        Update: {
+          audit_id?: string
+          colis_number?: number | null
+          counted_at?: string | null
+          counted_by?: string | null
+          counted_quantity?: number | null
+          created_at?: string
+          difference?: number | null
+          expected_quantity?: number
+          id?: string
+          location?: string
+          notes?: string | null
+          pallet_number?: string | null
+          product_code?: string
+          product_id?: string | null
+          product_name?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_audit_items_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "location_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_audit_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      location_audits: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          locations: string[]
+          name: string
+          notes: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          locations: string[]
+          name: string
+          notes?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          locations?: string[]
+          name?: string
+          notes?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       picking_items: {
         Row: {
           aisle_name: string | null

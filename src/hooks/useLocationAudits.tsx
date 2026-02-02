@@ -1,0 +1,277 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+export interface LocationAudit {
+  id: string;
+  name: string;
+  locations: string[];
+  status: 'pending' | 'in_progress' | 'completed';
+  created_by: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LocationAuditItem {
+  id: string;
+  audit_id: string;
+  product_id: string | null;
+  product_code: string;
+  product_name: string;
+  location: string;
+  pallet_number: string | null;
+  colis_number: number | null;
+  expected_quantity: number;
+  counted_quantity: number | null;
+  difference: number | null;
+  status: 'pending' | 'counted';
+  counted_by: string | null;
+  counted_at: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface AuditWithItems extends LocationAudit {
+  items: LocationAuditItem[];
+}
+
+export interface CreateAuditInput {
+  name: string;
+  locations: string[];
+  notes?: string;
+}
+
+export function useLocationAudits() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch all audits
+  const { data: audits = [], isLoading } = useQuery({
+    queryKey: ['location-audits'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('location_audits')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data as LocationAudit[];
+    },
+  });
+
+  // Fetch single audit with items
+  const useAuditWithItems = (auditId: string | null) => {
+    return useQuery({
+      queryKey: ['location-audit', auditId],
+      queryFn: async (): Promise<AuditWithItems | null> => {
+        if (!auditId) return null;
+
+        const [auditRes, itemsRes] = await Promise.all([
+          supabase
+            .from('location_audits')
+            .select('*')
+            .eq('id', auditId)
+            .single(),
+          supabase
+            .from('location_audit_items')
+            .select('*')
+            .eq('audit_id', auditId)
+            .order('location', { ascending: true })
+            .order('product_code', { ascending: true }),
+        ]);
+
+        if (auditRes.error) throw auditRes.error;
+        if (itemsRes.error) throw itemsRes.error;
+
+        return {
+          ...(auditRes.data as LocationAudit),
+          items: itemsRes.data as LocationAuditItem[],
+        };
+      },
+      enabled: !!auditId,
+    });
+  };
+
+  // Create new audit
+  const createAudit = useMutation({
+    mutationFn: async (input: CreateAuditInput) => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Create audit
+      const { data: audit, error: auditError } = await supabase
+        .from('location_audits')
+        .insert({
+          name: input.name,
+          locations: input.locations,
+          notes: input.notes || null,
+          created_by: user?.id || null,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (auditError) throw auditError;
+
+      // Fetch products in these locations from counts
+      const { data: counts, error: countsError } = await supabase
+        .from('counts')
+        .select(`
+          id,
+          product_id,
+          location,
+          pallet_number,
+          colis_number,
+          quantity,
+          products (id, code, name)
+        `)
+        .in('location', input.locations)
+        .gt('quantity', 0);
+
+      if (countsError) throw countsError;
+
+      // Create audit items for each count
+      if (counts && counts.length > 0) {
+        const items = counts.map((count) => ({
+          audit_id: audit.id,
+          product_id: count.product_id,
+          product_code: (count.products as any)?.code || '',
+          product_name: (count.products as any)?.name || '',
+          location: count.location || '',
+          pallet_number: count.pallet_number,
+          colis_number: count.colis_number,
+          expected_quantity: count.quantity,
+          status: 'pending',
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('location_audit_items')
+          .insert(items);
+
+        if (itemsError) throw itemsError;
+      }
+
+      return audit;
+    },
+    onSuccess: () => {
+      toast({ title: 'Sucesso', description: 'Conferência criada com sucesso' });
+      queryClient.invalidateQueries({ queryKey: ['location-audits'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível criar a conferência',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Start audit
+  const startAudit = useMutation({
+    mutationFn: async (auditId: string) => {
+      const { error } = await supabase
+        .from('location_audits')
+        .update({
+          status: 'in_progress',
+          started_at: new Date().toISOString(),
+        })
+        .eq('id', auditId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['location-audits'] });
+      queryClient.invalidateQueries({ queryKey: ['location-audit'] });
+    },
+  });
+
+  // Update audit item (count)
+  const updateAuditItem = useMutation({
+    mutationFn: async ({
+      itemId,
+      countedQuantity,
+      notes,
+    }: {
+      itemId: string;
+      countedQuantity: number;
+      notes?: string;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Get item to calculate difference
+      const { data: item } = await supabase
+        .from('location_audit_items')
+        .select('expected_quantity')
+        .eq('id', itemId)
+        .single();
+
+      const difference = countedQuantity - (item?.expected_quantity || 0);
+
+      const { error } = await supabase
+        .from('location_audit_items')
+        .update({
+          counted_quantity: countedQuantity,
+          difference,
+          status: 'counted',
+          counted_by: user?.id || null,
+          counted_at: new Date().toISOString(),
+          notes: notes || null,
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['location-audit'] });
+    },
+  });
+
+  // Complete audit
+  const completeAudit = useMutation({
+    mutationFn: async (auditId: string) => {
+      const { error } = await supabase
+        .from('location_audits')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', auditId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: 'Conferência finalizada', description: 'Todos os itens foram conferidos' });
+      queryClient.invalidateQueries({ queryKey: ['location-audits'] });
+      queryClient.invalidateQueries({ queryKey: ['location-audit'] });
+    },
+  });
+
+  // Delete audit
+  const deleteAudit = useMutation({
+    mutationFn: async (auditId: string) => {
+      const { error } = await supabase
+        .from('location_audits')
+        .delete()
+        .eq('id', auditId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: 'Conferência eliminada' });
+      queryClient.invalidateQueries({ queryKey: ['location-audits'] });
+    },
+  });
+
+  return {
+    audits,
+    isLoading,
+    useAuditWithItems,
+    createAudit,
+    startAudit,
+    updateAuditItem,
+    completeAudit,
+    deleteAudit,
+  };
+}
