@@ -446,17 +446,59 @@ export function useCounting(sessionId: string | null) {
     return true;
   };
 
-  const updateColisPalletNumber = async (productId: string, colisNumber: number, palletNumber: string) => {
+  // Função auxiliar para buscar quantidade correcta do produto (evita inserir 0)
+  const getCorrectQuantityForProduct = async (productId: string): Promise<number> => {
+    const { data: product } = await supabase
+      .from('products')
+      .select('current_stock')
+      .eq('id', productId)
+      .single();
+    
+    return product?.current_stock || 0;
+  };
+
+  // Função auxiliar para buscar localização do palete
+  const getLocationFromPallet = async (palletCode: string): Promise<string | null> => {
+    if (!palletCode) return null;
+    
+    const { data: pallet } = await supabase
+      .from('warehouse_pallets')
+      .select(`
+        current_location_id,
+        location:warehouse_locations(code)
+      `)
+      .eq('code', palletCode)
+      .maybeSingle();
+    
+    // @ts-ignore - nested select type issue
+    return pallet?.location?.code || null;
+  };
+
+  const updateColisPalletNumber = async (
+    productId: string, 
+    colisNumber: number, 
+    palletNumber: string,
+    locationFromPallet?: string // Localização derivada do palete (opcional, se já conhecida)
+  ) => {
     if (!sessionId || !user) return false;
 
     const existingCount = counts.find(
       c => c.product_id === productId && c.colis_number === colisNumber
     );
 
+    // Determinar a localização do palete automaticamente
+    let derivedLocation = locationFromPallet;
+    if (derivedLocation === undefined && palletNumber) {
+      derivedLocation = await getLocationFromPallet(palletNumber) || undefined;
+    }
+
     if (existingCount) {
       const { error } = await supabase
         .from('counts')
-        .update({ pallet_number: palletNumber })
+        .update({ 
+          pallet_number: palletNumber,
+          location: derivedLocation || existingCount.location // Actualizar localização também
+        })
         .eq('id', existingCount.id);
 
       if (error) {
@@ -468,15 +510,18 @@ export function useCounting(sessionId: string | null) {
         return false;
       }
     } else {
-      // Create a count entry for this coli with quantity 0 just to store pallet number
+      // CORRIGIDO: Buscar quantidade correcta antes de inserir (não usar 0!)
+      const targetQuantity = await getCorrectQuantityForProduct(productId);
+      
       const { error } = await supabase
         .from('counts')
         .insert({
           session_id: sessionId,
           product_id: productId,
           colis_number: colisNumber,
-          quantity: 0,
+          quantity: targetQuantity, // Usa stock actual, NÃO 0!
           pallet_number: palletNumber,
+          location: derivedLocation || null,
           counted_by: user.id
         });
 

@@ -22,7 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface PalletSelectProps {
   value: string;
-  onValueChange: (value: string) => void;
+  onValueChange: (value: string, location?: string) => void; // Retorna também a localização do palete
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -151,14 +151,20 @@ export const PalletSelect = forwardRef<HTMLButtonElement, PalletSelectProps>(({
   }, [palletOptions]);
 
   const handleSelect = (selectedValue: string) => {
-    onValueChange(selectedValue === value ? '' : selectedValue);
+    const selectedPallet = palletOptions.find(p => p.value === selectedValue);
+    const location = selectedPallet?.location || undefined;
+    
+    onValueChange(
+      selectedValue === value ? '' : selectedValue,
+      location // Passa a localização junto
+    );
     setOpen(false);
     setInputValue('');
   };
 
   const handleCreateCustom = () => {
     if (inputValue.trim()) {
-      onValueChange(inputValue.trim());
+      onValueChange(inputValue.trim(), undefined); // Palete personalizado não tem localização conhecida
       setOpen(false);
       setInputValue('');
     }
