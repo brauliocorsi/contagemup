@@ -12,7 +12,7 @@ export function CountingSummary({ products }: CountingSummaryProps) {
   const withPartial = products.filter(p => p.hasPartialProduct).length;
   const notCounted = products.filter(p => p.status === 'not_counted').length;
 
-  const totalCompleteSets = products.reduce((sum, p) => sum + p.completeSets, 0);
+  const totalCompleteSets = products.reduce((sum, p) => sum + p.current_stock, 0);
   const totalPartialProducts = products.filter(p => p.hasPartialProduct).length;
   
   // Damage statistics
