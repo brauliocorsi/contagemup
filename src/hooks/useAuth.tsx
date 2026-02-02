@@ -1,4 +1,5 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { Profile } from '@/types/stock';
@@ -16,10 +17,25 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const prevUserId = useRef<string | null>(null);
+
+  // Detectar mudança de utilizador e limpar cache
+  useEffect(() => {
+    if (user?.id !== prevUserId.current) {
+      // Se havia um utilizador anterior e mudou, limpar cache
+      if (prevUserId.current !== null && user?.id !== prevUserId.current) {
+        console.log('User changed, clearing cache...');
+        queryClient.clear();
+        localStorage.removeItem('counting_selected_session');
+      }
+      prevUserId.current = user?.id ?? null;
+    }
+  }, [user?.id, queryClient]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -76,6 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Limpar cache do React Query ANTES do logout
+    console.log('Signing out, clearing all cache...');
+    queryClient.clear();
+    
+    // Limpar localStorage específico do utilizador
+    localStorage.removeItem('counting_selected_session');
+    
+    // Fazer logout
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

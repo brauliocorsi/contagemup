@@ -1,9 +1,9 @@
-import { useAuth, AuthProvider } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { LoginForm } from '@/components/auth/LoginForm';
 import Dashboard from './Dashboard';
 import { Loader2 } from 'lucide-react';
 
-function AppContent() {
+export default function Index() {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -19,12 +19,4 @@ function AppContent() {
   }
 
   return <Dashboard />;
-}
-
-export default function Index() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
 }
