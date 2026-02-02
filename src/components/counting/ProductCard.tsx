@@ -11,6 +11,7 @@ import { CountHistoryPopover } from './CountHistoryPopover';
 import { SplitStockDialog } from './SplitStockDialog';
 import { PalletSelect } from './PalletSelect';
 import { DamageReportDialog } from '@/components/damages/DamageReportDialog';
+import { LocationSelect } from './LocationSelect';
 import { OrderNumberEntrySelector } from '@/components/stock/OrderNumberSelector';
 import {
   AlertDialog,
@@ -673,18 +674,20 @@ export function ProductCard({
                           </div>
                         ) : (
                           <>
-                        {/* Per-coli pallet with Select - localização é derivada automaticamente */}
+                            {/* Per-coli pallet with Select - auto-preenche localização */}
                             <div className="flex items-center gap-1.5 pt-1">
                               <PalletSelect
                                 value={colisPallets[colisNum] ?? colisPallet ?? ''}
                                 onValueChange={(newPal, derivedLocation) => {
                                   setColisPallets(prev => ({ ...prev, [colisNum]: newPal }));
-                                  // Actualiza também a localização local baseada no palete
+                                  // Auto-preencher localização do palete
                                   if (derivedLocation) {
                                     setColisLocations(prev => ({ ...prev, [colisNum]: derivedLocation }));
+                                    if (onColisLocationChange) {
+                                      onColisLocationChange(product.id, colisNum, derivedLocation);
+                                    }
                                   }
                                   if (onColisPalletChange) {
-                                    // Passa o palete - a localização é derivada automaticamente no hook
                                     onColisPalletChange(product.id, colisNum, newPal);
                                   }
                                 }}
@@ -697,16 +700,23 @@ export function ProductCard({
                               />
                             </div>
                             
-                            {/* Mostrar localização derivada do palete (só leitura) */}
-                            {(colisLocations[colisNum] || colisLocation) && (
-                              <div className="flex items-center gap-1.5">
-                                <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 text-blue-700 border-blue-200">
-                                  <MapPin className="h-3 w-3" />
-                                  {colisLocations[colisNum] || colisLocation}
-                                  <span className="text-muted-foreground">(do palete)</span>
-                                </Badge>
-                              </div>
-                            )}
+                            {/* Localização editável - auto-preenchida pelo palete mas pode ser alterada */}
+                            <div className="flex items-center gap-1.5">
+                              <LocationSelect
+                                value={colisLocations[colisNum] ?? colisLocation ?? ''}
+                                onValueChange={(newLoc) => {
+                                  setColisLocations(prev => ({ ...prev, [colisNum]: newLoc }));
+                                  if (onColisLocationChange) {
+                                    onColisLocationChange(product.id, colisNum, newLoc);
+                                  }
+                                }}
+                                placeholder="Selecionar localização..."
+                                className={cn(
+                                  "flex-1 h-7 text-xs",
+                                  locDiff && "border-orange-300 bg-orange-50"
+                                )}
+                              />
+                            </div>
                           </>
                         )}
                       </div>

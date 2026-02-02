@@ -273,7 +273,27 @@ export function SplitStockDialog({
                     />
                   </div>
 
-                  {/* Location */}
+                  {/* Pallet - auto-preenche localização */}
+                  <div className="space-y-1">
+                    <Label className="text-xs flex items-center gap-1">
+                      <Box className="h-3 w-3" />
+                      Palete
+                    </Label>
+                    <PalletSelect
+                      value={dist.pallet_number}
+                      onValueChange={(value, derivedLocation) => {
+                        updateDistribution(dist.id, 'pallet_number', value);
+                        // Auto-preencher localização do palete (se disponível)
+                        if (derivedLocation) {
+                          updateDistribution(dist.id, 'location', derivedLocation);
+                        }
+                      }}
+                      placeholder="Selecionar..."
+                      className="h-8"
+                    />
+                  </div>
+
+                  {/* Location - editável, auto-preenchida pelo palete */}
                   <div className="space-y-1">
                     <Label className="text-xs flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
@@ -282,20 +302,6 @@ export function SplitStockDialog({
                     <LocationSelect
                       value={dist.location}
                       onValueChange={(value) => updateDistribution(dist.id, 'location', value)}
-                      placeholder="Selecionar..."
-                      className="h-8"
-                    />
-                  </div>
-
-                  {/* Pallet */}
-                  <div className="space-y-1">
-                    <Label className="text-xs flex items-center gap-1">
-                      <Box className="h-3 w-3" />
-                      Palete
-                    </Label>
-                    <PalletSelect
-                      value={dist.pallet_number}
-                      onValueChange={(value) => updateDistribution(dist.id, 'pallet_number', value)}
                       placeholder="Selecionar..."
                       className="h-8"
                     />
