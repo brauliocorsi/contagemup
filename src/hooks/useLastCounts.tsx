@@ -207,8 +207,8 @@ export function useLastCounts() {
   const { data: rawData, isLoading: loading } = useQuery({
     queryKey: ['last-counts'],
     queryFn: fetchCountsAndSessions,
-    staleTime: 2 * 60 * 1000, // 2 minutos
-    gcTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 5000, // 5 segundos - sincronizado com counts e products
+    gcTime: 30000, // 30 segundos
   });
 
   // Memoize the processing - only recalculate when raw data changes
