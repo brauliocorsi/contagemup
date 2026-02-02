@@ -11,6 +11,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfileSettings } from './ProfileSettings';
+import { Separator } from '@/components/ui/separator';
 
 interface Profile {
   id: string;
@@ -18,6 +21,7 @@ interface Profile {
   name: string;
   role: string;
   created_at: string;
+  avatar_url?: string | null;
 }
 
 export function SettingsView() {
@@ -124,6 +128,11 @@ export function SettingsView() {
           </p>
         </div>
       </div>
+
+      {/* Profile Settings (Photo & Password) */}
+      <ProfileSettings />
+
+      <Separator className="my-2" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Add User Form */}
@@ -236,11 +245,12 @@ export function SettingsView() {
                     <TableRow key={profile.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-sm font-medium text-primary">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={profile.avatar_url || undefined} alt={profile.name} />
+                            <AvatarFallback className="text-sm bg-primary/10 text-primary">
                               {profile.name?.charAt(0).toUpperCase() || '?'}
-                            </span>
-                          </div>
+                            </AvatarFallback>
+                          </Avatar>
                           <div>
                             <span>{profile.name}</span>
                             {profile.user_id === currentProfile?.user_id && (
