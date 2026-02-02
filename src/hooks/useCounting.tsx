@@ -95,6 +95,8 @@ export function useCounting(sessionId: string | null) {
   }, [queryClient, sessionId]);
 
   // Função auxiliar para buscar count fresco da BD (evita race condition)
+  // IMPORTANTE: Quando um coli está dividido em múltiplas localizações, 
+  // retornamos o registo com a maior quantidade (para o decremento funcionar)
   const fetchFreshCount = async (productId: string, colisNumber: number) => {
     // Primeiro tentar buscar com session_id específico
     let query = supabase
@@ -110,17 +112,26 @@ export function useCounting(sessionId: string | null) {
       query = query.is('session_id', null);
     }
     
-    const { data, error } = await query
-      .order('counted_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Buscar todos os registos para este coli (pode estar dividido)
+    const { data, error } = await query;
     
     if (error) {
       console.error('Erro ao buscar count:', error);
       return null;
     }
     
-    return data;
+    if (!data || data.length === 0) {
+      return null;
+    }
+    
+    // Se há múltiplos registos, retornar o que tem a maior quantidade
+    // Isto garante que o decremento funciona mesmo quando há registos com quantity=0
+    if (data.length > 1) {
+      const sorted = [...data].sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
+      return sorted[0];
+    }
+    
+    return data[0];
   };
 
   const updateCount = async (productId: string, colisNumber: number, quantity: number) => {
