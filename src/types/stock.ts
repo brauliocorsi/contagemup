@@ -94,6 +94,7 @@ export interface Profile {
   user_id: string;
   name: string;
   role: 'admin' | 'operator';
+  avatar_url?: string | null;
   created_at: string;
   updated_at: string;
 }
