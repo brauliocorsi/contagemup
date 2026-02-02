@@ -2,6 +2,7 @@ import { useState, Suspense, lazy } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Navigation } from '@/components/layout/Navigation';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AuditExecutionView } from '@/components/audit/AuditExecutionView';
 
 // Lazy loading - cada view é carregada apenas quando necessária
 const CountingView = lazy(() => import('@/components/counting/CountingView').then(m => ({ default: m.CountingView })));
@@ -37,10 +38,39 @@ function ViewLoader() {
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('counting');
+  const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
 
   const handleNavigateToProducts = () => {
     setActiveTab('products');
   };
+
+  const handleStartAudit = (auditId: string) => {
+    setActiveAuditId(auditId);
+  };
+
+  const handleAuditComplete = () => {
+    setActiveAuditId(null);
+  };
+
+  const handleAuditBack = () => {
+    setActiveAuditId(null);
+  };
+
+  // If executing an audit, show the execution view
+  if (activeAuditId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header onNavigateToProducts={handleNavigateToProducts} />
+        <main className="container py-4">
+          <AuditExecutionView
+            auditId={activeAuditId}
+            onComplete={handleAuditComplete}
+            onBack={handleAuditBack}
+          />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -57,8 +87,8 @@ export default function Dashboard() {
           {activeTab === 'alerts' && <StockAlertsView />}
           {activeTab === 'damages' && <DamagesView />}
           {activeTab === 'reconciliation' && <ReconciliationView />}
-          {activeTab === 'warehouse' && <WarehouseMapView />}
-          {activeTab === 'reports' && <ReportsView />}
+          {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
+          {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
           {activeTab === 'settings' && <SettingsView />}
         </Suspense>
       </main>

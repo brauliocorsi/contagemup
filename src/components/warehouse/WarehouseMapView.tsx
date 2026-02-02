@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, Map } from 'lucide-react';
+import { Settings, Map, ClipboardCheck } from 'lucide-react';
 import { AislesConfig } from './AislesConfig';
 import { LevelsConfig } from './LevelsConfig';
 import { LocationsConfig } from './LocationsConfig';
 import { PalletsConfig } from './PalletsConfig';
 import { InteractiveWarehouseMap } from './InteractiveWarehouseMap';
+import { LocationAuditView } from './LocationAuditView';
 
-export function WarehouseMapView() {
+interface WarehouseMapViewProps {
+  onStartAudit?: (auditId: string) => void;
+}
+
+export function WarehouseMapView({ onStartAudit }: WarehouseMapViewProps) {
   const [activeTab, setActiveTab] = useState('map');
 
   return (
@@ -18,6 +23,10 @@ export function WarehouseMapView() {
             <Map className="h-4 w-4" />
             Mapa Visual
           </TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2">
+            <ClipboardCheck className="h-4 w-4" />
+            Conferência
+          </TabsTrigger>
           <TabsTrigger value="config" className="gap-2">
             <Settings className="h-4 w-4" />
             Configurar
@@ -26,6 +35,10 @@ export function WarehouseMapView() {
 
         <TabsContent value="map" className="mt-4">
           <InteractiveWarehouseMap />
+        </TabsContent>
+
+        <TabsContent value="audit" className="mt-4">
+          <LocationAuditView onStartAudit={onStartAudit} />
         </TabsContent>
 
         <TabsContent value="config" className="space-y-4 mt-4">
