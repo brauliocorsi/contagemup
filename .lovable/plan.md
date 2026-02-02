@@ -1,499 +1,250 @@
 
 
-# Implementação: Selecção de Localização em Saídas/Entradas + Controle por Localização
+# Melhoria Visual: Selecção de Localização por Coli
 
-## Resumo do Pedido
+## Objectivo
 
-O utilizador pretende:
-
-1. **Saídas de Stock**: Quando um coli está dividido em múltiplas localizações, ao dar saída deve poder seleccionar de qual localização tirar o produto
-2. **Botões +/- no ProductCard**: Quando há localização dividida, os botões do coli "master" devem ser desactivados, forçando o utilizador a expandir e usar os botões por localização
-3. **Entradas de Stock**: Ao dar entrada, deve poder seleccionar se vai para mesma localização, nova localização, ou escolher uma localização existente (quando há colis divididos)
-4. **Paletes opcionais**: Alguns produtos precisam apenas de localização, sem número de palete
+Melhorar a apresentação visual dos colis nos dialogs de entrada e saída de stock para que o utilizador tenha informação clara e intuitiva sobre cada coli quando precisa seleccionar localizações.
 
 ---
 
-## Problema Actual
+## Situação Actual
 
-**Situação descrita:**
-```text
-Produto X
-├── Coli 1/2: 6un em B3 + 1un em C12  (dividido)
-├── Coli 2/2: 3un em B3 + 3un em C12  (dividido)
-└── Sets Completos: 4 (min dos totais: min(7,6)=6 → mas na verdade 3+3=6)
-
-Problema nas SAÍDAS:
-→ Ao retirar 2 sets, de qual localização tirar?
-→ Se tirar de B3: Coli1 fica 4un, Coli2 fica 1un em B3
-→ Se tirar de C12: Coli1 fica 0un (ou 1un-2?), Coli2 fica 1un em C12
-→ FALTA opção para o utilizador escolher!
-
-Problema nas ENTRADAS:
-→ Ao adicionar 3 sets, onde colocar?
-→ Adicionar a B3? A C12? Nova localização?
-→ FALTA opção para o utilizador escolher!
-```
+Actualmente os dialogs mostram os colis de forma simples:
+- "Coli 1/2" sem nome descritivo
+- Cards de localização pequenos e pouco diferenciados
+- Falta de hierarquia visual entre colis
 
 ---
 
-## Solução
+## Proposta de Melhoria
 
-### Parte 1: ProductCard - Desactivar botões "master" quando dividido
+### Novo Design Visual para Cada Coli
 
-**Comportamento actual:**
-- Botões +/- no coli sempre activos
-- Ao clicar, incrementa/decrementa o primeiro registo encontrado
-
-**Comportamento desejado:**
-- Quando coli tem múltiplas localizações (`hasMultipleLocations = true`), os botões +/- do coli principal ficam **desactivados**
-- Uma mensagem indica "Use os controlos por localização abaixo"
-- O coli fica automaticamente expandido quando dividido
-
-**Ficheiro:** `src/components/counting/ProductCard.tsx`
-
-### Parte 2: Saídas de Stock - Selecção de Localização
-
-**Fluxo actual:**
 ```text
-1. Seleccionar produto
-2. Escolher quantidade
-3. Confirmar → Decrementa dos counts automaticamente
+┌──────────────────────────────────────────────────────────────────┐
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  📦 COLI 1 de 2 - Cabeceira                    [2/3 ✓]     │  │
+│  │  ─────────────────────────────────────────────────────────  │  │
+│  │                                                             │  │
+│  │  ○ 📍 B3-01  |  📦 PLT-052  |  6 un. disponível       [+]  │  │
+│  │                                                             │  │
+│  │  ● 📍 C12-02  |  📦 PLT-089  |  3 un. disponível      [2] │  │
+│  │                                                  ↑ retirar  │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  📦 COLI 2 de 2 - Ilhargueiro                  [0/3 ⚠]     │  │
+│  │  ─────────────────────────────────────────────────────────  │  │
+│  │                                                             │  │
+│  │  ● 📍 B3-01  |  📦 PLT-052  |  3 un. disponível      [3]  │  │
+│  │                                                             │  │
+│  │  ○ 📍 C12-02  |              |  3 un. disponível       [+] │  │
+│  │                 sem palete                                  │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-**Fluxo desejado:**
-```text
-1. Seleccionar produto
-2. Escolher quantidade
-3. Se produto tem colis divididos:
-   a. Sistema detecta quais colis têm múltiplas localizações
-   b. Mostra dialog/UI para escolher de onde tirar
-   c. Ex: "Coli 1 - Retirar 2un de: B3 (tem 6) / C12 (tem 1)"
-4. Confirmar → Decrementa das localizações específicas
-```
+### Elementos Visuais a Implementar
 
-**Ficheiros:**
-- `src/components/stock/StockExitsView.tsx`
-- `src/components/stock/ManualStockSection.tsx` 
-- Criar: `src/components/stock/LocationSelectionDialog.tsx`
+1. **Card por Coli com Destaque**
+   - Fundo colorido diferenciado por estado (verde = completo, laranja = pendente)
+   - Header proeminente com número do coli e nome descritivo
+   - Badge de progresso (X/Y seleccionado)
 
-### Parte 3: Entradas de Stock - Selecção de Destino
+2. **Nome do Coli**
+   - Exibir o nome da categoria (ex: "Cabeceira", "Ilhargueiro", "Base") quando disponível
+   - Derivado da configuração da categoria (`colis_names`)
 
-**Fluxo actual:**
-```text
-1. Seleccionar produto
-2. Escolher quantidade
-3. Confirmar → Adiciona ao primeiro count existente
-```
+3. **Cards de Localização Melhorados**
+   - Ícones coloridos e maiores
+   - Separação clara entre localização e palete
+   - Indicador visual claro de "sem palete" quando aplicável
+   - Quantidade disponível bem destacada
 
-**Fluxo desejado:**
-```text
-1. Seleccionar produto
-2. Escolher quantidade
-3. Se produto tem colis divididos:
-   a. Mostrar opções:
-      - "Adicionar à localização existente" (escolher qual)
-      - "Nova localização" (seleccionar palete/localização)
-      - "Distribuir entre localizações" (para cada colis)
-   b. Seleccionar palete (opcional) e/ou localização
-4. Confirmar → Adiciona à(s) localização(ões) escolhida(s)
-```
-
-**Ficheiros:**
-- `src/components/stock/StockEntriesView.tsx`
-- `src/components/stock/ManualStockSection.tsx`
-- Criar: `src/components/stock/EntryLocationDialog.tsx`
+4. **Indicadores de Estado**
+   - Checkmark verde quando coli está completo
+   - Aviso laranja quando falta seleccionar
+   - Números de progresso sempre visíveis
 
 ---
 
 ## Detalhes Técnicos
 
-### Modificação 1: ProductCard.tsx - Desactivar botões em colis divididos
+### Modificação 1: LocationSelectionDialog.tsx (Saídas)
+
+**Estrutura proposta para cada coli:**
 
 ```tsx
-// No render do coli principal:
-const hasMultipleLocationsForColi = colisDetail?.hasMultipleLocations || false;
-
-{/* Botões +/- desactivados se dividido */}
-<Button
-  variant="outline"
-  size="icon"
-  className="h-8 w-8"
-  onClick={() => onDecrement(product.id, colisNum)}
-  disabled={quantity === 0 || hasMultipleLocationsForColi}
->
-  <Minus className="h-4 w-4" />
-</Button>
-
-{hasMultipleLocationsForColi && (
-  <TooltipProvider>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="text-xs text-orange-600">
-          ⚠️ Dividido
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>
-        Use os controlos por localização abaixo
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
-)}
-
-{/* Expandir automaticamente quando dividido */}
-useEffect(() => {
-  const dividedColis = product.colisDetails
-    .filter(c => c.hasMultipleLocations)
-    .map(c => c.colis_number);
-  if (dividedColis.length > 0) {
-    setExpandedColis(new Set(dividedColis));
-  }
-}, [product.colisDetails]);
-```
-
-### Modificação 2: ManualStockSection - Detectar colis divididos
-
-Adicionar lógica para detectar se o produto a sair tem colis divididos:
-
-```tsx
-// Novo hook para buscar dados de localização
-const [productLocations, setProductLocations] = useState<Record<string, ColisLocationData[]>>({});
-
-// Ao confirmar saída, verificar se precisa selecção de localização
-const handleValidateExit = async (item: MovementItem) => {
-  const { data: counts } = await supabase
-    .from('counts')
-    .select('*')
-    .eq('product_id', item.product_id);
-  
-  // Agrupar por colis_number
-  const colisCounts = groupBy(counts, 'colis_number');
-  
-  // Verificar se algum colis tem múltiplas localizações
-  const dividedColis = Object.entries(colisCounts)
-    .filter(([_, entries]) => entries.filter(e => e.quantity > 0).length > 1);
-  
-  if (dividedColis.length > 0) {
-    // Abrir dialog de selecção de localização
-    setLocationSelectionProduct(item);
-    return;
-  }
-  
-  // Sem divisões, proceder normalmente
-  confirmExit(item);
-};
-```
-
-### Modificação 3: Novo componente - LocationSelectionDialog.tsx
-
-Dialog para seleccionar de qual localização retirar stock:
-
-```tsx
-interface LocationSelectionDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  productId: string;
-  productName: string;
-  quantity: number; // Quantidade de sets a retirar
-  totalColis: number;
-  colisData: {
-    colisNumber: number;
-    entries: { countId: string; quantity: number; location: string; pallet: string }[];
-  }[];
-  onConfirm: (selections: { colisNumber: number; countId: string; quantity: number }[]) => void;
-}
-
-export function LocationSelectionDialog({...}: LocationSelectionDialogProps) {
-  // Para cada colis, permitir escolher de qual localização tirar
-  const [selections, setSelections] = useState<Record<number, { countId: string; quantity: number }>>({});
-
-  return (
-    <Dialog>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Seleccionar Localização para Saída</DialogTitle>
-          <DialogDescription>
-            Este produto está dividido em múltiplas localizações.
-            Seleccione de onde retirar {quantity} set(s).
-          </DialogDescription>
-        </DialogHeader>
-        
-        {colisData.map(colis => (
-          <div key={colis.colisNumber} className="space-y-2">
-            <Label>Coli {colis.colisNumber}/{totalColis}</Label>
-            
-            {colis.entries.map(entry => (
-              <div 
-                key={entry.countId}
-                className={cn(
-                  "p-3 rounded-lg border cursor-pointer",
-                  selections[colis.colisNumber]?.countId === entry.countId 
-                    && "border-primary bg-primary/5"
-                )}
-                onClick={() => setSelections(prev => ({
-                  ...prev,
-                  [colis.colisNumber]: { countId: entry.countId, quantity: quantity }
-                }))}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    <span>{entry.location || 'Sem localização'}</span>
-                    {entry.pallet && (
-                      <>
-                        <Box className="h-4 w-4 ml-2" />
-                        <span>{entry.pallet}</span>
-                      </>
-                    )}
-                  </div>
-                  <Badge variant="secondary">
-                    {entry.quantity} disponível
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
-        
-        <DialogFooter>
-          <Button onClick={() => onConfirm(Object.entries(selections).map(...))} >
-            Confirmar Saída
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-```
-
-### Modificação 4: Novo componente - EntryLocationDialog.tsx
-
-Dialog para seleccionar destino de entrada:
-
-```tsx
-interface EntryLocationDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  productId: string;
-  productName: string;
-  quantity: number;
-  totalColis: number;
-  existingLocations: { location: string; pallet: string }[];
-  onConfirm: (destination: {
-    type: 'existing' | 'new';
-    location?: string;
-    pallet?: string;
-  }) => void;
-}
-
-export function EntryLocationDialog({...}: EntryLocationDialogProps) {
-  const [destinationType, setDestinationType] = useState<'existing' | 'new'>('existing');
-  const [selectedLocation, setSelectedLocation] = useState('');
-  const [newLocation, setNewLocation] = useState('');
-  const [newPallet, setNewPallet] = useState('');
-
-  return (
-    <Dialog>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Destino da Entrada</DialogTitle>
-          <DialogDescription>
-            Seleccione onde armazenar os {quantity} set(s) de {productName}.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          {/* Opção: Localização Existente */}
-          {existingLocations.length > 0 && (
-            <div>
-              <RadioGroup value={destinationType} onValueChange={setDestinationType}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="existing" id="existing" />
-                  <Label htmlFor="existing">Adicionar a localização existente</Label>
-                </div>
-              </RadioGroup>
-              
-              {destinationType === 'existing' && (
-                <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar localização..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {existingLocations.map(loc => (
-                      <SelectItem 
-                        key={`${loc.location}-${loc.pallet}`} 
-                        value={`${loc.location}|${loc.pallet}`}
-                      >
-                        {loc.location} {loc.pallet && `(${loc.pallet})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          )}
-          
-          {/* Opção: Nova Localização */}
-          <div>
-            <RadioGroup value={destinationType} onValueChange={setDestinationType}>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="new" id="new" />
-                <Label htmlFor="new">Nova localização</Label>
-              </div>
-            </RadioGroup>
-            
-            {destinationType === 'new' && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <div>
-                  <Label className="text-xs">Palete (opcional)</Label>
-                  <PalletSelect
-                    value={newPallet}
-                    onValueChange={(val, derivedLoc) => {
-                      setNewPallet(val);
-                      if (derivedLoc) setNewLocation(derivedLoc);
-                    }}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Localização</Label>
-                  <LocationSelect
-                    value={newLocation}
-                    onValueChange={setNewLocation}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+// Header do coli com design destacado
+<div className="rounded-lg border-2 overflow-hidden mb-4">
+  {/* Header colorido */}
+  <div className={cn(
+    "px-4 py-3 flex items-center justify-between",
+    isColisComplete 
+      ? "bg-green-50 border-b-2 border-green-200" 
+      : "bg-amber-50 border-b-2 border-amber-200"
+  )}>
+    <div className="flex items-center gap-3">
+      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+        <Package className="h-5 w-5 text-primary" />
+      </div>
+      <div>
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-lg">
+            Coli {colisNumber}
+          </span>
+          <span className="text-muted-foreground">
+            de {totalColis}
+          </span>
         </div>
-        
-        <DialogFooter>
-          <Button onClick={() => onConfirm({
-            type: destinationType,
-            location: destinationType === 'new' ? newLocation : selectedLocation.split('|')[0],
-            pallet: destinationType === 'new' ? newPallet : selectedLocation.split('|')[1],
-          })}>
-            Confirmar Entrada
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+        {colisName && (
+          <span className="text-sm text-muted-foreground">
+            {colisName}
+          </span>
+        )}
+      </div>
+    </div>
+    
+    {/* Badge de progresso */}
+    <Badge className={cn(
+      "text-base px-3 py-1",
+      isColisComplete 
+        ? "bg-green-600" 
+        : "bg-amber-500"
+    )}>
+      {isColisComplete ? (
+        <><Check className="h-4 w-4 mr-1.5" /> {selected}/{needed}</>
+      ) : (
+        <><AlertCircle className="h-4 w-4 mr-1.5" /> {selected}/{needed}</>
+      )}
+    </Badge>
+  </div>
+  
+  {/* Corpo com opções de localização */}
+  <div className="p-3 space-y-2 bg-white">
+    {entries.map(entry => (
+      <LocationCard entry={entry} ... />
+    ))}
+  </div>
+</div>
+```
+
+**Card de localização melhorado:**
+
+```tsx
+<div className={cn(
+  "p-4 rounded-lg border-2 cursor-pointer transition-all",
+  isSelected 
+    ? "border-primary bg-primary/5 shadow-sm" 
+    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+)}>
+  <div className="flex items-center justify-between">
+    {/* Info da localização */}
+    <div className="flex items-center gap-4">
+      {/* Ícone de localização */}
+      <div className={cn(
+        "h-10 w-10 rounded-lg flex items-center justify-center",
+        entry.location ? "bg-blue-100" : "bg-gray-100"
+      )}>
+        <MapPin className={cn(
+          "h-5 w-5",
+          entry.location ? "text-blue-600" : "text-gray-400"
+        )} />
+      </div>
+      
+      {/* Detalhes */}
+      <div className="space-y-0.5">
+        <div className="font-medium text-base">
+          {entry.location || 'Sem localização'}
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          {entry.pallet_number ? (
+            <span className="flex items-center gap-1">
+              <Box className="h-3.5 w-3.5" />
+              {entry.pallet_number}
+            </span>
+          ) : (
+            <span className="italic text-gray-400">Sem palete</span>
+          )}
+        </div>
+      </div>
+    </div>
+    
+    {/* Quantidade e input */}
+    <div className="flex items-center gap-3">
+      <Badge variant="secondary" className="text-sm px-2.5 py-1">
+        {entry.quantity} disponível
+      </Badge>
+      
+      {isSelected && (
+        <div className="flex items-center gap-2 bg-white rounded-md border px-2 py-1">
+          <Label className="text-xs font-medium text-muted-foreground">
+            Retirar:
+          </Label>
+          <Input
+            type="number"
+            min="1"
+            max={entry.quantity}
+            value={selection.quantity}
+            className="h-8 w-16 text-center font-semibold"
+          />
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+```
+
+### Modificação 2: EntryLocationDialog.tsx (Entradas)
+
+**Adicionar suporte para colis_names e melhorar visualização:**
+
+```tsx
+// Props expandidas para incluir nome do coli
+interface EntryLocationDialogProps {
+  // ... props existentes ...
+  totalColis?: number;
+  currentColisNumber?: number;
+  colisName?: string | null;
 }
-```
 
-### Modificação 5: StockExitsView.tsx - Integrar selecção de localização
-
-```tsx
-// Estado para o dialog
-const [locationSelectionData, setLocationSelectionData] = useState<{
-  item: MovementItem;
-  colisData: ColisLocationData[];
-} | null>(null);
-
-// Antes de confirmar saída, verificar se precisa selecção
-const handleFinalConfirm = async () => {
-  for (const item of detailedPickingItems) {
-    // Verificar se algum colis tem múltiplas localizações com stock
-    const dividedColis = item.colisDetails
-      .filter(c => c.hasMultipleLocations && c.locationEntries.filter(e => e.quantity > 0).length > 1);
-    
-    if (dividedColis.length > 0) {
-      // Precisa seleccionar localização
-      setLocationSelectionData({
-        item: item,
-        colisData: dividedColis
-      });
-      return; // Parar e aguardar selecção
-    }
-  }
-  
-  // Sem divisões, proceder normalmente
-  executeExits();
-};
-
-// Callback após selecção
-const handleLocationSelected = (selections: LocationSelection[]) => {
-  // Aplicar as selecções e decrementar dos counts específicos
-  // ...
-};
-```
-
-### Modificação 6: StockEntriesView.tsx - Integrar selecção de destino
-
-```tsx
-// Estado para o dialog
-const [entryLocationData, setEntryLocationData] = useState<{
-  item: MovementItem;
-  existingLocations: { location: string; pallet: string }[];
-} | null>(null);
-
-// Antes de confirmar entrada, verificar se produto tem localizações existentes
-const handleConfirm = async () => {
-  for (const item of allItems) {
-    // Buscar localizações existentes do produto
-    const { data: counts } = await supabase
-      .from('counts')
-      .select('location, pallet_number')
-      .eq('product_id', item.product_id)
-      .gt('quantity', 0);
-    
-    const uniqueLocations = [...new Map(
-      (counts || [])
-        .filter(c => c.location)
-        .map(c => [`${c.location}-${c.pallet_number}`, c])
-    ).values()];
-    
-    // Se tem localizações e mais de 1, perguntar onde colocar
-    if (uniqueLocations.length > 1) {
-      setEntryLocationData({
-        item,
-        existingLocations: uniqueLocations.map(c => ({
-          location: c.location || '',
-          pallet: c.pallet_number || ''
-        }))
-      });
-      return; // Parar e aguardar selecção
-    }
-  }
-  
-  // Sem múltiplas localizações, proceder normalmente
-  executeEntries();
-};
+// Header melhorado
+<DialogHeader>
+  <DialogTitle className="flex items-center gap-3">
+    <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+      <Plus className="h-5 w-5 text-green-600" />
+    </div>
+    <div>
+      <span>Destino da Entrada</span>
+      {totalColis && totalColis > 1 && (
+        <div className="text-sm font-normal text-muted-foreground mt-0.5">
+          Coli {currentColisNumber} de {totalColis}
+          {colisName && <span className="ml-1">- {colisName}</span>}
+        </div>
+      )}
+    </div>
+  </DialogTitle>
+</DialogHeader>
 ```
 
 ---
 
-## Ficheiros a Modificar/Criar
+## Ficheiros a Modificar
 
-| Ficheiro | Tipo | Alteração |
-|----------|------|-----------|
-| `src/components/counting/ProductCard.tsx` | Modificar | Desactivar botões +/- quando coli dividido, expandir automaticamente |
-| `src/components/stock/ManualStockSection.tsx` | Modificar | Detectar colis divididos antes de confirmar |
-| `src/components/stock/StockExitsView.tsx` | Modificar | Integrar dialog de selecção de localização |
-| `src/components/stock/StockEntriesView.tsx` | Modificar | Integrar dialog de selecção de destino |
-| `src/components/stock/LocationSelectionDialog.tsx` | Criar | Dialog para escolher localização de saída |
-| `src/components/stock/EntryLocationDialog.tsx` | Criar | Dialog para escolher destino de entrada |
+| Ficheiro | Alteração |
+|----------|-----------|
+| `src/components/stock/LocationSelectionDialog.tsx` | Redesign visual completo com cards destacados por coli, nomes descritivos, ícones maiores e indicadores de progresso melhorados |
+| `src/components/stock/EntryLocationDialog.tsx` | Adicionar suporte para exibir nome do coli, melhorar visualização das opções de localização |
 
 ---
 
 ## Resultado Esperado
 
-1. **ProductCard melhorado**:
-   - Botões +/- do coli principal desactivados quando dividido
-   - Colis divididos expandem automaticamente
-   - Controlos por localização permanecem funcionais
-
-2. **Saídas inteligentes**:
-   - Sistema detecta colis divididos
-   - Utilizador escolhe de qual localização tirar
-   - Stock decrementado da localização correcta
-
-3. **Entradas inteligentes**:
-   - Sistema detecta se produto tem múltiplas localizações
-   - Utilizador escolhe: localização existente OU nova
-   - Se nova: pode seleccionar palete (opcional) e/ou localização
-   - Stock adicionado à localização escolhida
-
-4. **Paletes opcionais**:
-   - Todos os selects de palete permitem deixar vazio
-   - Localização pode ser seleccionada independentemente do palete
+1. **Hierarquia visual clara** - Cada coli num card separado e bem identificado
+2. **Nomes descritivos** - "Cabeceira", "Ilhargueiro", etc. quando configurados na categoria
+3. **Ícones intuitivos** - Maiores e coloridos para fácil identificação
+4. **Indicadores de progresso** - O utilizador sabe imediatamente o que já seleccionou e o que falta
+5. **Distinção "sem palete"** - Texto claro quando não há palete, em vez de vazio
+6. **Feedback de estado** - Cards mudam de cor quando completos (verde) ou pendentes (laranja)
 
