@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Package, LogOut, User, ClipboardList, Moon, Sun } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { StockAlertsBell } from '@/components/stock/StockAlertsBell';
 import { Badge } from '@/components/ui/badge';
 
@@ -47,6 +47,9 @@ export function Header({ onNavigateToProducts }: HeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                 <Avatar className="h-9 w-9">
+                  {profile?.avatar_url && (
+                    <AvatarImage src={profile.avatar_url} alt={profile.name || 'Avatar'} />
+                  )}
                   <AvatarFallback className="bg-primary/10 text-primary">
                     {profile?.name?.charAt(0).toUpperCase() || <User className="h-4 w-4" />}
                   </AvatarFallback>
