@@ -1,115 +1,114 @@
 
-
-# Correcção: Utilizadores Diferentes Veem Stock Diferente
+# Correcção: Dashboard/Contagem Mostra Números Diferentes da Gestão de Produtos
 
 ## Problema Identificado
 
-Quando um utilizador faz logout e outro faz login, o sistema mostra dados antigos porque:
+O resumo da contagem mostra valores de "Sets Completos" diferentes do `current_stock` mostrado na gestão de produtos.
 
-1. **Cache do React Query não é limpo** - O `QueryClient` mantém os dados em cache por 2 minutos (`staleTime: 2 * 60 * 1000`)
-2. **localStorage não é limpo** - A sessão de contagem seleccionada (`counting_selected_session`) persiste entre utilizadores
-3. **Não há detecção de mudança de utilizador** - O sistema não detecta quando o user_id muda para invalidar o cache
+**Dados na BD (correctos):**
+- Produto "teste" (t-12): current_stock = 18, Coli 1 = 18, Coli 2 = 18
+
+**Comportamento actual:**
+- **Gestão de Produtos**: Mostra `product.current_stock` da tabela products (16 ou outro valor em cache)
+- **Resumo da Contagem**: Calcula `completeSets` = MIN(coli1, coli2) a partir dos counts carregados (20 ou outro valor em cache)
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│  PROBLEMA                                                        │
+│  PROBLEMA: DUAS FONTES DE DADOS DIFERENTES                     │
 ├─────────────────────────────────────────────────────────────────┤
-│  1. Utilizador A faz login                                      │
-│     └─ React Query carrega dados: products, counts, sessions    │
 │                                                                 │
-│  2. Utilizador A faz logout                                     │
-│     └─ signOut() limpa apenas: user, session, profile           │
-│     └─ NÃO limpa: QueryClient cache, localStorage               │
+│  CountingSummary.tsx (linha 15):                                │
+│  ├─ totalCompleteSets = SUM(p.completeSets)                     │
+│  └─ completeSets vem de useCounting → getProductWithCounts()   │
+│      └─ MIN(quantidades de cada coli) dos COUNTS em cache      │
 │                                                                 │
-│  3. Utilizador B faz login                                      │
-│     └─ React Query mostra dados EM CACHE (2min stale)           │
-│     └─ Dados antigos do Utilizador A são mostrados! ❌          │
+│  ProductsView.tsx:                                              │
+│  └─ Mostra product.current_stock da tabela PRODUCTS em cache   │
+│                                                                 │
+│  PROBLEMA: Os caches têm staleTime diferentes:                  │
+│  ├─ counts: 5 segundos                                          │
+│  ├─ products: 2 segundos                                        │
+│  └─ last-counts: 2 MINUTOS (!)                                  │
+│                                                                 │
+│  E NÃO INVALIDAM SINCRONIZADAMENTE!                             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+---
+
+## Causa Raiz
+
+Há **três problemas**:
+
+1. **Caches dessincronizados**: Quando um count muda, o sistema:
+   - Invalida `['counts', sessionId]` ✓
+   - Espera que o trigger BD actualize `products.current_stock`
+   - Espera que o realtime invalide `['products']`
+   - **NÃO invalida** `['last-counts']` explicitamente!
+
+2. **staleTime muito longo em last-counts**: 2 minutos vs 2-5 segundos dos outros
+
+3. **CountingSummary usa completeSets em vez de current_stock**: O resumo deveria usar `current_stock` para ser consistente com a gestão de produtos
+
+---
+
 ## Solução
 
-Implementar limpeza completa de cache e localStorage quando o utilizador muda (login/logout).
+### Passo 1: Invalidar todos os caches relacionados após mudanças de contagem
 
-### Passo 1: Modificar useAuth.tsx
+Quando um count é modificado, invalidar também:
+- `['products']` - para actualizar current_stock
+- `['last-counts']` - para actualizar a visualização
 
-Adicionar acesso ao QueryClient para limpar o cache no signOut:
-
-```typescript
-// src/hooks/useAuth.tsx
-import { useQueryClient } from '@tanstack/react-query';
-
-const signOut = async () => {
-  // Limpar cache do React Query
-  queryClient.clear();
-  
-  // Limpar localStorage específico do utilizador
-  localStorage.removeItem('counting_selected_session');
-  
-  // Fazer logout
-  await supabase.auth.signOut();
-  setUser(null);
-  setSession(null);
-  setProfile(null);
-};
-```
-
-### Passo 2: Detectar mudança de utilizador no login
-
-Criar um hook ou effect que detecte quando o `user.id` muda e limpe o cache:
+**Ficheiro**: `src/hooks/useCounting.tsx`
 
 ```typescript
-// Em useAuth.tsx ou criar novo hook useUserChange.tsx
-const prevUserId = useRef<string | null>(null);
-
-useEffect(() => {
-  if (user?.id !== prevUserId.current) {
-    // User mudou - limpar cache
-    queryClient.clear();
-    
-    // Limpar localStorage do utilizador anterior
-    if (prevUserId.current !== null) {
-      localStorage.removeItem('counting_selected_session');
-    }
-    
-    prevUserId.current = user?.id ?? null;
-  }
-}, [user?.id, queryClient]);
+// Na função invalidateCounts (linha ~92)
+const invalidateCounts = useCallback(() => {
+  queryClient.invalidateQueries({ queryKey: ['counts', sessionId] });
+  queryClient.invalidateQueries({ queryKey: ['products'] });
+  queryClient.invalidateQueries({ queryKey: ['last-counts'] });
+}, [queryClient, sessionId]);
 ```
 
-### Passo 3: Mover QueryClient para dentro do React Tree
+### Passo 2: Reduzir staleTime de last-counts
 
-Para que o `useQueryClient()` funcione no `useAuth`, precisamos de reestruturar a hierarquia de componentes:
+**Ficheiro**: `src/hooks/useLastCounts.tsx`
 
-**Antes:**
-```
-App.tsx
-└─ QueryClientProvider
-   └─ Index.tsx
-      └─ AuthProvider (não tem acesso ao queryClient)
+```typescript
+// Linha 210 - reduzir de 2 minutos para 5 segundos
+staleTime: 5000, // 5 segundos em vez de 2 minutos
 ```
 
-**Depois:**
+### Passo 3: Usar current_stock no CountingSummary (opcional)
+
+Para garantir consistência, o resumo pode usar `current_stock` directamente:
+
+**Ficheiro**: `src/components/counting/CountingSummary.tsx`
+
+```typescript
+// Linha 15 - usar current_stock em vez de completeSets calculado
+const totalCompleteSets = products.reduce((sum, p) => sum + p.current_stock, 0);
 ```
-App.tsx
-└─ QueryClientProvider
-   └─ AuthProviderWithQuery (tem acesso ao queryClient)
-      └─ AppContent
-```
+
+**Nota**: Esta alteração é opcional se os passos 1 e 2 forem implementados, pois os valores devem ficar sincronizados.
+
+---
 
 ## Ficheiros a Modificar
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/hooks/useAuth.tsx` | Adicionar limpeza de cache e localStorage no signOut |
-| `src/pages/Index.tsx` | Passar queryClient para AuthProvider ou reestruturar |
-| `src/App.tsx` | Possivelmente mover AuthProvider para dentro do QueryClientProvider |
+| `src/hooks/useCounting.tsx` | Invalidar `['products']` e `['last-counts']` após mudanças |
+| `src/hooks/useLastCounts.tsx` | Reduzir staleTime de 2min para 5s |
+| `src/components/counting/CountingSummary.tsx` | (Opcional) Usar `current_stock` em vez de `completeSets` |
+
+---
 
 ## Resultado Esperado
 
 Após a correcção:
-- Quando um utilizador faz logout, todo o cache é limpo
-- Quando um novo utilizador faz login, dados frescos são carregados
-- Não há mais confusão de dados entre utilizadores diferentes
-- A experiência é consistente independentemente de quem estava logado antes
-
+- Todos os valores de stock ficam sincronizados entre todas as views
+- Quando um count muda, todas as views actualizam imediatamente
+- "Sets Completos" no resumo = soma de `current_stock` de todos os produtos
+- Não há mais discrepâncias entre Contagem e Gestão de Produtos
