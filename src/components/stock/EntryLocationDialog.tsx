@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Box, Plus, CheckCircle2 } from 'lucide-react';
+import { MapPin, Box, Plus, CheckCircle2, Package } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -37,6 +37,10 @@ interface EntryLocationDialogProps {
   quantity: number;
   existingLocations: ExistingLocation[];
   onConfirm: (destination: EntryDestination) => void;
+  // New props for multi-coli context
+  totalColis?: number;
+  currentColisNumber?: number;
+  colisName?: string | null;
 }
 
 export function EntryLocationDialog({
@@ -47,11 +51,16 @@ export function EntryLocationDialog({
   quantity,
   existingLocations,
   onConfirm,
+  totalColis,
+  currentColisNumber,
+  colisName,
 }: EntryLocationDialogProps) {
   const [destinationType, setDestinationType] = useState<'existing' | 'new'>('existing');
   const [selectedExisting, setSelectedExisting] = useState<string>('');
   const [newLocation, setNewLocation] = useState('');
   const [newPallet, setNewPallet] = useState('');
+
+  const isMultiColi = totalColis && totalColis > 1;
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -104,14 +113,31 @@ export function EntryLocationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5 text-green-600" />
-            Destino da Entrada
+          <DialogTitle className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+              <Plus className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <span>Destino da Entrada</span>
+              {isMultiColi && (
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="font-normal">
+                    <Package className="h-3 w-3 mr-1" />
+                    Coli {currentColisNumber} de {totalColis}
+                  </Badge>
+                  {colisName && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {colisName}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="pt-2">
             <span className="font-medium">{productCode}</span> - {productName}
             <br />
-            Seleccione onde armazenar <span className="font-semibold">{quantity} set{quantity > 1 ? 's' : ''}</span>.
+            Seleccione onde armazenar <span className="font-semibold text-foreground">{quantity} set{quantity > 1 ? 's' : ''}</span>.
           </DialogDescription>
         </DialogHeader>
 
@@ -144,32 +170,50 @@ export function EntryLocationDialog({
                         <div
                           key={idx}
                           className={cn(
-                            "p-3 rounded-lg border cursor-pointer transition-colors",
+                            "p-4 rounded-lg border-2 cursor-pointer transition-all",
                             isSelected 
-                              ? "border-primary bg-primary/5" 
-                              : "hover:border-muted-foreground/50"
+                              ? "border-primary bg-primary/5 shadow-sm" 
+                              : "border-border hover:border-muted-foreground/50 hover:bg-muted/30"
                           )}
                           onClick={() => setSelectedExisting(key)}
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{loc.location}</span>
+                            <div className="flex items-center gap-4">
+                              {/* Location Icon */}
+                              <div className={cn(
+                                "h-10 w-10 rounded-lg flex items-center justify-center",
+                                loc.location ? "bg-blue-100" : "bg-muted"
+                              )}>
+                                <MapPin className={cn(
+                                  "h-5 w-5",
+                                  loc.location ? "text-blue-600" : "text-muted-foreground"
+                                )} />
                               </div>
-                              {loc.pallet && (
-                                <div className="flex items-center gap-1.5 text-muted-foreground">
-                                  <Box className="h-4 w-4" />
-                                  <span>{loc.pallet}</span>
+                              
+                              {/* Details */}
+                              <div className="space-y-0.5">
+                                <div className="font-medium text-base">
+                                  {loc.location}
                                 </div>
-                              )}
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  {loc.pallet ? (
+                                    <span className="flex items-center gap-1">
+                                      <Box className="h-3.5 w-3.5" />
+                                      {loc.pallet}
+                                    </span>
+                                  ) : (
+                                    <span className="italic text-muted-foreground/70">Sem palete</span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
+                            
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary">
+                              <Badge variant="secondary" className="text-sm px-2.5 py-1">
                                 {loc.quantity} un. actual
                               </Badge>
                               {isSelected && (
-                                <CheckCircle2 className="h-4 w-4 text-primary" />
+                                <CheckCircle2 className="h-5 w-5 text-primary" />
                               )}
                             </div>
                           </div>

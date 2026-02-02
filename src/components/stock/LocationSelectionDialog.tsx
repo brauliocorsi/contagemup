@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Box, AlertTriangle, Check } from 'lucide-react';
+import { MapPin, Box, AlertTriangle, Check, Package, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -165,14 +165,13 @@ export function LocationSelectionDialog({
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
+            <MapPin className="h-5 w-5 text-destructive" />
             Seleccionar Localizações para Saída
           </DialogTitle>
           <DialogDescription>
             <span className="font-medium">{productCode}</span> - {productName}
             <br />
-            Este produto está dividido em múltiplas localizações. 
-            Seleccione de onde retirar <span className="font-semibold">{quantitySets} set{quantitySets > 1 ? 's' : ''}</span>.
+            Seleccione de onde retirar <span className="font-semibold text-foreground">{quantitySets} set{quantitySets > 1 ? 's' : ''}</span> de cada coli.
           </DialogDescription>
         </DialogHeader>
 
@@ -184,29 +183,72 @@ export function LocationSelectionDialog({
               const isColisComplete = totalSelected >= quantitySets;
               
               return (
-                <div key={colis.colisNumber} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2">
-                      <span>Coli {colis.colisNumber}/{totalColis}</span>
-                      {colis.colisName && (
-                        <span className="text-muted-foreground">- {colis.colisName}</span>
-                      )}
-                    </Label>
+                <div 
+                  key={colis.colisNumber} 
+                  className={cn(
+                    "rounded-xl border-2 overflow-hidden transition-colors",
+                    isColisComplete 
+                      ? "border-green-300" 
+                      : "border-amber-300"
+                  )}
+                >
+                  {/* Coli Header */}
+                  <div className={cn(
+                    "px-4 py-3 flex items-center justify-between",
+                    isColisComplete 
+                      ? "bg-green-50" 
+                      : "bg-amber-50"
+                  )}>
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "h-10 w-10 rounded-full flex items-center justify-center",
+                        isColisComplete 
+                          ? "bg-green-100" 
+                          : "bg-amber-100"
+                      )}>
+                        <Package className={cn(
+                          "h-5 w-5",
+                          isColisComplete 
+                            ? "text-green-600" 
+                            : "text-amber-600"
+                        )} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-lg">
+                            Coli {colis.colisNumber}
+                          </span>
+                          <span className="text-muted-foreground">
+                            de {totalColis}
+                          </span>
+                        </div>
+                        {colis.colisName && (
+                          <span className="text-sm text-muted-foreground">
+                            {colis.colisName}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Progress Badge */}
                     <Badge 
-                      variant={isColisComplete ? "default" : "secondary"}
                       className={cn(
-                        isColisComplete && "bg-green-600"
+                        "text-sm px-3 py-1.5 font-semibold",
+                        isColisComplete 
+                          ? "bg-green-600 hover:bg-green-600" 
+                          : "bg-amber-500 hover:bg-amber-500"
                       )}
                     >
                       {isColisComplete ? (
-                        <><Check className="h-3 w-3 mr-1" /> {totalSelected}/{quantitySets}</>
+                        <><Check className="h-4 w-4 mr-1.5" /> {totalSelected}/{quantitySets}</>
                       ) : (
-                        `${totalSelected}/${quantitySets}`
+                        <><AlertCircle className="h-4 w-4 mr-1.5" /> {totalSelected}/{quantitySets}</>
                       )}
                     </Badge>
                   </div>
                   
-                  <div className="space-y-1.5">
+                  {/* Location Entries */}
+                  <div className="p-3 space-y-2 bg-background">
                     {colis.entries.filter(e => e.quantity > 0).map((entry) => {
                       const isSelected = colisSelections.some(s => s.countId === entry.countId);
                       const selection = colisSelections.find(s => s.countId === entry.countId);
@@ -215,37 +257,59 @@ export function LocationSelectionDialog({
                         <div 
                           key={entry.countId}
                           className={cn(
-                            "p-3 rounded-lg border cursor-pointer transition-colors",
+                            "p-4 rounded-lg border-2 cursor-pointer transition-all",
                             isSelected 
-                              ? "border-primary bg-primary/5" 
-                              : "hover:border-muted-foreground/50"
+                              ? "border-primary bg-primary/5 shadow-sm" 
+                              : "border-border hover:border-muted-foreground/50 hover:bg-muted/30"
                           )}
                           onClick={() => handleSelectLocation(colis.colisNumber, entry)}
                         >
                           <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">
-                                  {entry.location || 'Sem localização'}
-                                </span>
+                            {/* Location Info */}
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                              {/* Location Icon */}
+                              <div className={cn(
+                                "h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0",
+                                entry.location ? "bg-blue-100" : "bg-muted"
+                              )}>
+                                <MapPin className={cn(
+                                  "h-5 w-5",
+                                  entry.location ? "text-blue-600" : "text-muted-foreground"
+                                )} />
                               </div>
-                              {entry.pallet_number && (
-                                <div className="flex items-center gap-1.5 text-muted-foreground">
-                                  <Box className="h-4 w-4" />
-                                  <span>{entry.pallet_number}</span>
+                              
+                              {/* Details */}
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="font-medium text-base">
+                                  {entry.location || 'Sem localização'}
                                 </div>
-                              )}
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  {entry.pallet_number ? (
+                                    <span className="flex items-center gap-1">
+                                      <Box className="h-3.5 w-3.5" />
+                                      {entry.pallet_number}
+                                    </span>
+                                  ) : (
+                                    <span className="italic text-muted-foreground/70">Sem palete</span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                             
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary">
+                            {/* Quantity & Input */}
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <Badge variant="secondary" className="text-sm px-2.5 py-1">
                                 {entry.quantity} disponível
                               </Badge>
                               
                               {isSelected && (
-                                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                  <Label className="text-xs whitespace-nowrap">Retirar:</Label>
+                                <div 
+                                  className="flex items-center gap-2 bg-background rounded-md border px-2 py-1"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <Label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                                    Retirar:
+                                  </Label>
                                   <Input
                                     type="number"
                                     min="1"
@@ -256,7 +320,7 @@ export function LocationSelectionDialog({
                                       entry.countId, 
                                       parseInt(e.target.value) || 0
                                     )}
-                                    className="h-8 w-16 text-center"
+                                    className="h-8 w-16 text-center font-semibold"
                                   />
                                 </div>
                               )}
@@ -293,6 +357,7 @@ export function LocationSelectionDialog({
           <Button 
             onClick={handleConfirm}
             disabled={!isValid}
+            className="bg-destructive hover:bg-destructive/90"
           >
             Confirmar Saída
           </Button>
