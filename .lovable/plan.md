@@ -1,253 +1,138 @@
 
 
-# Correção da Entrada de Stock: Divisão Automática e Opção de Localização
+# Reset de Stock - Começar Contagem do Zero
 
-## Problemas Identificados
+## Resumo da Operação
 
-### Problema 1: Divisão Automática Indesejada
+Vamos limpar todos os dados de movimentação e stock, mantendo a estrutura dos produtos:
 
-Quando se dá entrada de um produto, o sistema cria **novos registos de count** em vez de actualizar os existentes. Isto acontece porque:
+### O que será MANTIDO ✅
+| Dados | Descrição |
+|-------|-----------|
+| **Produtos** | 491 produtos com código, nome, categoria |
+| **Localizações** | Campo `location` de cada produto |
+| **Paletes** | Campo `pallet_number` de cada produto |
+| **Número de Colis** | Campo `total_colis` de cada produto |
+| **Categorias** | Todas as categorias e configurações |
+| **Configuração Armazém** | Corredores, níveis, localizações, paletes |
+| **Utilizadores** | Profiles mantidos |
 
-```typescript
-// Linha 229-238 do StockEntriesView.tsx
-const { data: existingCount } = await supabase
-  .from('counts')
-  .select('id, quantity')
-  .eq('product_id', item.product_id)
-  .eq('colis_number', colisNumber)
-  .eq('location', targetLocation || '')  // ← PROBLEMA AQUI
-  .order('counted_at', { ascending: false })
-  .limit(1)
-  .maybeSingle();
-```
+### O que será APAGADO 🗑️
+| Tabela | Registos | Descrição |
+|--------|----------|-----------|
+| `counts` | 1.401 | Contagens de stock (quantidades) |
+| `count_logs` | 2.378 | Histórico de incrementos/decrementos |
+| `stock_movements` | 623 | Movimentos de entrada/saída |
+| `picking_items` | 66 | Itens de picking |
+| `picking_sessions` | 36 | Sessões de picking |
+| `counting_sessions` | 2 | Sessões de contagem |
+| `product_changes` | 444 | Histórico de alterações de produtos |
+| `product_damages` | 1 | Relatórios de danos |
 
-O filtro `eq('location', targetLocation || '')` procura um count com localização exactamente igual. Se:
-- O produto tem stock em "A1" mas `targetLocation` é "B2" (ou vazio)
-- Não encontra o count existente
-- Cria um novo registo ← **Divisão automática!**
-
-### Problema 2: Falta Opção de Seleccionar Localização
-
-O diálogo `EntryLocationDialog` só aparece se o produto já tiver **2+ localizações diferentes** (linha 143). O utilizador não tem opção de escolher localização quando:
-- Produto tem 0 localizações (novo)
-- Produto tem 1 localização existente
-
----
-
-## Solução Proposta
-
-### Parte 1: Sempre Mostrar Opção de Localização
-
-Modificar a lógica para que o diálogo de destino apareça **sempre** que o utilizador quiser, com as seguintes opções:
-
-| Cenário | Comportamento |
-|---------|---------------|
-| Produto sem stock | Mostrar apenas opção "Nova localização" |
-| Produto com 1 localização | Mostrar localização existente + "Nova localização" |
-| Produto com 2+ localizações | Mostrar todas + "Nova localização" |
-
-Adicionar um **checkbox/toggle** no formulário de entrada para "Especificar localização" que, quando activado, força o diálogo a aparecer.
-
-### Parte 2: Corrigir Lógica de Actualização
-
-Quando o utilizador **não especifica localização**, o sistema deve:
-1. Buscar counts existentes do produto (qualquer localização)
-2. Actualizar o primeiro count encontrado (manter na mesma localização)
-3. Só criar novo registo se não existir nenhum count
-
-Quando o utilizador **especifica localização**:
-1. Buscar count nessa localização específica
-2. Se existir, actualizar
-3. Se não existir, criar novo com essa localização
+### O que será ZERADO
+| Campo | Descrição |
+|-------|-----------|
+| `products.current_stock` | Será definido como 0 |
+| `products.damaged_stock` | Será definido como 0 |
 
 ---
 
-## Alterações Técnicas
+## Plano de Execução
 
-### Ficheiro: `src/components/stock/StockEntriesView.tsx`
+A operação será feita através de SQL executado directamente na base de dados. A ordem é importante para respeitar as foreign keys.
 
-#### 1. Adicionar Toggle de Localização
+### Passo 1: Apagar Tabelas Dependentes (sem foreign keys de outras)
 
-```typescript
-// Novo estado
-const [specifyLocation, setSpecifyLocation] = useState(false);
+```sql
+-- Apagar itens de picking primeiro (depende de picking_sessions)
+DELETE FROM picking_items;
+
+-- Apagar logs de contagem (depende de counting_sessions e products)
+DELETE FROM count_logs;
+
+-- Apagar itens de reconciliação (depende de reconciliations)
+DELETE FROM reconciliation_items;
+
+-- Apagar itens de auditoria (depende de location_audits)
+DELETE FROM location_audit_items;
 ```
 
-#### 2. Modificar Função `checkForMultipleLocations`
+### Passo 2: Apagar Tabelas Principais
 
-Renomear para `prepareLocationSelection` e alterar lógica:
+```sql
+-- Apagar contagens (a fonte principal do stock)
+DELETE FROM counts;
 
-```typescript
-const prepareLocationSelection = async (items: MovementItem[]): Promise<Array<{
-  item: MovementItem;
-  existingLocations: ExistingLocation[];
-}>> => {
-  const result: Array<{ item: MovementItem; existingLocations: ExistingLocation[] }> = [];
+-- Apagar movimentos de stock
+DELETE FROM stock_movements;
 
-  for (const item of items) {
-    if (pendingEntryDestinations.has(item.product_id)) continue;
+-- Apagar sessões de picking
+DELETE FROM picking_sessions;
 
-    // Buscar localizações existentes
-    const { data: counts } = await supabase
-      .from('counts')
-      .select('location, pallet_number, quantity')
-      .eq('product_id', item.product_id)
-      .gt('quantity', 0);
+-- Apagar sessões de contagem
+DELETE FROM counting_sessions;
 
-    // Agrupar por localização
-    const locationMap = new Map<string, ExistingLocation>();
-    (counts || []).forEach(c => {
-      if (!c.location) return;
-      const key = `${c.location}|${c.pallet_number || ''}`;
-      const existing = locationMap.get(key);
-      if (existing) {
-        existing.quantity += c.quantity;
-      } else {
-        locationMap.set(key, {
-          location: c.location,
-          pallet: c.pallet_number,
-          quantity: c.quantity,
-        });
-      }
-    });
+-- Apagar reconciliações
+DELETE FROM reconciliations;
 
-    const uniqueLocations = Array.from(locationMap.values());
-    
-    // NOVO: Sempre incluir se specifyLocation está activado
-    // OU se há múltiplas localizações
-    if (specifyLocation || uniqueLocations.length > 1) {
-      result.push({ item, existingLocations: uniqueLocations });
-    }
-  }
+-- Apagar auditorias de localização
+DELETE FROM location_audits;
 
-  return result;
-};
+-- Apagar histórico de alterações de produtos
+DELETE FROM product_changes;
+
+-- Apagar relatórios de danos
+DELETE FROM product_damages;
 ```
 
-#### 3. Modificar Função `executeEntries`
+### Passo 3: Zerar Stock nos Produtos
 
-```typescript
-const executeEntries = async () => {
-  setIsSubmitting(true);
-
-  try {
-    // 1. Registar em stock_movements
-    await registerBulkMovements.mutateAsync({ ... });
-
-    // 2. Actualizar counts
-    for (const item of allItems) {
-      const product = products.find(p => p.id === item.product_id);
-      const totalColis = product?.total_colis || 1;
-      const destination = pendingEntryDestinations.get(item.product_id);
-
-      for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
-        const colisQty = item.isCompleteSet !== false 
-          ? item.quantity 
-          : (item.colisQuantities?.[colisNumber] || 0);
-        
-        if (colisQty <= 0) continue;
-
-        // NOVO: Se há destino específico, usar; senão, actualizar registo existente
-        if (destination) {
-          // Localização específica foi seleccionada
-          const { data: existingCount } = await supabase
-            .from('counts')
-            .select('id, quantity')
-            .eq('product_id', item.product_id)
-            .eq('colis_number', colisNumber)
-            .eq('location', destination.location)
-            .maybeSingle();
-
-          if (existingCount) {
-            await supabase
-              .from('counts')
-              .update({ 
-                quantity: existingCount.quantity + colisQty,
-                pallet_number: destination.pallet,
-                updated_at: new Date().toISOString() 
-              })
-              .eq('id', existingCount.id);
-          } else {
-            await supabase.from('counts').insert({
-              product_id: item.product_id,
-              colis_number: colisNumber,
-              quantity: colisQty,
-              session_id: null,
-              location: destination.location,
-              pallet_number: destination.pallet,
-            });
-          }
-        } else {
-          // SEM destino específico - actualizar count existente (qualquer localização)
-          const { data: existingCount } = await supabase
-            .from('counts')
-            .select('id, quantity, location, pallet_number')
-            .eq('product_id', item.product_id)
-            .eq('colis_number', colisNumber)
-            .order('quantity', { ascending: false }) // Preferir o com mais stock
-            .limit(1)
-            .maybeSingle();
-
-          if (existingCount) {
-            // Actualizar existente mantendo localização original
-            await supabase
-              .from('counts')
-              .update({ 
-                quantity: existingCount.quantity + colisQty,
-                updated_at: new Date().toISOString() 
-              })
-              .eq('id', existingCount.id);
-          } else {
-            // Criar novo sem localização (ou com default do produto)
-            await supabase.from('counts').insert({
-              product_id: item.product_id,
-              colis_number: colisNumber,
-              quantity: colisQty,
-              session_id: null,
-              location: product?.location || null,
-              pallet_number: product?.pallet_number || null,
-            });
-          }
-        }
-      }
-    }
-
-    // 3. Invalidar queries e reset
-    // ...
-  }
-};
-```
-
-#### 4. Adicionar Toggle na UI
-
-No formulário de confirmação, adicionar opção:
-
-```tsx
-<div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-md">
-  <div className="flex items-center gap-2 text-sm">
-    <MapPin className="h-4 w-4 text-muted-foreground" />
-    <span>Especificar localização</span>
-  </div>
-  <Switch
-    checked={specifyLocation}
-    onCheckedChange={setSpecifyLocation}
-  />
-</div>
+```sql
+-- Zerar current_stock e damaged_stock mantendo location, pallet_number e total_colis
+UPDATE products 
+SET 
+  current_stock = 0,
+  damaged_stock = 0,
+  updated_at = now();
 ```
 
 ---
 
-## Ficheiros a Modificar
+## Implementação Técnica
 
-| Ficheiro | Alteração |
-|----------|-----------|
-| `src/components/stock/StockEntriesView.tsx` | Adicionar toggle, corrigir lógica de actualização |
+Vou criar uma página ou função de administração que execute estas operações com confirmação do utilizador.
+
+### Ficheiro: `src/components/settings/ResetStockDialog.tsx`
+
+Novo componente com:
+- Diálogo de confirmação com resumo do que será apagado
+- Campo de confirmação (escrever "CONFIRMAR" para activar)
+- Botão de reset desabilitado até confirmação
+- Feedback de progresso durante execução
+- Toast de sucesso/erro no final
+
+### Ficheiro: `src/components/settings/SettingsView.tsx`
+
+Adicionar secção "Gestão de Dados" com:
+- Botão "Reset de Stock" que abre o diálogo
+- Apenas visível para administradores
 
 ---
 
-## Resultado Esperado
+## Segurança
 
-1. **Sem divisão automática** - Entradas sem localização específica actualizam o count existente
-2. **Opção de localização** - Toggle permite ao utilizador especificar onde armazenar
-3. **Comportamento consistente** - Só há divisão quando o utilizador escolhe explicitamente
+1. **Confirmação obrigatória** - Utilizador deve escrever "CONFIRMAR"
+2. **Apenas admins** - Verificar role do utilizador
+3. **Sem reversão** - Aviso claro que a operação é irreversível
+4. **Backup recomendado** - Sugestão para exportar dados antes
+
+---
+
+## Resultado Final
+
+Após a operação:
+- Todos os produtos terão `current_stock = 0`
+- Localizações e paletes mantidos nos produtos
+- Sistema pronto para nova contagem de inventário
+- Histórico completamente limpo
 
