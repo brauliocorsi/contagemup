@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Users, UserPlus, Loader2, Trash2, Mail, User } from 'lucide-react';
+import { Settings, Users, UserPlus, Loader2, Trash2, Mail, User, Database, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileSettings } from './ProfileSettings';
 import { Separator } from '@/components/ui/separator';
+import { ResetStockDialog } from './ResetStockDialog';
 
 interface Profile {
   id: string;
@@ -29,6 +30,7 @@ export function SettingsView() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const { toast } = useToast();
   const { profile: currentProfile } = useAuth();
   const queryClient = useQueryClient();
@@ -271,6 +273,48 @@ export function SettingsView() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Data Management Section */}
+      <Separator className="my-2" />
+      
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-destructive">
+            <Database className="h-5 w-5" />
+            Gestão de Dados
+          </CardTitle>
+          <CardDescription>
+            Operações de manutenção e reset do sistema
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/20 bg-destructive/5">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <h4 className="font-medium">Reset de Stock</h4>
+                <p className="text-sm text-muted-foreground">
+                  Zera todo o stock e histórico, mantendo produtos e localizações
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant="destructive" 
+              onClick={() => setResetDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Reset
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ResetStockDialog 
+        open={resetDialogOpen} 
+        onOpenChange={setResetDialogOpen} 
+      />
     </div>
   );
 }
