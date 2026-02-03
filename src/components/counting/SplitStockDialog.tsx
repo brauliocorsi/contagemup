@@ -103,11 +103,40 @@ export function SplitStockDialog({
   };
 
   const updateDistribution = (id: string, field: keyof StockDistribution, value: string | number) => {
-    setDistributions(prev =>
-      prev.map(d =>
-        d.id === id ? { ...d, [field]: value } : d
-      )
-    );
+    if (field === 'quantity' && typeof value === 'number') {
+      setDistributions(prev => {
+        const idx = prev.findIndex(d => d.id === id);
+        if (idx === -1) return prev;
+        
+        const oldValue = prev[idx].quantity;
+        const diff = value - oldValue;
+        
+        // Se não há diferença ou só há 1 distribuição, apenas actualizar
+        if (diff === 0 || prev.length === 1) {
+          return prev.map(d => d.id === id ? { ...d, quantity: value } : d);
+        }
+        
+        // Encontrar o campo para subtrair (preferir o último, ou o primeiro se for o último)
+        const targetIdx = idx === prev.length - 1 ? 0 : prev.length - 1;
+        
+        // Se o target não é o mesmo que estamos a editar
+        if (targetIdx !== idx) {
+          const targetNewValue = Math.max(0, prev[targetIdx].quantity - diff);
+          
+          return prev.map((d, i) => {
+            if (i === idx) return { ...d, quantity: value };
+            if (i === targetIdx) return { ...d, quantity: targetNewValue };
+            return d;
+          });
+        }
+        
+        return prev.map(d => d.id === id ? { ...d, quantity: value } : d);
+      });
+    } else {
+      setDistributions(prev =>
+        prev.map(d => d.id === id ? { ...d, [field]: value } : d)
+      );
+    }
   };
 
   const handleSave = async () => {
