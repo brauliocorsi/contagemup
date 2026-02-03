@@ -1,129 +1,139 @@
 
-# Correção da Inconsistência na Divisão/Unificação de Stock
 
-## Problema Identificado
+# Guard para Cliques Duplos e Subtração Automática na Divisão de Stock
 
-Quando um produto tem registos de contagem em **duas fontes** diferentes:
-1. **Sessão actual** (`session_id = 'ae7b31b4...'`)
-2. **Administrativos** (`session_id IS NULL`)
+## Resumo
 
-As funções de **Unificar** e **Dividir** causam duplicação de quantidade porque:
-
-| Etapa | O que acontece | Problema |
-|-------|----------------|----------|
-| 1. Leitura | Soma quantidades de AMBAS fontes | Inclui registos administrativos |
-| 2. Apagar | Apaga apenas registos da sessão | Deixa os administrativos intactos |
-| 3. Inserir | Cria novo registo com a soma total | Quantidade duplicada |
-
-### Exemplo com produto 017817F (Coli 2):
-- Registo sessão: 1 un. em C2/PLT052
-- Registo admin: 0 un. em B3
-- **Ao unificar**: soma = 1, apaga só sessão, insere 1 → admin fica → total vira 1+0 = OK neste caso, mas...
-- **Se admin tivesse quantidade**: soma = 1+X, apaga sessão, insere 1+X → admin fica com X → total = 1+X+X
+Adicionar duas melhorias ao sistema de divisão de stock:
+1. **Guard de cliques duplos** - Prevenir operações duplicadas nos botões Split e Merge
+2. **Subtração automática** - Ao editar uma quantidade na distribuição, automaticamente ajustar as outras para manter o total
 
 ---
 
-## Solução
+## Parte 1: Guard de Cliques Duplos no ProductCard
 
-### Abordagem Escolhida: Unificar Ambas Fontes
+### Problema Actual
+Os botões de "Dividir" e "Unificar" podem ser clicados múltiplas vezes rapidamente antes da operação terminar, causando comportamento inconsistente.
 
-Quando se divide ou unifica stock, o sistema deve:
-1. **Apagar TODOS os registos** do coli (sessão E administrativos)
-2. **Inserir novos registos** apenas com `session_id` da sessão actual
+### Solução
+Usar um `useRef` para rastrear operações em progresso e desabilitar os botões durante a execução.
 
-Isto garante que não há "fantasmas" administrativos a interferir.
-
----
-
-## Alterações Técnicas
-
-### Ficheiro: `src/hooks/useCounting.tsx`
-
-#### 1. Função `splitColisStock` (linhas ~705-753)
-
-**Antes:**
-```typescript
-const { error: deleteError } = await supabase
-  .from('counts')
-  .delete()
-  .eq('session_id', sessionId)  // Só apaga sessão!
-  .eq('product_id', productId)
-  .eq('colis_number', colisNumber);
-```
-
-**Depois:**
-```typescript
-// Apagar TODOS os registos deste coli (sessão + administrativos)
-const { error: deleteError } = await supabase
-  .from('counts')
-  .delete()
-  .eq('product_id', productId)
-  .eq('colis_number', colisNumber)
-  .or(`session_id.eq.${sessionId},session_id.is.null`);
-```
-
-#### 2. Função `mergeColisStock` (linhas ~757-810)
-
-**Antes:**
-```typescript
-// Filtra do cache (inclui admin)
-const existingCounts = counts.filter(
-  c => c.product_id === productId && c.colis_number === colisNumber
-);
-const totalQuantity = existingCounts.reduce(...);
-
-// Apaga só sessão
-const { error: deleteError } = await supabase
-  .from('counts')
-  .delete()
-  .eq('session_id', sessionId)
-  ...
-```
-
-**Depois:**
-```typescript
-// Buscar directamente da BD para ter dados frescos
-const { data: freshCounts } = await supabase
-  .from('counts')
-  .select('id, quantity, session_id')
-  .eq('product_id', productId)
-  .eq('colis_number', colisNumber)
-  .or(`session_id.eq.${sessionId},session_id.is.null`);
-
-const totalQuantity = (freshCounts || []).reduce(
-  (sum, c) => sum + (c.quantity || 0), 0
-);
-
-// Apagar TODOS (sessão + admin)
-const { error: deleteError } = await supabase
-  .from('counts')
-  .delete()
-  .eq('product_id', productId)
-  .eq('colis_number', colisNumber)
-  .or(`session_id.eq.${sessionId},session_id.is.null`);
-```
-
----
-
-## Validação Adicional
-
-### Prevenir Race Conditions
-
-Adicionar um guard de operação em progresso para evitar cliques duplos durante split/merge:
+### Implementação
 
 ```typescript
+// No ProductCard
+const [pendingOperations, setPendingOperations] = useState<Set<string>>(new Set());
+
+const openSplitDialog = (colisNumber: number) => {
+  const key = `split-${product.id}-${colisNumber}`;
+  if (pendingOperations.has(key)) return;
+  
+  const detail = getColisDetail(colisNumber);
+  if (detail) {
+    setSelectedColisForSplit(detail);
+    setSplitDialogOpen(true);
+  }
+};
+
 const handleMergeStock = async (colisNumber: number) => {
-  const operationKey = `merge-${product.id}-${colisNumber}`;
-  if (pendingOperationsRef.current.has(operationKey)) return;
-  pendingOperationsRef.current.add(operationKey);
+  const key = `merge-${product.id}-${colisNumber}`;
+  if (pendingOperations.has(key) || !onMergeStock) return;
+  
+  setPendingOperations(prev => new Set(prev).add(key));
   
   try {
-    await onMergeStock(...);
+    const detail = getColisDetail(colisNumber);
+    if (detail) {
+      await onMergeStock(product.id, colisNumber, detail.location || '', detail.pallet_number || '');
+    }
   } finally {
-    pendingOperationsRef.current.delete(operationKey);
+    setPendingOperations(prev => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
   }
 };
 ```
+
+### Alteração Visual
+Os botões mostrarão um indicador de loading e ficarão desabilitados durante a operação.
+
+---
+
+## Parte 2: Subtração Automática no SplitStockDialog
+
+### Comportamento Desejado
+Quando o utilizador tem 2 ou mais localizações de distribuição e edita uma quantidade, o sistema deve automaticamente ajustar as outras para manter o total correcto.
+
+### Regras de Subtração
+
+| Cenário | Comportamento |
+|---------|---------------|
+| 2 localizações | Editar uma → subtrair da outra |
+| 3+ localizações | Editar uma → subtrair da última localização |
+| Valor > Total | Mostrar aviso, permitir (adiciona stock) |
+| Último campo zerado | Não criar campo negativo |
+
+### Exemplo Prático
+
+```
+Total: 10 unidades
+
+Localização 1: [5]  ← Utilizador muda para 7
+Localização 2: [5]  ← Automaticamente ajusta para 3
+
+Resultado:
+Localização 1: [7]
+Localização 2: [3]
+Total: 10 ✓
+```
+
+### Implementação
+
+```typescript
+const updateDistribution = (id: string, field: keyof StockDistribution, value: string | number) => {
+  if (field === 'quantity' && typeof value === 'number') {
+    setDistributions(prev => {
+      const idx = prev.findIndex(d => d.id === id);
+      if (idx === -1) return prev;
+      
+      const oldValue = prev[idx].quantity;
+      const diff = value - oldValue;
+      
+      // Se não há diferença ou só há 1 distribuição, apenas actualizar
+      if (diff === 0 || prev.length === 1) {
+        return prev.map(d => d.id === id ? { ...d, quantity: value } : d);
+      }
+      
+      // Encontrar o campo para subtrair (preferir o próximo, ou o primeiro se for o último)
+      const targetIdx = idx === prev.length - 1 ? 0 : prev.length - 1;
+      
+      // Se o target não é o mesmo que estamos a editar
+      if (targetIdx !== idx) {
+        const targetNewValue = Math.max(0, prev[targetIdx].quantity - diff);
+        
+        return prev.map((d, i) => {
+          if (i === idx) return { ...d, quantity: value };
+          if (i === targetIdx) return { ...d, quantity: targetNewValue };
+          return d;
+        });
+      }
+      
+      return prev.map(d => d.id === id ? { ...d, quantity: value } : d);
+    });
+  } else {
+    setDistributions(prev =>
+      prev.map(d => d.id === id ? { ...d, [field]: value } : d)
+    );
+  }
+};
+```
+
+### Comportamento com Nova Localização
+Quando o utilizador adiciona uma nova localização (inicia com 0), ao preencher o valor:
+- A quantidade é subtraída da última localização existente com stock > 0
+- Isto mantém o total consistente sem alterar o total geral
 
 ---
 
@@ -131,12 +141,39 @@ const handleMergeStock = async (colisNumber: number) => {
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/hooks/useCounting.tsx` | Corrigir `splitColisStock` e `mergeColisStock` para apagar ambas fontes |
+| `src/components/counting/ProductCard.tsx` | Adicionar estado `pendingOperations` e guards nos handlers |
+| `src/components/counting/SplitStockDialog.tsx` | Modificar `updateDistribution` para subtração automática |
+
+---
+
+## Detalhes Técnicos
+
+### ProductCard.tsx
+
+**Adicionar estado:**
+```typescript
+const [pendingOperations, setPendingOperations] = useState<Set<string>>(new Set());
+```
+
+**Modificar `handleMergeStock`:**
+- Adicionar verificação de operação pendente
+- Envolver em try/finally para limpar estado
+- Desabilitar botão com `disabled={pendingOperations.has(...)}`
+
+### SplitStockDialog.tsx
+
+**Modificar `updateDistribution`:**
+- Detectar quando `field === 'quantity'`
+- Calcular diferença entre valor antigo e novo
+- Distribuir a diferença para outro campo automaticamente
+- Garantir que nenhum campo fica negativo (mínimo 0)
 
 ---
 
 ## Resultado Esperado
 
-1. **Dividir**: Apaga todos os registos do coli e cria novos com a distribuição correcta
-2. **Unificar**: Soma todas as quantidades, apaga todos os registos, cria um único com o total
-3. **Consistência**: Não haverá mais registos "órfãos" a causar duplicação de quantidade
+1. **Cliques duplos prevenidos** - Botões de Split/Merge ficam desabilitados durante operações
+2. **Subtração inteligente** - Editar um campo ajusta automaticamente o outro
+3. **Experiência fluída** - Utilizador pode rapidamente redistribuir quantidades
+4. **Consistência** - Total mantém-se correcto automaticamente
+
