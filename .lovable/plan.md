@@ -1,139 +1,239 @@
 
 
-# Guard para Cliques Duplos e Subtração Automática na Divisão de Stock
+# Correção da Entrada de Stock: Divisão Automática e Opção de Localização
 
-## Resumo
+## Problemas Identificados
 
-Adicionar duas melhorias ao sistema de divisão de stock:
-1. **Guard de cliques duplos** - Prevenir operações duplicadas nos botões Split e Merge
-2. **Subtração automática** - Ao editar uma quantidade na distribuição, automaticamente ajustar as outras para manter o total
+### Problema 1: Divisão Automática Indesejada
 
----
-
-## Parte 1: Guard de Cliques Duplos no ProductCard
-
-### Problema Actual
-Os botões de "Dividir" e "Unificar" podem ser clicados múltiplas vezes rapidamente antes da operação terminar, causando comportamento inconsistente.
-
-### Solução
-Usar um `useRef` para rastrear operações em progresso e desabilitar os botões durante a execução.
-
-### Implementação
+Quando se dá entrada de um produto, o sistema cria **novos registos de count** em vez de actualizar os existentes. Isto acontece porque:
 
 ```typescript
-// No ProductCard
-const [pendingOperations, setPendingOperations] = useState<Set<string>>(new Set());
-
-const openSplitDialog = (colisNumber: number) => {
-  const key = `split-${product.id}-${colisNumber}`;
-  if (pendingOperations.has(key)) return;
-  
-  const detail = getColisDetail(colisNumber);
-  if (detail) {
-    setSelectedColisForSplit(detail);
-    setSplitDialogOpen(true);
-  }
-};
-
-const handleMergeStock = async (colisNumber: number) => {
-  const key = `merge-${product.id}-${colisNumber}`;
-  if (pendingOperations.has(key) || !onMergeStock) return;
-  
-  setPendingOperations(prev => new Set(prev).add(key));
-  
-  try {
-    const detail = getColisDetail(colisNumber);
-    if (detail) {
-      await onMergeStock(product.id, colisNumber, detail.location || '', detail.pallet_number || '');
-    }
-  } finally {
-    setPendingOperations(prev => {
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
-  }
-};
+// Linha 229-238 do StockEntriesView.tsx
+const { data: existingCount } = await supabase
+  .from('counts')
+  .select('id, quantity')
+  .eq('product_id', item.product_id)
+  .eq('colis_number', colisNumber)
+  .eq('location', targetLocation || '')  // ← PROBLEMA AQUI
+  .order('counted_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
 ```
 
-### Alteração Visual
-Os botões mostrarão um indicador de loading e ficarão desabilitados durante a operação.
+O filtro `eq('location', targetLocation || '')` procura um count com localização exactamente igual. Se:
+- O produto tem stock em "A1" mas `targetLocation` é "B2" (ou vazio)
+- Não encontra o count existente
+- Cria um novo registo ← **Divisão automática!**
+
+### Problema 2: Falta Opção de Seleccionar Localização
+
+O diálogo `EntryLocationDialog` só aparece se o produto já tiver **2+ localizações diferentes** (linha 143). O utilizador não tem opção de escolher localização quando:
+- Produto tem 0 localizações (novo)
+- Produto tem 1 localização existente
 
 ---
 
-## Parte 2: Subtração Automática no SplitStockDialog
+## Solução Proposta
 
-### Comportamento Desejado
-Quando o utilizador tem 2 ou mais localizações de distribuição e edita uma quantidade, o sistema deve automaticamente ajustar as outras para manter o total correcto.
+### Parte 1: Sempre Mostrar Opção de Localização
 
-### Regras de Subtração
+Modificar a lógica para que o diálogo de destino apareça **sempre** que o utilizador quiser, com as seguintes opções:
 
 | Cenário | Comportamento |
 |---------|---------------|
-| 2 localizações | Editar uma → subtrair da outra |
-| 3+ localizações | Editar uma → subtrair da última localização |
-| Valor > Total | Mostrar aviso, permitir (adiciona stock) |
-| Último campo zerado | Não criar campo negativo |
+| Produto sem stock | Mostrar apenas opção "Nova localização" |
+| Produto com 1 localização | Mostrar localização existente + "Nova localização" |
+| Produto com 2+ localizações | Mostrar todas + "Nova localização" |
 
-### Exemplo Prático
+Adicionar um **checkbox/toggle** no formulário de entrada para "Especificar localização" que, quando activado, força o diálogo a aparecer.
 
-```
-Total: 10 unidades
+### Parte 2: Corrigir Lógica de Actualização
 
-Localização 1: [5]  ← Utilizador muda para 7
-Localização 2: [5]  ← Automaticamente ajusta para 3
+Quando o utilizador **não especifica localização**, o sistema deve:
+1. Buscar counts existentes do produto (qualquer localização)
+2. Actualizar o primeiro count encontrado (manter na mesma localização)
+3. Só criar novo registo se não existir nenhum count
 
-Resultado:
-Localização 1: [7]
-Localização 2: [3]
-Total: 10 ✓
-```
+Quando o utilizador **especifica localização**:
+1. Buscar count nessa localização específica
+2. Se existir, actualizar
+3. Se não existir, criar novo com essa localização
 
-### Implementação
+---
+
+## Alterações Técnicas
+
+### Ficheiro: `src/components/stock/StockEntriesView.tsx`
+
+#### 1. Adicionar Toggle de Localização
 
 ```typescript
-const updateDistribution = (id: string, field: keyof StockDistribution, value: string | number) => {
-  if (field === 'quantity' && typeof value === 'number') {
-    setDistributions(prev => {
-      const idx = prev.findIndex(d => d.id === id);
-      if (idx === -1) return prev;
-      
-      const oldValue = prev[idx].quantity;
-      const diff = value - oldValue;
-      
-      // Se não há diferença ou só há 1 distribuição, apenas actualizar
-      if (diff === 0 || prev.length === 1) {
-        return prev.map(d => d.id === id ? { ...d, quantity: value } : d);
-      }
-      
-      // Encontrar o campo para subtrair (preferir o próximo, ou o primeiro se for o último)
-      const targetIdx = idx === prev.length - 1 ? 0 : prev.length - 1;
-      
-      // Se o target não é o mesmo que estamos a editar
-      if (targetIdx !== idx) {
-        const targetNewValue = Math.max(0, prev[targetIdx].quantity - diff);
-        
-        return prev.map((d, i) => {
-          if (i === idx) return { ...d, quantity: value };
-          if (i === targetIdx) return { ...d, quantity: targetNewValue };
-          return d;
+// Novo estado
+const [specifyLocation, setSpecifyLocation] = useState(false);
+```
+
+#### 2. Modificar Função `checkForMultipleLocations`
+
+Renomear para `prepareLocationSelection` e alterar lógica:
+
+```typescript
+const prepareLocationSelection = async (items: MovementItem[]): Promise<Array<{
+  item: MovementItem;
+  existingLocations: ExistingLocation[];
+}>> => {
+  const result: Array<{ item: MovementItem; existingLocations: ExistingLocation[] }> = [];
+
+  for (const item of items) {
+    if (pendingEntryDestinations.has(item.product_id)) continue;
+
+    // Buscar localizações existentes
+    const { data: counts } = await supabase
+      .from('counts')
+      .select('location, pallet_number, quantity')
+      .eq('product_id', item.product_id)
+      .gt('quantity', 0);
+
+    // Agrupar por localização
+    const locationMap = new Map<string, ExistingLocation>();
+    (counts || []).forEach(c => {
+      if (!c.location) return;
+      const key = `${c.location}|${c.pallet_number || ''}`;
+      const existing = locationMap.get(key);
+      if (existing) {
+        existing.quantity += c.quantity;
+      } else {
+        locationMap.set(key, {
+          location: c.location,
+          pallet: c.pallet_number,
+          quantity: c.quantity,
         });
       }
-      
-      return prev.map(d => d.id === id ? { ...d, quantity: value } : d);
     });
-  } else {
-    setDistributions(prev =>
-      prev.map(d => d.id === id ? { ...d, [field]: value } : d)
-    );
+
+    const uniqueLocations = Array.from(locationMap.values());
+    
+    // NOVO: Sempre incluir se specifyLocation está activado
+    // OU se há múltiplas localizações
+    if (specifyLocation || uniqueLocations.length > 1) {
+      result.push({ item, existingLocations: uniqueLocations });
+    }
+  }
+
+  return result;
+};
+```
+
+#### 3. Modificar Função `executeEntries`
+
+```typescript
+const executeEntries = async () => {
+  setIsSubmitting(true);
+
+  try {
+    // 1. Registar em stock_movements
+    await registerBulkMovements.mutateAsync({ ... });
+
+    // 2. Actualizar counts
+    for (const item of allItems) {
+      const product = products.find(p => p.id === item.product_id);
+      const totalColis = product?.total_colis || 1;
+      const destination = pendingEntryDestinations.get(item.product_id);
+
+      for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
+        const colisQty = item.isCompleteSet !== false 
+          ? item.quantity 
+          : (item.colisQuantities?.[colisNumber] || 0);
+        
+        if (colisQty <= 0) continue;
+
+        // NOVO: Se há destino específico, usar; senão, actualizar registo existente
+        if (destination) {
+          // Localização específica foi seleccionada
+          const { data: existingCount } = await supabase
+            .from('counts')
+            .select('id, quantity')
+            .eq('product_id', item.product_id)
+            .eq('colis_number', colisNumber)
+            .eq('location', destination.location)
+            .maybeSingle();
+
+          if (existingCount) {
+            await supabase
+              .from('counts')
+              .update({ 
+                quantity: existingCount.quantity + colisQty,
+                pallet_number: destination.pallet,
+                updated_at: new Date().toISOString() 
+              })
+              .eq('id', existingCount.id);
+          } else {
+            await supabase.from('counts').insert({
+              product_id: item.product_id,
+              colis_number: colisNumber,
+              quantity: colisQty,
+              session_id: null,
+              location: destination.location,
+              pallet_number: destination.pallet,
+            });
+          }
+        } else {
+          // SEM destino específico - actualizar count existente (qualquer localização)
+          const { data: existingCount } = await supabase
+            .from('counts')
+            .select('id, quantity, location, pallet_number')
+            .eq('product_id', item.product_id)
+            .eq('colis_number', colisNumber)
+            .order('quantity', { ascending: false }) // Preferir o com mais stock
+            .limit(1)
+            .maybeSingle();
+
+          if (existingCount) {
+            // Actualizar existente mantendo localização original
+            await supabase
+              .from('counts')
+              .update({ 
+                quantity: existingCount.quantity + colisQty,
+                updated_at: new Date().toISOString() 
+              })
+              .eq('id', existingCount.id);
+          } else {
+            // Criar novo sem localização (ou com default do produto)
+            await supabase.from('counts').insert({
+              product_id: item.product_id,
+              colis_number: colisNumber,
+              quantity: colisQty,
+              session_id: null,
+              location: product?.location || null,
+              pallet_number: product?.pallet_number || null,
+            });
+          }
+        }
+      }
+    }
+
+    // 3. Invalidar queries e reset
+    // ...
   }
 };
 ```
 
-### Comportamento com Nova Localização
-Quando o utilizador adiciona uma nova localização (inicia com 0), ao preencher o valor:
-- A quantidade é subtraída da última localização existente com stock > 0
-- Isto mantém o total consistente sem alterar o total geral
+#### 4. Adicionar Toggle na UI
+
+No formulário de confirmação, adicionar opção:
+
+```tsx
+<div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-md">
+  <div className="flex items-center gap-2 text-sm">
+    <MapPin className="h-4 w-4 text-muted-foreground" />
+    <span>Especificar localização</span>
+  </div>
+  <Switch
+    checked={specifyLocation}
+    onCheckedChange={setSpecifyLocation}
+  />
+</div>
+```
 
 ---
 
@@ -141,39 +241,13 @@ Quando o utilizador adiciona uma nova localização (inicia com 0), ao preencher
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/components/counting/ProductCard.tsx` | Adicionar estado `pendingOperations` e guards nos handlers |
-| `src/components/counting/SplitStockDialog.tsx` | Modificar `updateDistribution` para subtração automática |
-
----
-
-## Detalhes Técnicos
-
-### ProductCard.tsx
-
-**Adicionar estado:**
-```typescript
-const [pendingOperations, setPendingOperations] = useState<Set<string>>(new Set());
-```
-
-**Modificar `handleMergeStock`:**
-- Adicionar verificação de operação pendente
-- Envolver em try/finally para limpar estado
-- Desabilitar botão com `disabled={pendingOperations.has(...)}`
-
-### SplitStockDialog.tsx
-
-**Modificar `updateDistribution`:**
-- Detectar quando `field === 'quantity'`
-- Calcular diferença entre valor antigo e novo
-- Distribuir a diferença para outro campo automaticamente
-- Garantir que nenhum campo fica negativo (mínimo 0)
+| `src/components/stock/StockEntriesView.tsx` | Adicionar toggle, corrigir lógica de actualização |
 
 ---
 
 ## Resultado Esperado
 
-1. **Cliques duplos prevenidos** - Botões de Split/Merge ficam desabilitados durante operações
-2. **Subtração inteligente** - Editar um campo ajusta automaticamente o outro
-3. **Experiência fluída** - Utilizador pode rapidamente redistribuir quantidades
-4. **Consistência** - Total mantém-se correcto automaticamente
+1. **Sem divisão automática** - Entradas sem localização específica actualizam o count existente
+2. **Opção de localização** - Toggle permite ao utilizador especificar onde armazenar
+3. **Comportamento consistente** - Só há divisão quando o utilizador escolhe explicitamente
 
