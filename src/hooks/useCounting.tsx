@@ -706,17 +706,18 @@ export function useCounting(sessionId: string | null) {
     if (!sessionId || !user) return false;
 
     try {
-      // Delete existing counts for this coli
+      // Delete ALL counts for this coli (session + administrative)
+      // This prevents "ghost" records from causing quantity duplication
       const { error: deleteError } = await supabase
         .from('counts')
         .delete()
-        .eq('session_id', sessionId)
         .eq('product_id', productId)
-        .eq('colis_number', colisNumber);
+        .eq('colis_number', colisNumber)
+        .or(`session_id.eq.${sessionId},session_id.is.null`);
 
       if (deleteError) throw deleteError;
 
-      // Insert new count records for each distribution
+      // Insert new count records for each distribution (always with current session_id)
       const newCounts = distributions
         .filter(d => d.quantity > 0)
         .map(d => ({
@@ -758,25 +759,31 @@ export function useCounting(sessionId: string | null) {
     if (!sessionId || !user) return false;
 
     try {
-      // Get all counts for this coli
-      const existingCounts = counts.filter(
-        c => c.product_id === productId && c.colis_number === colisNumber
-      );
-      
-      // Sum total quantity
-      const totalQuantity = existingCounts.reduce((sum, c) => sum + c.quantity, 0);
+      // Fetch fresh data from DB to get accurate totals (session + administrative)
+      const { data: freshCounts, error: fetchError } = await supabase
+        .from('counts')
+        .select('id, quantity, session_id')
+        .eq('product_id', productId)
+        .eq('colis_number', colisNumber)
+        .or(`session_id.eq.${sessionId},session_id.is.null`);
 
-      // Delete all existing counts for this coli
+      if (fetchError) throw fetchError;
+      
+      // Sum total quantity from fresh data
+      const totalQuantity = (freshCounts || []).reduce((sum, c) => sum + (c.quantity || 0), 0);
+
+      // Delete ALL counts for this coli (session + administrative)
+      // This prevents "ghost" records from causing quantity duplication
       const { error: deleteError } = await supabase
         .from('counts')
         .delete()
-        .eq('session_id', sessionId)
         .eq('product_id', productId)
-        .eq('colis_number', colisNumber);
+        .eq('colis_number', colisNumber)
+        .or(`session_id.eq.${sessionId},session_id.is.null`);
 
       if (deleteError) throw deleteError;
 
-      // Insert single merged count
+      // Insert single merged count (always with current session_id)
       if (totalQuantity > 0) {
         const { error: insertError } = await supabase
           .from('counts')
