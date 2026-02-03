@@ -87,6 +87,7 @@ export function ProductCard({
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [selectedColisForSplit, setSelectedColisForSplit] = useState<ColisDetail | null>(null);
   const [damageDialogOpen, setDamageDialogOpen] = useState(false);
+  const [pendingOperations, setPendingOperations] = useState<Set<string>>(new Set());
   
   // For products with many colis, show only first few by default
   const COLIS_PREVIEW_LIMIT = 4;
@@ -235,6 +236,9 @@ export function ProductCard({
   };
 
   const openSplitDialog = (colisNumber: number) => {
+    const key = `split-${product.id}-${colisNumber}`;
+    if (pendingOperations.has(key)) return;
+    
     const detail = getColisDetail(colisNumber);
     if (detail) {
       setSelectedColisForSplit(detail);
@@ -244,16 +248,47 @@ export function ProductCard({
 
   const handleSplitSave = async (distributions: StockDistribution[]) => {
     if (!selectedColisForSplit || !onSplitStock) return false;
-    return onSplitStock(product.id, selectedColisForSplit.colis_number, distributions);
+    
+    const key = `split-${product.id}-${selectedColisForSplit.colis_number}`;
+    if (pendingOperations.has(key)) return false;
+    
+    setPendingOperations(prev => new Set(prev).add(key));
+    
+    try {
+      return await onSplitStock(product.id, selectedColisForSplit.colis_number, distributions);
+    } finally {
+      setPendingOperations(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
   };
 
   const handleMergeStock = async (colisNumber: number) => {
-    if (!onMergeStock) return;
+    const key = `merge-${product.id}-${colisNumber}`;
+    if (pendingOperations.has(key) || !onMergeStock) return;
+    
     const detail = getColisDetail(colisNumber);
     if (!detail) return;
     
-    // Use the primary location/pallet for merge
-    await onMergeStock(product.id, colisNumber, detail.location || '', detail.pallet_number || '');
+    setPendingOperations(prev => new Set(prev).add(key));
+    
+    try {
+      // Use the primary location/pallet for merge
+      await onMergeStock(product.id, colisNumber, detail.location || '', detail.pallet_number || '');
+    } finally {
+      setPendingOperations(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+  
+  // Helper to check if an operation is pending
+  const isOperationPending = (type: 'split' | 'merge', colisNumber: number) => {
+    return pendingOperations.has(`${type}-${product.id}-${colisNumber}`);
   };
 
   return (
@@ -576,8 +611,12 @@ export function ProductCard({
                                   size="icon"
                                   className="h-7 w-7"
                                   onClick={() => openSplitDialog(colisNum)}
+                                  disabled={isOperationPending('split', colisNum)}
                                 >
-                                  <Split className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <Split className={cn(
+                                    "h-3.5 w-3.5 text-muted-foreground",
+                                    isOperationPending('split', colisNum) && "animate-pulse"
+                                  )} />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>Dividir em localizações</TooltipContent>
@@ -594,11 +633,17 @@ export function ProductCard({
                                   size="icon"
                                   className="h-7 w-7"
                                   onClick={() => handleMergeStock(colisNum)}
+                                  disabled={isOperationPending('merge', colisNum)}
                                 >
-                                  <Merge className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <Merge className={cn(
+                                    "h-3.5 w-3.5 text-muted-foreground",
+                                    isOperationPending('merge', colisNum) && "animate-spin"
+                                  )} />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Unificar em 1 localização</TooltipContent>
+                              <TooltipContent>
+                                {isOperationPending('merge', colisNum) ? 'A unificar...' : 'Unificar em 1 localização'}
+                              </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
                         )}
