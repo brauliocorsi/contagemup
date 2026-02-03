@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { TrendingUp, Upload } from 'lucide-react';
+import { TrendingUp, Upload, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useStockMovements, MovementItem, ParsedCSVItem } from '@/hooks/useStockMovements';
 import { useProducts } from '@/hooks/useProducts';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,6 +50,9 @@ export function StockEntriesView() {
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Toggle para especificar localização
+  const [specifyLocation, setSpecifyLocation] = useState(false);
 
   // Entry location dialog state
   const [showEntryLocationDialog, setShowEntryLocationDialog] = useState(false);
@@ -97,8 +101,8 @@ export function StockEntriesView() {
     setCart(prev => prev.filter(item => item.product_id !== productId));
   }, []);
 
-  // Check if items need location selection (products with multiple existing locations)
-  const checkForMultipleLocations = async (items: MovementItem[]): Promise<Array<{
+  // Check if items need location selection
+  const prepareLocationSelection = async (items: MovementItem[]): Promise<Array<{
     item: MovementItem;
     existingLocations: ExistingLocation[];
   }>> => {
@@ -118,11 +122,9 @@ export function StockEntriesView() {
         .eq('product_id', item.product_id)
         .gt('quantity', 0);
 
-      if (!counts || counts.length === 0) continue;
-
       // Get unique locations
       const locationMap = new Map<string, ExistingLocation>();
-      counts.forEach(c => {
+      (counts || []).forEach(c => {
         if (!c.location) return;
         const key = `${c.location}|${c.pallet_number || ''}`;
         const existing = locationMap.get(key);
@@ -139,8 +141,8 @@ export function StockEntriesView() {
 
       const uniqueLocations = Array.from(locationMap.values());
       
-      // If product has multiple locations, ask where to add
-      if (uniqueLocations.length > 1) {
+      // NOVO: Mostrar diálogo se specifyLocation está activado OU se há múltiplas localizações
+      if (specifyLocation || uniqueLocations.length > 1) {
         itemsNeedingSelection.push({
           item,
           existingLocations: uniqueLocations,
@@ -166,7 +168,7 @@ export function StockEntriesView() {
     setEntryLocationItem(null);
 
     // Check if there are more items needing selection
-    const remainingItems = await checkForMultipleLocations(allItems);
+    const remainingItems = await prepareLocationSelection(allItems);
     if (remainingItems.length > 0) {
       const nextItem = remainingItems[0];
       setEntryLocationItem(nextItem);
@@ -181,7 +183,7 @@ export function StockEntriesView() {
     if (allItems.length === 0) return;
     
     // Check if any items need location selection
-    const itemsNeedingSelection = await checkForMultipleLocations(allItems);
+    const itemsNeedingSelection = await prepareLocationSelection(allItems);
     if (itemsNeedingSelection.length > 0) {
       const firstItem = itemsNeedingSelection[0];
       setEntryLocationItem(firstItem);
@@ -213,8 +215,6 @@ export function StockEntriesView() {
 
         // Check if we have a specific destination for this product
         const destination = pendingEntryDestinations.get(item.product_id);
-        const targetLocation = destination?.location || product?.location || null;
-        const targetPallet = destination?.pallet || product?.pallet_number || null;
 
         // Atualizar cada colis do produto
         for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
@@ -226,36 +226,68 @@ export function StockEntriesView() {
           // Só processar se há quantidade a adicionar
           if (colisQty <= 0) continue;
 
-          // Buscar count existente para este colis NA LOCALIZAÇÃO ESPECÍFICA
-          const { data: existingCount } = await supabase
-            .from('counts')
-            .select('id, quantity')
-            .eq('product_id', item.product_id)
-            .eq('colis_number', colisNumber)
-            .eq('location', targetLocation || '')
-            .order('counted_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          const currentQty = existingCount?.quantity || 0;
-          const newQty = currentQty + colisQty;
-
-          if (existingCount) {
-            // Atualizar count existente
-            await supabase
+          if (destination) {
+            // CASO 1: Localização específica foi seleccionada pelo utilizador
+            const { data: existingCount } = await supabase
               .from('counts')
-              .update({ quantity: newQty, updated_at: new Date().toISOString() })
-              .eq('id', existingCount.id);
+              .select('id, quantity')
+              .eq('product_id', item.product_id)
+              .eq('colis_number', colisNumber)
+              .eq('location', destination.location)
+              .maybeSingle();
+
+            if (existingCount) {
+              // Actualizar count existente nessa localização
+              await supabase
+                .from('counts')
+                .update({ 
+                  quantity: existingCount.quantity + colisQty,
+                  pallet_number: destination.pallet,
+                  updated_at: new Date().toISOString() 
+                })
+                .eq('id', existingCount.id);
+            } else {
+              // Criar novo count na localização especificada
+              await supabase.from('counts').insert({
+                product_id: item.product_id,
+                colis_number: colisNumber,
+                quantity: colisQty,
+                session_id: null,
+                location: destination.location,
+                pallet_number: destination.pallet,
+              });
+            }
           } else {
-            // Criar novo count com localização específica
-            await supabase.from('counts').insert({
-              product_id: item.product_id,
-              colis_number: colisNumber,
-              quantity: colisQty,
-              session_id: null, // Movimento administrativo
-              location: targetLocation,
-              pallet_number: targetPallet,
-            });
+            // CASO 2: SEM destino específico - actualizar count existente (qualquer localização)
+            const { data: existingCount } = await supabase
+              .from('counts')
+              .select('id, quantity, location, pallet_number')
+              .eq('product_id', item.product_id)
+              .eq('colis_number', colisNumber)
+              .order('quantity', { ascending: false }) // Preferir o com mais stock
+              .limit(1)
+              .maybeSingle();
+
+            if (existingCount) {
+              // Actualizar existente mantendo localização original
+              await supabase
+                .from('counts')
+                .update({ 
+                  quantity: existingCount.quantity + colisQty,
+                  updated_at: new Date().toISOString() 
+                })
+                .eq('id', existingCount.id);
+            } else {
+              // Criar novo com default do produto
+              await supabase.from('counts').insert({
+                product_id: item.product_id,
+                colis_number: colisNumber,
+                quantity: colisQty,
+                session_id: null,
+                location: product?.location || null,
+                pallet_number: product?.pallet_number || null,
+              });
+            }
           }
         }
       }
@@ -273,6 +305,7 @@ export function StockEntriesView() {
       setReference('');
       setNotes('');
       setPendingEntryDestinations(new Map());
+      setSpecifyLocation(false);
     } catch (error) {
       console.error('Erro ao registar entradas:', error);
       toast.error('Erro ao registar entradas');
@@ -371,6 +404,18 @@ export function StockEntriesView() {
                     placeholder="Observações adicionais..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                  />
+                </div>
+
+                {/* Toggle para especificar localização */}
+                <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-md">
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span>Especificar localização</span>
+                  </div>
+                  <Switch
+                    checked={specifyLocation}
+                    onCheckedChange={setSpecifyLocation}
                   />
                 </div>
 
