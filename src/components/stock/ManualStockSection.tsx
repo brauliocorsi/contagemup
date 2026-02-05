@@ -274,17 +274,17 @@ export function ManualStockSection({
           )}
 
           {filteredProducts.length > 0 && (
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-x-auto">
               <ScrollArea className="h-[400px]">
-                <Table>
+                <Table className="min-w-[600px]">
                   <TableHeader className="sticky top-0 bg-muted z-10">
                     <TableRow>
-                      <TableHead className="w-[120px]">Código</TableHead>
-                      <TableHead>Nome</TableHead>
-                      <TableHead className="w-[80px] text-center">Stock</TableHead>
-                      <TableHead className="w-[80px] text-center">Colis</TableHead>
-                      <TableHead className="w-[180px] text-right">Quantidade</TableHead>
-                      <TableHead className="w-[60px]"></TableHead>
+                      <TableHead className="w-[80px] md:w-[120px]">Código</TableHead>
+                      <TableHead className="min-w-[180px]">Nome</TableHead>
+                      <TableHead className="w-[50px] md:w-[80px] text-center">Stock</TableHead>
+                      <TableHead className="w-[50px] md:w-[80px] text-center hidden sm:table-cell">Colis</TableHead>
+                      <TableHead className="w-[100px] md:w-[180px] text-right">Qtd.</TableHead>
+                      <TableHead className="w-[50px] md:w-[60px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -312,12 +312,12 @@ export function ManualStockSection({
                               hasMatchingOrders && "bg-amber-50/50 border-l-2 border-l-amber-400"
                             )}
                           >
-                            <TableCell className="font-mono font-medium">
+                            <TableCell className="font-mono font-medium text-xs md:text-sm">
                               {product.code}
                             </TableCell>
-                            <TableCell className="max-w-[200px]">
+                            <TableCell className="py-2">
                               <div className="flex flex-col gap-0.5">
-                                <span className="truncate block" title={product.name}>
+                                <span className="text-sm leading-snug whitespace-normal break-words">
                                   {product.name}
                                 </span>
                                 {requiresOrder && (
@@ -354,7 +354,7 @@ export function ManualStockSection({
                                 {stock}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-center">
+                            <TableCell className="text-center hidden sm:table-cell">
                               {totalColis > 1 ? (
                                 <Button
                                   variant="ghost"
