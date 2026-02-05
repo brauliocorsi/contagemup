@@ -1,149 +1,78 @@
 
-# Visualização Completa do Nome do Produto na Seleção de Stock
+# Permitir Dividir Stock na Mesma Localização com Paletes Diferentes
 
 ## Problema Identificado
 
-Na tabela de seleção de produtos (entradas e saídas de stock), o nome do produto é cortado devido a:
+Existe uma constraint UNIQUE na tabela `counts` que impede ter o mesmo coli numa mesma localização em paletes diferentes:
 
-```tsx
-// Linha 318 - ManualStockSection.tsx
-<TableCell className="max-w-[200px]">
-  <span className="truncate block" title={product.name}>
-    {product.name}
-  </span>
-</TableCell>
+```sql
+CREATE UNIQUE INDEX idx_counts_unique_product_colis_session_location 
+ON public.counts USING btree (
+  product_id, 
+  colis_number, 
+  COALESCE(session_id, '00000000-0000-0000-0000-000000000000'::uuid), 
+  COALESCE(location, ''::text)  -- ← Não inclui pallet_number!
+)
 ```
 
-| Problema | Impacto |
-|----------|---------|
-| `max-w-[200px]` | Limita largura máxima da célula |
-| `truncate` | Corta texto com "..." |
-| Layout fixo | Não adapta bem a tablet/mobile |
+### Cenário que Falha
+
+| Palete | Localização | Coli | Resultado |
+|--------|-------------|------|-----------|
+| Palete 01 | A1 | 1 | OK - Primeiro registo |
+| Palete 02 | A1 | 1 | **ERRO** - Viola constraint |
+
+### Porque existe esta constraint?
+
+Foi criada para prevenir duplicação acidental de registos (mesmo produto + coli + session + local). No entanto, o caso de uso de paletes diferentes na mesma localização é legítimo.
 
 ---
 
-## Solução Proposta
+## Solução
 
-### Abordagem: Layout Responsivo com Wrap do Texto
+Alterar a constraint para incluir também o `pallet_number`:
 
-Em vez de cortar o nome, vamos:
-1. **Remover o truncate** - Permitir que o nome quebre em múltiplas linhas
-2. **Ajustar larguras das colunas** - Dar mais espaço ao nome, comprimir outras
-3. **Layout diferente para mobile** - Em ecrãs pequenos, usar layout de cartões ou empilhado
+```sql
+-- Remover constraint antiga
+DROP INDEX IF EXISTS idx_counts_unique_product_colis_session_location;
+
+-- Criar nova constraint que inclui pallet_number
+CREATE UNIQUE INDEX idx_counts_unique_product_colis_session_location_pallet 
+ON public.counts USING btree (
+  product_id, 
+  colis_number, 
+  COALESCE(session_id, '00000000-0000-0000-0000-000000000000'::uuid), 
+  COALESCE(location, ''::text),
+  COALESCE(pallet_number, ''::text)  -- ← NOVO
+);
+```
+
+### Nova Tabela de Permissões
+
+| Palete 01 | Palete 02 | Mesma Loc? | Resultado |
+|-----------|-----------|------------|-----------|
+| A1 | A1 | Sim | **OK** - paletes diferentes |
+| A1 (P1) | A1 (P1) | Sim | **ERRO** - duplicado exacto |
+| A1 | B2 | Não | OK - localizações diferentes |
 
 ---
 
-## Alterações Técnicas
+## Verificação de Dados Existentes
 
-### Ficheiro: `src/components/stock/ManualStockSection.tsx`
-
-#### 1. Remover Truncate e Limites de Largura
-
-**Antes:**
-```tsx
-<TableCell className="max-w-[200px]">
-  <span className="truncate block" title={product.name}>
-    {product.name}
-  </span>
-</TableCell>
-```
-
-**Depois:**
-```tsx
-<TableCell>
-  <div className="flex flex-col gap-0.5">
-    <span className="text-sm leading-tight break-words">
-      {product.name}
-    </span>
-    {/* badges... */}
-  </div>
-</TableCell>
-```
-
-#### 2. Optimizar Larguras das Colunas
-
-**Antes:**
-```tsx
-<TableHead className="w-[120px]">Código</TableHead>
-<TableHead>Nome</TableHead>
-<TableHead className="w-[80px] text-center">Stock</TableHead>
-<TableHead className="w-[80px] text-center">Colis</TableHead>
-<TableHead className="w-[180px] text-right">Quantidade</TableHead>
-<TableHead className="w-[60px]"></TableHead>
-```
-
-**Depois (responsivo):**
-```tsx
-<TableHead className="w-[100px] md:w-[120px]">Código</TableHead>
-<TableHead className="min-w-[180px]">Nome</TableHead>
-<TableHead className="w-[60px] md:w-[80px] text-center">Stock</TableHead>
-<TableHead className="w-[50px] md:w-[80px] text-center hidden sm:table-cell">Colis</TableHead>
-<TableHead className="w-[120px] md:w-[180px] text-right">Qtd.</TableHead>
-<TableHead className="w-[50px] md:w-[60px]"></TableHead>
-```
-
-#### 3. Usar `whitespace-normal` e `break-words`
-
-Para garantir que o nome quebra correctamente em múltiplas linhas:
-
-```tsx
-<TableCell className="py-2">
-  <div className="flex flex-col gap-0.5">
-    <span className="text-sm leading-snug whitespace-normal break-words">
-      {product.name}
-    </span>
-    {/* resto do conteúdo */}
-  </div>
-</TableCell>
-```
-
-#### 4. Adicionar Scroll Horizontal no Container
-
-Para tablets, permitir scroll horizontal se necessário:
-
-```tsx
-<div className="border rounded-lg overflow-x-auto">
-  <ScrollArea className="h-[400px]">
-    <Table className="min-w-[600px]">
-      {/* ... */}
-    </Table>
-  </ScrollArea>
-</div>
-```
+Antes de alterar a constraint, verificar se há registos duplicados que violariam a nova constraint (mesma combinação incluindo pallet).
 
 ---
 
-## Comparação Visual
+## Alterações
 
-| Antes | Depois |
-|-------|--------|
-| "CAMA ARTICULAD..." | "CAMA ARTICULADA ELÉTRICA COM CABECEIRA EM MADEIRA" |
-| Nome cortado | Nome completo em 2-3 linhas |
-| Linhas compactas | Linhas mais altas mas legíveis |
-
----
-
-## Comportamento por Dispositivo
-
-| Dispositivo | Comportamento |
-|-------------|---------------|
-| **Desktop** | Tabela normal, nome em 1-2 linhas |
-| **Tablet** | Nome pode ocupar 2-3 linhas, colunas comprimidas |
-| **Mobile** | Scroll horizontal disponível, nomes visíveis |
-
----
-
-## Ficheiros a Modificar
-
-| Ficheiro | Alteração |
-|----------|-----------|
-| `src/components/stock/ManualStockSection.tsx` | Remover truncate, ajustar larguras, permitir wrap do texto |
+| Tipo | Descrição |
+|------|-----------|
+| Migration | Alterar constraint unique para incluir `pallet_number` |
 
 ---
 
 ## Resultado Esperado
 
-1. Nome completo visível sem precisar de hover
-2. Layout adapta-se a diferentes tamanhos de ecrã
-3. Linhas da tabela mais altas mas totalmente legíveis
-4. Mantém funcionalidade de scroll se necessário
+1. Permitir dividir stock de um coli na mesma localização mas em paletes diferentes
+2. Manter protecção contra duplicação exacta (mesmo produto + coli + session + local + palete)
+3. Não afectar funcionalidades existentes
