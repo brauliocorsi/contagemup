@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Tags } from 'lucide-react';
+import { RecountReportDialog } from './RecountReportDialog';
 
 interface Session {
   id: string;
@@ -40,9 +41,12 @@ export function CountingHeader({
           Sessão ativa • {totalProducts} produtos
         </p>
       </div>
-      <Button variant="outline" size="sm" onClick={onChangeSession}>
-        Mudar sessão
-      </Button>
+      <div className="flex items-center gap-2">
+        <RecountReportDialog sessionId={currentSession.id} />
+        <Button variant="outline" size="sm" onClick={onChangeSession}>
+          Mudar sessão
+        </Button>
+      </div>
     </div>
   );
 }
