@@ -248,7 +248,9 @@ export function LocationSelectionDialog({
                   </div>
                   
                   {/* Location Entries */}
-                  <div className="p-3 space-y-2 bg-background">
+                  <div className="p-3 bg-background">
+                    <ScrollArea className="max-h-[200px]">
+                    <div className="space-y-2 pr-2">
                     {colis.entries.filter(e => e.quantity > 0).map((entry) => {
                       const isSelected = colisSelections.some(s => s.countId === entry.countId);
                       const selection = colisSelections.find(s => s.countId === entry.countId);
@@ -329,6 +331,8 @@ export function LocationSelectionDialog({
                         </div>
                       );
                     })}
+                    </div>
+                    </ScrollArea>
                   </div>
                 </div>
               );
