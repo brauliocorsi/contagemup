@@ -175,8 +175,8 @@ export function LocationSelectionDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="space-y-4 pr-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          <div className="space-y-4">
             {colisData.map(colis => {
               const colisSelections = selections[colis.colisNumber] || [];
               const totalSelected = colisSelections.reduce((sum, s) => sum + s.quantity, 0);
@@ -338,7 +338,7 @@ export function LocationSelectionDialog({
               );
             })}
           </div>
-        </ScrollArea>
+        </div>
 
         {validationIssues.length > 0 && (
           <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
