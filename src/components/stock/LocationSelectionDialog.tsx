@@ -162,7 +162,7 @@ export function LocationSelectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5 text-destructive" />
@@ -249,8 +249,7 @@ export function LocationSelectionDialog({
                   
                   {/* Location Entries */}
                   <div className="p-3 bg-background">
-                    <ScrollArea className="max-h-[200px]">
-                    <div className="space-y-2 pr-2">
+                    <div className="space-y-2">
                     {colis.entries.filter(e => e.quantity > 0).map((entry) => {
                       const isSelected = colisSelections.some(s => s.countId === entry.countId);
                       const selection = colisSelections.find(s => s.countId === entry.countId);
@@ -332,7 +331,6 @@ export function LocationSelectionDialog({
                       );
                     })}
                     </div>
-                    </ScrollArea>
                   </div>
                 </div>
               );
