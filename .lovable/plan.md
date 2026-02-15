@@ -1,78 +1,44 @@
 
-# Permitir Dividir Stock na Mesma Localização com Paletes Diferentes
+# PWA - Aplicativo Instalavel (Mobile e Windows)
 
-## Problema Identificado
+Vou transformar a aplicacao num Progressive Web App (PWA) que podera ser instalado directamente do navegador em qualquer dispositivo: telemovel (Android/iPhone) e computador (Windows/Mac/Linux).
 
-Existe uma constraint UNIQUE na tabela `counts` que impede ter o mesmo coli numa mesma localização em paletes diferentes:
+## O que vai mudar para o utilizador
 
-```sql
-CREATE UNIQUE INDEX idx_counts_unique_product_colis_session_location 
-ON public.counts USING btree (
-  product_id, 
-  colis_number, 
-  COALESCE(session_id, '00000000-0000-0000-0000-000000000000'::uuid), 
-  COALESCE(location, ''::text)  -- ← Não inclui pallet_number!
-)
-```
+- Um botao "Instalar App" aparecera na pagina principal
+- No telemovel ou PC, o navegador ira sugerir a instalacao
+- A app ficara com icone no ecra inicial / desktop, como uma app nativa
+- Funcionara offline para navegacao basica
 
-### Cenário que Falha
+## Passos tecnicos
 
-| Palete | Localização | Coli | Resultado |
-|--------|-------------|------|-----------|
-| Palete 01 | A1 | 1 | OK - Primeiro registo |
-| Palete 02 | A1 | 1 | **ERRO** - Viola constraint |
+### 1. Instalar plugin PWA
+- Adicionar o pacote `vite-plugin-pwa` ao projecto
 
-### Porque existe esta constraint?
+### 2. Configurar vite.config.ts
+- Adicionar o plugin `VitePWA` com:
+  - Manifest (nome: "UP Moveis - Contagem", cores, icones)
+  - Service worker com `navigateFallbackDenylist: [/^\/~oauth/]` para nao interferir com autenticacao
+  - Estrategia de cache para funcionamento offline
 
-Foi criada para prevenir duplicação acidental de registos (mesmo produto + coli + session + local). No entanto, o caso de uso de paletes diferentes na mesma localização é legítimo.
+### 3. Criar icones PWA
+- Gerar icones em `public/` nos tamanhos 192x192 e 512x512 (usando o logo existente da UP Moveis)
 
----
+### 4. Actualizar index.html
+- Adicionar meta tags para mobile:
+  - `theme-color`
+  - `apple-mobile-web-app-capable`
+  - `apple-mobile-web-app-status-bar-style`
 
-## Solução
+### 5. Criar pagina /install
+- Pagina dedicada com instrucoes de instalacao
+- Botao que acciona o prompt de instalacao nativo do navegador (evento `beforeinstallprompt`)
+- Instrucoes visuais para iOS (que nao suporta o prompt automatico)
 
-Alterar a constraint para incluir também o `pallet_number`:
+### 6. Adicionar botao "Instalar" no Header
+- Botao visivel no cabecalho que leva a pagina de instalacao ou acciona o prompt directamente
 
-```sql
--- Remover constraint antiga
-DROP INDEX IF EXISTS idx_counts_unique_product_colis_session_location;
-
--- Criar nova constraint que inclui pallet_number
-CREATE UNIQUE INDEX idx_counts_unique_product_colis_session_location_pallet 
-ON public.counts USING btree (
-  product_id, 
-  colis_number, 
-  COALESCE(session_id, '00000000-0000-0000-0000-000000000000'::uuid), 
-  COALESCE(location, ''::text),
-  COALESCE(pallet_number, ''::text)  -- ← NOVO
-);
-```
-
-### Nova Tabela de Permissões
-
-| Palete 01 | Palete 02 | Mesma Loc? | Resultado |
-|-----------|-----------|------------|-----------|
-| A1 | A1 | Sim | **OK** - paletes diferentes |
-| A1 (P1) | A1 (P1) | Sim | **ERRO** - duplicado exacto |
-| A1 | B2 | Não | OK - localizações diferentes |
-
----
-
-## Verificação de Dados Existentes
-
-Antes de alterar a constraint, verificar se há registos duplicados que violariam a nova constraint (mesma combinação incluindo pallet).
-
----
-
-## Alterações
-
-| Tipo | Descrição |
-|------|-----------|
-| Migration | Alterar constraint unique para incluir `pallet_number` |
-
----
-
-## Resultado Esperado
-
-1. Permitir dividir stock de um coli na mesma localização mas em paletes diferentes
-2. Manter protecção contra duplicação exacta (mesmo produto + coli + session + local + palete)
-3. Não afectar funcionalidades existentes
+## Resultado final
+- A app podera ser instalada em Windows, Android e iOS
+- Tera icone proprio e abrira em janela dedicada (sem barra do navegador)
+- Suportara uso offline basico
