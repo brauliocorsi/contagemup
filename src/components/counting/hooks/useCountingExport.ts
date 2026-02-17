@@ -14,7 +14,8 @@ interface ExportFilters {
 
 export function useCountingExport(
   filteredProducts: ProductWithCounts[],
-  filters: ExportFilters
+  filters: ExportFilters,
+  productIdsWithDamages?: Set<string>
 ) {
   const { filterStatus, filterCategory, filterLocation, filterPallet, searchTerm } = filters;
 
@@ -306,6 +307,72 @@ export function useCountingExport(
     toast.success(`${complete.length} produtos completos exportados para Excel`);
   }, [filteredProducts, getColisDistribution, exportToExcel]);
 
+  // Damage-based export helpers
+  const getProductsWithDamages = useCallback(() => {
+    if (!productIdsWithDamages) return [];
+    return filteredProducts.filter(p => productIdsWithDamages.has(p.id));
+  }, [filteredProducts, productIdsWithDamages]);
+
+  const getProductsWithoutDamages = useCallback(() => {
+    if (!productIdsWithDamages) return filteredProducts;
+    return filteredProducts.filter(p => !productIdsWithDamages.has(p.id));
+  }, [filteredProducts, productIdsWithDamages]);
+
+  const buildRows = useCallback((products: ProductWithCounts[]) => {
+    return products.map(product => {
+      const status = product.completeSets > 0 ? (product.hasPartialProduct ? 'Completo + Pendente' : 'Completo') : (product.status === 'not_counted' ? 'Não Contado' : 'Incompleto');
+      const locations = product.uniqueLocations.length > 0 ? product.uniqueLocations.join(', ') : (product.location || '-');
+      const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
+      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), status, getMissingColisInfo(product)];
+    });
+  }, [getColisDistribution, getMissingColisInfo]);
+
+  const damageHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes'];
+
+  const exportWithDamagesCSV = useCallback(() => {
+    const products = getProductsWithDamages();
+    if (products.length === 0) { toast.info('Nenhum produto com avarias para exportar'); return; }
+    const rows = buildRows(products);
+    const csvContent = [damageHeaders.join(';'), ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `produtos_com_avarias_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success(`${products.length} produtos com avarias exportados`);
+  }, [getProductsWithDamages, buildRows]);
+
+  const exportWithoutDamagesCSV = useCallback(() => {
+    const products = getProductsWithoutDamages();
+    if (products.length === 0) { toast.info('Nenhum produto sem avarias para exportar'); return; }
+    const rows = buildRows(products);
+    const csvContent = [damageHeaders.join(';'), ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `produtos_sem_avarias_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success(`${products.length} produtos sem avarias exportados`);
+  }, [getProductsWithoutDamages, buildRows]);
+
+  const exportWithDamagesExcel = useCallback(() => {
+    const products = getProductsWithDamages();
+    if (products.length === 0) { toast.info('Nenhum produto com avarias para exportar'); return; }
+    const rows = buildRows(products);
+    exportToExcel([damageHeaders, ...rows], `produtos_com_avarias_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Com Avarias');
+    toast.success(`${products.length} produtos com avarias exportados para Excel`);
+  }, [getProductsWithDamages, buildRows, exportToExcel]);
+
+  const exportWithoutDamagesExcel = useCallback(() => {
+    const products = getProductsWithoutDamages();
+    if (products.length === 0) { toast.info('Nenhum produto sem avarias para exportar'); return; }
+    const rows = buildRows(products);
+    exportToExcel([damageHeaders, ...rows], `produtos_sem_avarias_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Sem Avarias');
+    toast.success(`${products.length} produtos sem avarias exportados para Excel`);
+  }, [getProductsWithoutDamages, buildRows, exportToExcel]);
+
   return {
     exportFilteredReport,
     exportIncompleteReport,
@@ -313,5 +380,9 @@ export function useCountingExport(
     exportFilteredReportExcel,
     exportIncompleteReportExcel,
     exportCompleteReportExcel,
+    exportWithDamagesCSV,
+    exportWithoutDamagesCSV,
+    exportWithDamagesExcel,
+    exportWithoutDamagesExcel,
   };
 }

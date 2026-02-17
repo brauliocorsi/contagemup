@@ -136,6 +136,18 @@ export function CountingView() {
     filterCategory,
   });
 
+  // Build set of product IDs with active damages
+  const productIdsWithDamages = useMemo(() => {
+    const set = new Set<string>();
+    filteredProducts.forEach((p: any) => {
+      const damages = getDamagesForProduct(p.id);
+      if (damages && damages.length > 0) {
+        set.add(p.id);
+      }
+    });
+    return set;
+  }, [filteredProducts, getDamagesForProduct]);
+
   // Use counting export hook
   const {
     exportFilteredReport,
@@ -144,13 +156,17 @@ export function CountingView() {
     exportFilteredReportExcel,
     exportIncompleteReportExcel,
     exportCompleteReportExcel,
+    exportWithDamagesCSV,
+    exportWithoutDamagesCSV,
+    exportWithDamagesExcel,
+    exportWithoutDamagesExcel,
   } = useCountingExport(filteredProducts as any, {
     filterStatus,
     filterCategory,
     filterLocation,
     filterPallet,
     searchTerm,
-  });
+  }, productIdsWithDamages);
 
   // Product action handlers
   const handleAddColi = async (productId: string, newTotalColis: number) => {
@@ -276,12 +292,18 @@ export function CountingView() {
         <CountingExportMenu
           totalFiltered={filteredProducts.length}
           totalComplete={completeProducts.filter(p => !p.hasPartialProduct).length}
+          totalWithDamages={productIdsWithDamages.size}
+          totalWithoutDamages={filteredProducts.length - productIdsWithDamages.size}
           onExportFilteredCSV={exportFilteredReport}
           onExportCompleteCSV={exportCompleteReport}
           onExportIncompleteCSV={exportIncompleteReport}
           onExportFilteredExcel={exportFilteredReportExcel}
           onExportCompleteExcel={exportCompleteReportExcel}
           onExportIncompleteExcel={exportIncompleteReportExcel}
+          onExportWithDamagesCSV={exportWithDamagesCSV}
+          onExportWithoutDamagesCSV={exportWithoutDamagesCSV}
+          onExportWithDamagesExcel={exportWithDamagesExcel}
+          onExportWithoutDamagesExcel={exportWithoutDamagesExcel}
         />
       </CountingFilters>
 
