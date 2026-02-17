@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle, Trash2, Search, Package, MapPin, Box, Calendar } from 'lucide-react';
+import { CheckCircle, Trash2, Search, Package, MapPin, Box, Calendar, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { DAMAGE_TYPES } from '@/types/damages';
 import { DamageResolutionDialog } from './DamageResolutionDialog';
+import { DamageEditDialog } from './DamageEditDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,16 +25,19 @@ import {
 interface DamagesTableProps {
   damages: ProductDamageWithProduct[];
   onResolve: (data: { id: string; resolution_type: string; resolution_notes?: string }) => Promise<unknown>;
+  onUpdate: (data: { id: string; damage_type?: string; description?: string | null; quantity?: number; location?: string | null; pallet_number?: string | null; colis_number?: number | null }) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
   isResolving?: boolean;
+  isUpdating?: boolean;
   showResolved?: boolean;
 }
 
-export function DamagesTable({ damages, onResolve, onDelete, isResolving, showResolved = false }: DamagesTableProps) {
+export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolving, isUpdating, showResolved = false }: DamagesTableProps) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>(showResolved ? 'all' : 'active');
   const [resolveDialogDamage, setResolveDialogDamage] = useState<ProductDamageWithProduct | null>(null);
+  const [editDialogDamage, setEditDialogDamage] = useState<ProductDamageWithProduct | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const filteredDamages = damages.filter(damage => {
@@ -196,14 +200,24 @@ export function DamagesTable({ damages, onResolve, onDelete, isResolving, showRe
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       {damage.status === 'active' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleResolve(damage)}
-                          title="Resolver avaria"
-                        >
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditDialogDamage(damage)}
+                            title="Editar avaria"
+                          >
+                            <Edit className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleResolve(damage)}
+                            title="Resolver avaria"
+                          >
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          </Button>
+                        </>
                       )}
                       <Button
                         size="sm"
@@ -230,6 +244,17 @@ export function DamagesTable({ damages, onResolve, onDelete, isResolving, showRe
           damage={resolveDialogDamage}
           onSubmit={onResolve}
           isLoading={isResolving}
+        />
+      )}
+
+      {/* Edit Dialog */}
+      {editDialogDamage && (
+        <DamageEditDialog
+          open={!!editDialogDamage}
+          onOpenChange={(open) => !open && setEditDialogDamage(null)}
+          damage={editDialogDamage}
+          onSubmit={onUpdate}
+          isLoading={isUpdating}
         />
       )}
 

@@ -11,7 +11,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
 export function DamagesView() {
-  const { damages, loading, resolveDamage, deleteDamage, isResolving, getStats } = useDamages();
+  const { damages, loading, resolveDamage, updateDamage, deleteDamage, isResolving, isUpdating, getStats } = useDamages();
   const [activeTab, setActiveTab] = useState('active');
 
   const stats = getStats();
@@ -246,8 +246,10 @@ export function DamagesView() {
               <DamagesTable
                 damages={activeDamages}
                 onResolve={resolveDamage}
+                onUpdate={updateDamage}
                 onDelete={deleteDamage}
                 isResolving={isResolving}
+                isUpdating={isUpdating}
               />
             </TabsContent>
 
@@ -255,8 +257,10 @@ export function DamagesView() {
               <DamagesTable
                 damages={resolvedDamages}
                 onResolve={resolveDamage}
+                onUpdate={updateDamage}
                 onDelete={deleteDamage}
                 isResolving={isResolving}
+                isUpdating={isUpdating}
                 showResolved
               />
             </TabsContent>
@@ -265,8 +269,10 @@ export function DamagesView() {
               <DamagesTable
                 damages={damages}
                 onResolve={resolveDamage}
+                onUpdate={updateDamage}
                 onDelete={deleteDamage}
                 isResolving={isResolving}
+                isUpdating={isUpdating}
                 showResolved
               />
             </TabsContent>
