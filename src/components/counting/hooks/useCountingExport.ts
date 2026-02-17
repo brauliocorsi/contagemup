@@ -88,7 +88,7 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes', 'Avarias'];
 
     const rows = filteredProducts.map(product => {
       const status = product.completeSets > 0
@@ -106,7 +106,8 @@ export function useCountingExport(
       return [
         product.code, product.name, product.category, locations, pallets,
         product.total_colis.toString(), product.completeSets.toString(),
-        getColisDistribution(product), status, getMissingColisInfo(product)
+        getColisDistribution(product), status, getMissingColisInfo(product),
+        (product.damaged_stock || 0).toString()
       ];
     });
 
@@ -154,7 +155,7 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Colis Faltantes', 'Detalhes'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Colis Faltantes', 'Detalhes', 'Avarias'];
 
     const rows = incomplete
       .filter(product => {
@@ -170,7 +171,7 @@ export function useCountingExport(
 
         return [product.code, product.name, product.category, locations, pallets,
           product.total_colis.toString(), product.completeSets.toString(),
-          getColisDistribution(product), missingInfo, details];
+          getColisDistribution(product), missingInfo, details, (product.damaged_stock || 0).toString()];
       });
 
     if (rows.length === 0) {
@@ -196,13 +197,13 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Avarias'];
 
     const rows = complete.map(product => {
       const locations = product.uniqueLocations.length > 0 ? product.uniqueLocations.join(', ') : (product.location || '-');
       const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
       return [product.code, product.name, product.category, locations, pallets,
-        product.total_colis.toString(), product.completeSets.toString(), getColisDistribution(product)];
+        product.total_colis.toString(), product.completeSets.toString(), getColisDistribution(product), (product.damaged_stock || 0).toString()];
     });
 
     const totalSets = complete.reduce((sum, p) => sum + p.completeSets, 0);
@@ -211,7 +212,7 @@ export function useCountingExport(
       headers.join(';'),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(';')),
       '',
-      `"TOTAL";"";"";"";"";"${complete.length} produtos";"${totalSets} sets";""`
+      `"TOTAL";"";"";"";"";"${complete.length} produtos";"${totalSets} sets";"";""`
     ].join('\n');
 
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -230,13 +231,13 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes', 'Avarias'];
 
     const rows = filteredProducts.map(product => {
       const status = product.completeSets > 0 ? (product.hasPartialProduct ? 'Completo + Pendente' : 'Completo') : (product.status === 'not_counted' ? 'Não Contado' : 'Incompleto');
       const locations = product.uniqueLocations.length > 0 ? product.uniqueLocations.join(', ') : (product.location || '-');
       const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
-      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), status, getMissingColisInfo(product)];
+      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), status, getMissingColisInfo(product), product.damaged_stock || 0];
     });
 
     const totalComplete = filteredProducts.filter(p => p.completeSets > 0 && !p.hasPartialProduct).length;
@@ -272,7 +273,7 @@ export function useCountingExport(
         const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
         const missingInfo = getMissingColisInfo(product);
         const details = product.hasPartialProduct ? 'Tem pendências' : (missingInfo !== '-' ? 'Colis em falta' : '-');
-        return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), missingInfo, details];
+        return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), missingInfo, details, product.damaged_stock || 0];
       });
 
     if (rows.length === 0) {
@@ -280,7 +281,7 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Colis Faltantes', 'Detalhes'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Colis Faltantes', 'Detalhes', 'Avarias'];
     exportToExcel([headers, ...rows], `produtos_incompletos_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Incompletos');
     toast.success(`${rows.length} produtos incompletos exportados para Excel`);
   }, [filteredProducts, getColisDistribution, getMissingColisInfo, exportToExcel]);
@@ -293,15 +294,15 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Avarias'];
     const rows = complete.map(product => {
       const locations = product.uniqueLocations.length > 0 ? product.uniqueLocations.join(', ') : (product.location || '-');
       const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
-      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product)];
+      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), product.damaged_stock || 0];
     });
 
     const totalSets = complete.reduce((sum, p) => sum + p.completeSets, 0);
-    const summaryRow: (string | number)[] = ['TOTAL', '', '', '', '', complete.length + ' produtos', totalSets + ' sets', ''];
+    const summaryRow: (string | number)[] = ['TOTAL', '', '', '', '', complete.length + ' produtos', totalSets + ' sets', '', ''];
 
     exportToExcel([headers, ...rows, [], summaryRow], `produtos_completos_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Completos');
     toast.success(`${complete.length} produtos completos exportados para Excel`);
@@ -323,11 +324,11 @@ export function useCountingExport(
       const status = product.completeSets > 0 ? (product.hasPartialProduct ? 'Completo + Pendente' : 'Completo') : (product.status === 'not_counted' ? 'Não Contado' : 'Incompleto');
       const locations = product.uniqueLocations.length > 0 ? product.uniqueLocations.join(', ') : (product.location || '-');
       const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
-      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), status, getMissingColisInfo(product)];
+      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), status, getMissingColisInfo(product), product.damaged_stock || 0];
     });
   }, [getColisDistribution, getMissingColisInfo]);
 
-  const damageHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes'];
+  const damageHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes', 'Avarias'];
 
   const exportWithDamagesCSV = useCallback(() => {
     const products = getProductsWithDamages();
