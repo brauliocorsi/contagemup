@@ -150,7 +150,10 @@ export function useProducts() {
     // Remove duplicate codes - keep only the last occurrence of each code
     const uniqueProductsMap = new Map<string, typeof productsData[0]>();
     for (const product of productsData) {
-      uniqueProductsMap.set(product.code, product);
+      // Clean invisible characters (tabs, extra spaces) from code and name
+      const cleanCode = product.code.replace(/\t/g, '').trim();
+      const cleanName = product.name.replace(/\t/g, '').trim();
+      uniqueProductsMap.set(cleanCode, { ...product, code: cleanCode, name: cleanName });
     }
     const uniqueProducts = Array.from(uniqueProductsMap.values());
     
