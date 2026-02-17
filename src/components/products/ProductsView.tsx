@@ -20,8 +20,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft, ShoppingBag } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft, ShoppingBag, FileText, FileSpreadsheet, ShieldCheck } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -29,6 +29,7 @@ import { Product } from '@/types/stock';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
 
 const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   checkbox: 48,
@@ -228,122 +229,89 @@ export function ProductsView() {
     return { withOrders, withoutOrders };
   }, [products, productIdsWithOrders]);
 
-  const exportLastCounts = () => {
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Última Quantidade', 'Sessão', 'Data Contagem'];
-    const rows = filteredProducts.map(product => {
-      const lastCount = lastCounts[product.id];
-      return [
-        product.code,
-        product.name,
-        product.category,
-        product.location || '',
-        product.pallet_number || '',
-        lastCount?.totalQuantity?.toString() || '0',
-        lastCount?.sessionName || '-',
-        lastCount?.countedAt 
-          ? format(new Date(lastCount.countedAt), 'dd/MM/yyyy HH:mm', { locale: pt })
-          : '-'
-      ];
+  // Export helpers
+  const exportToExcel = useCallback((data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const colWidths = data[0].map((_, colIndex) => {
+      const maxLength = Math.max(...data.map(row => String(row[colIndex] || '').length));
+      return { wch: Math.min(Math.max(maxLength + 2, 10), 50) };
     });
-    
-    const csvContent = [
-      headers.join(';'),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
-    ].join('\n');
-    
+    worksheet['!cols'] = colWidths;
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, filename);
+  }, []);
+
+  const productHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Stock (Sets)', 'Avarias', 'Última Contagem', 'Sessão', 'Data Contagem'];
+
+  const buildProductRow = useCallback((product: Product) => {
+    const lastCount = lastCounts[product.id];
+    return [
+      product.code,
+      product.name,
+      product.category,
+      product.location || '-',
+      product.pallet_number || '-',
+      product.total_colis,
+      product.current_stock,
+      product.damaged_stock || 0,
+      lastCount?.totalQuantity ?? 0,
+      lastCount?.sessionName || '-',
+      lastCount?.countedAt ? format(new Date(lastCount.countedAt), 'dd/MM/yyyy HH:mm', { locale: pt }) : '-'
+    ];
+  }, [lastCounts]);
+
+  const productsWithDamagesCount = useMemo(() => filteredProducts.filter(p => (p.damaged_stock || 0) > 0).length, [filteredProducts]);
+  const productsWithoutDamagesCount = useMemo(() => filteredProducts.filter(p => (p.damaged_stock || 0) === 0).length, [filteredProducts]);
+
+  const exportProductsCSV = useCallback((prods: Product[], filename: string) => {
+    if (prods.length === 0) { toast({ title: 'Nenhum produto para exportar' }); return; }
+    const rows = prods.map(buildProductRow);
+    const csvContent = [productHeaders.join(';'), ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))].join('\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `ultima_contagem_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.csv`;
+    link.download = `${filename}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.csv`;
     link.click();
-  };
+    URL.revokeObjectURL(link.href);
+    toast({ title: 'Exportação concluída', description: `${prods.length} produtos exportados` });
+  }, [buildProductRow, toast]);
+
+  const exportProductsExcel = useCallback((prods: Product[], filename: string, sheetName: string) => {
+    if (prods.length === 0) { toast({ title: 'Nenhum produto para exportar' }); return; }
+    const rows = prods.map(buildProductRow);
+    exportToExcel([productHeaders, ...rows], `${filename}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, sheetName);
+    toast({ title: 'Exportação concluída', description: `${prods.length} produtos exportados para Excel` });
+  }, [buildProductRow, exportToExcel, toast]);
 
   const exportIncompleteProducts = () => {
-    // Find products with incomplete units (excess colis that don't form complete sets)
     const incompleteProducts = products
       .map(product => {
         const lastCount = lastCounts[product.id];
         if (!lastCount || product.total_colis <= 1) return null;
-        
-        const colisDistribution = lastCount.colisLocations.map(c => ({
-          colisNumber: c.colisNumber,
-          quantity: c.quantity
-        }));
-        
+        const colisDistribution = lastCount.colisLocations.map(c => ({ colisNumber: c.colisNumber, quantity: c.quantity }));
         const totalUnits = colisDistribution.reduce((sum, c) => sum + c.quantity, 0);
         const completeSets = product.current_stock;
         const unitsInCompleteSets = completeSets * product.total_colis;
         const incompleteUnits = totalUnits - unitsInCompleteSets;
-        
         if (incompleteUnits <= 0) return null;
-        
-        // Build colis detail string
-        const colisDetail = colisDistribution
-          .map(c => `Coli ${c.colisNumber}: ${c.quantity}`)
-          .join(' | ');
-        
-        // Find which colis have excess
-        const excessColis = colisDistribution
-          .filter(c => c.quantity > completeSets)
-          .map(c => `Coli ${c.colisNumber}: +${c.quantity - completeSets}`)
-          .join(', ');
-        
-        return {
-          code: product.code,
-          name: product.name,
-          category: product.category,
-          totalColis: product.total_colis,
-          completeSets,
-          totalUnits,
-          incompleteUnits,
-          colisDetail,
-          excessColis,
-          locations: lastCount.uniqueLocations.join(', ') || '-'
-        };
+        const colisDetail = colisDistribution.map(c => `Coli ${c.colisNumber}: ${c.quantity}`).join(' | ');
+        const excessColis = colisDistribution.filter(c => c.quantity > completeSets).map(c => `Coli ${c.colisNumber}: +${c.quantity - completeSets}`).join(', ');
+        return { code: product.code, name: product.name, category: product.category, totalColis: product.total_colis, completeSets, totalUnits, incompleteUnits, colisDetail, excessColis, locations: lastCount.uniqueLocations.join(', ') || '-', damaged_stock: product.damaged_stock || 0 };
       })
       .filter(Boolean);
     
-    if (incompleteProducts.length === 0) {
-      return { count: 0 };
-    }
+    if (incompleteProducts.length === 0) { return { count: 0 }; }
     
-    const headers = [
-      'Código',
-      'Nome', 
-      'Categoria',
-      'Colis/Set',
-      'Sets Completos',
-      'Total Unidades',
-      'Unidades Incompletas',
-      'Distribuição por Coli',
-      'Colis em Excesso',
-      'Localizações'
-    ];
+    const headers = ['Código', 'Nome', 'Categoria', 'Colis/Set', 'Sets Completos', 'Total Unidades', 'Unidades Incompletas', 'Distribuição por Coli', 'Colis em Excesso', 'Localizações', 'Avarias'];
+    const rows = incompleteProducts.map(p => [p!.code, p!.name, p!.category, p!.totalColis.toString(), p!.completeSets.toString(), p!.totalUnits.toString(), p!.incompleteUnits.toString(), p!.colisDetail, p!.excessColis || '-', p!.locations, p!.damaged_stock.toString()]);
     
-    const rows = incompleteProducts.map(p => [
-      p!.code,
-      p!.name,
-      p!.category,
-      p!.totalColis.toString(),
-      p!.completeSets.toString(),
-      p!.totalUnits.toString(),
-      p!.incompleteUnits.toString(),
-      p!.colisDetail,
-      p!.excessColis || '-',
-      p!.locations
-    ]);
-    
-    const csvContent = [
-      headers.join(';'),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
-    ].join('\n');
-    
+    const csvContent = [headers.join(';'), ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))].join('\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `produtos_incompletos_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.csv`;
     link.click();
-    
     return { count: incompleteProducts.length };
   };
 
@@ -540,28 +508,63 @@ export function ProductsView() {
               Exportar
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={exportLastCounts}>
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Última Contagem
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {
-              const result = exportIncompleteProducts();
-              if (result.count === 0) {
-                toast({
-                  title: 'Tudo completo!',
-                  description: 'Não existem produtos com unidades incompletas',
-                });
-              } else {
-                toast({
-                  title: 'Exportação concluída',
-                  description: `${result.count} produtos com unidades incompletas exportados`,
-                });
-              }
-            }}>
-              <AlertTriangle className="h-4 w-4 mr-2 text-orange-500" />
-              Produtos Incompletos
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-64 bg-background border shadow-lg z-50">
+            {/* CSV Exports */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <FileText className="h-4 w-4 mr-2" />
+                Exportar CSV
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="bg-background border shadow-lg z-50">
+                <DropdownMenuItem onClick={() => exportProductsCSV(filteredProducts, 'produtos_completo')}>
+                  <Package className="h-4 w-4 mr-2" />
+                  Relatório Completo ({filteredProducts.length})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  const result = exportIncompleteProducts();
+                  if (result.count === 0) {
+                    toast({ title: 'Tudo completo!', description: 'Não existem produtos com unidades incompletas' });
+                  }
+                }}>
+                  <AlertTriangle className="h-4 w-4 mr-2 text-amber-600" />
+                  Produtos Incompletos
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => exportProductsCSV(filteredProducts.filter(p => (p.damaged_stock || 0) > 0), 'produtos_com_avarias')}>
+                  <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
+                  Com Avarias ({productsWithDamagesCount})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportProductsCSV(filteredProducts.filter(p => (p.damaged_stock || 0) === 0), 'produtos_sem_avarias')}>
+                  <ShieldCheck className="h-4 w-4 mr-2 text-green-600" />
+                  Sem Avarias ({productsWithoutDamagesCount})
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            <DropdownMenuSeparator />
+
+            {/* Excel Exports */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                Exportar Excel
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="bg-background border shadow-lg z-50">
+                <DropdownMenuItem onClick={() => exportProductsExcel(filteredProducts, 'produtos_completo', 'Produtos')}>
+                  <Package className="h-4 w-4 mr-2" />
+                  Relatório Completo ({filteredProducts.length})
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => exportProductsExcel(filteredProducts.filter(p => (p.damaged_stock || 0) > 0), 'produtos_com_avarias', 'Com Avarias')}>
+                  <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
+                  Com Avarias ({productsWithDamagesCount})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportProductsExcel(filteredProducts.filter(p => (p.damaged_stock || 0) === 0), 'produtos_sem_avarias', 'Sem Avarias')}>
+                  <ShieldCheck className="h-4 w-4 mr-2 text-green-600" />
+                  Sem Avarias ({productsWithoutDamagesCount})
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </DropdownMenuContent>
         </DropdownMenu>
         <Popover>
