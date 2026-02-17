@@ -11,6 +11,7 @@ import { pt } from 'date-fns/locale';
 import { DAMAGE_TYPES } from '@/types/damages';
 import { DamageResolutionDialog } from './DamageResolutionDialog';
 import { DamageEditDialog } from './DamageEditDialog';
+import { DamageDetailDialog } from './DamageDetailDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +40,7 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
   const [resolveDialogDamage, setResolveDialogDamage] = useState<ProductDamageWithProduct | null>(null);
   const [editDialogDamage, setEditDialogDamage] = useState<ProductDamageWithProduct | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [detailDamage, setDetailDamage] = useState<ProductDamageWithProduct | null>(null);
 
   const filteredDamages = damages.filter(damage => {
     // Search filter
@@ -135,7 +137,7 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
               </TableRow>
             ) : (
               filteredDamages.map((damage) => (
-                <TableRow key={damage.id} className={damage.status === 'resolved' ? 'opacity-60' : ''}>
+                <TableRow key={damage.id} className={`cursor-pointer hover:bg-muted/50 ${damage.status === 'resolved' ? 'opacity-60' : ''}`} onClick={() => setDetailDamage(damage)}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-muted-foreground" />
@@ -197,7 +199,7 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       {damage.status === 'active' && (
                         <>
@@ -255,6 +257,15 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
           damage={editDialogDamage}
           onSubmit={onUpdate}
           isLoading={isUpdating}
+        />
+      )}
+
+      {/* Detail Dialog */}
+      {detailDamage && (
+        <DamageDetailDialog
+          open={!!detailDamage}
+          onOpenChange={(open) => !open && setDetailDamage(null)}
+          damage={detailDamage}
         />
       )}
 
