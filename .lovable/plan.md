@@ -1,44 +1,33 @@
 
-# PWA - Aplicativo Instalavel (Mobile e Windows)
 
-Vou transformar a aplicacao num Progressive Web App (PWA) que podera ser instalado directamente do navegador em qualquer dispositivo: telemovel (Android/iPhone) e computador (Windows/Mac/Linux).
+## Plan: Selecao de palete/localizacao por coli na entrada de stock
 
-## O que vai mudar para o utilizador
+### Problema actual
+O dialogo `EntryLocationDialog` selecciona **um unico destino** para todo o produto. Todos os colis vao para o mesmo palete/localizacao. O utilizador quer poder escolher destinos diferentes para cada coli, ou manter o mesmo destino para todos.
 
-- Um botao "Instalar App" aparecera na pagina principal
-- No telemovel ou PC, o navegador ira sugerir a instalacao
-- A app ficara com icone no ecra inicial / desktop, como uma app nativa
-- Funcionara offline para navegacao basica
+### Abordagem
 
-## Passos tecnicos
+**1. Modificar `EntryLocationDialog`** para suportar produtos multi-coli:
+- Adicionar um toggle: "Mesmo destino para todos" vs "Destino por coli"
+- No modo "mesmo destino", funciona como hoje (um destino para tudo)
+- No modo "por coli", mostrar a selecao de localização/palete para cada coli individualmente, com nome do coli se disponivel
+- O resultado passa de um unico `EntryDestination` para um `Map<number, EntryDestination>` (colis_number -> destino)
 
-### 1. Instalar plugin PWA
-- Adicionar o pacote `vite-plugin-pwa` ao projecto
+**2. Modificar `StockEntriesView`** para usar destinos por coli:
+- Alterar `pendingEntryDestinations` de `Map<string, EntryDestination>` para `Map<string, Map<number, EntryDestination>>` (product_id -> colis_number -> destino)
+- No `executeEntries`, ao iterar pelos colis, consultar o destino especifico daquele coli
+- Passar `totalColis`, `colisNames` e `categoryColisNamesMap` ao dialogo
 
-### 2. Configurar vite.config.ts
-- Adicionar o plugin `VitePWA` com:
-  - Manifest (nome: "UP Moveis - Contagem", cores, icones)
-  - Service worker com `navigateFallbackDenylist: [/^\/~oauth/]` para nao interferir com autenticacao
-  - Estrategia de cache para funcionamento offline
+**3. Manter compatibilidade total:**
+- Produtos com 1 coli: comportamento identico ao actual
+- Modo "mesmo destino": gera internamente o mesmo destino para todos os colis
+- Sem "Especificar localizacao" activo e sem multiplas localizacoes: nenhum dialogo aparece (como hoje)
 
-### 3. Criar icones PWA
-- Gerar icones em `public/` nos tamanhos 192x192 e 512x512 (usando o logo existente da UP Moveis)
+### Ficheiros a modificar
+- `src/components/stock/EntryLocationDialog.tsx` -- adicionar UI per-coli com toggle
+- `src/components/stock/StockEntriesView.tsx` -- adaptar state e logica de destinos por coli
 
-### 4. Actualizar index.html
-- Adicionar meta tags para mobile:
-  - `theme-color`
-  - `apple-mobile-web-app-capable`
-  - `apple-mobile-web-app-status-bar-style`
+### Riscos mitigados
+- O modo "mesmo destino" e o default, mantendo o fluxo rapido para quem nao precisa separar
+- Nenhuma alteracao na logica de `counts`, `ManualStockSection` ou outros hooks
 
-### 5. Criar pagina /install
-- Pagina dedicada com instrucoes de instalacao
-- Botao que acciona o prompt de instalacao nativo do navegador (evento `beforeinstallprompt`)
-- Instrucoes visuais para iOS (que nao suporta o prompt automatico)
-
-### 6. Adicionar botao "Instalar" no Header
-- Botao visivel no cabecalho que leva a pagina de instalacao ou acciona o prompt directamente
-
-## Resultado final
-- A app podera ser instalada em Windows, Android e iOS
-- Tera icone proprio e abrira em janela dedicada (sem barra do navegador)
-- Suportara uso offline basico
