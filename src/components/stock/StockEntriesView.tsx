@@ -14,6 +14,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useStockMovements, MovementItem, ParsedCSVItem } from '@/hooks/useStockMovements';
 import { useProducts } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -43,6 +44,7 @@ export function StockEntriesView() {
   } = useStockMovements('entrada');
 
   const { products } = useProducts();
+  const { categories } = useCategories();
 
   const [parsedItems, setParsedItems] = useState<ParsedCSVItem[]>([]);
   const [cart, setCart] = useState<MovementItem[]>([]);
@@ -54,13 +56,24 @@ export function StockEntriesView() {
   // Toggle para especificar localização
   const [specifyLocation, setSpecifyLocation] = useState(false);
 
-  // Entry location dialog state
+  // Entry location dialog state - now per-coli: product_id -> (colis_number -> destination)
   const [showEntryLocationDialog, setShowEntryLocationDialog] = useState(false);
   const [entryLocationItem, setEntryLocationItem] = useState<{
     item: MovementItem;
     existingLocations: ExistingLocation[];
+    totalColis: number;
+    colisNames: Record<string, string> | null;
   } | null>(null);
-  const [pendingEntryDestinations, setPendingEntryDestinations] = useState<Map<string, EntryDestination>>(new Map());
+  const [pendingEntryDestinations, setPendingEntryDestinations] = useState<Map<string, Map<number, EntryDestination>>>(new Map());
+
+  // Build category colis names map
+  const getCategoryColisNames = (categoryName: string): Record<string, string> | null => {
+    const cat = categories?.find(c => c.name === categoryName);
+    if (cat?.colis_names && typeof cat.colis_names === 'object') {
+      return cat.colis_names as Record<string, string>;
+    }
+    return null;
+  };
 
   // Combine CSV items and manual cart
   const allItems: MovementItem[] = [
@@ -105,15 +118,23 @@ export function StockEntriesView() {
   const prepareLocationSelection = async (items: MovementItem[]): Promise<Array<{
     item: MovementItem;
     existingLocations: ExistingLocation[];
+    totalColis: number;
+    colisNames: Record<string, string> | null;
   }>> => {
     const itemsNeedingSelection: Array<{
       item: MovementItem;
       existingLocations: ExistingLocation[];
+      totalColis: number;
+      colisNames: Record<string, string> | null;
     }> = [];
 
     for (const item of items) {
       // Skip items that already have destination selected
       if (pendingEntryDestinations.has(item.product_id)) continue;
+
+      const product = products.find(p => p.id === item.product_id);
+      const totalColis = product?.total_colis || 1;
+      const colisNames = product ? getCategoryColisNames(product.category) : null;
 
       // Fetch counts with locations for this product
       const { data: counts } = await supabase
@@ -141,11 +162,13 @@ export function StockEntriesView() {
 
       const uniqueLocations = Array.from(locationMap.values());
       
-      // NOVO: Mostrar diálogo se specifyLocation está activado OU se há múltiplas localizações
+      // Mostrar diálogo se specifyLocation está activado OU se há múltiplas localizações
       if (specifyLocation || uniqueLocations.length > 1) {
         itemsNeedingSelection.push({
           item,
           existingLocations: uniqueLocations,
+          totalColis,
+          colisNames,
         });
       }
     }
@@ -153,14 +176,14 @@ export function StockEntriesView() {
     return itemsNeedingSelection;
   };
 
-  // Handle entry location selection
-  const handleEntryLocationConfirm = async (destination: EntryDestination) => {
+  // Handle entry location selection - now receives per-coli destinations
+  const handleEntryLocationConfirm = async (destinations: Map<number, EntryDestination>) => {
     if (!entryLocationItem) return;
 
-    // Store destination for this product
+    // Store per-coli destinations for this product
     setPendingEntryDestinations(prev => {
       const newMap = new Map(prev);
-      newMap.set(entryLocationItem.item.product_id, destination);
+      newMap.set(entryLocationItem.item.product_id, destinations);
       return newMap;
     });
 
@@ -213,8 +236,8 @@ export function StockEntriesView() {
         const product = products.find(p => p.id === item.product_id);
         const totalColis = product?.total_colis || 1;
 
-        // Check if we have a specific destination for this product
-        const destination = pendingEntryDestinations.get(item.product_id);
+        // Get per-coli destinations for this product (if any)
+        const productDestinations = pendingEntryDestinations.get(item.product_id);
 
         // Atualizar cada colis do produto
         for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
@@ -225,6 +248,9 @@ export function StockEntriesView() {
 
           // Só processar se há quantidade a adicionar
           if (colisQty <= 0) continue;
+
+          // Look up destination for this specific coli
+          const destination = productDestinations?.get(colisNumber) || null;
 
           if (destination) {
             // CASO 1: Localização específica foi seleccionada pelo utilizador
@@ -237,7 +263,6 @@ export function StockEntriesView() {
               .maybeSingle();
 
             if (existingCount) {
-              // Actualizar count existente nessa localização
               await supabase
                 .from('counts')
                 .update({ 
@@ -247,7 +272,6 @@ export function StockEntriesView() {
                 })
                 .eq('id', existingCount.id);
             } else {
-              // Criar novo count na localização especificada
               await supabase.from('counts').insert({
                 product_id: item.product_id,
                 colis_number: colisNumber,
@@ -264,12 +288,11 @@ export function StockEntriesView() {
               .select('id, quantity, location, pallet_number')
               .eq('product_id', item.product_id)
               .eq('colis_number', colisNumber)
-              .order('quantity', { ascending: false }) // Preferir o com mais stock
+              .order('quantity', { ascending: false })
               .limit(1)
               .maybeSingle();
 
             if (existingCount) {
-              // Actualizar existente mantendo localização original
               await supabase
                 .from('counts')
                 .update({ 
@@ -278,7 +301,6 @@ export function StockEntriesView() {
                 })
                 .eq('id', existingCount.id);
             } else {
-              // Criar novo com default do produto
               await supabase.from('counts').insert({
                 product_id: item.product_id,
                 colis_number: colisNumber,
@@ -333,9 +355,8 @@ export function StockEntriesView() {
           </p>
         </div>
 
-        {/* Main Content - Stacked Layout for better product visibility */}
+        {/* Main Content */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Left/Main Column - Manual Selection (takes 2 cols on xl) */}
           <div className="xl:col-span-2 space-y-4">
             <ManualStockSection
               cart={cart}
@@ -345,7 +366,6 @@ export function StockEntriesView() {
               movementType="entrada"
             />
 
-            {/* Collapsible Upload Section */}
             <details className="group">
               <summary className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors py-2">
                 <Upload className="h-4 w-4" />
@@ -360,30 +380,22 @@ export function StockEntriesView() {
                   movementType="entrada"
                 />
                 {parsedItems.length > 0 && (
-                  <ParsedItemsPreview
-                    items={parsedItems}
-                    onClear={() => setParsedItems([])}
-                  />
+                  <ParsedItemsPreview items={parsedItems} onClear={() => setParsedItems([])} />
                 )}
               </div>
             </details>
           </div>
 
-          {/* Right Column - Confirmation */}
           <div className="space-y-4">
             <Card>
               <CardContent className="pt-6 space-y-4">
                 <div className="space-y-2">
                   <Label>Motivo</Label>
                   <Select value={reason} onValueChange={setReason}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um motivo..." />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Selecione um motivo..." /></SelectTrigger>
                     <SelectContent>
                       {ENTRY_REASONS.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
-                        </SelectItem>
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -391,20 +403,12 @@ export function StockEntriesView() {
 
                 <div className="space-y-2">
                   <Label>Referência (opcional)</Label>
-                  <Input
-                    placeholder="Ex: PO-2024-001, Nota fiscal..."
-                    value={reference}
-                    onChange={(e) => setReference(e.target.value)}
-                  />
+                  <Input placeholder="Ex: PO-2024-001, Nota fiscal..." value={reference} onChange={(e) => setReference(e.target.value)} />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Notas (opcional)</Label>
-                  <Input
-                    placeholder="Observações adicionais..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
+                  <Input placeholder="Observações adicionais..." value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </div>
 
                 {/* Toggle para especificar localização */}
@@ -413,10 +417,7 @@ export function StockEntriesView() {
                     <MapPin className="h-4 w-4 text-muted-foreground" />
                     <span>Especificar localização</span>
                   </div>
-                  <Switch
-                    checked={specifyLocation}
-                    onCheckedChange={setSpecifyLocation}
-                  />
+                  <Switch checked={specifyLocation} onCheckedChange={setSpecifyLocation} />
                 </div>
 
                 <div className="pt-4 border-t space-y-3">
@@ -426,25 +427,14 @@ export function StockEntriesView() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total de unidades:</span>
-                    <span className="font-medium">
-                      {allItems.reduce((sum, i) => sum + i.quantity, 0)} un.
-                    </span>
+                    <span className="font-medium">{allItems.reduce((sum, i) => sum + i.quantity, 0)} un.</span>
                   </div>
 
                   <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={handleClearAll}
-                      disabled={allItems.length === 0}
-                    >
+                    <Button variant="outline" className="flex-1" onClick={handleClearAll} disabled={allItems.length === 0}>
                       Limpar
                     </Button>
-                    <Button
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      onClick={handleConfirm}
-                      disabled={allItems.length === 0 || isSubmitting}
-                    >
+                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleConfirm} disabled={allItems.length === 0 || isSubmitting}>
                       {isSubmitting ? 'A registar...' : 'Confirmar Entradas'}
                     </Button>
                   </div>
@@ -454,13 +444,7 @@ export function StockEntriesView() {
           </div>
         </div>
 
-        {/* History */}
-        <StockHistoryTable
-          movements={movements}
-          isLoading={isLoading}
-          onDelete={(m) => deleteMovement.mutate(m)}
-          movementType="entrada"
-        />
+        <StockHistoryTable movements={movements} isLoading={isLoading} onDelete={(m) => deleteMovement.mutate(m)} movementType="entrada" />
       </div>
 
       {/* Entry Location Dialog */}
@@ -476,6 +460,8 @@ export function StockEntriesView() {
           quantity={entryLocationItem.item.quantity}
           existingLocations={entryLocationItem.existingLocations}
           onConfirm={handleEntryLocationConfirm}
+          totalColis={entryLocationItem.totalColis}
+          colisNames={entryLocationItem.colisNames}
         />
       )}
     </>
