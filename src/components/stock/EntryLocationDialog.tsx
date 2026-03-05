@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Box, Plus, CheckCircle2, Package } from 'lucide-react';
+import { MapPin, Box, Plus, CheckCircle2, Package, Sparkles } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -75,11 +75,19 @@ function SingleDestinationForm({
     <div className="space-y-4">
       {existingLocations.length > 0 && (
         <div className="space-y-3">
+          {/* Suggestion banner */}
+          <div className="flex items-center gap-2 p-2.5 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
+            <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="text-sm text-amber-800 dark:text-amber-300">
+              Este produto já existe no armazém. Sugerimos armazenar junto!
+            </span>
+          </div>
+
           <RadioGroup value={destinationType} onValueChange={(v) => setDestinationType(v as 'existing' | 'new')}>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="existing" id="existing" />
               <Label htmlFor="existing" className="font-medium cursor-pointer">
-                Adicionar a localização existente
+                Juntar à localização existente
               </Label>
             </div>
           </RadioGroup>
@@ -135,12 +143,17 @@ function ExistingLocationList({
   selectedExisting: string;
   setSelectedExisting: (v: string) => void;
 }) {
+  // Sort by quantity descending - highest stock first (best suggestion)
+  const sorted = [...existingLocations].sort((a, b) => b.quantity - a.quantity);
+  const topKey = sorted.length > 0 ? `${sorted[0].location}|${sorted[0].pallet || ''}` : '';
+
   return (
     <ScrollArea className="max-h-[200px]">
       <div className="space-y-2 pr-2">
-        {existingLocations.map((loc, idx) => {
+        {sorted.map((loc, idx) => {
           const key = `${loc.location}|${loc.pallet || ''}`;
           const isSelected = selectedExisting === key;
+          const isRecommended = key === topKey;
           return (
             <div
               key={idx}
@@ -148,17 +161,27 @@ function ExistingLocationList({
                 "p-4 rounded-lg border-2 cursor-pointer transition-all",
                 isSelected
                   ? "border-primary bg-primary/5 shadow-sm"
-                  : "border-border hover:border-muted-foreground/50 hover:bg-muted/30"
+                  : isRecommended
+                    ? "border-amber-300 bg-amber-50/50 hover:border-amber-400 dark:border-amber-700 dark:bg-amber-950/20"
+                    : "border-border hover:border-muted-foreground/50 hover:bg-muted/30"
               )}
               onClick={() => setSelectedExisting(key)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", loc.location ? "bg-blue-100" : "bg-muted")}>
-                    <MapPin className={cn("h-5 w-5", loc.location ? "text-blue-600" : "text-muted-foreground")} />
+                  <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", loc.location ? "bg-blue-100 dark:bg-blue-950" : "bg-muted")}>
+                    <MapPin className={cn("h-5 w-5", loc.location ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground")} />
                   </div>
                   <div className="space-y-0.5">
-                    <div className="font-medium text-base">{loc.location}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-base">{loc.location}</span>
+                      {isRecommended && (
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700 text-xs px-1.5 py-0">
+                          <Sparkles className="h-3 w-3 mr-0.5" />
+                          Sugerido
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       {loc.pallet ? (
                         <span className="flex items-center gap-1"><Box className="h-3.5 w-3.5" />{loc.pallet}</span>
@@ -246,20 +269,24 @@ function PerColiDestinationForm({
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="existing" id={`existing-${colisNumber}`} />
-                <Label htmlFor={`existing-${colisNumber}`} className="text-sm cursor-pointer">Localização existente</Label>
+                <Label htmlFor={`existing-${colisNumber}`} className="text-sm cursor-pointer">
+                  Juntar à localização existente
+                </Label>
+                <Sparkles className="h-3 w-3 text-amber-500" />
               </div>
             </RadioGroup>
             {state.destinationType === 'existing' && (
               <div className="space-y-1 pl-6">
-                {existingLocations.map((loc, idx) => {
+                {[...existingLocations].sort((a, b) => b.quantity - a.quantity).map((loc, idx) => {
                   const key = `${loc.location}|${loc.pallet || ''}`;
                   const isSelected = state.selectedExisting === key;
+                  const isTop = idx === 0;
                   return (
                     <div
                       key={idx}
                       className={cn(
                         "p-2 rounded-md border cursor-pointer transition-all text-sm flex items-center justify-between",
-                        isSelected ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/50"
+                        isSelected ? "border-primary bg-primary/5" : isTop ? "border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/20" : "border-border hover:border-muted-foreground/50"
                       )}
                       onClick={() => onStateChange({ ...state, selectedExisting: key })}
                     >
@@ -267,6 +294,7 @@ function PerColiDestinationForm({
                         <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                         <span>{loc.location}</span>
                         {loc.pallet && <span className="text-muted-foreground">/ {loc.pallet}</span>}
+                        {isTop && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Sugerido</span>}
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-xs text-muted-foreground">{loc.quantity} un.</span>
