@@ -175,11 +175,10 @@ export function SplitStockDialog({
               <span className="font-medium">Total a distribuir:</span>
               {isEditingTotal ? (
                 <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
+                  <NumericInput
                     min={0}
                     value={editableTotal}
-                    onChange={(e) => setEditableTotal(Math.max(0, parseInt(e.target.value) || 0))}
+                    onChange={setEditableTotal}
                     className="h-8 w-20 text-right"
                     autoFocus
                   />
