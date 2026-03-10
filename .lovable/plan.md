@@ -1,26 +1,33 @@
 
 
-# Update Export Reports with Available Stock Column
+## Plan: Selecao de palete/localizacao por coli na entrada de stock
 
-## What the user wants
-- Add a new column "Stock Disponível" (available stock) = `completeSets - damaged_stock` in all export reports
-- Update headers to clearly show: Sets Completos, Avarias, Stock Disponível
-- Example: CH2 with 9 complete sets and 4 damages = 5 available units
+### Problema actual
+O dialogo `EntryLocationDialog` selecciona **um unico destino** para todo o produto. Todos os colis vao para o mesmo palete/localizacao. O utilizador quer poder escolher destinos diferentes para cada coli, ou manter o mesmo destino para todos.
 
-## Conceptual clarification
-Damages represent complete products temporarily removed from stock. When resolved, they return to stock. The reports must reflect: `Stock Disponível = Sets Completos - Avarias`.
+### Abordagem
 
-## Changes
+**1. Modificar `EntryLocationDialog`** para suportar produtos multi-coli:
+- Adicionar um toggle: "Mesmo destino para todos" vs "Destino por coli"
+- No modo "mesmo destino", funciona como hoje (um destino para tudo)
+- No modo "por coli", mostrar a selecao de localização/palete para cada coli individualmente, com nome do coli se disponivel
+- O resultado passa de um unico `EntryDestination` para um `Map<number, EntryDestination>` (colis_number -> destino)
 
-### 1. `src/components/counting/hooks/useCountingExport.ts`
-Update all export functions (CSV + Excel) across all report types:
+**2. Modificar `StockEntriesView`** para usar destinos por coli:
+- Alterar `pendingEntryDestinations` de `Map<string, EntryDestination>` para `Map<string, Map<number, EntryDestination>>` (product_id -> colis_number -> destino)
+- No `executeEntries`, ao iterar pelos colis, consultar o destino especifico daquele coli
+- Passar `totalColis`, `colisNames` e `categoryColisNamesMap` ao dialogo
 
-- **Headers**: Change from `['...', 'Sets Completos', 'Stock Atual', '...', 'Avarias']` to `['...', 'Sets Completos', 'Avarias', 'Stock Disponível', '...']`
-- **Row data**: Add calculated column `Math.max(0, product.completeSets - (product.damaged_stock || 0))` as "Stock Disponível"
-- Apply to all 6 export functions: `exportFilteredReport`, `exportFilteredReportExcel`, `exportCompleteReport`, `exportCompleteReportExcel`, `exportIncompleteReport`, `exportIncompleteReportExcel`, and the damage-specific exports
+**3. Manter compatibilidade total:**
+- Produtos com 1 coli: comportamento identico ao actual
+- Modo "mesmo destino": gera internamente o mesmo destino para todos os colis
+- Sem "Especificar localizacao" activo e sem multiplas localizacoes: nenhum dialogo aparece (como hoje)
 
-The column order per row will be:
-`Código | Nome | Categoria | Localização | Palete | Colis/Set | Sets Completos | Avarias | Stock Disponível | Distribuição Colis | Status | Colis Faltantes`
+### Ficheiros a modificar
+- `src/components/stock/EntryLocationDialog.tsx` -- adicionar UI per-coli com toggle
+- `src/components/stock/StockEntriesView.tsx` -- adaptar state e logica de destinos por coli
 
-No database changes needed. No new files.
+### Riscos mitigados
+- O modo "mesmo destino" e o default, mantendo o fluxo rapido para quem nao precisa separar
+- Nenhuma alteracao na logica de `counts`, `ManualStockSection` ou outros hooks
 
