@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, MapPin, Box, AlertCircle, CheckCircle2, Pencil, Check, X } from 'lucide-react';
 import { ColisDetail, StockDistribution } from '@/types/stock';
