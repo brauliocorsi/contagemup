@@ -58,7 +58,7 @@ export function DamagesView() {
 
   // Export to Excel
   const exportToExcel = useCallback(() => {
-    const activeDamages = damages.filter(d => d.status === 'active');
+    const activeDamages = filteredDamages.filter(d => d.status === 'active');
     
     if (activeDamages.length === 0) return;
 
