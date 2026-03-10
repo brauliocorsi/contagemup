@@ -107,14 +107,12 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="colis">Número de Colis *</Label>
-              <Input
+              <NumericInput
                 id="colis"
-                type="number"
                 min={1}
                 max={20}
                 value={totalColis}
-                onChange={(e) => setTotalColis(parseInt(e.target.value) || 1)}
-                required
+                onChange={setTotalColis}
               />
               <p className="text-xs text-muted-foreground">
                 Quantas partes/colis compõem este produto
