@@ -105,8 +105,8 @@ export function DamagesView() {
     );
   }
 
-  const activeDamages = damages.filter(d => d.status === 'active');
-  const resolvedDamages = damages.filter(d => d.status === 'resolved');
+  const activeDamages = filteredDamages.filter(d => d.status === 'active');
+  const resolvedDamages = filteredDamages.filter(d => d.status === 'resolved');
 
   // Get top damaged products
   const topDamagedProducts = Object.entries(stats.byProduct)
