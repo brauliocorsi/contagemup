@@ -283,7 +283,7 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Colis Faltantes', 'Detalhes', 'Avarias'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Stock Atual', 'Distribuição Colis', 'Colis Faltantes', 'Detalhes', 'Avarias'];
     exportToExcel([headers, ...rows], `produtos_incompletos_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Incompletos');
     toast.success(`${rows.length} produtos incompletos exportados para Excel`);
   }, [filteredProducts, getColisDistribution, getMissingColisInfo, exportToExcel]);
