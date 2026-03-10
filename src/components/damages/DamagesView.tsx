@@ -53,7 +53,8 @@ export function DamagesView() {
     link.href = URL.createObjectURL(blob);
     link.download = `avarias_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     link.click();
-  }, [damages]);
+    URL.revokeObjectURL(link.href);
+  }, [filteredDamages]);
 
   // Export to Excel
   const exportToExcel = useCallback(() => {
