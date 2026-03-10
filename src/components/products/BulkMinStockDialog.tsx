@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -71,12 +71,11 @@ export function BulkMinStockDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="minStock">Stock Mínimo</Label>
-            <Input
+            <NumericInput
               id="minStock"
-              type="number"
               min={0}
               value={minStock}
-              onChange={(e) => setMinStock(parseInt(e.target.value) || 0)}
+              onChange={setMinStock}
               placeholder="Ex: 5"
             />
             <p className="text-sm text-muted-foreground">

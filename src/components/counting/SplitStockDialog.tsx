@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, MapPin, Box, AlertCircle, CheckCircle2, Pencil, Check, X } from 'lucide-react';
 import { ColisDetail, StockDistribution } from '@/types/stock';
@@ -175,11 +176,10 @@ export function SplitStockDialog({
               <span className="font-medium">Total a distribuir:</span>
               {isEditingTotal ? (
                 <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
+                  <NumericInput
                     min={0}
                     value={editableTotal}
-                    onChange={(e) => setEditableTotal(Math.max(0, parseInt(e.target.value) || 0))}
+                    onChange={setEditableTotal}
                     className="h-8 w-20 text-right"
                     autoFocus
                   />
@@ -293,11 +293,10 @@ export function SplitStockDialog({
                   {/* Quantity */}
                   <div className="space-y-1">
                     <Label className="text-xs">Quantidade</Label>
-                    <Input
-                      type="number"
+                    <NumericInput
                       min={0}
                       value={dist.quantity}
-                      onChange={(e) => updateDistribution(dist.id, 'quantity', parseInt(e.target.value) || 0)}
+                      onChange={(val) => updateDistribution(dist.id, 'quantity', val)}
                       className="h-8"
                     />
                   </div>

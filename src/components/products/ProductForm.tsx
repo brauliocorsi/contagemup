@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -107,14 +108,12 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="colis">Número de Colis *</Label>
-              <Input
+              <NumericInput
                 id="colis"
-                type="number"
                 min={1}
                 max={20}
                 value={totalColis}
-                onChange={(e) => setTotalColis(parseInt(e.target.value) || 1)}
-                required
+                onChange={setTotalColis}
               />
               <p className="text-xs text-muted-foreground">
                 Quantas partes/colis compõem este produto
@@ -122,12 +121,11 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="min-stock">Stock Mínimo</Label>
-              <Input
+              <NumericInput
                 id="min-stock"
-                type="number"
                 min={0}
                 value={minStock}
-                onChange={(e) => setMinStock(Math.max(0, parseInt(e.target.value) || 0))}
+                onChange={setMinStock}
               />
               <p className="text-xs text-muted-foreground">
                 Alerta quando o stock ficar abaixo deste valor

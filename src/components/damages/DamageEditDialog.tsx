@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DAMAGE_TYPES, ProductDamageWithProduct } from '@/types/damages';
@@ -95,11 +96,10 @@ export function DamageEditDialog({
 
           <div className="space-y-2">
             <Label>Quantidade *</Label>
-            <Input
-              type="number"
+            <NumericInput
               min={1}
               value={quantity}
-              onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+              onChange={setQuantity}
             />
           </div>
 

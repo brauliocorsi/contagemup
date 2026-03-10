@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Search, Plus, Minus, X, ShoppingCart, AlertTriangle, Layers, Package, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -385,14 +386,11 @@ export function ManualStockSection({
                                     >
                                       <Minus className="h-3 w-3" />
                                     </Button>
-                                    <Input
-                                      type="number"
-                                      min="1"
+                                    <NumericInput
+                                      min={1}
                                       value={state.quantity}
-                                      onChange={(e) => updateInputState(product.id, { 
-                                        quantity: Math.max(1, parseInt(e.target.value) || 1) 
-                                      })}
-                                      className="h-7 w-12 text-center border-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      onChange={(val) => updateInputState(product.id, { quantity: val })}
+                                      className="h-7 w-12 text-center border-0 text-sm"
                                     />
                                     <Button
                                       variant="ghost"
@@ -551,14 +549,11 @@ export function ManualStockSection({
                                           >
                                             <Minus className="h-3 w-3" />
                                           </Button>
-                                          <Input
-                                            type="number"
-                                            min="1"
+                                          <NumericInput
+                                            min={1}
                                             value={state.quantity}
-                                            onChange={(e) => updateInputState(product.id, { 
-                                              quantity: Math.max(1, parseInt(e.target.value) || 1) 
-                                            })}
-                                            className="h-7 w-14 text-center border-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            onChange={(val) => updateInputState(product.id, { quantity: val })}
+                                            className="h-7 w-14 text-center border-0 text-sm"
                                           />
                                           <Button
                                             variant="ghost"
@@ -599,14 +594,13 @@ export function ManualStockSection({
                                           return (
                                             <div key={colisNumber} className="flex items-center gap-1">
                                               <span className="text-xs text-muted-foreground w-12">Coli {colisNumber}:</span>
-                                              <Input
-                                                type="number"
-                                                min="0"
+                                              <NumericInput
+                                                min={0}
                                                 value={qty}
-                                                onChange={(e) => {
+                                                onChange={(val) => {
                                                   const newColisQuantities = {
                                                     ...state.colisQuantities,
-                                                    [colisNumber]: Math.max(0, parseInt(e.target.value) || 0),
+                                                    [colisNumber]: val,
                                                   };
                                                   updateInputState(product.id, { colisQuantities: newColisQuantities });
                                                 }}
@@ -743,12 +737,11 @@ export function ManualStockSection({
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <Input
-                            type="number"
-                            min="1"
+                          <NumericInput
+                            min={1}
                             value={item.quantity}
-                            onChange={(e) => onUpdateQuantity(item.product_id, Math.max(1, parseInt(e.target.value) || 1))}
-                            className="h-7 w-12 text-center border-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            onChange={(val) => onUpdateQuantity(item.product_id, val)}
+                            className="h-7 w-12 text-center border-0 text-sm"
                           />
                           <Button
                             variant="ghost"

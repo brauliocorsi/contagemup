@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Package, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -80,11 +80,10 @@ export function ColisQuantityInput({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Label className="text-sm">Quantidade de sets:</Label>
-            <Input
-              type="number"
-              min="1"
+            <NumericInput
+              min={1}
               value={quantity}
-              onChange={(e) => onQuantityChange(Math.max(1, parseInt(e.target.value) || 1))}
+              onChange={onQuantityChange}
               className="w-20 h-8 text-center"
             />
           </div>
@@ -119,11 +118,10 @@ export function ColisQuantityInput({
               return (
                 <div key={colisNumber} className="flex items-center gap-1">
                   <span className="text-xs text-muted-foreground w-12">Coli {colisNumber}:</span>
-                  <Input
-                    type="number"
-                    min="0"
+                  <NumericInput
+                    min={0}
                     value={qty}
-                    onChange={(e) => onColisQuantityChange(colisNumber, Math.max(0, parseInt(e.target.value) || 0))}
+                    onChange={(val) => onColisQuantityChange(colisNumber, val)}
                     className={cn(
                       "h-8 w-16 text-center text-sm",
                       exceedsStock && "border-destructive bg-destructive/10"
