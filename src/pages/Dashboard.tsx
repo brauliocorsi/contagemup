@@ -17,6 +17,7 @@ const StockAlertsView = lazy(() => import('@/components/stock/StockAlertsView').
 const WarehouseMapView = lazy(() => import('@/components/warehouse/WarehouseMapView').then(m => ({ default: m.WarehouseMapView })));
 const DamagesView = lazy(() => import('@/components/damages/DamagesView').then(m => ({ default: m.DamagesView })));
 const SettingsView = lazy(() => import('@/components/settings/SettingsView').then(m => ({ default: m.SettingsView })));
+const RecentProductsView = lazy(() => import('@/components/products/RecentProductsView').then(m => ({ default: m.RecentProductsView })));
 
 // Loading skeleton component
 function ViewLoader() {
@@ -89,6 +90,7 @@ export default function Dashboard() {
           {activeTab === 'reconciliation' && <ReconciliationView />}
           {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
           {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
+          {activeTab === 'recent' && <RecentProductsView />}
           {activeTab === 'settings' && <SettingsView />}
         </Suspense>
       </main>
