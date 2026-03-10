@@ -292,11 +292,10 @@ export function SplitStockDialog({
                   {/* Quantity */}
                   <div className="space-y-1">
                     <Label className="text-xs">Quantidade</Label>
-                    <Input
-                      type="number"
+                    <NumericInput
                       min={0}
                       value={dist.quantity}
-                      onChange={(e) => updateDistribution(dist.id, 'quantity', parseInt(e.target.value) || 0)}
+                      onChange={(val) => updateDistribution(dist.id, 'quantity', val)}
                       className="h-8"
                     />
                   </div>

@@ -120,12 +120,11 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="min-stock">Stock Mínimo</Label>
-              <Input
+              <NumericInput
                 id="min-stock"
-                type="number"
                 min={0}
                 value={minStock}
-                onChange={(e) => setMinStock(Math.max(0, parseInt(e.target.value) || 0))}
+                onChange={setMinStock}
               />
               <p className="text-xs text-muted-foreground">
                 Alerta quando o stock ficar abaixo deste valor

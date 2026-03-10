@@ -118,11 +118,10 @@ export function ColisQuantityInput({
               return (
                 <div key={colisNumber} className="flex items-center gap-1">
                   <span className="text-xs text-muted-foreground w-12">Coli {colisNumber}:</span>
-                  <Input
-                    type="number"
-                    min="0"
+                  <NumericInput
+                    min={0}
                     value={qty}
-                    onChange={(e) => onColisQuantityChange(colisNumber, Math.max(0, parseInt(e.target.value) || 0))}
+                    onChange={(val) => onColisQuantityChange(colisNumber, val)}
                     className={cn(
                       "h-8 w-16 text-center text-sm",
                       exceedsStock && "border-destructive bg-destructive/10"

@@ -71,12 +71,11 @@ export function BulkMinStockDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="minStock">Stock Mínimo</Label>
-            <Input
+            <NumericInput
               id="minStock"
-              type="number"
               min={0}
               value={minStock}
-              onChange={(e) => setMinStock(parseInt(e.target.value) || 0)}
+              onChange={setMinStock}
               placeholder="Ex: 5"
             />
             <p className="text-sm text-muted-foreground">

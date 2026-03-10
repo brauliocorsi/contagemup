@@ -95,11 +95,10 @@ export function DamageEditDialog({
 
           <div className="space-y-2">
             <Label>Quantidade *</Label>
-            <Input
-              type="number"
+            <NumericInput
               min={1}
               value={quantity}
-              onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+              onChange={setQuantity}
             />
           </div>
 

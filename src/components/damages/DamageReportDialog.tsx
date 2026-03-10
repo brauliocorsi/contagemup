@@ -93,13 +93,11 @@ export function DamageReportDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantidade *</Label>
-              <Input
+              <NumericInput
                 id="quantity"
-                type="number"
                 min={1}
                 value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                required
+                onChange={setQuantity}
               />
             </div>
 

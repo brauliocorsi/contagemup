@@ -736,12 +736,11 @@ export function ManualStockSection({
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <Input
-                            type="number"
-                            min="1"
+                          <NumericInput
+                            min={1}
                             value={item.quantity}
-                            onChange={(e) => onUpdateQuantity(item.product_id, Math.max(1, parseInt(e.target.value) || 1))}
-                            className="h-7 w-12 text-center border-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            onChange={(val) => onUpdateQuantity(item.product_id, val)}
+                            className="h-7 w-12 text-center border-0 text-sm"
                           />
                           <Button
                             variant="ghost"
