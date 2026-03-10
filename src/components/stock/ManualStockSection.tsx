@@ -593,14 +593,13 @@ export function ManualStockSection({
                                           return (
                                             <div key={colisNumber} className="flex items-center gap-1">
                                               <span className="text-xs text-muted-foreground w-12">Coli {colisNumber}:</span>
-                                              <Input
-                                                type="number"
-                                                min="0"
+                                              <NumericInput
+                                                min={0}
                                                 value={qty}
-                                                onChange={(e) => {
+                                                onChange={(val) => {
                                                   const newColisQuantities = {
                                                     ...state.colisQuantities,
-                                                    [colisNumber]: Math.max(0, parseInt(e.target.value) || 0),
+                                                    [colisNumber]: val,
                                                   };
                                                   updateInputState(product.id, { colisQuantities: newColisQuantities });
                                                 }}
