@@ -326,11 +326,11 @@ export function useCountingExport(
       const status = product.completeSets > 0 ? (product.hasPartialProduct ? 'Completo + Pendente' : 'Completo') : (product.status === 'not_counted' ? 'Não Contado' : 'Incompleto');
       const locations = product.uniqueLocations.length > 0 ? product.uniqueLocations.join(', ') : (product.location || '-');
       const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
-      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), status, getMissingColisInfo(product), product.damaged_stock || 0];
+      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, product.current_stock || 0, getColisDistribution(product), status, getMissingColisInfo(product), product.damaged_stock || 0];
     });
   }, [getColisDistribution, getMissingColisInfo]);
 
-  const damageHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes', 'Avarias'];
+  const damageHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Stock Atual', 'Distribuição Colis', 'Status', 'Colis Faltantes', 'Avarias'];
 
   const exportWithDamagesCSV = useCallback(() => {
     const products = getProductsWithDamages();
