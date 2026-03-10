@@ -95,7 +95,7 @@ export function DamagesView() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Avarias');
     XLSX.writeFile(workbook, `avarias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-  }, [damages, stats.totalDamagedUnits]);
+  }, [filteredDamages, stats.totalDamagedUnits]);
 
   if (loading) {
     return (
