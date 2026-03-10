@@ -197,13 +197,13 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Avarias'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Stock Atual', 'Distribuição Colis', 'Avarias'];
 
     const rows = complete.map(product => {
       const locations = product.uniqueLocations.length > 0 ? product.uniqueLocations.join(', ') : (product.location || '-');
       const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
       return [product.code, product.name, product.category, locations, pallets,
-        product.total_colis.toString(), product.completeSets.toString(), getColisDistribution(product), (product.damaged_stock || 0).toString()];
+        product.total_colis.toString(), product.completeSets.toString(), (product.current_stock || 0).toString(), getColisDistribution(product), (product.damaged_stock || 0).toString()];
     });
 
     const totalSets = complete.reduce((sum, p) => sum + p.completeSets, 0);
