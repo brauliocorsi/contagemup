@@ -88,7 +88,7 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Status', 'Colis Faltantes', 'Avarias'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Stock Atual', 'Distribuição Colis', 'Status', 'Colis Faltantes', 'Avarias'];
 
     const rows = filteredProducts.map(product => {
       const status = product.completeSets > 0
@@ -106,6 +106,7 @@ export function useCountingExport(
       return [
         product.code, product.name, product.category, locations, pallets,
         product.total_colis.toString(), product.completeSets.toString(),
+        (product.current_stock || 0).toString(),
         getColisDistribution(product), status, getMissingColisInfo(product),
         (product.damaged_stock || 0).toString()
       ];
