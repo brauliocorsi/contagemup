@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useDamages } from '@/hooks/useDamages';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DamagesTable } from './DamagesTable';
+import { DateRangeFilter, filterByDateRange } from '@/components/ui/date-range-filter';
 import { AlertOctagon, Package, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
@@ -13,12 +14,20 @@ import { pt } from 'date-fns/locale';
 export function DamagesView() {
   const { damages, loading, resolveDamage, updateDamage, deleteDamage, isResolving, isUpdating, getStats } = useDamages();
   const [activeTab, setActiveTab] = useState('active');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const stats = getStats();
 
+  // Filter damages by date range
+  const filteredDamages = useMemo(
+    () => filterByDateRange(damages, dateFrom, dateTo, d => d.created_at),
+    [damages, dateFrom, dateTo]
+  );
+
   // Export to CSV
   const exportToCSV = useCallback(() => {
-    const activeDamages = damages.filter(d => d.status === 'active');
+    const activeDamages = filteredDamages.filter(d => d.status === 'active');
     
     if (activeDamages.length === 0) return;
 
@@ -44,11 +53,12 @@ export function DamagesView() {
     link.href = URL.createObjectURL(blob);
     link.download = `avarias_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     link.click();
-  }, [damages]);
+    URL.revokeObjectURL(link.href);
+  }, [filteredDamages]);
 
   // Export to Excel
   const exportToExcel = useCallback(() => {
-    const activeDamages = damages.filter(d => d.status === 'active');
+    const activeDamages = filteredDamages.filter(d => d.status === 'active');
     
     if (activeDamages.length === 0) return;
 
@@ -85,7 +95,7 @@ export function DamagesView() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Avarias');
     XLSX.writeFile(workbook, `avarias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-  }, [damages, stats.totalDamagedUnits]);
+  }, [filteredDamages, stats.totalDamagedUnits]);
 
   if (loading) {
     return (
@@ -95,8 +105,8 @@ export function DamagesView() {
     );
   }
 
-  const activeDamages = damages.filter(d => d.status === 'active');
-  const resolvedDamages = damages.filter(d => d.status === 'resolved');
+  const activeDamages = filteredDamages.filter(d => d.status === 'active');
+  const resolvedDamages = filteredDamages.filter(d => d.status === 'resolved');
 
   // Get top damaged products
   const topDamagedProducts = Object.entries(stats.byProduct)
@@ -207,18 +217,21 @@ export function DamagesView() {
 
       {/* Tabs with Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Lista de Avarias</CardTitle>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={exportToCSV} disabled={activeDamages.length === 0}>
-              <Download className="h-4 w-4 mr-2" />
-              CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportToExcel} disabled={activeDamages.length === 0}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Excel
-            </Button>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-row items-center justify-between">
+            <CardTitle>Lista de Avarias</CardTitle>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={exportToCSV} disabled={activeDamages.length === 0}>
+                <Download className="h-4 w-4 mr-2" />
+                CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportToExcel} disabled={activeDamages.length === 0}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+            </div>
           </div>
+          <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
