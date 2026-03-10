@@ -217,18 +217,21 @@ export function DamagesView() {
 
       {/* Tabs with Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Lista de Avarias</CardTitle>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={exportToCSV} disabled={activeDamages.length === 0}>
-              <Download className="h-4 w-4 mr-2" />
-              CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportToExcel} disabled={activeDamages.length === 0}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Excel
-            </Button>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-row items-center justify-between">
+            <CardTitle>Lista de Avarias</CardTitle>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={exportToCSV} disabled={activeDamages.length === 0}>
+                <Download className="h-4 w-4 mr-2" />
+                CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportToExcel} disabled={activeDamages.length === 0}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+            </div>
           </div>
+          <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
