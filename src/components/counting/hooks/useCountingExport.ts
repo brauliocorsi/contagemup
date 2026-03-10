@@ -275,7 +275,7 @@ export function useCountingExport(
         const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
         const missingInfo = getMissingColisInfo(product);
         const details = product.hasPartialProduct ? 'Tem pendências' : (missingInfo !== '-' ? 'Colis em falta' : '-');
-        return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), missingInfo, details, product.damaged_stock || 0];
+        return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, product.current_stock || 0, getColisDistribution(product), missingInfo, details, product.damaged_stock || 0];
       });
 
     if (rows.length === 0) {
