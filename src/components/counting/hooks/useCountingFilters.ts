@@ -13,6 +13,7 @@ export interface ProductWithCounts {
   status: string;
   uniqueLocations: string[];
   uniquePallets: string[];
+  current_stock?: number;
   damaged_stock?: number;
   colisDetails: Array<{
     colis_number: number;
