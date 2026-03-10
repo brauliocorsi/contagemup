@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useDamages } from '@/hooks/useDamages';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DamagesTable } from './DamagesTable';
+import { DateRangeFilter, filterByDateRange } from '@/components/ui/date-range-filter';
 import { AlertOctagon, Package, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
