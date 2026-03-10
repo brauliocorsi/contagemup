@@ -212,7 +212,7 @@ export function useCountingExport(
       headers.join(';'),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(';')),
       '',
-      `"TOTAL";"";"";"";"";"${complete.length} produtos";"${totalSets} sets";"";""`
+      `"TOTAL";"";"";"";"";"${complete.length} produtos";"${totalSets} sets";"";"";""`,
     ].join('\n');
 
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
