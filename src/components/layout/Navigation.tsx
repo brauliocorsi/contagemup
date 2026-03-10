@@ -30,6 +30,7 @@ const managementItems = [
   { id: 'products', label: 'Produtos', icon: Package },
   { id: 'categories', label: 'Categorias', icon: Tags },
   { id: 'sessions', label: 'Sessões', icon: History },
+  { id: 'recent', label: 'Recentes', icon: History },
 ];
 
 // Items principais (não agrupados)
