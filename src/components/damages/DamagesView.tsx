@@ -14,8 +14,16 @@ import { pt } from 'date-fns/locale';
 export function DamagesView() {
   const { damages, loading, resolveDamage, updateDamage, deleteDamage, isResolving, isUpdating, getStats } = useDamages();
   const [activeTab, setActiveTab] = useState('active');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const stats = getStats();
+
+  // Filter damages by date range
+  const filteredDamages = useMemo(
+    () => filterByDateRange(damages, dateFrom, dateTo, d => d.created_at),
+    [damages, dateFrom, dateTo]
+  );
 
   // Export to CSV
   const exportToCSV = useCallback(() => {
