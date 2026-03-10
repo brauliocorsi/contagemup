@@ -27,7 +27,7 @@ export function DamagesView() {
 
   // Export to CSV
   const exportToCSV = useCallback(() => {
-    const activeDamages = damages.filter(d => d.status === 'active');
+    const activeDamages = filteredDamages.filter(d => d.status === 'active');
     
     if (activeDamages.length === 0) return;
 
