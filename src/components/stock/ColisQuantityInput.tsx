@@ -80,11 +80,10 @@ export function ColisQuantityInput({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Label className="text-sm">Quantidade de sets:</Label>
-            <Input
-              type="number"
-              min="1"
+            <NumericInput
+              min={1}
               value={quantity}
-              onChange={(e) => onQuantityChange(Math.max(1, parseInt(e.target.value) || 1))}
+              onChange={onQuantityChange}
               className="w-20 h-8 text-center"
             />
           </div>
