@@ -294,15 +294,15 @@ export function useCountingExport(
       return;
     }
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Distribuição Colis', 'Avarias'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Stock Atual', 'Distribuição Colis', 'Avarias'];
     const rows = complete.map(product => {
       const locations = product.uniqueLocations.length > 0 ? product.uniqueLocations.join(', ') : (product.location || '-');
       const pallets = product.uniquePallets.length > 0 ? product.uniquePallets.join(', ') : (product.pallet_number || '-');
-      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, getColisDistribution(product), product.damaged_stock || 0];
+      return [product.code, product.name, product.category, locations, pallets, product.total_colis, product.completeSets, product.current_stock || 0, getColisDistribution(product), product.damaged_stock || 0];
     });
 
     const totalSets = complete.reduce((sum, p) => sum + p.completeSets, 0);
-    const summaryRow: (string | number)[] = ['TOTAL', '', '', '', '', complete.length + ' produtos', totalSets + ' sets', '', ''];
+    const summaryRow: (string | number)[] = ['TOTAL', '', '', '', '', complete.length + ' produtos', totalSets + ' sets', '', '', ''];
 
     exportToExcel([headers, ...rows, [], summaryRow], `produtos_completos_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Completos');
     toast.success(`${complete.length} produtos completos exportados para Excel`);
