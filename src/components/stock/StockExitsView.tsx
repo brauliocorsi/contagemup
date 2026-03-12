@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { TrendingDown, History, AlertTriangle, ClipboardList, Upload } from 'lucide-react';
+import { TrendingDown, History, AlertTriangle, ClipboardList, Upload, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +27,7 @@ import { StockValidationDialog, StockValidationError } from './StockValidationDi
 import { PickingReportDialog } from './PickingReportDialog';
 import { LocationSelectionDialog, LocationSelection, ColisLocationData } from './LocationSelectionDialog';
 import { removeOrderNumberAfterExit } from '@/hooks/useOrderNumbers';
+import { ERPExitsView } from './ERPExitsView';
 import { toast } from 'sonner';
 
 const EXIT_REASONS = [
@@ -534,6 +535,10 @@ export function StockExitsView() {
             <History className="h-4 w-4" />
             Histórico de Picking
           </TabsTrigger>
+          <TabsTrigger value="erp-exits" className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            Saídas do ERP
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="saidas" className="space-y-6">
@@ -690,6 +695,10 @@ export function StockExitsView() {
 
         <TabsContent value="historico">
           <PickingHistoryView />
+        </TabsContent>
+
+        <TabsContent value="erp-exits">
+          <ERPExitsView />
         </TabsContent>
       </Tabs>
 
