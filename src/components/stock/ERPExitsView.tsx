@@ -1,15 +1,20 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Loader2, ShoppingCart, User, Package, Download, Truck } from 'lucide-react';
+import { CalendarIcon, Loader2, ShoppingCart, User, Package, Download, Truck, Plus, AlertTriangle, ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useProducts } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
@@ -29,12 +34,45 @@ interface SaleExit {
   items: SaleExitItem[];
 }
 
-export function ERPExitsView() {
+export interface ERPExitCartItem {
+  product_id: string;
+  product_code: string;
+  product_name: string;
+  quantity: number;
+}
+
+interface ERPExitsViewProps {
+  onSendToCart?: (items: ERPExitCartItem[]) => void;
+}
+
+export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
   const [date, setDate] = useState<Date>(new Date());
   const [salesExits, setSalesExits] = useState<SaleExit[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
+  const { products, fetchProducts } = useProducts();
+  const { categories } = useCategories();
+
+  // Quick register dialog state
+  const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
+  const [registerItem, setRegisterItem] = useState<{ code: string; name: string } | null>(null);
+  const [registerCategory, setRegisterCategory] = useState('Geral');
+  const [registering, setRegistering] = useState(false);
+
+  // Local products map by code (lowercase)
+  const localProductMap = useMemo(() => {
+    const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
+    for (const p of products) {
+      map.set(p.code.toLowerCase(), {
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        current_stock: p.current_stock,
+      });
+    }
+    return map;
+  }, [products]);
 
   const fetchScheduledExits = async (selectedDate: Date) => {
     setLoading(true);
@@ -71,7 +109,7 @@ export function ERPExitsView() {
     }
   };
 
-  // Aggregate all products across all sales
+  // Aggregate all products across all sales with local matching
   const aggregatedProducts = useMemo(() => {
     const map = new Map<string, { productCode: string; productName: string; totalQuantity: number; salesCount: number }>();
     for (const sale of salesExits) {
@@ -96,8 +134,87 @@ export function ERPExitsView() {
 
   const totalProducts = aggregatedProducts.reduce((sum, p) => sum + p.totalQuantity, 0);
 
+  // Products not found locally
+  const missingProducts = useMemo(() => {
+    return aggregatedProducts.filter(p => !localProductMap.has(p.productCode.toLowerCase()));
+  }, [aggregatedProducts, localProductMap]);
+
+  // Products found locally (for cart)
+  const matchedProducts = useMemo(() => {
+    return aggregatedProducts
+      .filter(p => localProductMap.has(p.productCode.toLowerCase()))
+      .map(p => {
+        const local = localProductMap.get(p.productCode.toLowerCase())!;
+        return { ...p, localProduct: local };
+      });
+  }, [aggregatedProducts, localProductMap]);
+
+  const handleQuickRegister = (code: string, name: string) => {
+    setRegisterItem({ code, name });
+    setRegisterCategory('Geral');
+    setRegisterDialogOpen(true);
+  };
+
+  const confirmRegister = async () => {
+    if (!registerItem) return;
+    setRegistering(true);
+    try {
+      const { error } = await supabase.from('products').insert({
+        code: registerItem.code,
+        name: registerItem.name,
+        category: registerCategory,
+        current_stock: 0,
+        total_colis: 1,
+        min_stock: 0,
+      });
+      if (error) throw error;
+      toast({ title: 'Produto cadastrado', description: `${registerItem.code} adicionado ao sistema local.` });
+      setRegisterDialogOpen(false);
+      setRegisterItem(null);
+      fetchProducts();
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleRegisterAll = async () => {
+    if (missingProducts.length === 0) return;
+    setRegistering(true);
+    try {
+      const toInsert = missingProducts.map(p => ({
+        code: p.productCode,
+        name: p.productName,
+        category: registerCategory || 'Geral',
+        current_stock: 0,
+        total_colis: 1,
+        min_stock: 0,
+      }));
+      const { error } = await supabase.from('products').insert(toInsert);
+      if (error) throw error;
+      toast({ title: 'Produtos cadastrados', description: `${toInsert.length} produto(s) adicionado(s).` });
+      fetchProducts();
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleSendToCart = () => {
+    if (!onSendToCart || matchedProducts.length === 0) return;
+    const items: ERPExitCartItem[] = matchedProducts.map(p => ({
+      product_id: p.localProduct.id,
+      product_code: p.localProduct.code,
+      product_name: p.localProduct.name,
+      quantity: p.totalQuantity,
+    }));
+    onSendToCart(items);
+    toast({ title: 'Enviado para carrinho', description: `${items.length} produto(s) adicionado(s) ao carrinho de saída.` });
+  };
+
   const exportToExcel = () => {
-    // Sheet 1: By sale
     const salesData = salesExits.flatMap(sale =>
       sale.items.map(item => ({
         'Venda': sale.codigo,
@@ -109,20 +226,15 @@ export function ERPExitsView() {
         'Quantidade': item.quantity,
       }))
     );
-
-    // Sheet 2: Aggregated
     const aggData = aggregatedProducts.map(p => ({
       'Código': p.productCode,
       'Produto': p.productName,
       'Quantidade Total': p.totalQuantity,
       'Nº Vendas': p.salesCount,
     }));
-
     const wb = XLSX.utils.book_new();
-    const ws1 = XLSX.utils.json_to_sheet(salesData);
-    const ws2 = XLSX.utils.json_to_sheet(aggData);
-    XLSX.utils.book_append_sheet(wb, ws1, 'Por Venda');
-    XLSX.utils.book_append_sheet(wb, ws2, 'Resumo Produtos');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(salesData), 'Por Venda');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(aggData), 'Resumo Produtos');
     XLSX.writeFile(wb, `saidas_erp_${format(date, 'yyyy-MM-dd')}.xlsx`);
   };
 
@@ -164,16 +276,24 @@ export function ERPExitsView() {
         </Button>
 
         {salesExits.length > 0 && (
-          <Button variant="outline" onClick={exportToExcel}>
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
+          <>
+            <Button variant="outline" onClick={exportToExcel}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+            {onSendToCart && matchedProducts.length > 0 && (
+              <Button onClick={handleSendToCart} className="bg-red-600 hover:bg-red-700 text-white">
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Enviar {matchedProducts.length} produto(s) para Saída
+              </Button>
+            )}
+          </>
         )}
       </div>
 
       {/* Summary */}
       {loaded && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <CardContent className="p-3 text-center">
               <p className="text-2xl font-bold">{salesExits.length}</p>
@@ -192,10 +312,64 @@ export function ERPExitsView() {
               <p className="text-xs text-muted-foreground">Unidades Total</p>
             </CardContent>
           </Card>
+          {missingProducts.length > 0 && (
+            <Card className="border-destructive/50">
+              <CardContent className="p-3 text-center">
+                <p className="text-2xl font-bold text-destructive">{missingProducts.length}</p>
+                <p className="text-xs text-muted-foreground">Não cadastrados</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
-      {/* Aggregated product list (the "cart") */}
+      {/* Missing products alert */}
+      {missingProducts.length > 0 && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              Produtos não cadastrados no sistema local ({missingProducts.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {missingProducts.map(p => (
+              <div key={p.productCode} className="flex items-center justify-between text-sm bg-background rounded px-3 py-2 border">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-muted-foreground">{p.productCode}</span>
+                  <span>{p.productName}</span>
+                  <Badge variant="secondary">{p.totalQuantity} un.</Badge>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => handleQuickRegister(p.productCode, p.productName)}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Cadastrar
+                </Button>
+              </div>
+            ))}
+            {missingProducts.length > 1 && (
+              <div className="flex items-center gap-3 pt-2">
+                <Select value={registerCategory} onValueChange={setRegisterCategory}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(c => (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                    <SelectItem value="Geral">Geral</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={handleRegisterAll} disabled={registering}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Cadastrar Todos ({missingProducts.length})
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Aggregated product list */}
       {aggregatedProducts.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
@@ -211,19 +385,44 @@ export function ERPExitsView() {
                   <TableRow>
                     <TableHead>Código</TableHead>
                     <TableHead>Produto</TableHead>
-                    <TableHead className="text-right">Qtd Total</TableHead>
+                    <TableHead className="text-right">Qtd Saída</TableHead>
+                    <TableHead className="text-right">Stock Local</TableHead>
                     <TableHead className="text-right">Nº Vendas</TableHead>
+                    <TableHead className="text-center">Estado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {aggregatedProducts.map(p => (
-                    <TableRow key={p.productCode}>
-                      <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
-                      <TableCell>{p.productName}</TableCell>
-                      <TableCell className="text-right font-bold">{p.totalQuantity}</TableCell>
-                      <TableCell className="text-right">{p.salesCount}</TableCell>
-                    </TableRow>
-                  ))}
+                  {aggregatedProducts.map(p => {
+                    const local = localProductMap.get(p.productCode.toLowerCase());
+                    const isRegistered = !!local;
+                    const hasEnoughStock = isRegistered && (local.current_stock >= p.totalQuantity);
+                    return (
+                      <TableRow key={p.productCode} className={!isRegistered ? 'bg-destructive/5' : ''}>
+                        <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
+                        <TableCell>{p.productName}</TableCell>
+                        <TableCell className="text-right font-bold">{p.totalQuantity}</TableCell>
+                        <TableCell className="text-right">
+                          {isRegistered ? (
+                            <span className={cn("font-medium", !hasEnoughStock && "text-destructive")}>
+                              {local.current_stock}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">{p.salesCount}</TableCell>
+                        <TableCell className="text-center">
+                          {!isRegistered ? (
+                            <Badge variant="destructive" className="text-xs">Não cadastrado</Badge>
+                          ) : hasEnoughStock ? (
+                            <Badge variant="default" className="text-xs bg-green-600"><Check className="h-3 w-3 mr-1" />OK</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs text-orange-600 border-orange-300">Stock baixo</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -281,6 +480,46 @@ export function ERPExitsView() {
           </CardContent>
         </Card>
       )}
+
+      {/* Quick Register Dialog */}
+      <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cadastrar Produto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm text-muted-foreground">Código</Label>
+              <p className="font-mono font-medium">{registerItem?.code}</p>
+            </div>
+            <div>
+              <Label className="text-sm text-muted-foreground">Nome</Label>
+              <p className="font-medium">{registerItem?.name}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select value={registerCategory} onValueChange={setRegisterCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                  <SelectItem value="Geral">Geral</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRegisterDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmRegister} disabled={registering}>
+              {registering ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Cadastrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

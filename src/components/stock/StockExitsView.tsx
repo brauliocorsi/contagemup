@@ -27,7 +27,7 @@ import { StockValidationDialog, StockValidationError } from './StockValidationDi
 import { PickingReportDialog } from './PickingReportDialog';
 import { LocationSelectionDialog, LocationSelection, ColisLocationData } from './LocationSelectionDialog';
 import { removeOrderNumberAfterExit } from '@/hooks/useOrderNumbers';
-import { ERPExitsView } from './ERPExitsView';
+import { ERPExitsView, ERPExitCartItem } from './ERPExitsView';
 import { toast } from 'sonner';
 
 const EXIT_REASONS = [
@@ -698,7 +698,10 @@ export function StockExitsView() {
         </TabsContent>
 
         <TabsContent value="erp-exits">
-          <ERPExitsView />
+          <ERPExitsView onSendToCart={(items) => {
+            items.forEach(item => handleAddToCart(item));
+            setActiveTab('saidas');
+          }} />
         </TabsContent>
       </Tabs>
 
