@@ -254,6 +254,20 @@ export function ERPReconciliationView() {
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
                           </TableCell>
+                          <TableCell>
+                            {item.status === 'erp_only' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 gap-1 px-2 text-xs"
+                                onClick={() => handleRegisterSingle(item)}
+                                disabled={registering.has(item.productCode)}
+                              >
+                                {registering.has(item.productCode) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                                Cadastrar
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                         {isExpanded && salesCount > 0 && (
                           <TableRow key={`${rowKey}-sales`} className="bg-muted/30">
