@@ -32,6 +32,54 @@ async function fetchPage(baseUrl: string, page: number, headers: Record<string, 
   return { data: data?.data || [], meta: data?.meta || {} };
 }
 
+function normalizeCode(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function normalizeIdentifier(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function extractProductReferences(item: any): { productCode: string; productId: string; variationId: string } {
+  const product = item?.produto || {};
+
+  const productCodeCandidates = [
+    item?.codigo_interno,
+    item?.codigo,
+    item?.produto_codigo,
+    item?.produto_codigo_interno,
+    item?.variacao_codigo,
+    item?.variacao?.codigo,
+    product?.codigo_interno,
+    product?.codigo,
+    product?.produto_codigo,
+    product?.codigo_produto,
+    product?.variacao_codigo,
+    product?.referencia,
+  ];
+
+  const productIdCandidates = [
+    item?.produto_id,
+    item?.product_id,
+    product?.produto_id,
+    product?.id,
+  ];
+
+  const variationIdCandidates = [
+    item?.variacao_id,
+    item?.variation_id,
+    item?.variacao?.id,
+    product?.variacao_id,
+    product?.variacao?.id,
+  ];
+
+  const productCode = normalizeCode(productCodeCandidates.find((value) => String(value ?? '').trim() !== ''));
+  const productId = normalizeIdentifier(productIdCandidates.find((value) => String(value ?? '').trim() !== ''));
+  const variationId = normalizeIdentifier(variationIdCandidates.find((value) => String(value ?? '').trim() !== ''));
+
+  return { productCode, productId, variationId };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -111,7 +159,90 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Step 3: Build a map of product codes to their vendas
+    // Step 3: Build a map of product IDs/variation IDs to internal product codes
+    const requiredProductIds = new Set<string>();
+    const requiredVariationIds = new Set<string>();
+
+    for (const venda of allVendas) {
+      const items = venda.produtos || venda.itens || [];
+      for (const item of items) {
+        const refs = extractProductReferences(item);
+        if (!refs.productCode) {
+          if (refs.productId) requiredProductIds.add(refs.productId);
+          if (refs.variationId) requiredVariationIds.add(refs.variationId);
+        }
+      }
+    }
+
+    const productCodeByProductId: Record<string, string> = {};
+    const productCodeByVariationId: Record<string, string> = {};
+
+    if (requiredProductIds.size > 0 || requiredVariationIds.size > 0) {
+      const productsBaseUrl = 'https://api.gestaoclick.com/api/produtos?ativo=1';
+      const firstProductsPage = await fetchPage(productsBaseUrl, 1, apiHeaders);
+      const totalProductPages = firstProductsPage.meta.total_paginas || 1;
+
+      const pendingProductIds = new Set(requiredProductIds);
+      const pendingVariationIds = new Set(requiredVariationIds);
+
+      const consumeProducts = (products: any[]) => {
+        for (const product of products) {
+          const productId = normalizeIdentifier(product?.id);
+          const fallbackCode = normalizeCode(product?.codigo_interno || product?.codigo);
+
+          if (productId && fallbackCode) {
+            productCodeByProductId[productId] = fallbackCode;
+            pendingProductIds.delete(productId);
+          }
+
+          const variacoes = Array.isArray(product?.variacoes) ? product.variacoes : [];
+          for (const variationWrapper of variacoes) {
+            const variation = variationWrapper?.variacao || variationWrapper || {};
+            const variationId = normalizeIdentifier(variation?.id || variation?.variacao_id);
+            const variationCode = normalizeCode(variation?.codigo || variation?.codigo_interno || fallbackCode);
+
+            if (variationId && variationCode) {
+              productCodeByVariationId[variationId] = variationCode;
+              pendingVariationIds.delete(variationId);
+            }
+          }
+        }
+      };
+
+      consumeProducts(firstProductsPage.data);
+
+      const BATCH_SIZE_PRODUCTS = 5;
+      for (
+        let batchStart = 2;
+        batchStart <= totalProductPages && (pendingProductIds.size > 0 || pendingVariationIds.size > 0);
+        batchStart += BATCH_SIZE_PRODUCTS
+      ) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE_PRODUCTS - 1, totalProductPages);
+        const pages: number[] = [];
+        for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
+
+        const results = await Promise.all(
+          pages.map((p) => fetchPage(productsBaseUrl, p, apiHeaders))
+        );
+
+        for (const result of results) {
+          consumeProducts(result.data);
+        }
+
+        if (batchEnd < totalProductPages) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+        }
+      }
+
+      console.log('Mapeamento de produtos resolvido:', {
+        productIdsResolvidos: requiredProductIds.size - pendingProductIds.size,
+        productIdsPendentes: pendingProductIds.size,
+        variationIdsResolvidos: requiredVariationIds.size - pendingVariationIds.size,
+        variationIdsPendentes: pendingVariationIds.size,
+      });
+    }
+
+    // Step 4: Build a map of product codes to their vendas
     const productSalesMap: Record<string, Array<{
       venda_id: string;
       codigo: string;
@@ -133,6 +264,7 @@ Deno.serve(async (req) => {
       const firstItems = allVendas[0].produtos || allVendas[0].itens || [];
       if (firstItems.length > 0) {
         console.log('DEBUG - First sale item keys:', Object.keys(firstItems[0]));
+        console.log('DEBUG - Nested product keys:', Object.keys(firstItems[0]?.produto || {}));
         console.log('DEBUG - First sale item:', JSON.stringify(firstItems[0]).substring(0, 500));
       }
     }
@@ -150,22 +282,26 @@ Deno.serve(async (req) => {
 
       const items = venda.produtos || venda.itens || [];
       for (const item of items) {
-        const productCode = String(item.codigo_interno || item.codigo || item.produto_codigo || '');
-        if (!productCode) continue;
+        const refs = extractProductReferences(item);
+        const resolvedCode = refs.productCode
+          || (refs.variationId ? productCodeByVariationId[refs.variationId] : '')
+          || (refs.productId ? productCodeByProductId[refs.productId] : '');
+
+        if (!resolvedCode) continue;
 
         vendaInfo.produtos.push({
-          nome: item.nome || item.produto_nome || '',
-          codigo: productCode,
-          quantidade: String(item.quantidade || '1'),
-          valor_unitario: String(item.valor_unitario || '0'),
+          nome: item.nome || item.produto_nome || item.produto?.nome_produto || '',
+          codigo: resolvedCode,
+          quantidade: String(item.quantidade || item.produto?.quantidade || '1'),
+          valor_unitario: String(item.valor_unitario || item.produto?.valor_venda || '0'),
         });
 
-        if (!productSalesMap[productCode]) {
-          productSalesMap[productCode] = [];
+        if (!productSalesMap[resolvedCode]) {
+          productSalesMap[resolvedCode] = [];
         }
         // Avoid duplicating the same venda for same product
-        if (!productSalesMap[productCode].find(v => v.venda_id === vendaInfo.venda_id)) {
-          productSalesMap[productCode].push(vendaInfo);
+        if (!productSalesMap[resolvedCode].find(v => v.venda_id === vendaInfo.venda_id)) {
+          productSalesMap[resolvedCode].push(vendaInfo);
         }
       }
     }

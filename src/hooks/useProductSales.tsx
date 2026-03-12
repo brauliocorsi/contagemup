@@ -24,6 +24,8 @@ export interface ProductSalesData {
   loaded: boolean;
 }
 
+const normalizeProductCode = (value: string): string => value.trim().toLowerCase();
+
 export function useProductSales() {
   const [salesMap, setSalesMap] = useState<Record<string, VendaInfo[]>>({});
   const [totalVendas, setTotalVendas] = useState(0);
@@ -42,7 +44,15 @@ export function useProductSales() {
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
 
-      setSalesMap(data?.productSalesMap || {});
+      const rawMap = (data?.productSalesMap || {}) as Record<string, VendaInfo[]>;
+      const normalizedMap = Object.entries(rawMap).reduce<Record<string, VendaInfo[]>>((acc, [code, vendas]) => {
+        const normalizedCode = normalizeProductCode(String(code || ''));
+        if (!normalizedCode) return acc;
+        acc[normalizedCode] = Array.isArray(vendas) ? vendas : [];
+        return acc;
+      }, {});
+
+      setSalesMap(normalizedMap);
       setTotalVendas(data?.totalVendas || 0);
       setLoaded(true);
     } catch (err: any) {
@@ -54,16 +64,18 @@ export function useProductSales() {
   }, []);
 
   const getSalesForProduct = useCallback((productCode: string): VendaInfo[] => {
-    return salesMap[productCode] || [];
+    const normalizedCode = normalizeProductCode(String(productCode || ''));
+    if (!normalizedCode) return [];
+    return salesMap[normalizedCode] || [];
   }, [salesMap]);
 
   const hasSales = useCallback((productCode: string): boolean => {
-    return (salesMap[productCode]?.length || 0) > 0;
-  }, [salesMap]);
+    return getSalesForProduct(productCode).length > 0;
+  }, [getSalesForProduct]);
 
   const getSalesCount = useCallback((productCode: string): number => {
-    return salesMap[productCode]?.length || 0;
-  }, [salesMap]);
+    return getSalesForProduct(productCode).length;
+  }, [getSalesForProduct]);
 
   return {
     salesMap,
