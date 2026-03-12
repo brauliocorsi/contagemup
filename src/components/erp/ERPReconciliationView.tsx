@@ -19,12 +19,13 @@ const STATUS_CONFIG = {
 };
 
 export function ERPReconciliationView() {
-  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct } = useERPReconciliation();
+  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts } = useERPReconciliation();
   const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount } = useProductSales();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [quickSearch, setQuickSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [registering, setRegistering] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
     return comparisonItems.filter(item => {
