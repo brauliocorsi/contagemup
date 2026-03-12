@@ -336,6 +336,42 @@ export function ERPReconciliationView() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Selecionar Categoria</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              {pendingRegisterItems.length === 1
+                ? `Cadastrar "${pendingRegisterItems[0]?.productName}" no sistema local.`
+                : `Cadastrar ${pendingRegisterItems.length} produto(s) no sistema local.`}
+            </p>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Geral">Geral</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmRegister} disabled={registering.size > 0}>
+              {registering.size > 0 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Cadastrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
