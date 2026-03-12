@@ -115,7 +115,7 @@ export function PurchaseOrdersView() {
   };
 
   const exportToExcel = () => {
-    const data = negativeStockItems.map(p => ({
+    const data = displayItems.map(p => ({
       'Código': p.productCode,
       'Produto': p.productName,
       'Vendido': p.totalSold,
