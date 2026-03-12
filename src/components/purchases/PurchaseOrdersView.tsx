@@ -261,6 +261,15 @@ export function PurchaseOrdersView() {
                     <TableRow key={p.productCode}>
                       <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
                       <TableCell>{p.productName}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {p.vendas.map((v, i) => (
+                            <Badge key={i} variant="outline" className="text-[10px] font-mono px-1.5 py-0">
+                              #{v.codigo}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">{p.totalSold}</TableCell>
                       <TableCell className="text-right">
                         <span className={cn("font-medium", p.localStock < 0 && "text-destructive")}>
