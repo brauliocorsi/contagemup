@@ -55,14 +55,15 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json',
     };
 
-    // Quick single-product search by code/name (searches page by page until found)
+    // Quick single-product search by code/name (max 10 pages to stay fast)
     if (searchQuery) {
       const normalizedSearch = searchQuery.toLowerCase().trim();
       let page = 1;
       let totalPages = 1;
       const foundProducts: any[] = [];
+      const MAX_SEARCH_PAGES = 10;
 
-      while (page <= totalPages) {
+      while (page <= totalPages && page <= MAX_SEARCH_PAGES) {
         const result = await fetchPage(page, apiHeaders);
         if (page === 1) totalPages = result.meta.total_paginas || 1;
 
@@ -74,14 +75,14 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Stop early if we found results and scanned at least a few pages
-        if (foundProducts.length > 0 && page >= Math.min(3, totalPages)) break;
+        // Stop as soon as we find results
+        if (foundProducts.length > 0) break;
         page++;
       }
 
       return new Response(JSON.stringify({
         data: foundProducts,
-        meta: { total: foundProducts.length, searched: true },
+        meta: { total: foundProducts.length, searched: true, pages_scanned: page },
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
