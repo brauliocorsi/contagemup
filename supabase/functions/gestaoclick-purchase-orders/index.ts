@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
     if (requiredProductIds.size > 0 || requiredVariationIds.size > 0) {
       const productsBaseUrl = 'https://api.gestaoclick.com/api/produtos?ativo=1';
       const firstProductsPage = await fetchPage(productsBaseUrl, 1, apiHeaders);
-      const totalProductPages = firstProductsPage.meta.total_paginas || 1;
+      const totalProductPages = Math.min(firstProductsPage.meta.total_paginas || 1, 30);
       const pendingProductIds = new Set(requiredProductIds);
       const pendingVariationIds = new Set(requiredVariationIds);
 
