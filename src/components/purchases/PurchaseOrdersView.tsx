@@ -229,14 +229,15 @@ export function PurchaseOrdersView() {
       )}
 
       {/* Product list */}
-      {negativeStockItems.length > 0 && (
+      {displayItems.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Package className="h-4 w-4" />
-              Produtos para Compra
+              {showAll ? 'Todos os Produtos Vendidos' : 'Produtos para Compra'}
+              <Badge variant="secondary" className="text-xs ml-1">{displayItems.length}</Badge>
               {removedProducts.size > 0 && (
-                <Badge variant="secondary" className="text-xs ml-2">{removedProducts.size} removido(s)</Badge>
+                <Badge variant="outline" className="text-xs ml-1">{removedProducts.size} removido(s)</Badge>
               )}
             </CardTitle>
           </CardHeader>
@@ -255,7 +256,7 @@ export function PurchaseOrdersView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {negativeStockItems.map(p => (
+                  {displayItems.map(p => (
                     <TableRow key={p.productCode}>
                       <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
                       <TableCell>{p.productName}</TableCell>
@@ -266,10 +267,16 @@ export function PurchaseOrdersView() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="text-destructive font-medium">{p.stockAfterSale}</span>
+                        <span className={cn("font-medium", p.stockAfterSale < 0 && "text-destructive")}>
+                          {p.stockAfterSale}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Badge variant="destructive" className="font-bold">{p.deficit} un.</Badge>
+                        {p.deficit > 0 ? (
+                          <Badge variant="destructive" className="font-bold">{p.deficit} un.</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveProduct(p.productCode)} title="Remover da lista">
