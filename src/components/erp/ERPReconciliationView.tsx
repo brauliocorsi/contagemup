@@ -206,8 +206,9 @@ export function ERPReconciliationView() {
                           </Button>
                         )}
                       </div>
-                    </TableHead>
-                  </TableRow>
+                     </TableHead>
+                     <TableHead>Ações</TableHead>
+                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((item, idx) => {
