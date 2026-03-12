@@ -49,7 +49,7 @@ export function useERPReconciliation() {
       id: String(p.id),
       codigo_interno: p.codigo_interno || p.codigo || '',
       nome: p.nome || '',
-      estoque_atual: Math.max(0, parseFloat(String(p.estoque ?? '0')) || 0),
+      estoque_atual: parseFloat(String(p.estoque ?? '0')) || 0,
       grupo: p.nome_grupo || '',
     }));
 
