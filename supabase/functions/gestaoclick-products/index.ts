@@ -88,11 +88,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const apiHeaders = {
-      'access-token': accessToken,
-      'secret-access-token': secretToken,
-      'Content-Type': 'application/json',
-    };
 
     if (fetchAll) {
       // Step 1: Fetch page 1 to get total_paginas
