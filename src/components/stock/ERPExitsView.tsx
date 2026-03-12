@@ -194,7 +194,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
       const { error } = await supabase.from('products').insert(toInsert);
       if (error) throw error;
       toast({ title: 'Produtos cadastrados', description: `${toInsert.length} produto(s) adicionado(s).` });
-      refetchProducts();
+      fetchProducts();
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' });
     } finally {
