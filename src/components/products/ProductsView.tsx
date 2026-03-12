@@ -74,6 +74,7 @@ export function ProductsView() {
   const { logChange, logMultipleChanges } = useProductChanges();
   const { lastCounts } = useLastCounts();
   const { productIdsWithOrders, getOrderStats, loading: ordersLoading } = useProductsWithOrders();
+  const { getSalesForProduct, getSalesCount, loading: salesLoading, loaded: salesLoaded, fetchSales } = useProductSales();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
