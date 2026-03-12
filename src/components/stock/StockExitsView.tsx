@@ -27,6 +27,7 @@ import { StockValidationDialog, StockValidationError } from './StockValidationDi
 import { PickingReportDialog } from './PickingReportDialog';
 import { LocationSelectionDialog, LocationSelection, ColisLocationData } from './LocationSelectionDialog';
 import { removeOrderNumberAfterExit } from '@/hooks/useOrderNumbers';
+import { ERPExitsView } from './ERPExitsView';
 import { toast } from 'sonner';
 
 const EXIT_REASONS = [
