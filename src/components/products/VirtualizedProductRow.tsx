@@ -68,6 +68,8 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
   isSelected,
   hasOrders,
   orderStats,
+  salesCount,
+  sales,
   visibleColumns,
   columnWidths,
   onToggleSelection,
