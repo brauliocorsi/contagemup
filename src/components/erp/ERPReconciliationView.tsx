@@ -205,6 +205,17 @@ export function ERPReconciliationView() {
                             {config.label}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          {salesLoaded ? (
+                            <ProductSalesPopover
+                              salesCount={getSalesCount(item.productCode)}
+                              sales={getSalesForProduct(item.productCode)}
+                              productCode={item.productCode}
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{item.location || '—'}</TableCell>
                       </TableRow>
                     );
