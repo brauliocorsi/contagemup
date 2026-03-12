@@ -91,6 +91,7 @@ export default function Dashboard() {
           {activeTab === 'damages' && <DamagesView />}
           {activeTab === 'reconciliation' && <ReconciliationView />}
           {activeTab === 'erp' && <ERPReconciliationView />}
+          {activeTab === 'purchases' && <PurchaseOrdersView />}
           {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
           {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
           {activeTab === 'recent' && <RecentProductsView />}

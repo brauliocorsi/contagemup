@@ -42,6 +42,7 @@ const mainTabs = [
 const endTabs = [
   { id: 'reconciliation', label: 'Separação', icon: Scale },
   { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
+  { id: 'purchases', label: 'Compras', icon: ShoppingBag },
   { id: 'warehouse', label: 'Armazém', icon: Warehouse },
   { id: 'reports', label: 'Relatórios', icon: BarChart3 },
   { id: 'settings', label: 'Configurações', icon: Settings },
