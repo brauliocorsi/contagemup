@@ -366,6 +366,20 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
         </div>
       )}
 
+      {/* Sales */}
+      {isColumnVisible('sales') && (
+        <div className="p-2" style={getColWidth('sales')}>
+          <ProductSalesPopover
+            salesCount={salesCount}
+            sales={sales}
+            productCode={product.code}
+          />
+          {salesCount === 0 && (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex-shrink-0 flex items-center justify-end gap-1 px-2" style={{ width: '144px' }}>
         <Button 
