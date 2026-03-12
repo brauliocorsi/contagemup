@@ -28,7 +28,7 @@ export function PurchaseOrdersView() {
   const [loaded, setLoaded] = useState(false);
   const [removedProducts, setRemovedProducts] = useState<Set<string>>(new Set());
   const [sortAlpha, setSortAlpha] = useState(true);
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(true);
   const { toast } = useToast();
   const { products } = useProducts();
 
