@@ -161,7 +161,20 @@ export function PurchaseOrdersView() {
               {loading ? 'A carregar...' : 'Buscar Vendas do Dia'}
             </Button>
 
-            {negativeStockItems.length > 0 && (
+            {loaded && soldItems.length > 0 && (
+              <>
+                <Button
+                  variant={showAll ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setShowAll(!showAll)}
+                >
+                  {showAll ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
+                  {showAll ? 'Todos' : 'Só Negativos'}
+                </Button>
+              </>
+            )}
+
+            {displayItems.length > 0 && (
               <>
                 <Button variant="outline" onClick={exportToExcel}>
                   <Download className="h-4 w-4 mr-2" /> Exportar
