@@ -239,7 +239,7 @@ export function useERPReconciliation() {
     }
   }, [toast]);
 
-  const registerERPProducts = useCallback(async (items: ERPComparisonItem[]) => {
+  const registerERPProducts = useCallback(async (items: ERPComparisonItem[], categoryOverride?: string) => {
     if (items.length === 0) return;
     
     const erpMap = new Map(erpProducts.map(p => [p.codigo_interno.toLowerCase(), p]));
@@ -252,7 +252,7 @@ export function useERPReconciliation() {
           code: item.productCode,
           name: item.productName,
           current_stock: 0,
-          category: erpProd?.grupo || 'Geral',
+          category: categoryOverride || erpProd?.grupo || 'Geral',
           total_colis: 1,
           min_stock: 0,
         };
