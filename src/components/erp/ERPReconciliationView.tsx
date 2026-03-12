@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useERPReconciliation, ERPComparisonItem } from '@/hooks/useERPReconciliation';
 import { useProductSales, VendaInfo } from '@/hooks/useProductSales';
+import { useCategories } from '@/hooks/useCategories';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
 
 const STATUS_CONFIG = {
@@ -21,11 +24,15 @@ const STATUS_CONFIG = {
 export function ERPReconciliationView() {
   const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts } = useERPReconciliation();
   const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount } = useProductSales();
+  const { categories } = useCategories();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [quickSearch, setQuickSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [registering, setRegistering] = useState<Set<string>>(new Set());
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('Geral');
 
   const filtered = useMemo(() => {
     return comparisonItems.filter(item => {
@@ -62,16 +69,19 @@ export function ERPReconciliationView() {
 
   const erpOnlyItems = useMemo(() => filtered.filter(i => i.status === 'erp_only'), [filtered]);
 
-  const handleRegisterSingle = async (item: ERPComparisonItem) => {
-    setRegistering(prev => new Set(prev).add(item.productCode));
-    await registerERPProducts([item]);
-    setRegistering(prev => { const s = new Set(prev); s.delete(item.productCode); return s; });
+  const openCategoryDialog = (items: ERPComparisonItem[]) => {
+    setPendingRegisterItems(items);
+    setSelectedCategory('Geral');
+    setCategoryDialogOpen(true);
   };
 
-  const handleRegisterAll = async () => {
-    setRegistering(new Set(erpOnlyItems.map(i => i.productCode)));
-    await registerERPProducts(erpOnlyItems);
+  const confirmRegister = async () => {
+    setCategoryDialogOpen(false);
+    const codes = pendingRegisterItems.map(i => i.productCode);
+    setRegistering(new Set(codes));
+    await registerERPProducts(pendingRegisterItems, selectedCategory);
     setRegistering(new Set());
+    setPendingRegisterItems([]);
   };
 
   return (
@@ -108,7 +118,7 @@ export function ERPReconciliationView() {
                 Exportar Excel
               </Button>
               {erpOnlyItems.length > 0 && (
-                <Button variant="default" onClick={handleRegisterAll} disabled={registering.size > 0}>
+                <Button variant="default" onClick={() => openCategoryDialog(erpOnlyItems)} disabled={registering.size > 0}>
                   {registering.size > 0 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
                   Cadastrar {erpOnlyItems.length} em falta
                 </Button>
@@ -260,7 +270,7 @@ export function ERPReconciliationView() {
                                 variant="outline"
                                 size="sm"
                                 className="h-7 gap-1 px-2 text-xs"
-                                onClick={() => handleRegisterSingle(item)}
+                                onClick={() => openCategoryDialog([item])}
                                 disabled={registering.has(item.productCode)}
                               >
                                 {registering.has(item.productCode) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
@@ -326,6 +336,42 @@ export function ERPReconciliationView() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Selecionar Categoria</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              {pendingRegisterItems.length === 1
+                ? `Cadastrar "${pendingRegisterItems[0]?.productName}" no sistema local.`
+                : `Cadastrar ${pendingRegisterItems.length} produto(s) no sistema local.`}
+            </p>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Geral">Geral</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmRegister} disabled={registering.size > 0}>
+              {registering.size > 0 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Cadastrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
