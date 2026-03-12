@@ -18,9 +18,10 @@ const STATUS_CONFIG = {
 };
 
 export function ERPReconciliationView() {
-  const { comparisonItems, loading, fetchAndCompare } = useERPReconciliation();
+  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct } = useERPReconciliation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [quickSearch, setQuickSearch] = useState('');
 
   const filtered = useMemo(() => {
     return comparisonItems.filter(item => {
