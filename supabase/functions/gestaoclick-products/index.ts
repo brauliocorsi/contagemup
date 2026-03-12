@@ -55,34 +55,116 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json',
     };
 
-    // Quick single-product search by code/name (max 10 pages to stay fast)
+    // Quick search optimized for product code and name
     if (searchQuery) {
-      const normalizedSearch = searchQuery.toLowerCase().trim();
-      let page = 1;
-      let totalPages = 1;
-      const foundProducts: any[] = [];
-      const MAX_SEARCH_PAGES = 10;
+      const normalizedSearch = String(searchQuery).toLowerCase().trim();
+      const isCodeSearch = /^[a-z0-9._\-/]+$/i.test(normalizedSearch) && normalizedSearch.length >= 4;
 
-      while (page <= totalPages && page <= MAX_SEARCH_PAGES) {
-        const result = await fetchPage(page, apiHeaders);
-        if (page === 1) totalPages = result.meta.total_paginas || 1;
+      const matchesProduct = (p: any) => {
+        const code = String(p.codigo_interno ?? p.codigo ?? '').toLowerCase().trim();
+        const name = String(p.nome ?? '').toLowerCase().trim();
 
-        for (const p of result.products) {
-          const code = (p.codigo_interno || p.codigo || '').toLowerCase();
-          const name = (p.nome || '').toLowerCase();
-          if (code.includes(normalizedSearch) || name.includes(normalizedSearch)) {
-            foundProducts.push(p);
-          }
+        if (isCodeSearch) {
+          return code === normalizedSearch || code.startsWith(normalizedSearch) || code.includes(normalizedSearch);
         }
 
-        // Stop as soon as we find results
-        if (foundProducts.length > 0) break;
-        page++;
+        return code.includes(normalizedSearch) || name.includes(normalizedSearch);
+      };
+
+      const fetchFilteredProducts = async (filterKey: 'codigo' | 'nome') => {
+        const fetchFilteredPage = async (page: number) => {
+          const url = new URL('https://api.gestaoclick.com/api/produtos');
+          url.searchParams.set('pagina', String(page));
+          url.searchParams.set('ativo', '1');
+          url.searchParams.set(filterKey, String(searchQuery).trim());
+
+          const response = await fetchWithRetry(url.toString(), { method: 'GET', headers: apiHeaders });
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`GestãoClick API filtered search error [${response.status}]: ${errorText}`);
+          }
+
+          const data = await response.json();
+          return { products: data?.data || [], meta: data?.meta || {} };
+        };
+
+        const first = await fetchFilteredPage(1);
+        const totalPages = first.meta.total_paginas || 1;
+        const maxPages = filterKey === 'codigo' ? totalPages : Math.min(totalPages, 10);
+        const products = [...first.products];
+
+        const BATCH_SIZE = 5;
+        for (let batchStart = 2; batchStart <= maxPages; batchStart += BATCH_SIZE) {
+          const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, maxPages);
+          const pages: number[] = [];
+          for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
+
+          const results = await Promise.all(pages.map((p) => fetchFilteredPage(p)));
+          for (const result of results) {
+            products.push(...result.products);
+          }
+
+          if (products.length > 0 && filterKey === 'codigo') break;
+        }
+
+        return products;
+      };
+
+      let foundProducts: any[] = [];
+      let strategy: 'filtered' | 'fallback-scan' = 'filtered';
+
+      try {
+        foundProducts = await fetchFilteredProducts(isCodeSearch ? 'codigo' : 'nome');
+        foundProducts = foundProducts.filter(matchesProduct);
+      } catch (error) {
+        console.error('Filtered search failed, fallback to scan:', error);
       }
 
+      // Fallback: paginated scan when API filter does not return expected products
+      if (foundProducts.length === 0) {
+        strategy = 'fallback-scan';
+        const firstPage = await fetchPage(1, apiHeaders);
+        const totalPages = firstPage.meta.total_paginas || 1;
+
+        for (const p of firstPage.products) {
+          if (matchesProduct(p)) foundProducts.push(p);
+        }
+
+        if (foundProducts.length === 0) {
+          const maxPagesToScan = isCodeSearch ? Math.min(totalPages, 80) : Math.min(totalPages, 10);
+          const BATCH_SIZE = isCodeSearch ? 8 : 4;
+
+          for (let batchStart = 2; batchStart <= maxPagesToScan; batchStart += BATCH_SIZE) {
+            const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, maxPagesToScan);
+            const pages: number[] = [];
+            for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
+
+            const results = await Promise.all(pages.map((p) => fetchPage(p, apiHeaders)));
+
+            for (const result of results) {
+              for (const p of result.products) {
+                if (matchesProduct(p)) foundProducts.push(p);
+              }
+            }
+
+            if (foundProducts.length > 0) break;
+          }
+        }
+      }
+
+      const uniqueProducts = Array.from(
+        new Map(foundProducts.map((p: any) => [String(p.id), p])).values()
+      );
+
       return new Response(JSON.stringify({
-        data: foundProducts,
-        meta: { total: foundProducts.length, searched: true, pages_scanned: page },
+        data: uniqueProducts,
+        meta: {
+          total: uniqueProducts.length,
+          searched: true,
+          query: searchQuery,
+          search_mode: isCodeSearch ? 'code' : 'name',
+          strategy,
+        },
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
