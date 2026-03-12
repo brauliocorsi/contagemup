@@ -49,7 +49,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   actions: 120,
 };
 
-type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'damages' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'pallet';
+type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'damages' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'pallet' | 'sales';
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   code: 'Código',
@@ -63,9 +63,10 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   colisLocations: 'Colis/Localização',
   location: 'Localização',
   pallet: 'Palete',
+  sales: 'Vendas',
 };
 
-const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'damages', 'totalUnits', 'lastCount', 'colisLocations', 'location', 'pallet'];
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'damages', 'totalUnits', 'lastCount', 'colisLocations', 'location', 'pallet', 'sales'];
 
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
