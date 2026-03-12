@@ -51,7 +51,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
-  const { products, refetch: refetchProducts } = useProducts();
+  const { products, fetchProducts } = useProducts();
   const { categories } = useCategories();
 
   // Quick register dialog state
