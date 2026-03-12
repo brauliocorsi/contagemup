@@ -45,6 +45,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   colisLocations: 180,
   location: 120,
   pallet: 100,
+  sales: 100,
   actions: 120,
 };
 
