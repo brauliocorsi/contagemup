@@ -535,6 +535,10 @@ export function StockExitsView() {
             <History className="h-4 w-4" />
             Histórico de Picking
           </TabsTrigger>
+          <TabsTrigger value="erp-exits" className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            Saídas do ERP
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="saidas" className="space-y-6">
