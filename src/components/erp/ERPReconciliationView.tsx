@@ -24,11 +24,15 @@ const STATUS_CONFIG = {
 export function ERPReconciliationView() {
   const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts } = useERPReconciliation();
   const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount } = useProductSales();
+  const { categories } = useCategories();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [quickSearch, setQuickSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [registering, setRegistering] = useState<Set<string>>(new Set());
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('Geral');
 
   const filtered = useMemo(() => {
     return comparisonItems.filter(item => {
@@ -65,16 +69,19 @@ export function ERPReconciliationView() {
 
   const erpOnlyItems = useMemo(() => filtered.filter(i => i.status === 'erp_only'), [filtered]);
 
-  const handleRegisterSingle = async (item: ERPComparisonItem) => {
-    setRegistering(prev => new Set(prev).add(item.productCode));
-    await registerERPProducts([item]);
-    setRegistering(prev => { const s = new Set(prev); s.delete(item.productCode); return s; });
+  const openCategoryDialog = (items: ERPComparisonItem[]) => {
+    setPendingRegisterItems(items);
+    setSelectedCategory('Geral');
+    setCategoryDialogOpen(true);
   };
 
-  const handleRegisterAll = async () => {
-    setRegistering(new Set(erpOnlyItems.map(i => i.productCode)));
-    await registerERPProducts(erpOnlyItems);
+  const confirmRegister = async () => {
+    setCategoryDialogOpen(false);
+    const codes = pendingRegisterItems.map(i => i.productCode);
+    setRegistering(new Set(codes));
+    await registerERPProducts(pendingRegisterItems, selectedCategory);
     setRegistering(new Set());
+    setPendingRegisterItems([]);
   };
 
   return (
