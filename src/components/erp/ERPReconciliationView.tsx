@@ -173,6 +173,7 @@ export function ERPReconciliationView() {
                     <TableHead className="text-right">Stock Local</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead>Localização</TableHead>
                     <TableHead>
                       <div className="flex items-center gap-1">
                         Vendas
@@ -183,41 +184,85 @@ export function ERPReconciliationView() {
                         )}
                       </div>
                     </TableHead>
-                    <TableHead>Localização</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((item, idx) => {
                     const config = STATUS_CONFIG[item.status];
                     const Icon = config.icon;
+                    const rowKey = `${item.productCode}-${idx}`;
+                    const isExpanded = expandedRow === rowKey;
+                    const sales = salesLoaded ? getSalesForProduct(item.productCode) : [];
+                    const salesCount = sales.length;
+
                     return (
-                      <TableRow key={`${item.productCode}-${idx}`}>
-                        <TableCell className="font-mono text-sm">{item.productCode}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{item.productName}</TableCell>
-                        <TableCell className="text-right font-medium">{item.erpStock}</TableCell>
-                        <TableCell className="text-right font-medium">{item.localStock}</TableCell>
-                        <TableCell className={`text-right font-bold ${item.difference > 0 ? 'text-blue-600' : item.difference < 0 ? 'text-red-600' : ''}`}>
-                          {item.difference > 0 ? '+' : ''}{item.difference}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className={`${config.color} gap-1`}>
-                            <Icon className="h-3 w-3" />
-                            {config.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {salesLoaded ? (
-                            <ProductSalesPopover
-                              salesCount={getSalesCount(item.productCode)}
-                              sales={getSalesForProduct(item.productCode)}
-                              productCode={item.productCode}
-                            />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.location || '—'}</TableCell>
-                      </TableRow>
+                      <>
+                        <TableRow key={rowKey}>
+                          <TableCell className="font-mono text-sm">{item.productCode}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{item.productName}</TableCell>
+                          <TableCell className="text-right font-medium">{item.erpStock}</TableCell>
+                          <TableCell className="text-right font-medium">{item.localStock}</TableCell>
+                          <TableCell className={`text-right font-bold ${item.difference > 0 ? 'text-blue-600' : item.difference < 0 ? 'text-red-600' : ''}`}>
+                            {item.difference > 0 ? '+' : ''}{item.difference}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className={`${config.color} gap-1`}>
+                              <Icon className="h-3 w-3" />
+                              {config.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{item.location || '—'}</TableCell>
+                          <TableCell>
+                            {salesLoaded && salesCount > 0 ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 gap-1 px-2 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                                onClick={() => setExpandedRow(isExpanded ? null : rowKey)}
+                              >
+                                <ShoppingCart className="h-3 w-3" />
+                                {salesCount}
+                                {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                              </Button>
+                            ) : salesLoaded ? (
+                              <span className="text-xs text-muted-foreground">0</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && salesCount > 0 && (
+                          <TableRow key={`${rowKey}-sales`} className="bg-muted/30">
+                            <TableCell colSpan={8} className="p-0">
+                              <div className="px-4 py-3 space-y-1.5">
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                                  <ShoppingCart className="h-3 w-3 inline mr-1" />
+                                  {salesCount} venda(s) ativa(s) — excluindo: conferido, agendado entrega, cancelado
+                                </p>
+                                <div className="grid gap-1.5">
+                                  {sales.map((venda: VendaInfo) => (
+                                    <div
+                                      key={venda.venda_id}
+                                      className="flex items-center gap-3 text-sm bg-background rounded-md border px-3 py-2"
+                                    >
+                                      <span className="font-mono font-semibold text-foreground">#{venda.codigo}</span>
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">{venda.situacao}</Badge>
+                                      <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                                        <User className="h-3 w-3" />
+                                        <span className="truncate max-w-[180px]">{venda.cliente_nome}</span>
+                                      </span>
+                                      <span className="flex items-center gap-1 text-muted-foreground text-xs ml-auto">
+                                        <Calendar className="h-3 w-3" />
+                                        {venda.data}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     );
                   })}
                 </TableBody>
