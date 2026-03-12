@@ -817,6 +817,8 @@ export function ProductsView() {
                           isSelected={selectedProducts.has(product.id)}
                           hasOrders={productIdsWithOrders.has(product.id)}
                           orderStats={getOrderStats(product.id)}
+                          salesCount={getSalesCount(product.code)}
+                          sales={getSalesForProduct(product.code)}
                           visibleColumns={visibleColumns}
                           columnWidths={DEFAULT_COLUMN_WIDTHS}
                           onToggleSelection={toggleProductSelection}
