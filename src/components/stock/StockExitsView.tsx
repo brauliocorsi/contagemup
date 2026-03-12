@@ -698,7 +698,10 @@ export function StockExitsView() {
         </TabsContent>
 
         <TabsContent value="erp-exits">
-          <ERPExitsView />
+          <ERPExitsView onSendToCart={(items) => {
+            items.forEach(item => handleAddToCart(item));
+            setActiveTab('saidas');
+          }} />
         </TabsContent>
       </Tabs>
 
