@@ -102,17 +102,20 @@ Deno.serve(async (req) => {
       situacaoLookup[String(sit.id)] = sit.nome || '';
     }
 
-    // Step 2: Fetch vendas and filter by date
+    // Step 2: Fetch vendas filtered by date using API params
     const matchingVendas: any[] = [];
-    const firstPage = await fetchPage('https://api.gestaoclick.com/api/vendas', 1, apiHeaders);
+    const vendasUrl = `https://api.gestaoclick.com/api/vendas?data_de=${targetDate}&data_ate=${targetDate}`;
+    
+    console.log(`Fetching vendas for date: ${targetDate}`);
+    
+    const firstPage = await fetchPage(vendasUrl, 1, apiHeaders);
     const totalPages = firstPage.meta.total_paginas || 1;
+    
+    console.log(`Found ${firstPage.data.length} vendas on page 1, total pages: ${totalPages}`);
 
     const processVendas = (vendas: any[]) => {
       for (const venda of vendas) {
-        const vendaDate = normalizeDateStr(venda.data || '');
-        if (vendaDate === targetDate) {
-          matchingVendas.push(venda);
-        }
+        matchingVendas.push(venda);
       }
     };
 
@@ -124,11 +127,13 @@ Deno.serve(async (req) => {
       const pages = [];
       for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
       const results = await Promise.all(
-        pages.map(p => fetchPage('https://api.gestaoclick.com/api/vendas', p, apiHeaders))
+        pages.map(p => fetchPage(vendasUrl, p, apiHeaders))
       );
       for (const result of results) processVendas(result.data);
       if (batchEnd < totalPages) await new Promise(resolve => setTimeout(resolve, 200));
     }
+    
+    console.log(`Total matching vendas: ${matchingVendas.length}`);
 
     // Step 3: Resolve product codes
     const requiredProductIds = new Set<string>();
