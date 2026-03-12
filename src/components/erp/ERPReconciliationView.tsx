@@ -63,10 +63,25 @@ export function ERPReconciliationView() {
           <h2 className="text-2xl font-bold tracking-tight">Conciliação ERP</h2>
           <p className="text-sm text-muted-foreground">Compare o stock local com o GestãoClick</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center">
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar produto no ERP..."
+                value={quickSearch}
+                onChange={e => setQuickSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && quickSearch.trim()) searchSingleProduct(quickSearch); }}
+                className="pl-9 w-[220px]"
+              />
+            </div>
+            <Button variant="secondary" onClick={() => quickSearch.trim() && searchSingleProduct(quickSearch)} disabled={loading || !quickSearch.trim()}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            </Button>
+          </div>
           <Button onClick={fetchAndCompare} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            {loading ? 'A carregar...' : 'Sincronizar com ERP'}
+            {loading ? 'A carregar...' : 'Sincronizar Tudo'}
           </Button>
           {comparisonItems.length > 0 && (
             <Button variant="outline" onClick={exportToExcel}>

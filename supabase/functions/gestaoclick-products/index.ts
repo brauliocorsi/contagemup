@@ -47,6 +47,40 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const fetchAll = body.fetchAll || false;
+    const searchQuery = body.search || '';
+
+    // Quick single-product search by code/name (searches page by page until found)
+    if (searchQuery) {
+      const normalizedSearch = searchQuery.toLowerCase().trim();
+      let page = 1;
+      let totalPages = 1;
+      const foundProducts: any[] = [];
+
+      while (page <= totalPages) {
+        const result = await fetchPage(page, apiHeaders);
+        if (page === 1) totalPages = result.meta.total_paginas || 1;
+
+        for (const p of result.products) {
+          const code = (p.codigo_interno || p.codigo || '').toLowerCase();
+          const name = (p.nome || '').toLowerCase();
+          if (code.includes(normalizedSearch) || name.includes(normalizedSearch)) {
+            foundProducts.push(p);
+          }
+        }
+
+        // Stop early if we found results and scanned at least a few pages
+        if (foundProducts.length > 0 && page >= Math.min(3, totalPages)) break;
+        page++;
+      }
+
+      return new Response(JSON.stringify({
+        data: foundProducts,
+        meta: { total: foundProducts.length, searched: true },
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const apiHeaders = {
       'access-token': accessToken,
