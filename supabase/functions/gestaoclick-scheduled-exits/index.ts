@@ -3,8 +3,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const INCLUDED_STATUSES = ['agendado entrega', 'agendado levantamento'];
-
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -56,6 +54,25 @@ function extractProductReferences(item: any): { productCode: string; productId: 
   return { productCode, productId, variationId };
 }
 
+function normalizeDateStr(dateStr: string): string {
+  if (!dateStr) return '';
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+  return dateStr.substring(0, 10);
+}
+
+function isDateInRange(dateStr: string, dateFrom: string, dateTo: string): boolean {
+  const normalized = normalizeDateStr(dateStr);
+  if (!normalized) return false;
+  if (dateFrom && normalized < dateFrom) return false;
+  if (dateTo && normalized > dateTo) return false;
+  return true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -68,10 +85,13 @@ Deno.serve(async (req) => {
     if (!secretToken) throw new Error('GESTAOCLICK_SECRET_ACCESS_TOKEN não configurado');
 
     const body = await req.json();
-    const targetDate = body?.date; // format: YYYY-MM-DD
+    // Support both single date and date range
+    const dateFrom = body?.dateFrom || body?.date;
+    const dateTo = body?.dateTo || body?.date;
+    const selectedStatuses: string[] | undefined = body?.statuses; // optional array of status names
 
-    if (!targetDate) {
-      throw new Error('Parâmetro "date" é obrigatório (formato YYYY-MM-DD)');
+    if (!dateFrom) {
+      throw new Error('Parâmetro "dateFrom" ou "date" é obrigatório (formato YYYY-MM-DD)');
     }
 
     const apiHeaders = {
@@ -88,20 +108,28 @@ Deno.serve(async (req) => {
     const situacoesData = await situacoesRes.json();
     const situacoes = situacoesData?.data || [];
 
-    // Get IDs for included statuses only
+    // Build lookup and filter by selected statuses (or default)
+    const DEFAULT_STATUSES = ['agendado entrega', 'agendado levantamento'];
+    const filterStatuses = (selectedStatuses && selectedStatuses.length > 0)
+      ? selectedStatuses.map(s => s.toLowerCase().trim())
+      : DEFAULT_STATUSES;
+
     const includedIds = new Set<string>();
     const situacaoLookup: Record<string, string> = {};
+    const allSituacoes: Array<{ id: string; nome: string }> = [];
+
     for (const sit of situacoes) {
       const name = (sit.nome || '').toLowerCase().trim();
       situacaoLookup[String(sit.id)] = sit.nome;
-      if (INCLUDED_STATUSES.some(inc => name.includes(inc))) {
+      allSituacoes.push({ id: String(sit.id), nome: sit.nome || '' });
+      if (filterStatuses.some(inc => name.includes(inc))) {
         includedIds.add(String(sit.id));
       }
     }
 
-    console.log('Included status IDs:', [...includedIds]);
+    console.log('Included status IDs:', [...includedIds], 'Filter statuses:', filterStatuses);
 
-    // Step 2: Fetch all vendas and filter by included statuses
+    // Step 2: Fetch all vendas and filter
     const matchingVendas: any[] = [];
     const firstPage = await fetchPage('https://api.gestaoclick.com/api/vendas', 1, apiHeaders);
     const totalPages = firstPage.meta.total_paginas || 1;
@@ -110,26 +138,13 @@ Deno.serve(async (req) => {
       for (const venda of vendas) {
         if (!includedIds.has(String(venda.situacao_id))) continue;
 
-        // Check if the delivery date matches the target date
-        // Try multiple date fields
         const deliveryDate = venda.prazo_entrega || venda.data_entrega || venda.data_previsao || '';
         const vendaDate = venda.data || '';
-        
-        // The delivery date from the ERP might be in DD/MM/YYYY or YYYY-MM-DD format
-        let normalizedDeliveryDate = '';
-        if (deliveryDate) {
-          if (deliveryDate.includes('/')) {
-            const parts = deliveryDate.split('/');
-            if (parts.length === 3) {
-              normalizedDeliveryDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            }
-          } else {
-            normalizedDeliveryDate = deliveryDate.substring(0, 10);
-          }
-        }
 
-        // Match by delivery date or sale date
-        if (normalizedDeliveryDate === targetDate || vendaDate.substring(0, 10) === targetDate) {
+        const deliveryInRange = deliveryDate ? isDateInRange(deliveryDate, dateFrom, dateTo) : false;
+        const vendaInRange = vendaDate ? isDateInRange(vendaDate, dateFrom, dateTo) : false;
+
+        if (deliveryInRange || vendaInRange) {
           matchingVendas.push(venda);
         }
       }
@@ -201,7 +216,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Step 4: Build exit items grouped by sale
+    // Step 4: Build exit items
     const salesExits: Array<{
       venda_id: string;
       codigo: string;
@@ -209,11 +224,7 @@ Deno.serve(async (req) => {
       situacao: string;
       data: string;
       prazo_entrega: string;
-      items: Array<{
-        productCode: string;
-        productName: string;
-        quantity: number;
-      }>;
+      items: Array<{ productCode: string; productName: string; quantity: number }>;
     }> = [];
 
     for (const venda of matchingVendas) {
@@ -251,7 +262,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       salesExits,
       totalSales: salesExits.length,
-      targetDate,
+      dateFrom,
+      dateTo,
+      allSituacoes, // Return all available statuses for the UI
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
