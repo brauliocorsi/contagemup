@@ -110,11 +110,13 @@ Deno.serve(async (req) => {
     console.log(`Fetching vendas for date: ${targetDate}`);
     
     const firstPage = await fetchPage(vendasBaseUrl, 1, apiHeaders);
-    const totalPages = Math.min(firstPage.meta.total_paginas || 1, 30); // Cap at 30 pages max
+    const totalPages = Math.min(firstPage.meta.total_paginas || 1, 50); // Cap at 50 pages max
     
     console.log(`Page 1: ${firstPage.data.length} vendas, total_paginas from API: ${firstPage.meta.total_paginas}`);
 
     let stopEarly = false;
+    let consecutiveEmptyBatches = 0;
+    const MAX_EMPTY_BATCHES = 3; // Allow up to 3 consecutive empty batches before stopping
 
     const processVendas = (vendas: any[]): boolean => {
       let foundAny = false;
@@ -142,9 +144,13 @@ Deno.serve(async (req) => {
       for (const result of results) {
         if (processVendas(result.data)) batchHadMatches = true;
       }
-      // If after several pages with no matches and we already have some, stop
-      if (!batchHadMatches && matchingVendas.length > 0) {
-        stopEarly = true;
+      if (batchHadMatches) {
+        consecutiveEmptyBatches = 0;
+      } else if (matchingVendas.length > 0) {
+        consecutiveEmptyBatches++;
+        if (consecutiveEmptyBatches >= MAX_EMPTY_BATCHES) {
+          stopEarly = true;
+        }
       }
       if (batchEnd < totalPages && !stopEarly) await new Promise(resolve => setTimeout(resolve, 150));
     }
