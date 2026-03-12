@@ -5,6 +5,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useProductChanges } from '@/hooks/useProductChanges';
 import { useLastCounts } from '@/hooks/useLastCounts';
 import { useProductsWithOrders } from '@/hooks/useProductsWithOrders';
+import { useProductSales } from '@/hooks/useProductSales';
 import { useToast } from '@/hooks/use-toast';
 import { ProductForm } from './ProductForm';
 import { ProductEditForm } from './ProductEditForm';
