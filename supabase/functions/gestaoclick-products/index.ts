@@ -49,6 +49,12 @@ Deno.serve(async (req) => {
     const fetchAll = body.fetchAll || false;
     const searchQuery = body.search || '';
 
+    const apiHeaders = {
+      'access-token': accessToken,
+      'secret-access-token': secretToken,
+      'Content-Type': 'application/json',
+    };
+
     // Quick single-product search by code/name (searches page by page until found)
     if (searchQuery) {
       const normalizedSearch = searchQuery.toLowerCase().trim();
