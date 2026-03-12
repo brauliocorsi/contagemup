@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Loader2, ShoppingCart, User, Package, Download, Truck, Plus, AlertTriangle, ArrowRight, Check } from 'lucide-react';
+import { CalendarIcon, Loader2, ShoppingCart, User, Package, Download, Truck, Plus, AlertTriangle, ArrowRight, Check, X, SortAsc, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/hooks/useProducts';
@@ -34,6 +35,11 @@ interface SaleExit {
   items: SaleExitItem[];
 }
 
+interface ERPSituacao {
+  id: string;
+  nome: string;
+}
+
 export interface ERPExitCartItem {
   product_id: string;
   product_code: string;
@@ -46,7 +52,8 @@ interface ERPExitsViewProps {
 }
 
 export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
-  const [date, setDate] = useState<Date>(new Date());
+  const [dateFrom, setDateFrom] = useState<Date>(new Date());
+  const [dateTo, setDateTo] = useState<Date>(new Date());
   const [salesExits, setSalesExits] = useState<SaleExit[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -54,35 +61,44 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
   const { products, fetchProducts } = useProducts();
   const { categories } = useCategories();
 
+  // Situações (statuses)
+  const [availableSituacoes, setAvailableSituacoes] = useState<ERPSituacao[]>([]);
+  const [selectedSituacoes, setSelectedSituacoes] = useState<string[]>(['agendado entrega', 'agendado levantamento']);
+  const [situacoesOpen, setSituacoesOpen] = useState(false);
+
+  // Removed products from list
+  const [removedProducts, setRemovedProducts] = useState<Set<string>>(new Set());
+
+  // Sort
+  const [sortAlpha, setSortAlpha] = useState(false);
+
   // Quick register dialog state
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
   const [registerItem, setRegisterItem] = useState<{ code: string; name: string } | null>(null);
   const [registerCategory, setRegisterCategory] = useState('Geral');
   const [registering, setRegistering] = useState(false);
 
-  // Local products map by code (lowercase)
   const localProductMap = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
     for (const p of products) {
-      map.set(p.code.toLowerCase(), {
-        id: p.id,
-        code: p.code,
-        name: p.name,
-        current_stock: p.current_stock,
-      });
+      map.set(p.code.toLowerCase(), { id: p.id, code: p.code, name: p.name, current_stock: p.current_stock });
     }
     return map;
   }, [products]);
 
-  const fetchScheduledExits = async (selectedDate: Date) => {
+  const fetchScheduledExits = async () => {
     setLoading(true);
     setSalesExits([]);
     setLoaded(false);
+    setRemovedProducts(new Set());
 
     try {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const { data, error } = await supabase.functions.invoke('gestaoclick-scheduled-exits', {
-        body: { date: dateStr },
+        body: {
+          dateFrom: format(dateFrom, 'yyyy-MM-dd'),
+          dateTo: format(dateTo, 'yyyy-MM-dd'),
+          statuses: selectedSituacoes.length > 0 ? selectedSituacoes : undefined,
+        },
       });
 
       if (error) throw new Error(error.message);
@@ -90,10 +106,15 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
       setSalesExits(data?.salesExits || []);
       setLoaded(true);
 
+      // Save available situações for future use
+      if (data?.allSituacoes && data.allSituacoes.length > 0) {
+        setAvailableSituacoes(data.allSituacoes);
+      }
+
       const total = data?.salesExits?.length || 0;
       toast({
         title: 'Pesquisa concluída',
-        description: `${total} venda(s) agendada(s) para ${format(selectedDate, 'dd/MM/yyyy')}.`,
+        description: `${total} venda(s) encontrada(s) de ${format(dateFrom, 'dd/MM/yyyy')} a ${format(dateTo, 'dd/MM/yyyy')}.`,
       });
     } catch (err: any) {
       console.error('Error fetching scheduled exits:', err);
@@ -103,18 +124,19 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
     }
   };
 
-  const handleDateSelect = (newDate: Date | undefined) => {
-    if (newDate) {
-      setDate(newDate);
-    }
+  const toggleSituacao = (nome: string) => {
+    setSelectedSituacoes(prev =>
+      prev.includes(nome) ? prev.filter(s => s !== nome) : [...prev, nome]
+    );
   };
 
-  // Aggregate all products across all sales with local matching
+  // Aggregate products, excluding removed ones
   const aggregatedProducts = useMemo(() => {
     const map = new Map<string, { productCode: string; productName: string; totalQuantity: number; salesCount: number }>();
     for (const sale of salesExits) {
       for (const item of sale.items) {
         const key = item.productCode.toLowerCase();
+        if (removedProducts.has(key)) continue;
         const existing = map.get(key);
         if (existing) {
           existing.totalQuantity += item.quantity;
@@ -129,25 +151,34 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
         }
       }
     }
-    return Array.from(map.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
-  }, [salesExits]);
+    const arr = Array.from(map.values());
+    if (sortAlpha) {
+      arr.sort((a, b) => a.productName.localeCompare(b.productName, 'pt'));
+    } else {
+      arr.sort((a, b) => b.totalQuantity - a.totalQuantity);
+    }
+    return arr;
+  }, [salesExits, removedProducts, sortAlpha]);
 
   const totalProducts = aggregatedProducts.reduce((sum, p) => sum + p.totalQuantity, 0);
 
-  // Products not found locally
   const missingProducts = useMemo(() => {
     return aggregatedProducts.filter(p => !localProductMap.has(p.productCode.toLowerCase()));
   }, [aggregatedProducts, localProductMap]);
 
-  // Products found locally (for cart)
   const matchedProducts = useMemo(() => {
     return aggregatedProducts
       .filter(p => localProductMap.has(p.productCode.toLowerCase()))
-      .map(p => {
-        const local = localProductMap.get(p.productCode.toLowerCase())!;
-        return { ...p, localProduct: local };
-      });
+      .map(p => ({ ...p, localProduct: localProductMap.get(p.productCode.toLowerCase())! }));
   }, [aggregatedProducts, localProductMap]);
+
+  const handleRemoveProduct = (code: string) => {
+    setRemovedProducts(prev => new Set(prev).add(code.toLowerCase()));
+  };
+
+  const handleRestoreAll = () => {
+    setRemovedProducts(new Set());
+  };
 
   const handleQuickRegister = (code: string, name: string) => {
     setRegisterItem({ code, name });
@@ -160,12 +191,8 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
     setRegistering(true);
     try {
       const { error } = await supabase.from('products').insert({
-        code: registerItem.code,
-        name: registerItem.name,
-        category: registerCategory,
-        current_stock: 0,
-        total_colis: 1,
-        min_stock: 0,
+        code: registerItem.code, name: registerItem.name, category: registerCategory,
+        current_stock: 0, total_colis: 1, min_stock: 0,
       });
       if (error) throw error;
       toast({ title: 'Produto cadastrado', description: `${registerItem.code} adicionado ao sistema local.` });
@@ -184,12 +211,8 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
     setRegistering(true);
     try {
       const toInsert = missingProducts.map(p => ({
-        code: p.productCode,
-        name: p.productName,
-        category: registerCategory || 'Geral',
-        current_stock: 0,
-        total_colis: 1,
-        min_stock: 0,
+        code: p.productCode, name: p.productName, category: registerCategory || 'Geral',
+        current_stock: 0, total_colis: 1, min_stock: 0,
       }));
       const { error } = await supabase.from('products').insert(toInsert);
       if (error) throw error;
@@ -205,10 +228,8 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
   const handleSendToCart = () => {
     if (!onSendToCart || matchedProducts.length === 0) return;
     const items: ERPExitCartItem[] = matchedProducts.map(p => ({
-      product_id: p.localProduct.id,
-      product_code: p.localProduct.code,
-      product_name: p.localProduct.name,
-      quantity: p.totalQuantity,
+      product_id: p.localProduct.id, product_code: p.localProduct.code,
+      product_name: p.localProduct.name, quantity: p.totalQuantity,
     }));
     onSendToCart(items);
     toast({ title: 'Enviado para carrinho', description: `${items.length} produto(s) adicionado(s) ao carrinho de saída.` });
@@ -216,26 +237,22 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
 
   const exportToExcel = () => {
     const salesData = salesExits.flatMap(sale =>
-      sale.items.map(item => ({
-        'Venda': sale.codigo,
-        'Cliente': sale.cliente_nome,
-        'Estado': sale.situacao,
-        'Data Entrega': sale.prazo_entrega,
-        'Código Produto': item.productCode,
-        'Produto': item.productName,
-        'Quantidade': item.quantity,
-      }))
+      sale.items
+        .filter(item => !removedProducts.has(item.productCode.toLowerCase()))
+        .map(item => ({
+          'Venda': sale.codigo, 'Cliente': sale.cliente_nome, 'Estado': sale.situacao,
+          'Data Entrega': sale.prazo_entrega, 'Código Produto': item.productCode,
+          'Produto': item.productName, 'Quantidade': item.quantity,
+        }))
     );
     const aggData = aggregatedProducts.map(p => ({
-      'Código': p.productCode,
-      'Produto': p.productName,
-      'Quantidade Total': p.totalQuantity,
-      'Nº Vendas': p.salesCount,
+      'Código': p.productCode, 'Produto': p.productName,
+      'Quantidade Total': p.totalQuantity, 'Nº Vendas': p.salesCount,
     }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(salesData), 'Por Venda');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(aggData), 'Resumo Produtos');
-    XLSX.writeFile(wb, `saidas_erp_${format(date, 'yyyy-MM-dd')}.xlsx`);
+    XLSX.writeFile(wb, `saidas_erp_${format(dateFrom, 'yyyy-MM-dd')}_${format(dateTo, 'yyyy-MM-dd')}.xlsx`);
   };
 
   return (
@@ -246,50 +263,128 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
           Saídas Agendadas do ERP
         </h2>
         <p className="text-sm text-muted-foreground">
-          Produtos com entrega/levantamento agendado para o dia selecionado
+          Produtos com entrega/levantamento agendado no período selecionado
         </p>
       </div>
 
-      {/* Date picker + search */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className={cn("w-[220px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date ? format(date, 'dd/MM/yyyy') : 'Selecionar data'}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={handleDateSelect}
-              locale={pt}
-              className={cn("p-3 pointer-events-auto")}
-            />
-          </PopoverContent>
-        </Popover>
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          {/* Date range */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Label className="text-sm font-medium">Período:</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("h-9 justify-start text-left font-normal")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(dateFrom, 'dd/MM/yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateFrom} onSelect={(d) => d && setDateFrom(d)} locale={pt} className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+            <span className="text-sm text-muted-foreground">até</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("h-9 justify-start text-left font-normal")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(dateTo, 'dd/MM/yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateTo} onSelect={(d) => d && setDateTo(d)} locale={pt} className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
 
-        <Button onClick={() => fetchScheduledExits(date)} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
-          {loading ? 'A carregar...' : 'Buscar Saídas'}
-        </Button>
-
-        {salesExits.length > 0 && (
-          <>
-            <Button variant="outline" onClick={exportToExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
-            {onSendToCart && matchedProducts.length > 0 && (
-              <Button onClick={handleSendToCart} className="bg-red-600 hover:bg-red-700 text-white">
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Enviar {matchedProducts.length} produto(s) para Saída
-              </Button>
+          {/* Situações multi-select */}
+          <div className="flex flex-wrap items-start gap-2">
+            <Label className="text-sm font-medium pt-1">Situações:</Label>
+            <Popover open={situacoesOpen} onOpenChange={setSituacoesOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 min-w-[200px] justify-between">
+                  <span className="truncate text-left">
+                    {selectedSituacoes.length === 0 ? 'Selecionar situações' : `${selectedSituacoes.length} selecionada(s)`}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-3 max-h-[300px] overflow-y-auto" align="start">
+                <div className="space-y-2">
+                  {availableSituacoes.length > 0 ? (
+                    availableSituacoes.map(sit => (
+                      <label key={sit.id} className="flex items-center gap-2 cursor-pointer text-sm hover:bg-muted/50 rounded px-2 py-1">
+                        <Checkbox
+                          checked={selectedSituacoes.some(s => sit.nome.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(sit.nome.toLowerCase()))}
+                          onCheckedChange={() => toggleSituacao(sit.nome.toLowerCase())}
+                        />
+                        <span>{sit.nome}</span>
+                      </label>
+                    ))
+                  ) : (
+                    <>
+                      {['agendado entrega', 'agendado levantamento'].map(s => (
+                        <label key={s} className="flex items-center gap-2 cursor-pointer text-sm hover:bg-muted/50 rounded px-2 py-1">
+                          <Checkbox checked={selectedSituacoes.includes(s)} onCheckedChange={() => toggleSituacao(s)} />
+                          <span className="capitalize">{s}</span>
+                        </label>
+                      ))}
+                      <p className="text-xs text-muted-foreground pt-1">Faça a primeira busca para carregar todas as situações do ERP.</p>
+                    </>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {selectedSituacoes.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {selectedSituacoes.map(s => (
+                  <Badge key={s} variant="secondary" className="text-xs capitalize">
+                    {s}
+                    <button onClick={() => toggleSituacao(s)} className="ml-1 hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
             )}
-          </>
-        )}
-      </div>
+          </div>
+
+          {/* Search button */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={fetchScheduledExits} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
+              {loading ? 'A carregar...' : 'Buscar Saídas'}
+            </Button>
+
+            {salesExits.length > 0 && (
+              <>
+                <Button variant="outline" onClick={exportToExcel}>
+                  <Download className="h-4 w-4 mr-2" /> Exportar
+                </Button>
+                <Button
+                  variant={sortAlpha ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSortAlpha(!sortAlpha)}
+                >
+                  <SortAsc className="h-4 w-4 mr-1" />
+                  {sortAlpha ? 'A-Z' : 'Ordenar A-Z'}
+                </Button>
+                {removedProducts.size > 0 && (
+                  <Button variant="ghost" size="sm" onClick={handleRestoreAll}>
+                    Restaurar {removedProducts.size} removido(s)
+                  </Button>
+                )}
+                {onSendToCart && matchedProducts.length > 0 && (
+                  <Button onClick={handleSendToCart} className="bg-red-600 hover:bg-red-700 text-white">
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Enviar {matchedProducts.length} produto(s) para Saída
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary */}
       {loaded && (
@@ -329,7 +424,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4" />
-              Produtos não cadastrados no sistema local ({missingProducts.length})
+              Produtos não cadastrados ({missingProducts.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -340,28 +435,27 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
                   <span>{p.productName}</span>
                   <Badge variant="secondary">{p.totalQuantity} un.</Badge>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => handleQuickRegister(p.productCode, p.productName)}>
-                  <Plus className="h-3 w-3 mr-1" />
-                  Cadastrar
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="outline" onClick={() => handleQuickRegister(p.productCode, p.productName)}>
+                    <Plus className="h-3 w-3 mr-1" /> Cadastrar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleRemoveProduct(p.productCode)} title="Remover da lista">
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
               </div>
             ))}
             {missingProducts.length > 1 && (
               <div className="flex items-center gap-3 pt-2">
                 <Select value={registerCategory} onValueChange={setRegisterCategory}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Categoria" />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
                   <SelectContent>
-                    {categories.map(c => (
-                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                    ))}
+                    {categories.map(c => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
                     <SelectItem value="Geral">Geral</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button size="sm" onClick={handleRegisterAll} disabled={registering}>
-                  <Plus className="h-3 w-3 mr-1" />
-                  Cadastrar Todos ({missingProducts.length})
+                  <Plus className="h-3 w-3 mr-1" /> Cadastrar Todos ({missingProducts.length})
                 </Button>
               </div>
             )}
@@ -376,6 +470,9 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
             <CardTitle className="text-base flex items-center gap-2">
               <Package className="h-4 w-4" />
               Lista de Produtos para Saída
+              {removedProducts.size > 0 && (
+                <Badge variant="secondary" className="text-xs ml-2">{removedProducts.size} removido(s)</Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -389,6 +486,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
                     <TableHead className="text-right">Stock Local</TableHead>
                     <TableHead className="text-right">Nº Vendas</TableHead>
                     <TableHead className="text-center">Estado</TableHead>
+                    <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -403,9 +501,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
                         <TableCell className="text-right font-bold">{p.totalQuantity}</TableCell>
                         <TableCell className="text-right">
                           {isRegistered ? (
-                            <span className={cn("font-medium", !hasEnoughStock && "text-destructive")}>
-                              {local.current_stock}
-                            </span>
+                            <span className={cn("font-medium", !hasEnoughStock && "text-destructive")}>{local.current_stock}</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
@@ -419,6 +515,11 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
                           ) : (
                             <Badge variant="secondary" className="text-xs text-orange-600 border-orange-300">Stock baixo</Badge>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveProduct(p.productCode)} title="Remover da lista">
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -441,26 +542,26 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
                   <span className="font-mono font-bold">#{sale.codigo}</span>
                   <Badge variant="outline">{sale.situacao}</Badge>
                   <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <User className="h-3 w-3" />
-                    {sale.cliente_nome}
+                    <User className="h-3 w-3" /> {sale.cliente_nome}
                   </span>
                   {sale.prazo_entrega && (
                     <span className="flex items-center gap-1 text-sm text-muted-foreground ml-auto">
-                      <CalendarIcon className="h-3 w-3" />
-                      {sale.prazo_entrega}
+                      <CalendarIcon className="h-3 w-3" /> {sale.prazo_entrega}
                     </span>
                   )}
                 </div>
                 <div className="space-y-1">
-                  {sale.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm bg-muted/50 rounded px-3 py-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">{item.productCode}</span>
-                        <span>{item.productName}</span>
+                  {sale.items
+                    .filter(item => !removedProducts.has(item.productCode.toLowerCase()))
+                    .map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-sm bg-muted/50 rounded px-3 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-muted-foreground">{item.productCode}</span>
+                          <span>{item.productName}</span>
+                        </div>
+                        <Badge variant="secondary" className="font-bold">{item.quantity} un.</Badge>
                       </div>
-                      <Badge variant="secondary" className="font-bold">{item.quantity} un.</Badge>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </CardContent>
             </Card>
@@ -475,7 +576,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
             <Truck className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
             <h3 className="text-lg font-semibold mb-1">Sem saídas agendadas</h3>
             <p className="text-sm text-muted-foreground">
-              Nenhuma venda com entrega/levantamento agendado para {format(date, 'dd/MM/yyyy')}.
+              Nenhuma venda encontrada para o período {format(dateFrom, 'dd/MM/yyyy')} — {format(dateTo, 'dd/MM/yyyy')}.
             </p>
           </CardContent>
         </Card>
@@ -484,9 +585,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
       {/* Quick Register Dialog */}
       <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cadastrar Produto</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Cadastrar Produto</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div>
               <Label className="text-sm text-muted-foreground">Código</Label>
@@ -499,13 +598,9 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
             <div className="space-y-2">
               <Label>Categoria</Label>
               <Select value={registerCategory} onValueChange={setRegisterCategory}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {categories.map(c => (
-                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                  ))}
+                  {categories.map(c => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
                   <SelectItem value="Geral">Geral</SelectItem>
                 </SelectContent>
               </Select>
