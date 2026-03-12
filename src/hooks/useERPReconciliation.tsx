@@ -239,6 +239,51 @@ export function useERPReconciliation() {
     }
   }, [toast]);
 
+  const registerERPProducts = useCallback(async (items: ERPComparisonItem[]) => {
+    if (items.length === 0) return;
+    
+    const erpMap = new Map(erpProducts.map(p => [p.codigo_interno.toLowerCase(), p]));
+    
+    const productsToInsert = items
+      .filter(i => i.status === 'erp_only')
+      .map(item => {
+        const erpProd = erpMap.get(item.productCode.toLowerCase());
+        return {
+          code: item.productCode,
+          name: item.productName,
+          current_stock: 0,
+          category: erpProd?.grupo || 'Geral',
+          total_colis: 1,
+          min_stock: 0,
+        };
+      });
+
+    if (productsToInsert.length === 0) return;
+
+    const { error } = await supabase
+      .from('products')
+      .insert(productsToInsert);
+
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    toast({
+      title: 'Produtos cadastrados',
+      description: `${productsToInsert.length} produto(s) adicionado(s) ao sistema local.`,
+    });
+
+    // Update comparison items to reflect the registration
+    setComparisonItems(prev =>
+      prev.map(item =>
+        productsToInsert.some(p => p.code.toLowerCase() === item.productCode.toLowerCase())
+          ? { ...item, status: 'shortage' as const, localStock: 0 }
+          : item
+      )
+    );
+  }, [erpProducts, toast]);
+
   return {
     erpProducts,
     comparisonItems,
@@ -246,5 +291,6 @@ export function useERPReconciliation() {
     progress,
     fetchAndCompare,
     searchSingleProduct,
+    registerERPProducts,
   };
 }

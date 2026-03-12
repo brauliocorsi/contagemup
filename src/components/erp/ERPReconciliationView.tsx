@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar } from 'lucide-react';
+import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 
@@ -19,12 +19,13 @@ const STATUS_CONFIG = {
 };
 
 export function ERPReconciliationView() {
-  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct } = useERPReconciliation();
+  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts } = useERPReconciliation();
   const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount } = useProductSales();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [quickSearch, setQuickSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [registering, setRegistering] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
     return comparisonItems.filter(item => {
@@ -59,6 +60,20 @@ export function ERPReconciliationView() {
     XLSX.writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const erpOnlyItems = useMemo(() => filtered.filter(i => i.status === 'erp_only'), [filtered]);
+
+  const handleRegisterSingle = async (item: ERPComparisonItem) => {
+    setRegistering(prev => new Set(prev).add(item.productCode));
+    await registerERPProducts([item]);
+    setRegistering(prev => { const s = new Set(prev); s.delete(item.productCode); return s; });
+  };
+
+  const handleRegisterAll = async () => {
+    setRegistering(new Set(erpOnlyItems.map(i => i.productCode)));
+    await registerERPProducts(erpOnlyItems);
+    setRegistering(new Set());
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -87,10 +102,18 @@ export function ERPReconciliationView() {
             {loading ? 'A carregar...' : 'Sincronizar Tudo'}
           </Button>
           {comparisonItems.length > 0 && (
-            <Button variant="outline" onClick={exportToExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar Excel
-            </Button>
+            <>
+              <Button variant="outline" onClick={exportToExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Excel
+              </Button>
+              {erpOnlyItems.length > 0 && (
+                <Button variant="default" onClick={handleRegisterAll} disabled={registering.size > 0}>
+                  {registering.size > 0 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                  Cadastrar {erpOnlyItems.length} em falta
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -183,8 +206,9 @@ export function ERPReconciliationView() {
                           </Button>
                         )}
                       </div>
-                    </TableHead>
-                  </TableRow>
+                     </TableHead>
+                     <TableHead>Ações</TableHead>
+                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((item, idx) => {
@@ -230,10 +254,24 @@ export function ERPReconciliationView() {
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
                           </TableCell>
+                          <TableCell>
+                            {item.status === 'erp_only' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 gap-1 px-2 text-xs"
+                                onClick={() => handleRegisterSingle(item)}
+                                disabled={registering.has(item.productCode)}
+                              >
+                                {registering.has(item.productCode) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                                Cadastrar
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                         {isExpanded && salesCount > 0 && (
                           <TableRow key={`${rowKey}-sales`} className="bg-muted/30">
-                            <TableCell colSpan={8} className="p-0">
+                            <TableCell colSpan={9} className="p-0">
                               <div className="px-4 py-3 space-y-1.5">
                                 <p className="text-xs font-semibold text-muted-foreground mb-2">
                                   <ShoppingCart className="h-3 w-3 inline mr-1" />
