@@ -128,6 +128,15 @@ Deno.serve(async (req) => {
       situacaoLookup[String(sit.id)] = sit.nome;
     }
 
+    // Debug: log first sale item structure
+    if (allVendas.length > 0) {
+      const firstItems = allVendas[0].produtos || allVendas[0].itens || [];
+      if (firstItems.length > 0) {
+        console.log('DEBUG - First sale item keys:', Object.keys(firstItems[0]));
+        console.log('DEBUG - First sale item:', JSON.stringify(firstItems[0]).substring(0, 500));
+      }
+    }
+
     for (const venda of allVendas) {
       const vendaInfo = {
         venda_id: String(venda.id),
@@ -141,7 +150,7 @@ Deno.serve(async (req) => {
 
       const items = venda.produtos || venda.itens || [];
       for (const item of items) {
-        const productCode = String(item.codigo || item.produto_codigo || '');
+        const productCode = String(item.codigo_interno || item.codigo || item.produto_codigo || '');
         if (!productCode) continue;
 
         vendaInfo.produtos.push({
