@@ -32,6 +32,54 @@ async function fetchPage(baseUrl: string, page: number, headers: Record<string, 
   return { data: data?.data || [], meta: data?.meta || {} };
 }
 
+function normalizeCode(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function normalizeIdentifier(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function extractProductReferences(item: any): { productCode: string; productId: string; variationId: string } {
+  const product = item?.produto || {};
+
+  const productCodeCandidates = [
+    item?.codigo_interno,
+    item?.codigo,
+    item?.produto_codigo,
+    item?.produto_codigo_interno,
+    item?.variacao_codigo,
+    item?.variacao?.codigo,
+    product?.codigo_interno,
+    product?.codigo,
+    product?.produto_codigo,
+    product?.codigo_produto,
+    product?.variacao_codigo,
+    product?.referencia,
+  ];
+
+  const productIdCandidates = [
+    item?.produto_id,
+    item?.product_id,
+    product?.produto_id,
+    product?.id,
+  ];
+
+  const variationIdCandidates = [
+    item?.variacao_id,
+    item?.variation_id,
+    item?.variacao?.id,
+    product?.variacao_id,
+    product?.variacao?.id,
+  ];
+
+  const productCode = normalizeCode(productCodeCandidates.find((value) => String(value ?? '').trim() !== ''));
+  const productId = normalizeIdentifier(productIdCandidates.find((value) => String(value ?? '').trim() !== ''));
+  const variationId = normalizeIdentifier(variationIdCandidates.find((value) => String(value ?? '').trim() !== ''));
+
+  return { productCode, productId, variationId };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
