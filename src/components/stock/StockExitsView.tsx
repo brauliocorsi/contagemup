@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { TrendingDown, History, AlertTriangle, ClipboardList, Upload } from 'lucide-react';
+import { TrendingDown, History, AlertTriangle, ClipboardList, Upload, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
