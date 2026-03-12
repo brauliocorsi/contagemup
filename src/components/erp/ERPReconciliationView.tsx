@@ -270,7 +270,7 @@ export function ERPReconciliationView() {
                                 variant="outline"
                                 size="sm"
                                 className="h-7 gap-1 px-2 text-xs"
-                                onClick={() => handleRegisterSingle(item)}
+                                onClick={() => openCategoryDialog([item])}
                                 disabled={registering.has(item.productCode)}
                               >
                                 {registering.has(item.productCode) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
