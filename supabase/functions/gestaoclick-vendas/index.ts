@@ -3,7 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const EXCLUDED_STATUSES = ['conferido', 'agendado entrega', 'cancelado', 'produto entregue', 'levantado'];
+const EXCLUDED_STATUSES = ['conferido', 'produto entregue', 'cancelado', 'levantado'];
 
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
