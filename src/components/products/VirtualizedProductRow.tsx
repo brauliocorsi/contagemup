@@ -10,6 +10,8 @@ import { classifyLocation } from '@/lib/locationUtils';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { ProductSalesPopover } from './ProductSalesPopover';
+import { VendaInfo } from '@/hooks/useProductSales';
 
 interface LastCountData {
   totalQuantity: number;
@@ -42,6 +44,8 @@ interface VirtualizedProductRowProps {
   isSelected: boolean;
   hasOrders: boolean;
   orderStats?: OrderStats | null;
+  salesCount: number;
+  sales: VendaInfo[];
   visibleColumns: Set<string>;
   columnWidths: Record<string, number>;
   onToggleSelection: (id: string) => void;
@@ -64,6 +68,8 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
   isSelected,
   hasOrders,
   orderStats,
+  salesCount,
+  sales,
   visibleColumns,
   columnWidths,
   onToggleSelection,
@@ -357,6 +363,20 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
               <span className="truncate">{product.pallet_number}</span>
             </span>
           ) : '-'}
+        </div>
+      )}
+
+      {/* Sales */}
+      {isColumnVisible('sales') && (
+        <div className="p-2" style={getColWidth('sales')}>
+          <ProductSalesPopover
+            salesCount={salesCount}
+            sales={sales}
+            productCode={product.code}
+          />
+          {salesCount === 0 && (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
         </div>
       )}
 

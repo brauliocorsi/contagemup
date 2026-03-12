@@ -5,6 +5,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useProductChanges } from '@/hooks/useProductChanges';
 import { useLastCounts } from '@/hooks/useLastCounts';
 import { useProductsWithOrders } from '@/hooks/useProductsWithOrders';
+import { useProductSales } from '@/hooks/useProductSales';
 import { useToast } from '@/hooks/use-toast';
 import { ProductForm } from './ProductForm';
 import { ProductEditForm } from './ProductEditForm';
@@ -44,10 +45,11 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   colisLocations: 180,
   location: 120,
   pallet: 100,
+  sales: 100,
   actions: 120,
 };
 
-type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'damages' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'pallet';
+type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'damages' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'pallet' | 'sales';
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   code: 'Código',
@@ -61,9 +63,10 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   colisLocations: 'Colis/Localização',
   location: 'Localização',
   pallet: 'Palete',
+  sales: 'Vendas',
 };
 
-const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'damages', 'totalUnits', 'lastCount', 'colisLocations', 'location', 'pallet'];
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'damages', 'totalUnits', 'lastCount', 'colisLocations', 'location', 'pallet', 'sales'];
 
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
@@ -71,6 +74,7 @@ export function ProductsView() {
   const { logChange, logMultipleChanges } = useProductChanges();
   const { lastCounts } = useLastCounts();
   const { productIdsWithOrders, getOrderStats, loading: ordersLoading } = useProductsWithOrders();
+  const { getSalesForProduct, getSalesCount, loading: salesLoading, loaded: salesLoaded, fetchSales } = useProductSales();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -758,6 +762,22 @@ export function ProductsView() {
                     Palete
                   </div>
                 )}
+                {isColumnVisible('sales') && (
+                  <div 
+                    className="p-2 font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.sales}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.sales}px` }}
+                  >
+                    <span className="flex items-center gap-1">
+                      <ShoppingBag className="h-3.5 w-3.5" />
+                      Vendas
+                      {!salesLoaded && (
+                        <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={fetchSales} disabled={salesLoading}>
+                          {salesLoading ? '...' : 'Carregar'}
+                        </Button>
+                      )}
+                    </span>
+                  </div>
+                )}
                 <div className="flex-shrink-0 p-2 font-medium text-muted-foreground text-sm text-right" style={{ width: '144px' }}>
                   Ações
                 </div>
@@ -797,6 +817,8 @@ export function ProductsView() {
                           isSelected={selectedProducts.has(product.id)}
                           hasOrders={productIdsWithOrders.has(product.id)}
                           orderStats={getOrderStats(product.id)}
+                          salesCount={getSalesCount(product.code)}
+                          sales={getSalesForProduct(product.code)}
                           visibleColumns={visibleColumns}
                           columnWidths={DEFAULT_COLUMN_WIDTHS}
                           onToggleSelection={toggleProductSelection}
