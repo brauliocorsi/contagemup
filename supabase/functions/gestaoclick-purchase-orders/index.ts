@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     console.log(`Fetching vendas for date: ${targetDate}`);
     
     const firstPage = await fetchPage(vendasBaseUrl, 1, apiHeaders);
-    const totalPages = Math.min(firstPage.meta.total_paginas || 1, 30); // Cap at 30 pages max
+    const totalPages = Math.min(firstPage.meta.total_paginas || 1, 50); // Cap at 50 pages max
     
     console.log(`Page 1: ${firstPage.data.length} vendas, total_paginas from API: ${firstPage.meta.total_paginas}`);
 
