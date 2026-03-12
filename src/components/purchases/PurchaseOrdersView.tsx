@@ -70,24 +70,22 @@ export function PurchaseOrdersView() {
     }
   };
 
-  // Filter: only products with negative stock locally, excluding removed
-  const negativeStockItems = useMemo(() => {
+  // All sold items enriched with local stock data
+  const enrichedItems = useMemo(() => {
     const items = soldItems
       .filter(item => !removedProducts.has(item.productCode.toLowerCase()))
       .map(item => {
         const local = localProductMap.get(item.productCode.toLowerCase());
         const currentStock = local?.current_stock ?? 0;
-        // Calculate stock after sale: if already negative or goes negative
         const stockAfterSale = currentStock - item.totalSold;
         return {
           ...item,
           localStock: currentStock,
           stockAfterSale,
-          deficit: Math.abs(Math.min(0, stockAfterSale)), // How many units need to be purchased
+          deficit: Math.abs(Math.min(0, stockAfterSale)),
           isRegistered: !!local,
         };
-      })
-      .filter(item => item.stockAfterSale < 0 || item.localStock < 0);
+      });
 
     if (sortAlpha) {
       items.sort((a, b) => a.productName.localeCompare(b.productName, 'pt'));
@@ -97,6 +95,14 @@ export function PurchaseOrdersView() {
 
     return items;
   }, [soldItems, localProductMap, removedProducts, sortAlpha]);
+
+  // Filtered: only negative stock
+  const negativeStockItems = useMemo(() => 
+    enrichedItems.filter(item => item.stockAfterSale < 0 || item.localStock < 0),
+    [enrichedItems]
+  );
+
+  const displayItems = showAll ? enrichedItems : negativeStockItems;
 
   const totalDeficit = negativeStockItems.reduce((sum, p) => sum + p.deficit, 0);
 
