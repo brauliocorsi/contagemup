@@ -248,6 +248,7 @@ export function PurchaseOrdersView() {
                   <TableRow>
                     <TableHead>Código</TableHead>
                     <TableHead>Produto</TableHead>
+                    <TableHead>Nº Venda(s)</TableHead>
                     <TableHead className="text-right">Vendido</TableHead>
                     <TableHead className="text-right">Stock Atual</TableHead>
                     <TableHead className="text-right">Após Venda</TableHead>
