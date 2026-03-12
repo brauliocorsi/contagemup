@@ -223,7 +223,7 @@ export function ERPReconciliationView() {
                       <>
                         <TableRow key={rowKey}>
                           <TableCell className="font-mono text-sm">{item.productCode}</TableCell>
-                          <TableCell className="max-w-[200px] truncate">{item.productName}</TableCell>
+                          <TableCell>{item.productName}</TableCell>
                           <TableCell className="text-right font-medium">{item.erpStock}</TableCell>
                           <TableCell className="text-right font-medium">{item.localStock}</TableCell>
                           <TableCell className={`text-right font-bold ${item.difference > 0 ? 'text-blue-600' : item.difference < 0 ? 'text-red-600' : ''}`}>
