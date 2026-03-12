@@ -171,7 +171,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
       toast({ title: 'Produto cadastrado', description: `${registerItem.code} adicionado ao sistema local.` });
       setRegisterDialogOpen(false);
       setRegisterItem(null);
-      refetchProducts();
+      fetchProducts();
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' });
     } finally {
