@@ -762,6 +762,22 @@ export function ProductsView() {
                     Palete
                   </div>
                 )}
+                {isColumnVisible('sales') && (
+                  <div 
+                    className="p-2 font-medium text-muted-foreground text-sm"
+                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.sales}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.sales}px` }}
+                  >
+                    <span className="flex items-center gap-1">
+                      <ShoppingBag className="h-3.5 w-3.5" />
+                      Vendas
+                      {!salesLoaded && (
+                        <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={fetchSales} disabled={salesLoading}>
+                          {salesLoading ? '...' : 'Carregar'}
+                        </Button>
+                      )}
+                    </span>
+                  </div>
+                )}
                 <div className="flex-shrink-0 p-2 font-medium text-muted-foreground text-sm text-right" style={{ width: '144px' }}>
                   Ações
                 </div>
