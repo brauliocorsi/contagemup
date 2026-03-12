@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { 
   Package, ClipboardList, History, BarChart3, Tags, Scale, 
   TrendingUp, TrendingDown, Warehouse, AlertTriangle, AlertOctagon,
-  ChevronDown, Settings, ArrowLeftRight
+  ChevronDown, Settings, ArrowLeftRight, ShoppingBag
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -42,6 +42,7 @@ const mainTabs = [
 const endTabs = [
   { id: 'reconciliation', label: 'Separação', icon: Scale },
   { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
+  { id: 'purchases', label: 'Compras', icon: ShoppingBag },
   { id: 'warehouse', label: 'Armazém', icon: Warehouse },
   { id: 'reports', label: 'Relatórios', icon: BarChart3 },
   { id: 'settings', label: 'Configurações', icon: Settings },
