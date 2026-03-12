@@ -60,6 +60,20 @@ export function ERPReconciliationView() {
     XLSX.writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const erpOnlyItems = useMemo(() => filtered.filter(i => i.status === 'erp_only'), [filtered]);
+
+  const handleRegisterSingle = async (item: ERPComparisonItem) => {
+    setRegistering(prev => new Set(prev).add(item.productCode));
+    await registerERPProducts([item]);
+    setRegistering(prev => { const s = new Set(prev); s.delete(item.productCode); return s; });
+  };
+
+  const handleRegisterAll = async () => {
+    setRegistering(new Set(erpOnlyItems.map(i => i.productCode)));
+    await registerERPProducts(erpOnlyItems);
+    setRegistering(new Set());
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
