@@ -28,51 +28,33 @@ export function useERPReconciliation() {
   const { toast } = useToast();
 
   const fetchAllERPProducts = useCallback(async (): Promise<ERPProduct[]> => {
-    const allProducts: ERPProduct[] = [];
-    let page = 1;
-    let hasMore = true;
+    setProgress({ current: 0, total: 1 });
 
-    while (hasMore) {
-      setProgress(prev => ({ ...prev, current: page }));
+    // Single call - the edge function handles all pagination internally
+    const { data, error } = await supabase.functions.invoke('gestaoclick-products', {
+      body: { fetchAll: true },
+    });
 
-      const { data, error } = await supabase.functions.invoke('gestaoclick-products', {
-        body: { page },
-      });
-
-      if (error) {
-        throw new Error(`Erro ao buscar produtos do ERP: ${error.message}`);
-      }
-
-      const products = data?.data || [];
-      const meta = data?.meta || {};
-      
-      if (Array.isArray(products) && products.length > 0) {
-        const mapped = products.map((p: any) => ({
-          id: String(p.id),
-          codigo_interno: p.codigo_interno || p.codigo || '',
-          nome: p.nome || '',
-          estoque_atual: Math.max(0, parseFloat(String(p.estoque ?? '0')) || 0),
-          grupo: p.nome_grupo || '',
-        }));
-        allProducts.push(...mapped);
-        
-        // Use meta.proxima_pagina from GestãoClick API to check if there are more pages
-        if (meta.proxima_pagina) {
-          page = meta.proxima_pagina;
-        } else {
-          hasMore = false;
-        }
-      } else {
-        hasMore = false;
-      }
-
-      // Update total pages info for progress
-      if (meta.total_paginas) {
-        setProgress({ current: page, total: meta.total_paginas });
-      }
+    if (error) {
+      throw new Error(`Erro ao buscar produtos do ERP: ${error.message}`);
     }
 
-    return allProducts;
+    const products = data?.data || [];
+
+    if (!Array.isArray(products) || products.length === 0) {
+      return [];
+    }
+
+    const mapped = products.map((p: any) => ({
+      id: String(p.id),
+      codigo_interno: p.codigo_interno || p.codigo || '',
+      nome: p.nome || '',
+      estoque_atual: Math.max(0, parseFloat(String(p.estoque ?? '0')) || 0),
+      grupo: p.nome_grupo || '',
+    }));
+
+    setProgress({ current: 1, total: 1 });
+    return mapped;
   }, []);
 
   const fetchAndCompare = useCallback(async () => {
