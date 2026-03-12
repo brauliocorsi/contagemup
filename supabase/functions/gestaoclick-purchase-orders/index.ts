@@ -102,38 +102,54 @@ Deno.serve(async (req) => {
       situacaoLookup[String(sit.id)] = sit.nome || '';
     }
 
-    // Step 2: Fetch vendas filtered by date using API params
+    // Step 2: Fetch vendas - use date params and stop early
     const matchingVendas: any[] = [];
-    const vendasUrl = `https://api.gestaoclick.com/api/vendas?data_de=${targetDate}&data_ate=${targetDate}`;
+    // Try multiple date param formats the API might support
+    const vendasBaseUrl = `https://api.gestaoclick.com/api/vendas?data_inicial=${targetDate}&data_final=${targetDate}`;
     
     console.log(`Fetching vendas for date: ${targetDate}`);
     
-    const firstPage = await fetchPage(vendasUrl, 1, apiHeaders);
-    const totalPages = firstPage.meta.total_paginas || 1;
+    const firstPage = await fetchPage(vendasBaseUrl, 1, apiHeaders);
+    const totalPages = Math.min(firstPage.meta.total_paginas || 1, 30); // Cap at 30 pages max
     
-    console.log(`Found ${firstPage.data.length} vendas on page 1, total pages: ${totalPages}`);
+    console.log(`Page 1: ${firstPage.data.length} vendas, total_paginas from API: ${firstPage.meta.total_paginas}`);
 
-    const processVendas = (vendas: any[]) => {
+    let stopEarly = false;
+
+    const processVendas = (vendas: any[]): boolean => {
+      let foundAny = false;
       for (const venda of vendas) {
-        matchingVendas.push(venda);
+        const vendaDate = normalizeDateStr(venda.data || '');
+        if (vendaDate === targetDate) {
+          matchingVendas.push(venda);
+          foundAny = true;
+        }
       }
+      return foundAny;
     };
 
     processVendas(firstPage.data);
 
     const BATCH_SIZE = 5;
-    for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH_SIZE) {
+    for (let batchStart = 2; batchStart <= totalPages && !stopEarly; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
       const pages = [];
       for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
       const results = await Promise.all(
-        pages.map(p => fetchPage(vendasUrl, p, apiHeaders))
+        pages.map(p => fetchPage(vendasBaseUrl, p, apiHeaders))
       );
-      for (const result of results) processVendas(result.data);
-      if (batchEnd < totalPages) await new Promise(resolve => setTimeout(resolve, 200));
+      let batchHadMatches = false;
+      for (const result of results) {
+        if (processVendas(result.data)) batchHadMatches = true;
+      }
+      // If after several pages with no matches and we already have some, stop
+      if (!batchHadMatches && matchingVendas.length > 0) {
+        stopEarly = true;
+      }
+      if (batchEnd < totalPages && !stopEarly) await new Promise(resolve => setTimeout(resolve, 150));
     }
     
-    console.log(`Total matching vendas: ${matchingVendas.length}`);
+    console.log(`Total matching vendas: ${matchingVendas.length}, stopped early: ${stopEarly}`);
 
     // Step 3: Resolve product codes
     const requiredProductIds = new Set<string>();
