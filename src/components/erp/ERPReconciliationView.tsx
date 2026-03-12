@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useERPReconciliation, ERPComparisonItem } from '@/hooks/useERPReconciliation';
+import { useProductSales } from '@/hooks/useProductSales';
+import { ProductSalesPopover } from '@/components/products/ProductSalesPopover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2 } from 'lucide-react';
+import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 
@@ -19,6 +21,7 @@ const STATUS_CONFIG = {
 
 export function ERPReconciliationView() {
   const { comparisonItems, loading, fetchAndCompare, searchSingleProduct } = useERPReconciliation();
+  const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount } = useProductSales();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [quickSearch, setQuickSearch] = useState('');
@@ -170,6 +173,16 @@ export function ERPReconciliationView() {
                     <TableHead className="text-right">Stock Local</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        Vendas
+                        {!salesLoaded && (
+                          <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={fetchSales} disabled={salesLoading}>
+                            {salesLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Carregar'}
+                          </Button>
+                        )}
+                      </div>
+                    </TableHead>
                     <TableHead>Localização</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -191,6 +204,17 @@ export function ERPReconciliationView() {
                             <Icon className="h-3 w-3" />
                             {config.label}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {salesLoaded ? (
+                            <ProductSalesPopover
+                              salesCount={getSalesCount(item.productCode)}
+                              sales={getSalesForProduct(item.productCode)}
+                              productCode={item.productCode}
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{item.location || '—'}</TableCell>
                       </TableRow>
