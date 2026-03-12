@@ -44,6 +44,8 @@ interface VirtualizedProductRowProps {
   isSelected: boolean;
   hasOrders: boolean;
   orderStats?: OrderStats | null;
+  salesCount: number;
+  sales: VendaInfo[];
   visibleColumns: Set<string>;
   columnWidths: Record<string, number>;
   onToggleSelection: (id: string) => void;
