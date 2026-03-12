@@ -22,10 +22,20 @@ Deno.serve(async (req) => {
     // Parse request body for pagination/filters
     const body = await req.json().catch(() => ({}));
     const page = body.page || 1;
+    const searchCode = body.codigo || null;
+    const searchName = body.nome || null;
 
     const url = new URL('https://api.gestaoclick.com/api/produtos');
     url.searchParams.set('pagina', String(page));
     url.searchParams.set('ativo', '1');
+    
+    // Add optional filters
+    if (searchCode) {
+      url.searchParams.set('codigo', searchCode);
+    }
+    if (searchName) {
+      url.searchParams.set('nome', searchName);
+    }
 
     const response = await fetch(url.toString(), {
       method: 'GET',
