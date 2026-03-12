@@ -131,18 +131,36 @@ Deno.serve(async (req) => {
 
     processVendas(firstPage.data);
 
-    // Search from the LAST pages (newest vendas are typically at the end)
+    // Search the LAST pages thoroughly - recent vendas are always at the end
+    // Scan last 30 pages completely (no early stopping) to ensure we get all of today's sales
     const BATCH_SIZE = 5;
-    let backStopEarly = false;
-    let backEmptyBatches = 0;
+    const GUARANTEED_BACK_PAGES = 30; // Always scan last 30 pages fully
     
     if (apiTotalPages > 1) {
       const lastPage = await fetchPage(vendasBaseUrl, apiTotalPages, apiHeaders);
       processVendas(lastPage.data);
       console.log(`Last page (${apiTotalPages}): ${lastPage.data.length} vendas, matches so far: ${matchingVendas.length}`);
       
-      // Search backwards from last page
-      for (let batchEnd = apiTotalPages - 1; batchEnd > 1 && !backStopEarly; batchEnd -= BATCH_SIZE) {
+      // Phase 1: Scan last 30 pages completely (no early stopping)
+      const guaranteedStop = Math.max(2, apiTotalPages - GUARANTEED_BACK_PAGES);
+      for (let batchEnd = apiTotalPages - 1; batchEnd >= guaranteedStop; batchEnd -= BATCH_SIZE) {
+        const batchStart = Math.max(guaranteedStop, batchEnd - BATCH_SIZE + 1);
+        const pages = [];
+        for (let p = batchEnd; p >= batchStart; p--) pages.push(p);
+        const results = await Promise.all(
+          pages.map(p => fetchPage(vendasBaseUrl, p, apiHeaders))
+        );
+        for (const result of results) {
+          processVendas(result.data);
+        }
+        console.log(`Back scan pages ${batchEnd}-${batchStart}: total matches now ${matchingVendas.length}`);
+        if (batchStart > guaranteedStop) await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Phase 2: Continue backwards with early stopping if we already found matches
+      let backStopEarly = false;
+      let backEmptyBatches = 0;
+      for (let batchEnd = guaranteedStop - 1; batchEnd > 1 && !backStopEarly; batchEnd -= BATCH_SIZE) {
         const batchStart = Math.max(2, batchEnd - BATCH_SIZE + 1);
         const pages = [];
         for (let p = batchEnd; p >= batchStart; p--) pages.push(p);
@@ -157,36 +175,13 @@ Deno.serve(async (req) => {
           backEmptyBatches = 0;
         } else if (matchingVendas.length > 0) {
           backEmptyBatches++;
-          if (backEmptyBatches >= 3) backStopEarly = true;
+          if (backEmptyBatches >= 2) backStopEarly = true;
         }
-        if (batchStart > 2 && !backStopEarly) await new Promise(resolve => setTimeout(resolve, 150));
+        if (batchStart > 2 && !backStopEarly) await new Promise(resolve => setTimeout(resolve, 100));
       }
-    }
-
-    // Also search forward from page 2 (in case some vendas are near the front)
-    let fwdStopEarly = false;
-    let fwdEmptyBatches = 0;
-    for (let batchStart = 2; batchStart <= Math.min(totalPages, 20) && !fwdStopEarly; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
-      const pages = [];
-      for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
-      const results = await Promise.all(
-        pages.map(p => fetchPage(vendasBaseUrl, p, apiHeaders))
-      );
-      let batchHadMatches = false;
-      for (const result of results) {
-        if (processVendas(result.data)) batchHadMatches = true;
-      }
-      if (batchHadMatches) {
-        fwdEmptyBatches = 0;
-      } else if (matchingVendas.length > 0) {
-        fwdEmptyBatches++;
-        if (fwdEmptyBatches >= 2) fwdStopEarly = true;
-      }
-      if (batchEnd < totalPages && !fwdStopEarly) await new Promise(resolve => setTimeout(resolve, 150));
     }
     
-    console.log(`Total matching vendas: ${matchingVendas.length}, back stopped: ${backStopEarly}, fwd stopped: ${fwdStopEarly}`);
+    console.log(`Total matching vendas after full scan: ${matchingVendas.length}`);
 
     // Step 3: Resolve product codes
     const requiredProductIds = new Set<string>();
