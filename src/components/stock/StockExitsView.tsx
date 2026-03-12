@@ -696,6 +696,10 @@ export function StockExitsView() {
         <TabsContent value="historico">
           <PickingHistoryView />
         </TabsContent>
+
+        <TabsContent value="erp-exits">
+          <ERPExitsView />
+        </TabsContent>
       </Tabs>
 
       {/* Validation Dialog */}
