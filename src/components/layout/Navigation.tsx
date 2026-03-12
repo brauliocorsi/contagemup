@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { 
   Package, ClipboardList, History, BarChart3, Tags, Scale, 
   TrendingUp, TrendingDown, Warehouse, AlertTriangle, AlertOctagon,
-  ChevronDown, Settings, GitCompareArrows
+  ChevronDown, Settings, ArrowLeftRight
 } from 'lucide-react';
 import {
   DropdownMenu,
