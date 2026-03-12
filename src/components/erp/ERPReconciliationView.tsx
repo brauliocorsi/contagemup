@@ -102,10 +102,18 @@ export function ERPReconciliationView() {
             {loading ? 'A carregar...' : 'Sincronizar Tudo'}
           </Button>
           {comparisonItems.length > 0 && (
-            <Button variant="outline" onClick={exportToExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar Excel
-            </Button>
+            <>
+              <Button variant="outline" onClick={exportToExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Excel
+              </Button>
+              {erpOnlyItems.length > 0 && (
+                <Button variant="default" onClick={handleRegisterAll} disabled={registering.size > 0}>
+                  {registering.size > 0 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                  Cadastrar {erpOnlyItems.length} em falta
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
