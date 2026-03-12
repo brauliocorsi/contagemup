@@ -1,33 +1,24 @@
 
 
-## Plan: Selecao de palete/localizacao por coli na entrada de stock
+## Problema Identificado
 
-### Problema actual
-O dialogo `EntryLocationDialog` selecciona **um unico destino** para todo o produto. Todos os colis vao para o mesmo palete/localizacao. O utilizador quer poder escolher destinos diferentes para cada coli, ou manter o mesmo destino para todos.
+O problema esta na forma como o codigo do produto e extraido das vendas. Na Edge Function `gestaoclick-vendas`, os produtos dentro de cada venda sao mapeados usando `item.codigo || item.produto_codigo` (linha 144). Porem, na reconciliacao ERP, os produtos sao identificados pelo campo `codigo_interno` do GestãoClick. Se a API de vendas retorna o codigo do produto num campo diferente (ex: `codigo_interno`, `produto_codigo_interno`), os codigos nao batem e o mapa fica vazio para aquele produto.
 
-### Abordagem
+## Plano
 
-**1. Modificar `EntryLocationDialog`** para suportar produtos multi-coli:
-- Adicionar um toggle: "Mesmo destino para todos" vs "Destino por coli"
-- No modo "mesmo destino", funciona como hoje (um destino para tudo)
-- No modo "por coli", mostrar a selecao de localização/palete para cada coli individualmente, com nome do coli se disponivel
-- O resultado passa de um unico `EntryDestination` para um `Map<number, EntryDestination>` (colis_number -> destino)
+### 1. Adicionar logging de debug na Edge Function `gestaoclick-vendas`
+- Logar a estrutura de um item de produto da primeira venda para identificar os campos disponíveis (ex: `codigo`, `codigo_interno`, `produto_codigo`, etc.)
 
-**2. Modificar `StockEntriesView`** para usar destinos por coli:
-- Alterar `pendingEntryDestinations` de `Map<string, EntryDestination>` para `Map<string, Map<number, EntryDestination>>` (product_id -> colis_number -> destino)
-- No `executeEntries`, ao iterar pelos colis, consultar o destino especifico daquele coli
-- Passar `totalColis`, `colisNames` e `categoryColisNamesMap` ao dialogo
+### 2. Corrigir extração do código do produto
+- Na linha 144 do `gestaoclick-vendas/index.ts`, expandir a extração para incluir `item.codigo_interno`:
+```typescript
+const productCode = String(item.codigo_interno || item.codigo || item.produto_codigo || '');
+```
 
-**3. Manter compatibilidade total:**
-- Produtos com 1 coli: comportamento identico ao actual
-- Modo "mesmo destino": gera internamente o mesmo destino para todos os colis
-- Sem "Especificar localizacao" activo e sem multiplas localizacoes: nenhum dialogo aparece (como hoje)
+### 3. Redeploy da Edge Function
+- Fazer deploy da função atualizada para aplicar a correção
 
-### Ficheiros a modificar
-- `src/components/stock/EntryLocationDialog.tsx` -- adicionar UI per-coli com toggle
-- `src/components/stock/StockEntriesView.tsx` -- adaptar state e logica de destinos por coli
-
-### Riscos mitigados
-- O modo "mesmo destino" e o default, mantendo o fluxo rapido para quem nao precisa separar
-- Nenhuma alteracao na logica de `counts`, `ManualStockSection` ou outros hooks
+### Impacto
+- Apenas o ficheiro `supabase/functions/gestaoclick-vendas/index.ts` sera alterado
+- A correcao garante que o codigo interno do produto (usado na reconciliacao) faz match com os codigos extraidos das vendas
 
