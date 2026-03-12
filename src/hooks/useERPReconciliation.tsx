@@ -43,26 +43,32 @@ export function useERPReconciliation() {
         throw new Error(`Erro ao buscar produtos do ERP: ${error.message}`);
       }
 
-      // GestãoClick returns { data: [...products], meta: { total, ... } } or similar
-      const products = data?.data || data?.produtos || data || [];
+      const products = data?.data || [];
+      const meta = data?.meta || {};
       
       if (Array.isArray(products) && products.length > 0) {
         const mapped = products.map((p: any) => ({
           id: String(p.id),
           codigo_interno: p.codigo_interno || p.codigo || '',
           nome: p.nome || '',
-          estoque_atual: parseFloat(p.estoque_atual || p.estoque || '0') || 0,
-          grupo: p.grupo?.nome || p.grupo_nome || '',
+          estoque_atual: Math.max(0, parseFloat(String(p.estoque ?? '0')) || 0),
+          grupo: p.nome_grupo || '',
         }));
         allProducts.push(...mapped);
-        page++;
         
-        // If less than 100 products returned, we've reached the last page
-        if (products.length < 100) {
+        // Use meta.proxima_pagina from GestãoClick API to check if there are more pages
+        if (meta.proxima_pagina) {
+          page = meta.proxima_pagina;
+        } else {
           hasMore = false;
         }
       } else {
         hasMore = false;
+      }
+
+      // Update total pages info for progress
+      if (meta.total_paginas) {
+        setProgress({ current: page, total: meta.total_paginas });
       }
     }
 
