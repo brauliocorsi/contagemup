@@ -118,6 +118,7 @@ export function PurchaseOrdersView() {
     const data = displayItems.map(p => ({
       'Código': p.productCode,
       'Produto': p.productName,
+      'Nº Venda(s)': p.vendas.map(v => v.codigo).join(', '),
       'Vendido': p.totalSold,
       'Stock Atual': p.localStock,
       'Stock Após Venda': p.stockAfterSale,
