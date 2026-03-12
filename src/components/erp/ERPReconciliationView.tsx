@@ -21,6 +21,7 @@ const STATUS_CONFIG = {
 
 export function ERPReconciliationView() {
   const { comparisonItems, loading, fetchAndCompare, searchSingleProduct } = useERPReconciliation();
+  const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount } = useProductSales();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [quickSearch, setQuickSearch] = useState('');
