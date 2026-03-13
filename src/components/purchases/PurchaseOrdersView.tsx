@@ -399,17 +399,17 @@ export function PurchaseOrdersView() {
                 </TableHeader>
                 <TableBody>
                   {displayItems.map(p => {
-                    const isExpanded = expandedRows.has(p.productCode);
+                    const isExpanded = expandedRows.has(p.itemKey);
                     const isNegative = p.stockAfterSale < 0 || p.localStock < 0;
                     return (
                       <>
                         <TableRow 
-                          key={p.productCode} 
+                          key={p.itemKey}
                           className={cn(
                             "cursor-pointer",
                             isNegative && "bg-destructive/5 hover:bg-destructive/10"
                           )}
-                          onClick={() => toggleExpand(p.productCode)}
+                          onClick={() => toggleExpand(p.itemKey)}
                         >
                           <TableCell className="px-2">
                             {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
@@ -417,7 +417,17 @@ export function PurchaseOrdersView() {
                           <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
                           <TableCell className="font-medium">{p.productName}</TableCell>
                           <TableCell className="text-center">
-                            <Badge variant="secondary" className="text-xs">{p.vendas.length}</Badge>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <Badge variant="secondary" className="text-xs">{p.vendas.length}</Badge>
+                              {p.vendas.slice(0, 2).map((v, idx) => (
+                                <span key={`${v.codigo}-${idx}`} className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                  #{v.codigo} · {v.cliente}
+                                </span>
+                              ))}
+                              {p.vendas.length > 2 && (
+                                <span className="text-[10px] text-muted-foreground">+{p.vendas.length - 2}</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right font-medium">{p.totalSold}</TableCell>
                           <TableCell className="text-right">
@@ -438,13 +448,13 @@ export function PurchaseOrdersView() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleRemoveProduct(p.productCode); }} title="Remover da lista">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleRemoveProduct(p.itemKey); }} title="Remover da lista">
                               <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
                             </Button>
                           </TableCell>
                         </TableRow>
                         {isExpanded && (
-                          <TableRow key={`${p.productCode}-detail`} className="bg-muted/30 hover:bg-muted/40">
+                          <TableRow key={`${p.itemKey}-detail`} className="bg-muted/30 hover:bg-muted/40">
                             <TableCell colSpan={9} className="p-0">
                               <div className="px-6 py-3">
                                 <p className="text-xs font-semibold text-muted-foreground mb-2">Detalhes das Vendas ({p.vendas.length})</p>

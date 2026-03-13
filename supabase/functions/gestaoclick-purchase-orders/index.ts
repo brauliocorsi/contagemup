@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
     for (const venda of matchingVendas) {
       const items = venda.produtos || venda.itens || [];
       const vendaSituacao = situacaoLookup[String(venda.situacao_id)] || 'Desconhecida';
-      const vendaCliente = venda.cliente_nome || venda.cliente?.nome || 'N/A';
+      const vendaCliente = venda.cliente_nome || venda.nome_cliente || (typeof venda.cliente === 'string' ? venda.cliente : '') || venda.cliente?.nome || venda.cliente?.razao_social || venda.pessoa?.nome || venda.contato?.nome || 'N/A';
       const vendaCodigo = String(venda.codigo || '');
 
       if (items.length === 0) {
