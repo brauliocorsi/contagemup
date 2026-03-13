@@ -34,6 +34,21 @@ export function ERPReconciliationView() {
   const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Geral');
 
+  // Auto-load sales on mount
+  useEffect(() => {
+    if (!salesLoaded && !salesLoading) {
+      fetchSales();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper to show cache age
+  const getCacheAge = (cachedAt: string | null): string | null => {
+    if (!cachedAt) return null;
+    const mins = Math.round((Date.now() - new Date(cachedAt).getTime()) / 60000);
+    if (mins < 1) return 'agora';
+    return `há ${mins} min`;
+  };
+
   // Calculate sold stock per product from active sales
   const getSoldStock = (productCode: string): number => {
     if (!salesLoaded) return 0;
