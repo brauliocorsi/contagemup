@@ -185,7 +185,7 @@ export function ERPReconciliationView() {
 
       {/* Summary cards */}
       {comparisonItems.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className={`grid grid-cols-2 ${summary.duplicate_suspect > 0 ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-3`}>
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('all')}>
             <CardContent className="p-3 text-center">
               <p className="text-2xl font-bold">{summary.total}</p>
