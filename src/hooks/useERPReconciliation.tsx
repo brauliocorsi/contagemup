@@ -337,6 +337,6 @@ export function useERPReconciliation() {
 
   return {
     erpProducts, comparisonItems, loading, progress, cachedAt,
-    fetchAndCompare, searchSingleProduct, registerERPProducts,
+    fetchAndCompare, searchSingleProduct, registerERPProducts, unifyDuplicate,
   };
 }
