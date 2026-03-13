@@ -160,7 +160,7 @@ export function useERPReconciliation() {
 
       const erp: ERPProduct[] = products.map((p: any) => ({
         id: String(p.id), codigo_interno: p.codigo_interno || p.codigo || '',
-        nome: p.nome || '', estoque_atual: parseFloat(String(p.estoque ?? '0')) || 0,
+        nome: p.nome || '', estoque_atual: parseFloat(String(p.estoque_atual ?? p.estoque ?? '0')) || 0,
         grupo: p.nome_grupo || '',
       }));
 
