@@ -80,6 +80,13 @@ function getPostalPrefix(postalCode: string): string {
   return postalCode.replace(/[^0-9]/g, '').substring(0, 4);
 }
 
+// Extract Portuguese postal code (XXXX-XXX) from an address string
+function extractPostalCode(text: string): string {
+  if (!text) return '';
+  const match = text.match(/\d{4}-\d{3}/);
+  return match ? match[0] : '';
+}
+
 type Step = 'select_status' | 'loading' | 'results';
 
 export function SuggestRouteDialog({ open, onOpenChange, onCreateRoute }: SuggestRouteDialogProps) {
