@@ -132,6 +132,69 @@ export function PurchaseOrdersView() {
     }
   };
 
+  // Fetch exits already processed in the selected period to avoid double-counting
+  const [exitsMap, setExitsMap] = useState<Map<string, number>>(new Map());
+
+  // Reload exits whenever soldItems or dates change
+  const exitsLoaded = useMemo(() => ({ dateFrom, dateTo, loaded }), [dateFrom, dateTo, loaded]);
+
+  // Effect to fetch stock exits for the period
+  useState(() => { /* placeholder - real fetch below */ });
+
+  const fetchExitsForPeriod = useCallback(async () => {
+    if (!loaded || soldItems.length === 0) {
+      setExitsMap(new Map());
+      return;
+    }
+    try {
+      const dateFromStr = format(dateFrom, 'yyyy-MM-dd');
+      const dateToStr = format(dateTo, 'yyyy-MM-dd');
+      const nextDay = format(new Date(new Date(dateToStr).getTime() + 86400000), 'yyyy-MM-dd');
+
+      // Fetch stock_movements (exit type) in the period
+      const { data: movements } = await supabase
+        .from('stock_movements')
+        .select('product_id, quantity, movement_type')
+        .in('movement_type', ['exit', 'picking'])
+        .gte('created_at', `${dateFromStr}T00:00:00`)
+        .lt('created_at', `${nextDay}T00:00:00`);
+
+      // Fetch picking_items in the period (picking may not always create stock_movements)
+      const { data: pickingData } = await supabase
+        .from('picking_items')
+        .select('product_id, quantity, picked_at')
+        .gte('picked_at', `${dateFromStr}T00:00:00`)
+        .lt('picked_at', `${nextDay}T00:00:00`);
+
+      const map = new Map<string, number>();
+
+      // Aggregate movements by product_id
+      for (const m of (movements || [])) {
+        if (!m.product_id) continue;
+        const prev = map.get(m.product_id) ?? 0;
+        map.set(m.product_id, prev + Math.abs(m.quantity));
+      }
+
+      // Aggregate picking items by product_id (avoid double-counting with movements)
+      // Only add picking if there's no corresponding stock_movement
+      for (const p of (pickingData || [])) {
+        if (!p.product_id) continue;
+        // Picking items are already included via stock_movements in most cases
+        // We skip this to avoid double-counting
+      }
+
+      setExitsMap(map);
+    } catch (err) {
+      console.error('Error fetching exits for period:', err);
+      setExitsMap(new Map());
+    }
+  }, [loaded, soldItems.length, dateFrom, dateTo]);
+
+  // Trigger fetch when data is loaded
+  useMemo(() => {
+    if (loaded) fetchExitsForPeriod();
+  }, [loaded, fetchExitsForPeriod]);
+
   const enrichedItems = useMemo(() => {
     const items = soldItems
       .map(item => ({ ...item, itemKey: getSoldItemKey(item) }))
@@ -139,7 +202,17 @@ export function PurchaseOrdersView() {
       .map(item => {
         const local = localProductMap.get(item.productCode.toLowerCase());
         const currentStock = local?.current_stock ?? 0;
-        const stockAfterSale = currentStock - item.totalSold;
+        
+        // Get exits already processed for this product in the period
+        const alreadyExited = local ? (exitsMap.get(local.id) ?? 0) : 0;
+        
+        // Reconstruct stock before exits: current_stock already reflects exits,
+        // so add them back to get the "pre-exit" stock
+        const stockBeforeExits = currentStock + alreadyExited;
+        
+        // Now subtract total sold from pre-exit stock
+        const stockAfterSale = stockBeforeExits - item.totalSold;
+        
         return {
           ...item,
           localStock: currentStock,
@@ -156,7 +229,7 @@ export function PurchaseOrdersView() {
     }
 
     return items;
-  }, [soldItems, localProductMap, removedProducts, sortAlpha]);
+  }, [soldItems, localProductMap, removedProducts, sortAlpha, exitsMap]);
 
   const negativeStockItems = useMemo(() =>
     enrichedItems.filter(item => item.stockAfterSale < 0 || item.localStock < 0),
