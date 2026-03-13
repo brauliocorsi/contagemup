@@ -32,6 +32,7 @@ export function useProductSales() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
 
   const fetchSales = useCallback(async (skipCache = false) => {
     setLoading(true);
