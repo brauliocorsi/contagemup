@@ -79,7 +79,7 @@ export function ERPReconciliationView() {
   }, [comparisonItems, search, statusFilter]);
 
   const summary = useMemo(() => {
-    const s = { total: comparisonItems.length, match: 0, surplus: 0, shortage: 0, erp_only: 0, local_only: 0 };
+    const s = { total: comparisonItems.length, match: 0, surplus: 0, shortage: 0, erp_only: 0, local_only: 0, duplicate_suspect: 0 };
     comparisonItems.forEach(i => { s[i.status]++; });
     return s;
   }, [comparisonItems]);
