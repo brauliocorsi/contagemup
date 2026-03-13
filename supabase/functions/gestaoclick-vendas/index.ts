@@ -304,15 +304,67 @@ Deno.serve(async (req) => {
       situacaoLookup[String(sit.id)] = sit.nome;
     }
 
+    // Log first venda's raw structure for debugging
+    if (allVendas.length > 0) {
+      const sample = allVendas[0];
+      console.log('Sample venda keys:', Object.keys(sample));
+      console.log('Sample venda (partial):', JSON.stringify({
+        id: sample.id,
+        codigo: sample.codigo,
+        cliente_nome: sample.cliente_nome,
+        cliente: sample.cliente,
+        endereco: sample.endereco,
+        endereco_entrega: sample.endereco_entrega,
+        cep: sample.cep,
+        codigo_postal: sample.codigo_postal,
+        cidade: sample.cidade,
+        estado: sample.estado,
+        bairro: sample.bairro,
+        numero: sample.numero,
+        complemento: sample.complemento,
+        contato: sample.contato,
+        contato_nome: sample.contato_nome,
+        nome_cliente: sample.nome_cliente,
+        razao_social: sample.razao_social,
+      }, null, 2));
+    }
+
     for (const venda of allVendas) {
+      // Try multiple field paths for client info
+      const cliente = venda.cliente || {};
+      const contato = venda.contato || {};
+
+      const clienteNome = venda.cliente_nome || venda.nome_cliente || venda.razao_social
+        || cliente.nome || cliente.razao_social || contato.nome || 'N/A';
+
+      // Build full address from parts
+      const enderecoPartes = [
+        venda.endereco || venda.endereco_entrega || cliente.endereco || '',
+        venda.numero || cliente.numero || '',
+        venda.complemento || cliente.complemento || '',
+        venda.bairro || cliente.bairro || '',
+      ].filter(Boolean).join(', ');
+
+      const cidade = venda.cidade || cliente.cidade || contato.cidade || '';
+      const estado = venda.estado || cliente.estado || contato.estado || '';
+      
+      // Try multiple fields for postal code, also extract from address
+      let cep = venda.cep || venda.codigo_postal || cliente.cep || cliente.codigo_postal || '';
+      if (!cep) {
+        // Try to extract Portuguese postal code (XXXX-XXX) from address parts
+        const fullText = `${enderecoPartes} ${cidade} ${clienteNome}`;
+        const postalMatch = fullText.match(/\d{4}-\d{3}/);
+        if (postalMatch) cep = postalMatch[0];
+      }
+
       const vendaInfo = {
         venda_id: String(venda.id),
         codigo: String(venda.codigo || ''),
-        cliente_nome: venda.cliente_nome || venda.cliente?.nome || 'N/A',
-        cliente_endereco: venda.endereco || venda.cliente?.endereco || '',
-        cliente_cidade: venda.cidade || venda.cliente?.cidade || '',
-        cliente_cep: venda.cep || venda.codigo_postal || venda.cliente?.cep || venda.cliente?.codigo_postal || '',
-        cliente_estado: venda.estado || venda.cliente?.estado || '',
+        cliente_nome: clienteNome,
+        cliente_endereco: enderecoPartes,
+        cliente_cidade: cidade,
+        cliente_cep: cep,
+        cliente_estado: estado,
         situacao: situacaoLookup[String(venda.situacao_id)] || 'Desconhecida',
         data: venda.data || '',
         valor_total: String(venda.valor_total || '0'),
