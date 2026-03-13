@@ -73,6 +73,7 @@ export function ERPReconciliationView() {
       'Código': item.productCode,
       'Produto': item.productName,
       'Stock ERP': item.erpStock,
+      'Stock Vendido': getSoldStock(item.productCode),
       'Stock Local': item.localStock,
       'Diferença': item.difference,
       'Estado': STATUS_CONFIG[item.status].label,
