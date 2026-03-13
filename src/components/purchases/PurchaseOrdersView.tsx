@@ -163,6 +163,14 @@ export function PurchaseOrdersView() {
     setRemovedProducts(prev => new Set(prev).add(code.toLowerCase()));
   };
 
+  const toggleExpand = (code: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      return next;
+    });
+  };
+
   const handleRestoreAll = () => setRemovedProducts(new Set());
 
   const handleSetSingleDate = (d: Date) => {
