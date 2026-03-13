@@ -55,6 +55,7 @@ const endTabs = [
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const isStockActive = stockItems.some(item => item.id === activeTab);
   const isManagementActive = managementItems.some(item => item.id === activeTab);
+  const isOperationsActive = operationsItems.some(item => item.id === activeTab);
   
   const getActiveStockLabel = () => {
     const active = stockItems.find(item => item.id === activeTab);
@@ -64,6 +65,11 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const getActiveManagementLabel = () => {
     const active = managementItems.find(item => item.id === activeTab);
     return active?.label || 'Gestão';
+  };
+
+  const getActiveOperationsLabel = () => {
+    const active = operationsItems.find(item => item.id === activeTab);
+    return active?.label || 'Operações';
   };
 
   return (
