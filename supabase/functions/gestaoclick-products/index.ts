@@ -1,7 +1,20 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+const CACHE_TTL_MINUTES = 15;
+const BATCH_SIZE = 10;
+const BATCH_DELAY_MS = 50;
+
+function getSupabaseAdmin() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+}
 
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -33,6 +46,52 @@ async function fetchPage(page: number, headers: Record<string, string>): Promise
   return { products: data?.data || [], meta: data?.meta || {} };
 }
 
+async function getCachedProducts(supabase: any): Promise<{ products: any[]; cachedAt: string } | null> {
+  const cutoff = new Date(Date.now() - CACHE_TTL_MINUTES * 60 * 1000).toISOString();
+  
+  const { data, error } = await supabase
+    .from('erp_products_cache')
+    .select('code, name, erp_stock, grupo, raw_data, fetched_at')
+    .gte('fetched_at', cutoff)
+    .limit(1);
+
+  if (error || !data || data.length === 0) return null;
+
+  // All rows share the same fetched_at, so fetch all
+  const { data: allData, error: allError } = await supabase
+    .from('erp_products_cache')
+    .select('raw_data, fetched_at')
+    .gte('fetched_at', cutoff);
+
+  if (allError || !allData || allData.length === 0) return null;
+
+  return {
+    products: allData.map((row: any) => row.raw_data),
+    cachedAt: allData[0].fetched_at,
+  };
+}
+
+async function saveToCache(supabase: any, products: any[]) {
+  // Clear old cache
+  await supabase.from('erp_products_cache').delete().lt('fetched_at', new Date().toISOString());
+
+  // Insert in batches of 500
+  const now = new Date().toISOString();
+  const rows = products.map((p: any) => ({
+    code: p.codigo_interno || p.codigo || '',
+    name: p.nome || '',
+    erp_stock: parseFloat(String(p.estoque ?? '0')) || 0,
+    grupo: p.nome_grupo || '',
+    raw_data: p,
+    fetched_at: now,
+  }));
+
+  for (let i = 0; i < rows.length; i += 500) {
+    const batch = rows.slice(i, i + 500);
+    await supabase.from('erp_products_cache').insert(batch);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -48,6 +107,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const fetchAll = body.fetchAll || false;
     const searchQuery = body.search || '';
+    const skipCache = body.skipCache || false;
 
     const apiHeaders = {
       'access-token': accessToken,
@@ -55,7 +115,7 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json',
     };
 
-    // Quick search optimized for product code and name
+    // Quick search - no cache for search queries
     if (searchQuery) {
       const normalizedSearch = String(searchQuery).toLowerCase().trim();
       const isCodeSearch = /^[a-z0-9._\-/]+$/i.test(normalizedSearch) && normalizedSearch.length >= 4;
@@ -93,7 +153,6 @@ Deno.serve(async (req) => {
         const maxPages = filterKey === 'codigo' ? totalPages : Math.min(totalPages, 10);
         const products = [...first.products];
 
-        const BATCH_SIZE = 5;
         for (let batchStart = 2; batchStart <= maxPages; batchStart += BATCH_SIZE) {
           const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, maxPages);
           const pages: number[] = [];
@@ -120,7 +179,6 @@ Deno.serve(async (req) => {
         console.error('Filtered search failed, fallback to scan:', error);
       }
 
-      // Fallback: paginated scan when API filter does not return expected products
       if (foundProducts.length === 0) {
         strategy = 'fallback-scan';
         const firstPage = await fetchPage(1, apiHeaders);
@@ -132,7 +190,6 @@ Deno.serve(async (req) => {
 
         if (foundProducts.length === 0) {
           const maxPagesToScan = isCodeSearch ? Math.min(totalPages, 80) : Math.min(totalPages, 10);
-          const BATCH_SIZE = isCodeSearch ? 8 : 4;
 
           for (let batchStart = 2; batchStart <= maxPagesToScan; batchStart += BATCH_SIZE) {
             const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, maxPagesToScan);
@@ -171,15 +228,29 @@ Deno.serve(async (req) => {
       });
     }
 
-
     if (fetchAll) {
-      // Step 1: Fetch page 1 to get total_paginas
+      const supabase = getSupabaseAdmin();
+
+      // Check cache first
+      if (!skipCache) {
+        const cached = await getCachedProducts(supabase);
+        if (cached) {
+          console.log(`Cache hit: ${cached.products.length} products from ${cached.cachedAt}`);
+          return new Response(JSON.stringify({
+            data: cached.products,
+            meta: { total: cached.products.length, cached: true, cached_at: cached.cachedAt },
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      // Fetch from API
       const first = await fetchPage(1, apiHeaders);
       const totalPages = first.meta.total_paginas || 1;
       const allProducts = [...first.products];
 
-      // Step 2: Fetch remaining pages in parallel batches of 5
-      const BATCH_SIZE = 5;
       for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH_SIZE) {
         const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
         const pages = [];
@@ -197,15 +268,17 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Small delay between batches to avoid connection issues
         if (batchEnd < totalPages) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
         }
       }
 
+      // Save to cache in background (don't await)
+      saveToCache(supabase, allProducts).catch(err => console.error('Cache save error:', err));
+
       return new Response(JSON.stringify({
         data: allProducts,
-        meta: { total: allProducts.length, total_paginas: totalPages },
+        meta: { total: allProducts.length, total_paginas: totalPages, cached: false },
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
