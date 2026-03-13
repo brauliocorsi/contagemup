@@ -32,13 +32,14 @@ export function useProductSales() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
 
-  const fetchSales = useCallback(async () => {
+  const fetchSales = useCallback(async (skipCache = false) => {
     setLoading(true);
     setError(null);
     try {
       const { data, error: fnError } = await supabase.functions.invoke('gestaoclick-vendas', {
-        body: {},
+        body: { skipCache },
       });
 
       if (fnError) throw fnError;
@@ -54,6 +55,7 @@ export function useProductSales() {
 
       setSalesMap(normalizedMap);
       setTotalVendas(data?.totalVendas || 0);
+      setCachedAt(data?.cached_at || null);
       setLoaded(true);
     } catch (err: any) {
       console.error('Error fetching product sales:', err);
@@ -83,6 +85,7 @@ export function useProductSales() {
     loading,
     error,
     loaded,
+    cachedAt,
     fetchSales,
     getSalesForProduct,
     hasSales,

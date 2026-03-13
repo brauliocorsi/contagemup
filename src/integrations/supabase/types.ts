@@ -179,6 +179,57 @@ export type Database = {
           },
         ]
       }
+      erp_products_cache: {
+        Row: {
+          code: string
+          erp_stock: number
+          fetched_at: string
+          grupo: string
+          id: string
+          name: string
+          raw_data: Json | null
+        }
+        Insert: {
+          code: string
+          erp_stock?: number
+          fetched_at?: string
+          grupo?: string
+          id?: string
+          name?: string
+          raw_data?: Json | null
+        }
+        Update: {
+          code?: string
+          erp_stock?: number
+          fetched_at?: string
+          grupo?: string
+          id?: string
+          name?: string
+          raw_data?: Json | null
+        }
+        Relationships: []
+      }
+      erp_sales_cache: {
+        Row: {
+          fetched_at: string
+          id: string
+          product_code: string
+          venda_data: Json
+        }
+        Insert: {
+          fetched_at?: string
+          id?: string
+          product_code: string
+          venda_data?: Json
+        }
+        Update: {
+          fetched_at?: string
+          id?: string
+          product_code?: string
+          venda_data?: Json
+        }
+        Relationships: []
+      }
       location_audit_items: {
         Row: {
           audit_id: string

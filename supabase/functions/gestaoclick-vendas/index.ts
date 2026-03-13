@@ -1,9 +1,21 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 const EXCLUDED_STATUSES = ['conferido', 'produto entregue', 'cancelado', 'levantado'];
+const CACHE_TTL_MINUTES = 15;
+const BATCH_SIZE = 10;
+const BATCH_DELAY_MS = 50;
+
+function getSupabaseAdmin() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+}
 
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -44,40 +56,72 @@ function extractProductReferences(item: any): { productCode: string; productId: 
   const product = item?.produto || {};
 
   const productCodeCandidates = [
-    item?.codigo_interno,
-    item?.codigo,
-    item?.produto_codigo,
-    item?.produto_codigo_interno,
-    item?.variacao_codigo,
-    item?.variacao?.codigo,
-    product?.codigo_interno,
-    product?.codigo,
-    product?.produto_codigo,
-    product?.codigo_produto,
-    product?.variacao_codigo,
-    product?.referencia,
+    item?.codigo_interno, item?.codigo, item?.produto_codigo,
+    item?.produto_codigo_interno, item?.variacao_codigo, item?.variacao?.codigo,
+    product?.codigo_interno, product?.codigo, product?.produto_codigo,
+    product?.codigo_produto, product?.variacao_codigo, product?.referencia,
   ];
 
-  const productIdCandidates = [
-    item?.produto_id,
-    item?.product_id,
-    product?.produto_id,
-    product?.id,
-  ];
+  const productIdCandidates = [item?.produto_id, item?.product_id, product?.produto_id, product?.id];
+  const variationIdCandidates = [item?.variacao_id, item?.variation_id, item?.variacao?.id, product?.variacao_id, product?.variacao?.id];
 
-  const variationIdCandidates = [
-    item?.variacao_id,
-    item?.variation_id,
-    item?.variacao?.id,
-    product?.variacao_id,
-    product?.variacao?.id,
-  ];
-
-  const productCode = normalizeCode(productCodeCandidates.find((value) => String(value ?? '').trim() !== ''));
-  const productId = normalizeIdentifier(productIdCandidates.find((value) => String(value ?? '').trim() !== ''));
-  const variationId = normalizeIdentifier(variationIdCandidates.find((value) => String(value ?? '').trim() !== ''));
+  const productCode = normalizeCode(productCodeCandidates.find((v) => String(v ?? '').trim() !== ''));
+  const productId = normalizeIdentifier(productIdCandidates.find((v) => String(v ?? '').trim() !== ''));
+  const variationId = normalizeIdentifier(variationIdCandidates.find((v) => String(v ?? '').trim() !== ''));
 
   return { productCode, productId, variationId };
+}
+
+async function getCachedSales(supabase: any): Promise<{ salesMap: Record<string, any[]>; totalVendas: number; cachedAt: string } | null> {
+  const cutoff = new Date(Date.now() - CACHE_TTL_MINUTES * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('erp_sales_cache')
+    .select('product_code, venda_data, fetched_at')
+    .gte('fetched_at', cutoff)
+    .limit(1);
+
+  if (error || !data || data.length === 0) return null;
+
+  const { data: allData, error: allError } = await supabase
+    .from('erp_sales_cache')
+    .select('product_code, venda_data, fetched_at')
+    .gte('fetched_at', cutoff);
+
+  if (allError || !allData || allData.length === 0) return null;
+
+  const salesMap: Record<string, any[]> = {};
+  let totalVendas = 0;
+  const vendaIds = new Set<string>();
+
+  for (const row of allData) {
+    if (!salesMap[row.product_code]) salesMap[row.product_code] = [];
+    const venda = row.venda_data;
+    salesMap[row.product_code].push(venda);
+    if (!vendaIds.has(venda.venda_id)) {
+      vendaIds.add(venda.venda_id);
+      totalVendas++;
+    }
+  }
+
+  return { salesMap, totalVendas, cachedAt: allData[0].fetched_at };
+}
+
+async function saveToSalesCache(supabase: any, productSalesMap: Record<string, any[]>) {
+  await supabase.from('erp_sales_cache').delete().lt('fetched_at', new Date().toISOString());
+
+  const now = new Date().toISOString();
+  const rows: any[] = [];
+
+  for (const [code, vendas] of Object.entries(productSalesMap)) {
+    for (const venda of vendas) {
+      rows.push({ product_code: code, venda_data: venda, fetched_at: now });
+    }
+  }
+
+  for (let i = 0; i < rows.length; i += 500) {
+    await supabase.from('erp_sales_cache').insert(rows.slice(i, i + 500));
+  }
 }
 
 Deno.serve(async (req) => {
@@ -92,26 +136,48 @@ Deno.serve(async (req) => {
     if (!accessToken) throw new Error('GESTAOCLICK_ACCESS_TOKEN não configurado');
     if (!secretToken) throw new Error('GESTAOCLICK_SECRET_ACCESS_TOKEN não configurado');
 
+    const body = await req.json().catch(() => ({}));
+    const skipCache = body.skipCache || false;
+
+    const supabase = getSupabaseAdmin();
+
+    // Check cache
+    if (!skipCache) {
+      const cached = await getCachedSales(supabase);
+      if (cached) {
+        console.log(`Sales cache hit: ${Object.keys(cached.salesMap).length} products from ${cached.cachedAt}`);
+        return new Response(JSON.stringify({
+          productSalesMap: cached.salesMap,
+          totalVendas: cached.totalVendas,
+          excludedStatuses: EXCLUDED_STATUSES,
+          cached: true,
+          cached_at: cached.cachedAt,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const apiHeaders = {
       'access-token': accessToken,
       'secret-access-token': secretToken,
       'Content-Type': 'application/json',
     };
 
-    // Step 1: Fetch situacoes_vendas to get IDs of excluded statuses
-    const situacoesRes = await fetchWithRetry('https://api.gestaoclick.com/api/situacoes_vendas', {
-      method: 'GET',
-      headers: apiHeaders,
-    });
-    
+    // Step 1 + first vendas page in parallel
+    const [situacoesRes, firstVendasPage] = await Promise.all([
+      fetchWithRetry('https://api.gestaoclick.com/api/situacoes_vendas', { method: 'GET', headers: apiHeaders }),
+      fetchPage('https://api.gestaoclick.com/api/vendas', 1, apiHeaders),
+    ]);
+
     if (!situacoesRes.ok) {
       throw new Error(`Failed to fetch situacoes_vendas: ${situacoesRes.status}`);
     }
-    
+
     const situacoesData = await situacoesRes.json();
     const situacoes = situacoesData?.data || [];
-    
-    // Map situacao names to IDs for exclusion
+
     const excludedIds = new Set<string>();
     for (const sit of situacoes) {
       const name = (sit.nome || '').toLowerCase().trim();
@@ -119,24 +185,21 @@ Deno.serve(async (req) => {
         excludedIds.add(String(sit.id));
       }
     }
-    
+
     console.log('Situações encontradas:', situacoes.map((s: any) => `${s.id}: ${s.nome}`));
     console.log('IDs excluídos:', [...excludedIds]);
 
-    // Step 2: Fetch all vendas
+    // Process first page of vendas
     const allVendas: any[] = [];
-    const firstPage = await fetchPage('https://api.gestaoclick.com/api/vendas', 1, apiHeaders);
-    const totalPages = firstPage.meta.total_paginas || 1;
-    
-    // Filter first page
-    for (const venda of firstPage.data) {
+    const totalPages = firstVendasPage.meta.total_paginas || 1;
+
+    for (const venda of firstVendasPage.data) {
       if (!excludedIds.has(String(venda.situacao_id))) {
         allVendas.push(venda);
       }
     }
 
-    // Fetch remaining pages in parallel batches
-    const BATCH_SIZE = 5;
+    // Fetch remaining pages
     for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
       const pages = [];
@@ -155,11 +218,11 @@ Deno.serve(async (req) => {
       }
 
       if (batchEnd < totalPages) {
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
       }
     }
 
-    // Step 3: Build a map of product IDs/variation IDs to internal product codes
+    // Step 3: Build product ID/variation ID map
     const requiredProductIds = new Set<string>();
     const requiredVariationIds = new Set<string>();
 
@@ -211,13 +274,12 @@ Deno.serve(async (req) => {
 
       consumeProducts(firstProductsPage.data);
 
-      const BATCH_SIZE_PRODUCTS = 5;
       for (
         let batchStart = 2;
         batchStart <= totalProductPages && (pendingProductIds.size > 0 || pendingVariationIds.size > 0);
-        batchStart += BATCH_SIZE_PRODUCTS
+        batchStart += BATCH_SIZE
       ) {
-        const batchEnd = Math.min(batchStart + BATCH_SIZE_PRODUCTS - 1, totalProductPages);
+        const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalProductPages);
         const pages: number[] = [];
         for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
 
@@ -230,43 +292,16 @@ Deno.serve(async (req) => {
         }
 
         if (batchEnd < totalProductPages) {
-          await new Promise(resolve => setTimeout(resolve, 150));
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
         }
       }
-
-      console.log('Mapeamento de produtos resolvido:', {
-        productIdsResolvidos: requiredProductIds.size - pendingProductIds.size,
-        productIdsPendentes: pendingProductIds.size,
-        variationIdsResolvidos: requiredVariationIds.size - pendingVariationIds.size,
-        variationIdsPendentes: pendingVariationIds.size,
-      });
     }
 
-    // Step 4: Build a map of product codes to their vendas
-    const productSalesMap: Record<string, Array<{
-      venda_id: string;
-      codigo: string;
-      cliente_nome: string;
-      situacao: string;
-      data: string;
-      valor_total: string;
-      produtos: Array<{ nome: string; codigo: string; quantidade: string; valor_unitario: string }>;
-    }>> = {};
-
-    // Build situacao lookup
+    // Step 4: Build product sales map
+    const productSalesMap: Record<string, any[]> = {};
     const situacaoLookup: Record<string, string> = {};
     for (const sit of situacoes) {
       situacaoLookup[String(sit.id)] = sit.nome;
-    }
-
-    // Debug: log first sale item structure
-    if (allVendas.length > 0) {
-      const firstItems = allVendas[0].produtos || allVendas[0].itens || [];
-      if (firstItems.length > 0) {
-        console.log('DEBUG - First sale item keys:', Object.keys(firstItems[0]));
-        console.log('DEBUG - Nested product keys:', Object.keys(firstItems[0]?.produto || {}));
-        console.log('DEBUG - First sale item:', JSON.stringify(firstItems[0]).substring(0, 500));
-      }
     }
 
     for (const venda of allVendas) {
@@ -277,7 +312,7 @@ Deno.serve(async (req) => {
         situacao: situacaoLookup[String(venda.situacao_id)] || 'Desconhecida',
         data: venda.data || '',
         valor_total: String(venda.valor_total || '0'),
-        produtos: [] as Array<{ nome: string; codigo: string; quantidade: string; valor_unitario: string }>,
+        produtos: [] as any[],
       };
 
       const items = venda.produtos || venda.itens || [];
@@ -299,18 +334,21 @@ Deno.serve(async (req) => {
         if (!productSalesMap[resolvedCode]) {
           productSalesMap[resolvedCode] = [];
         }
-        // Avoid duplicating the same venda for same product
-        if (!productSalesMap[resolvedCode].find(v => v.venda_id === vendaInfo.venda_id)) {
+        if (!productSalesMap[resolvedCode].find((v: any) => v.venda_id === vendaInfo.venda_id)) {
           productSalesMap[resolvedCode].push(vendaInfo);
         }
       }
     }
+
+    // Save to cache in background
+    saveToSalesCache(supabase, productSalesMap).catch(err => console.error('Sales cache save error:', err));
 
     return new Response(JSON.stringify({
       productSalesMap,
       totalVendas: allVendas.length,
       excludedStatuses: EXCLUDED_STATUSES,
       situacoes: situacoes.map((s: any) => ({ id: s.id, nome: s.nome })),
+      cached: false,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

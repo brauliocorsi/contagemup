@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useERPReconciliation, ERPComparisonItem } from '@/hooks/useERPReconciliation';
 import { useProductSales, VendaInfo } from '@/hooks/useProductSales';
 import { useCategories } from '@/hooks/useCategories';
@@ -22,8 +22,8 @@ const STATUS_CONFIG = {
 };
 
 export function ERPReconciliationView() {
-  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts } = useERPReconciliation();
-  const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount } = useProductSales();
+  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts, cachedAt: productsCachedAt } = useERPReconciliation();
+  const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount, cachedAt: salesCachedAt } = useProductSales();
   const { categories } = useCategories();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -33,6 +33,21 @@ export function ERPReconciliationView() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Geral');
+
+  // Auto-load sales on mount
+  useEffect(() => {
+    if (!salesLoaded && !salesLoading) {
+      fetchSales();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper to show cache age
+  const getCacheAge = (cachedAt: string | null): string | null => {
+    if (!cachedAt) return null;
+    const mins = Math.round((Date.now() - new Date(cachedAt).getTime()) / 60000);
+    if (mins < 1) return 'agora';
+    return `há ${mins} min`;
+  };
 
   // Calculate sold stock per product from active sales
   const getSoldStock = (productCode: string): number => {
@@ -109,6 +124,23 @@ export function ERPReconciliationView() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Conciliação ERP</h2>
           <p className="text-sm text-muted-foreground">Compare o stock local com o GestãoClick</p>
+          {(productsCachedAt || salesCachedAt) && (
+            <div className="flex items-center gap-3 mt-1">
+              {productsCachedAt && (
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  Produtos: cache {getCacheAge(productsCachedAt)}
+                </span>
+              )}
+              {salesCachedAt && (
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  Vendas: cache {getCacheAge(salesCachedAt)}
+                </span>
+              )}
+              <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => { fetchAndCompare(true); fetchSales(true); }} disabled={loading || salesLoading}>
+                Forçar refresh
+              </Button>
+            </div>
+          )}
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center">
           <div className="flex gap-2">
@@ -126,7 +158,7 @@ export function ERPReconciliationView() {
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </Button>
           </div>
-          <Button onClick={fetchAndCompare} disabled={loading}>
+          <Button onClick={() => fetchAndCompare()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             {loading ? 'A carregar...' : 'Sincronizar Tudo'}
           </Button>
@@ -226,7 +258,7 @@ export function ERPReconciliationView() {
                       <div className="flex items-center justify-end gap-1">
                         Stock Vendido
                         {!salesLoaded && (
-                          <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={fetchSales} disabled={salesLoading}>
+                          <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => fetchSales()} disabled={salesLoading}>
                             {salesLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Carregar'}
                           </Button>
                         )}
@@ -240,7 +272,7 @@ export function ERPReconciliationView() {
                       <div className="flex items-center gap-1">
                         Vendas
                         {!salesLoaded && (
-                          <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={fetchSales} disabled={salesLoading}>
+                          <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => fetchSales()} disabled={salesLoading}>
                             {salesLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Carregar'}
                           </Button>
                         )}
@@ -370,7 +402,7 @@ export function ERPReconciliationView() {
             <p className="text-muted-foreground mb-4">
               Clique em "Sincronizar com ERP" para buscar os produtos do GestãoClick e comparar com o stock local.
             </p>
-            <Button onClick={fetchAndCompare}>
+            <Button onClick={() => fetchAndCompare()}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Sincronizar com ERP
             </Button>

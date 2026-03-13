@@ -771,7 +771,7 @@ export function ProductsView() {
                       <ShoppingBag className="h-3.5 w-3.5" />
                       Vendas
                       {!salesLoaded && (
-                        <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={fetchSales} disabled={salesLoading}>
+                        <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => fetchSales()} disabled={salesLoading}>
                           {salesLoading ? '...' : 'Carregar'}
                         </Button>
                       )}
