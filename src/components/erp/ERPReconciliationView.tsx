@@ -31,6 +31,7 @@ export function ERPReconciliationView() {
   const [quickSearch, setQuickSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [registering, setRegistering] = useState<Set<string>>(new Set());
+  const [unifying, setUnifying] = useState<Set<string>>(new Set());
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Geral');
