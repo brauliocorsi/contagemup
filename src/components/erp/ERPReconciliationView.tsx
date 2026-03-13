@@ -216,6 +216,14 @@ export function ERPReconciliationView() {
               <p className="text-xs text-muted-foreground">Só num sistema</p>
             </CardContent>
           </Card>
+          {summary.duplicate_suspect > 0 && (
+            <Card className="cursor-pointer hover:shadow-md transition-shadow border-yellow-200" onClick={() => setStatusFilter(statusFilter === 'duplicate_suspect' ? 'all' : 'duplicate_suspect')}>
+              <CardContent className="p-3 text-center">
+                <p className="text-2xl font-bold text-yellow-600">{summary.duplicate_suspect}</p>
+                <p className="text-xs text-muted-foreground">Possíveis Duplicados</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
