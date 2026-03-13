@@ -38,11 +38,15 @@ const mainTabs = [
   { id: 'counting', label: 'Contagem', icon: ClipboardList },
 ];
 
-// Items finais
-const endTabs = [
+// Grupo de operações
+const operationsItems = [
   { id: 'reconciliation', label: 'Separação', icon: Scale },
   { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
   { id: 'purchases', label: 'Compras', icon: ShoppingBag },
+];
+
+// Items finais
+const endTabs = [
   { id: 'warehouse', label: 'Armazém', icon: Warehouse },
   { id: 'reports', label: 'Relatórios', icon: BarChart3 },
   { id: 'settings', label: 'Configurações', icon: Settings },
