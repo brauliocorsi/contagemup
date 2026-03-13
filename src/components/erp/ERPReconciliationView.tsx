@@ -34,6 +34,24 @@ export function ERPReconciliationView() {
   const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Geral');
 
+  // Calculate sold stock per product from active sales
+  const getSoldStock = (productCode: string): number => {
+    if (!salesLoaded) return 0;
+    const sales = getSalesForProduct(productCode);
+    let total = 0;
+    for (const venda of sales) {
+      if (venda.produtos && Array.isArray(venda.produtos)) {
+        for (const prod of venda.produtos) {
+          const code = (prod.codigo || '').trim().toLowerCase();
+          if (code === productCode.trim().toLowerCase()) {
+            total += parseFloat(prod.quantidade || '0') || 0;
+          }
+        }
+      }
+    }
+    return Math.round(total);
+  };
+
   const filtered = useMemo(() => {
     return comparisonItems.filter(item => {
       const matchesSearch = !search ||
