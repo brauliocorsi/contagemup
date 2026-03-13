@@ -49,6 +49,16 @@ export function PurchaseOrdersView() {
     return map;
   }, [products]);
 
+  // Secondary map by normalized product name for fallback matching
+  const localProductByNameMap = useMemo(() => {
+    const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
+    for (const p of products) {
+      const normalizedName = p.name.trim().toLowerCase().replace(/\s+/g, ' ');
+      map.set(normalizedName, { id: p.id, code: p.code, name: p.name, current_stock: p.current_stock });
+    }
+    return map;
+  }, [products]);
+
   const mergeSoldItems = useCallback((existing: SoldItem[], newItems: SoldItem[]): SoldItem[] => {
     const map = new Map<string, SoldItem>();
     for (const item of existing) {
