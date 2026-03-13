@@ -132,68 +132,45 @@ export function PurchaseOrdersView() {
     }
   };
 
-  // Fetch exits already processed in the selected period to avoid double-counting
+  // State for exits already processed in the selected period
   const [exitsMap, setExitsMap] = useState<Map<string, number>>(new Map());
 
-  // Reload exits whenever soldItems or dates change
-  const exitsLoaded = useMemo(() => ({ dateFrom, dateTo, loaded }), [dateFrom, dateTo, loaded]);
-
-  // Effect to fetch stock exits for the period
-  useState(() => { /* placeholder - real fetch below */ });
-
-  const fetchExitsForPeriod = useCallback(async () => {
+  // Fetch stock exits for the period when data is loaded
+  useEffect(() => {
     if (!loaded || soldItems.length === 0) {
       setExitsMap(new Map());
       return;
     }
-    try {
-      const dateFromStr = format(dateFrom, 'yyyy-MM-dd');
-      const dateToStr = format(dateTo, 'yyyy-MM-dd');
-      const nextDay = format(new Date(new Date(dateToStr).getTime() + 86400000), 'yyyy-MM-dd');
 
-      // Fetch stock_movements (exit type) in the period
-      const { data: movements } = await supabase
-        .from('stock_movements')
-        .select('product_id, quantity, movement_type')
-        .in('movement_type', ['exit', 'picking'])
-        .gte('created_at', `${dateFromStr}T00:00:00`)
-        .lt('created_at', `${nextDay}T00:00:00`);
+    const fetchExits = async () => {
+      try {
+        const dateFromStr = format(dateFrom, 'yyyy-MM-dd');
+        const dateToStr = format(dateTo, 'yyyy-MM-dd');
+        const nextDay = format(new Date(new Date(dateToStr).getTime() + 86400000), 'yyyy-MM-dd');
 
-      // Fetch picking_items in the period (picking may not always create stock_movements)
-      const { data: pickingData } = await supabase
-        .from('picking_items')
-        .select('product_id, quantity, picked_at')
-        .gte('picked_at', `${dateFromStr}T00:00:00`)
-        .lt('picked_at', `${nextDay}T00:00:00`);
+        const { data: movements } = await supabase
+          .from('stock_movements')
+          .select('product_id, quantity, movement_type')
+          .in('movement_type', ['exit', 'picking'])
+          .gte('created_at', `${dateFromStr}T00:00:00`)
+          .lt('created_at', `${nextDay}T00:00:00`);
 
-      const map = new Map<string, number>();
+        const map = new Map<string, number>();
+        for (const m of (movements || [])) {
+          if (!m.product_id) continue;
+          const prev = map.get(m.product_id) ?? 0;
+          map.set(m.product_id, prev + Math.abs(m.quantity));
+        }
 
-      // Aggregate movements by product_id
-      for (const m of (movements || [])) {
-        if (!m.product_id) continue;
-        const prev = map.get(m.product_id) ?? 0;
-        map.set(m.product_id, prev + Math.abs(m.quantity));
+        setExitsMap(map);
+      } catch (err) {
+        console.error('Error fetching exits for period:', err);
+        setExitsMap(new Map());
       }
+    };
 
-      // Aggregate picking items by product_id (avoid double-counting with movements)
-      // Only add picking if there's no corresponding stock_movement
-      for (const p of (pickingData || [])) {
-        if (!p.product_id) continue;
-        // Picking items are already included via stock_movements in most cases
-        // We skip this to avoid double-counting
-      }
-
-      setExitsMap(map);
-    } catch (err) {
-      console.error('Error fetching exits for period:', err);
-      setExitsMap(new Map());
-    }
+    fetchExits();
   }, [loaded, soldItems.length, dateFrom, dateTo]);
-
-  // Trigger fetch when data is loaded
-  useMemo(() => {
-    if (loaded) fetchExitsForPeriod();
-  }, [loaded, fetchExitsForPeriod]);
 
   const enrichedItems = useMemo(() => {
     const items = soldItems
