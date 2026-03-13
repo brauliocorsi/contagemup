@@ -65,6 +65,11 @@ function normalizeDateStr(dateStr: string): string {
   return dateStr.substring(0, 10);
 }
 
+function isDateInRange(dateStr: string, dateFrom: string, dateTo: string): boolean {
+  if (!dateStr) return false;
+  return dateStr >= dateFrom && dateStr <= dateTo;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -77,10 +82,15 @@ Deno.serve(async (req) => {
     if (!secretToken) throw new Error('GESTAOCLICK_SECRET_ACCESS_TOKEN não configurado');
 
     const body = await req.json();
-    const targetDate = body?.date; // YYYY-MM-DD (yesterday typically)
+    // Support single date or date range
+    const dateFrom = body?.dateFrom || body?.date;
+    const dateTo = body?.dateTo || body?.date;
+    // Resumable pagination: which chunk of pages to scan
+    const startPage = body?.startPage || 1;
+    const pagesPerChunk = body?.pagesPerChunk || 20;
 
-    if (!targetDate) {
-      throw new Error('Parâmetro "date" é obrigatório (formato YYYY-MM-DD)');
+    if (!dateFrom) {
+      throw new Error('Parâmetro "date" ou "dateFrom" é obrigatório (formato YYYY-MM-DD)');
     }
 
     const apiHeaders = {
@@ -89,101 +99,66 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json',
     };
 
-    // Step 1: Fetch all situacoes_vendas to find "completed" sale statuses
-    const situacoesRes = await fetchWithRetry('https://api.gestaoclick.com/api/situacoes_vendas', {
-      method: 'GET', headers: apiHeaders,
-    });
-    if (!situacoesRes.ok) throw new Error(`Failed to fetch situacoes_vendas: ${situacoesRes.status}`);
-    const situacoesData = await situacoesRes.json();
-    const situacoes = situacoesData?.data || [];
-
-    const situacaoLookup: Record<string, string> = {};
-    for (const sit of situacoes) {
-      situacaoLookup[String(sit.id)] = sit.nome || '';
+    // Step 1: Fetch situacoes_vendas (only on first chunk)
+    let situacaoLookup: Record<string, string> = {};
+    if (startPage === 1) {
+      const situacoesRes = await fetchWithRetry('https://api.gestaoclick.com/api/situacoes_vendas', {
+        method: 'GET', headers: apiHeaders,
+      });
+      if (!situacoesRes.ok) throw new Error(`Failed to fetch situacoes_vendas: ${situacoesRes.status}`);
+      const situacoesData = await situacoesRes.json();
+      const situacoes = situacoesData?.data || [];
+      for (const sit of situacoes) {
+        situacaoLookup[String(sit.id)] = sit.nome || '';
+      }
     }
 
-    // Step 2: Fetch vendas - search from both ends (front + back) since API may not filter by date
+    // Step 2: Fetch vendas for the page chunk
+    const vendasBaseUrl = `https://api.gestaoclick.com/api/vendas?data_inicial=${dateFrom}&data_final=${dateTo}`;
+    
+    // Get total pages from first page
+    const firstPageData = await fetchPage(vendasBaseUrl, startPage, apiHeaders);
+    const apiTotalPages = firstPageData.meta.total_paginas || 1;
+    const endPage = Math.min(startPage + pagesPerChunk - 1, apiTotalPages);
+    
+    console.log(`Scanning pages ${startPage}-${endPage} of ${apiTotalPages} for dates ${dateFrom} to ${dateTo}`);
+
     const matchingVendas: any[] = [];
     const matchingVendaIds = new Set<string>();
-    const vendasBaseUrl = `https://api.gestaoclick.com/api/vendas?data_inicial=${targetDate}&data_final=${targetDate}`;
-    
-    console.log(`Fetching vendas for date: ${targetDate}`);
-    
-    const firstPage = await fetchPage(vendasBaseUrl, 1, apiHeaders);
-    const apiTotalPages = firstPage.meta.total_paginas || 1;
-    const totalPages = Math.min(apiTotalPages, 80);
-    
-    console.log(`Page 1: ${firstPage.data.length} vendas, total_paginas from API: ${apiTotalPages}`);
 
-    const processVendas = (vendas: any[]): boolean => {
-      let foundAny = false;
+    const processVendas = (vendas: any[]) => {
       for (const venda of vendas) {
         const vendaDate = normalizeDateStr(venda.data || '');
         const vendaId = String(venda.id || venda.codigo || '');
-        if (vendaDate === targetDate && !matchingVendaIds.has(vendaId)) {
+        if (isDateInRange(vendaDate, dateFrom, dateTo) && !matchingVendaIds.has(vendaId)) {
           matchingVendaIds.add(vendaId);
           matchingVendas.push(venda);
-          foundAny = true;
         }
       }
-      return foundAny;
     };
 
-    processVendas(firstPage.data);
+    // Process first page
+    processVendas(firstPageData.data);
 
-    // Search the LAST pages thoroughly - recent vendas are always at the end
-    // Scan last 30 pages completely (no early stopping) to ensure we get all of today's sales
+    // Process remaining pages in batches of 5
     const BATCH_SIZE = 5;
-    const GUARANTEED_BACK_PAGES = 30; // Always scan last 30 pages fully
-    
-    if (apiTotalPages > 1) {
-      const lastPage = await fetchPage(vendasBaseUrl, apiTotalPages, apiHeaders);
-      processVendas(lastPage.data);
-      console.log(`Last page (${apiTotalPages}): ${lastPage.data.length} vendas, matches so far: ${matchingVendas.length}`);
-      
-      // Phase 1: Scan last 30 pages completely (no early stopping)
-      const guaranteedStop = Math.max(2, apiTotalPages - GUARANTEED_BACK_PAGES);
-      for (let batchEnd = apiTotalPages - 1; batchEnd >= guaranteedStop; batchEnd -= BATCH_SIZE) {
-        const batchStart = Math.max(guaranteedStop, batchEnd - BATCH_SIZE + 1);
-        const pages = [];
-        for (let p = batchEnd; p >= batchStart; p--) pages.push(p);
-        const results = await Promise.all(
-          pages.map(p => fetchPage(vendasBaseUrl, p, apiHeaders))
-        );
-        for (const result of results) {
-          processVendas(result.data);
-        }
-        console.log(`Back scan pages ${batchEnd}-${batchStart}: total matches now ${matchingVendas.length}`);
-        if (batchStart > guaranteedStop) await new Promise(resolve => setTimeout(resolve, 100));
+    for (let batchStart = startPage + 1; batchStart <= endPage; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, endPage);
+      const pages = [];
+      for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
+      const results = await Promise.all(pages.map(p => fetchPage(vendasBaseUrl, p, apiHeaders)));
+      for (const result of results) {
+        processVendas(result.data);
       }
-      
-      // Phase 2: Continue backwards with early stopping if we already found matches
-      let backStopEarly = false;
-      let backEmptyBatches = 0;
-      for (let batchEnd = guaranteedStop - 1; batchEnd > 1 && !backStopEarly; batchEnd -= BATCH_SIZE) {
-        const batchStart = Math.max(2, batchEnd - BATCH_SIZE + 1);
-        const pages = [];
-        for (let p = batchEnd; p >= batchStart; p--) pages.push(p);
-        const results = await Promise.all(
-          pages.map(p => fetchPage(vendasBaseUrl, p, apiHeaders))
-        );
-        let batchHadMatches = false;
-        for (const result of results) {
-          if (processVendas(result.data)) batchHadMatches = true;
-        }
-        if (batchHadMatches) {
-          backEmptyBatches = 0;
-        } else if (matchingVendas.length > 0) {
-          backEmptyBatches++;
-          if (backEmptyBatches >= 2) backStopEarly = true;
-        }
-        if (batchStart > 2 && !backStopEarly) await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      if (batchEnd < endPage) await new Promise(resolve => setTimeout(resolve, 100));
     }
-    
-    console.log(`Total matching vendas after full scan: ${matchingVendas.length}`);
 
-    // Step 3: Resolve product codes
+    console.log(`Chunk ${startPage}-${endPage}: found ${matchingVendas.length} matching vendas`);
+
+    const hasMorePages = endPage < apiTotalPages;
+    const nextStartPage = hasMorePages ? endPage + 1 : null;
+
+    // Step 3: Resolve product codes if we have matches
     const requiredProductIds = new Set<string>();
     const requiredVariationIds = new Set<string>();
 
@@ -233,13 +208,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Step 4: Build sold items list with quantities
-    const soldItems: Array<{
-      productCode: string;
-      productName: string;
-      totalSold: number;
-      vendas: Array<{ codigo: string; cliente: string; situacao: string; quantidade: number }>;
-    }> = [];
+    // Step 4: Build sold items with situacao lookup
+    // Re-fetch situacoes if not first chunk (need it for status names)
+    if (startPage !== 1 && Object.keys(situacaoLookup).length === 0) {
+      const situacoesRes = await fetchWithRetry('https://api.gestaoclick.com/api/situacoes_vendas', {
+        method: 'GET', headers: apiHeaders,
+      });
+      if (situacoesRes.ok) {
+        const situacoesData = await situacoesRes.json();
+        for (const sit of (situacoesData?.data || [])) {
+          situacaoLookup[String(sit.id)] = sit.nome || '';
+        }
+      }
+    }
 
     const soldMap = new Map<string, {
       productCode: string;
@@ -286,7 +267,11 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       soldItems: Array.from(soldMap.values()),
       totalVendas: matchingVendas.length,
-      targetDate,
+      dateFrom,
+      dateTo,
+      scannedPages: { from: startPage, to: endPage, total: apiTotalPages },
+      hasMorePages,
+      nextStartPage,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
