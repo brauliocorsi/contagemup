@@ -85,6 +85,7 @@ export function useProductSales() {
     loading,
     error,
     loaded,
+    cachedAt,
     fetchSales,
     getSalesForProduct,
     hasSales,
