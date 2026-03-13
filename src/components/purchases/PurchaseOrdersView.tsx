@@ -187,7 +187,21 @@ export function PurchaseOrdersView() {
       .map(item => ({ ...item, itemKey: getSoldItemKey(item) }))
       .filter(item => !removedProducts.has(item.itemKey))
       .map(item => {
-        const local = localProductMap.get(item.productCode.toLowerCase());
+        // Try matching by code first, then by name
+        let local = localProductMap.get(item.productCode.toLowerCase());
+        if (!local && item.productName) {
+          const normalizedName = item.productName.trim().toLowerCase().replace(/\s+/g, ' ');
+          local = localProductByNameMap.get(normalizedName);
+          // Try partial match: ERP name often has " - variant" format
+          if (!local) {
+            for (const [key, val] of localProductByNameMap) {
+              if (key.includes(normalizedName) || normalizedName.includes(key)) {
+                local = val;
+                break;
+              }
+            }
+          }
+        }
         const currentStock = local?.current_stock ?? 0;
         
         // Get exits already processed for this product in the period
