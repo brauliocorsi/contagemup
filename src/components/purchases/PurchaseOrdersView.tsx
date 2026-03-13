@@ -49,6 +49,16 @@ export function PurchaseOrdersView() {
     return map;
   }, [products]);
 
+  // Secondary map by normalized product name for fallback matching
+  const localProductByNameMap = useMemo(() => {
+    const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
+    for (const p of products) {
+      const normalizedName = p.name.trim().toLowerCase().replace(/\s+/g, ' ');
+      map.set(normalizedName, { id: p.id, code: p.code, name: p.name, current_stock: p.current_stock });
+    }
+    return map;
+  }, [products]);
+
   const mergeSoldItems = useCallback((existing: SoldItem[], newItems: SoldItem[]): SoldItem[] => {
     const map = new Map<string, SoldItem>();
     for (const item of existing) {
@@ -177,7 +187,21 @@ export function PurchaseOrdersView() {
       .map(item => ({ ...item, itemKey: getSoldItemKey(item) }))
       .filter(item => !removedProducts.has(item.itemKey))
       .map(item => {
-        const local = localProductMap.get(item.productCode.toLowerCase());
+        // Try matching by code first, then by name
+        let local = localProductMap.get(item.productCode.toLowerCase());
+        if (!local && item.productName) {
+          const normalizedName = item.productName.trim().toLowerCase().replace(/\s+/g, ' ');
+          local = localProductByNameMap.get(normalizedName);
+          // Try partial match: ERP name often has " - variant" format
+          if (!local) {
+            for (const [key, val] of localProductByNameMap) {
+              if (key.includes(normalizedName) || normalizedName.includes(key)) {
+                local = val;
+                break;
+              }
+            }
+          }
+        }
         const currentStock = local?.current_stock ?? 0;
         
         // Get exits already processed for this product in the period
@@ -206,7 +230,7 @@ export function PurchaseOrdersView() {
     }
 
     return items;
-  }, [soldItems, localProductMap, removedProducts, sortAlpha, exitsMap]);
+  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, exitsMap]);
 
   const negativeStockItems = useMemo(() =>
     enrichedItems.filter(item => item.stockAfterSale < 0 || item.localStock < 0),
