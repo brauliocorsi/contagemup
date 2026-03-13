@@ -36,6 +36,7 @@ export function ERPReconciliationView() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Geral');
+  const [unifyConfirmItem, setUnifyConfirmItem] = useState<ERPComparisonItem | null>(null);
 
   // Auto-load sales on mount
   useEffect(() => {
