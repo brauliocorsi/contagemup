@@ -402,7 +402,7 @@ export function PurchaseOrdersView() {
                     const isExpanded = expandedRows.has(p.itemKey);
                     const isNegative = p.stockAfterSale < 0 || p.localStock < 0;
                     return (
-                      <>
+                      <Fragment key={p.itemKey}>
                         <TableRow 
                           key={p.itemKey}
                           className={cn(
