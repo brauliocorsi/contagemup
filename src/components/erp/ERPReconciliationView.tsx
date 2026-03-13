@@ -385,11 +385,7 @@ export function ERPReconciliationView() {
                                 variant="outline"
                                 size="sm"
                                 className="h-7 gap-1 px-2 text-xs bg-yellow-50 text-yellow-800 border-yellow-300 hover:bg-yellow-100"
-                                onClick={async () => {
-                                  setUnifying(prev => new Set(prev).add(item.productCode));
-                                  await unifyDuplicate(item);
-                                  setUnifying(prev => { const s = new Set(prev); s.delete(item.productCode); return s; });
-                                }}
+                                onClick={() => setUnifyConfirmItem(item)}
                                 disabled={unifying.has(item.productCode)}
                               >
                                 {unifying.has(item.productCode) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link className="h-3 w-3" />}
