@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus, Copy } from 'lucide-react';
+import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus, Copy, Link } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -23,7 +23,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
 };
 
 export function ERPReconciliationView() {
-  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts, cachedAt: productsCachedAt } = useERPReconciliation();
+  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts, unifyDuplicate, cachedAt: productsCachedAt } = useERPReconciliation();
   const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount, cachedAt: salesCachedAt } = useProductSales();
   const { categories } = useCategories();
   const [search, setSearch] = useState('');
@@ -31,6 +31,7 @@ export function ERPReconciliationView() {
   const [quickSearch, setQuickSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [registering, setRegistering] = useState<Set<string>>(new Set());
+  const [unifying, setUnifying] = useState<Set<string>>(new Set());
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Geral');
@@ -375,6 +376,22 @@ export function ERPReconciliationView() {
                               >
                                 {registering.has(item.productCode) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
                                 Cadastrar
+                              </Button>
+                            )}
+                            {item.status === 'duplicate_suspect' && item.possibleMatch && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 gap-1 px-2 text-xs bg-yellow-50 text-yellow-800 border-yellow-300 hover:bg-yellow-100"
+                                onClick={async () => {
+                                  setUnifying(prev => new Set(prev).add(item.productCode));
+                                  await unifyDuplicate(item);
+                                  setUnifying(prev => { const s = new Set(prev); s.delete(item.productCode); return s; });
+                                }}
+                                disabled={unifying.has(item.productCode)}
+                              >
+                                {unifying.has(item.productCode) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link className="h-3 w-3" />}
+                                Unificar Código
                               </Button>
                             )}
                           </TableCell>
