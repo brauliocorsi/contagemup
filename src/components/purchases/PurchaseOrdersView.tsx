@@ -230,7 +230,7 @@ export function PurchaseOrdersView() {
     }
 
     return items;
-  }, [soldItems, localProductMap, removedProducts, sortAlpha, exitsMap]);
+  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, exitsMap]);
 
   const negativeStockItems = useMemo(() =>
     enrichedItems.filter(item => item.stockAfterSale < 0 || item.localStock < 0),
