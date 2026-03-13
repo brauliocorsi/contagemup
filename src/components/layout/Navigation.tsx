@@ -170,23 +170,6 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Menus ERP fixos */}
-          {operationsItems.map((tab) => (
-            <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => onTabChange(tab.id)}
-              className={cn(
-                'flex items-center gap-2 whitespace-nowrap',
-                activeTab === tab.id && 'shadow-sm'
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </Button>
-          ))}
-
           {/* Items finais */}
           {endTabs.map((tab) => (
             <Button
