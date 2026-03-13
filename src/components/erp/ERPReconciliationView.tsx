@@ -141,6 +141,7 @@ export function ERPReconciliationView() {
               </Button>
             </div>
           )}
+        </div>
         <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center">
           <div className="flex gap-2">
             <div className="relative">
