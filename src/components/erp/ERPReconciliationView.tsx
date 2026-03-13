@@ -22,8 +22,8 @@ const STATUS_CONFIG = {
 };
 
 export function ERPReconciliationView() {
-  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts } = useERPReconciliation();
-  const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount } = useProductSales();
+  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts, cachedAt: productsCachedAt } = useERPReconciliation();
+  const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount, cachedAt: salesCachedAt } = useProductSales();
   const { categories } = useCategories();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
