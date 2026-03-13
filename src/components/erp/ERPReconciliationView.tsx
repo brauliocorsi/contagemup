@@ -358,7 +358,7 @@ export function ERPReconciliationView() {
                               <div className="px-4 py-3 space-y-1.5">
                                 <p className="text-xs font-semibold text-muted-foreground mb-2">
                                   <ShoppingCart className="h-3 w-3 inline mr-1" />
-                                  {salesCount} venda(s) ativa(s) — excluindo: conferido, agendado entrega, cancelado
+                                  {salesCount} venda(s) ativa(s) — excluindo: conferido, produto entregue, levantado, cancelado
                                 </p>
                                 <div className="grid gap-1.5">
                                   {sales.map((venda: VendaInfo) => (
