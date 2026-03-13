@@ -321,7 +321,7 @@ export function ERPReconciliationView() {
                         </TableRow>
                         {isExpanded && salesCount > 0 && (
                           <TableRow key={`${rowKey}-sales`} className="bg-muted/30">
-                            <TableCell colSpan={9} className="p-0">
+                            <TableCell colSpan={10} className="p-0">
                               <div className="px-4 py-3 space-y-1.5">
                                 <p className="text-xs font-semibold text-muted-foreground mb-2">
                                   <ShoppingCart className="h-3 w-3 inline mr-1" />
