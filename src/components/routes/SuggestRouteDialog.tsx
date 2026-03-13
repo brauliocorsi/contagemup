@@ -161,7 +161,11 @@ export function SuggestRouteDialog({ open, onOpenChange, onCreateRoute }: Sugges
           const clientKey = venda.cliente_nome?.toLowerCase().trim();
           if (!clientKey || clientKey === 'n/a') continue;
 
-          const postalCode = (venda.cliente_cep || '').trim();
+          // Try cliente_cep first, then extract from address
+          let postalCode = (venda.cliente_cep || '').trim();
+          if (!postalCode) {
+            postalCode = extractPostalCode(venda.cliente_endereco || '');
+          }
           if (!postalCode) continue;
 
           if (!clientMap.has(clientKey)) {
