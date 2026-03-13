@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo, useCallback } from 'react';
+import { Fragment, useState, useMemo, useCallback, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Loader2, ShoppingBag, Package, Download, SortAsc, Trash2, AlertTriangle, CalendarIcon, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react';
