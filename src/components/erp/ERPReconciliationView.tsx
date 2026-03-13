@@ -126,7 +126,7 @@ export function ERPReconciliationView() {
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </Button>
           </div>
-          <Button onClick={fetchAndCompare} disabled={loading}>
+          <Button onClick={() => fetchAndCompare()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             {loading ? 'A carregar...' : 'Sincronizar Tudo'}
           </Button>
