@@ -80,6 +80,13 @@ function getPostalPrefix(postalCode: string): string {
   return postalCode.replace(/[^0-9]/g, '').substring(0, 4);
 }
 
+// Extract Portuguese postal code (XXXX-XXX) from an address string
+function extractPostalCode(text: string): string {
+  if (!text) return '';
+  const match = text.match(/\d{4}-\d{3}/);
+  return match ? match[0] : '';
+}
+
 type Step = 'select_status' | 'loading' | 'results';
 
 export function SuggestRouteDialog({ open, onOpenChange, onCreateRoute }: SuggestRouteDialogProps) {
@@ -154,7 +161,11 @@ export function SuggestRouteDialog({ open, onOpenChange, onCreateRoute }: Sugges
           const clientKey = venda.cliente_nome?.toLowerCase().trim();
           if (!clientKey || clientKey === 'n/a') continue;
 
-          const postalCode = (venda.cliente_cep || '').trim();
+          // Try cliente_cep first, then extract from address
+          let postalCode = (venda.cliente_cep || '').trim();
+          if (!postalCode) {
+            postalCode = extractPostalCode(venda.cliente_endereco || '');
+          }
           if (!postalCode) continue;
 
           if (!clientMap.has(clientKey)) {
