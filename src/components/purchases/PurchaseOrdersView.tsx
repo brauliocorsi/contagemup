@@ -484,7 +484,7 @@ export function PurchaseOrdersView() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </TableBody>
