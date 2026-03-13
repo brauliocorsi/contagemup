@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { format, subDays } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Loader2, ShoppingBag, Package, Download, SortAsc, Trash2, AlertTriangle, CalendarIcon, Eye, EyeOff } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/hooks/useProducts';
@@ -21,18 +22,21 @@ interface SoldItem {
   vendas: Array<{ codigo: string; cliente: string; situacao: string; quantidade: number }>;
 }
 
+const PAGES_PER_CHUNK = 20;
+
 export function PurchaseOrdersView() {
-  const [date, setDate] = useState<Date>(subDays(new Date(), 1));
+  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 1));
+  const [dateTo, setDateTo] = useState<Date>(subDays(new Date(), 1));
   const [soldItems, setSoldItems] = useState<SoldItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [removedProducts, setRemovedProducts] = useState<Set<string>>(new Set());
   const [sortAlpha, setSortAlpha] = useState(true);
   const [showAll, setShowAll] = useState(true);
+  const [scanProgress, setScanProgress] = useState<{ current: number; total: number } | null>(null);
   const { toast } = useToast();
   const { products } = useProducts();
 
-  // Local products map
   const localProductMap = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
     for (const p of products) {
@@ -41,36 +45,86 @@ export function PurchaseOrdersView() {
     return map;
   }, [products]);
 
+  const mergeSoldItems = useCallback((existing: SoldItem[], newItems: SoldItem[]): SoldItem[] => {
+    const map = new Map<string, SoldItem>();
+    for (const item of existing) {
+      map.set(item.productCode.toLowerCase(), { ...item });
+    }
+    for (const item of newItems) {
+      const key = item.productCode.toLowerCase();
+      const ex = map.get(key);
+      if (ex) {
+        // Merge vendas, avoiding duplicates by codigo
+        const existingCodigos = new Set(ex.vendas.map(v => v.codigo));
+        for (const v of item.vendas) {
+          if (!existingCodigos.has(v.codigo)) {
+            ex.vendas.push(v);
+            ex.totalSold += v.quantidade;
+          }
+        }
+      } else {
+        map.set(key, { ...item });
+      }
+    }
+    return Array.from(map.values());
+  }, []);
+
   const fetchPurchaseOrders = async () => {
     setLoading(true);
     setSoldItems([]);
     setLoaded(false);
     setRemovedProducts(new Set());
+    setScanProgress(null);
 
     try {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const { data, error } = await supabase.functions.invoke('gestaoclick-purchase-orders', {
-        body: { date: dateStr },
-      });
+      const dateFromStr = format(dateFrom, 'yyyy-MM-dd');
+      const dateToStr = format(dateTo, 'yyyy-MM-dd');
+      
+      let allSoldItems: SoldItem[] = [];
+      let startPage = 1;
+      let hasMore = true;
+      let totalPages = 0;
 
-      if (error) throw new Error(error.message);
+      while (hasMore) {
+        const { data, error } = await supabase.functions.invoke('gestaoclick-purchase-orders', {
+          body: { dateFrom: dateFromStr, dateTo: dateToStr, startPage, pagesPerChunk: PAGES_PER_CHUNK },
+        });
 
-      setSoldItems(data?.soldItems || []);
+        if (error) throw new Error(error.message);
+        if (data?.error) throw new Error(data.error);
+
+        const chunkItems: SoldItem[] = data?.soldItems || [];
+        allSoldItems = mergeSoldItems(allSoldItems, chunkItems);
+        
+        totalPages = data?.scannedPages?.total || totalPages;
+        const scannedTo = data?.scannedPages?.to || startPage;
+        
+        setScanProgress({ current: scannedTo, total: totalPages });
+        setSoldItems([...allSoldItems]);
+
+        hasMore = data?.hasMorePages === true;
+        startPage = data?.nextStartPage || (startPage + PAGES_PER_CHUNK);
+        
+        // Small delay between chunks
+        if (hasMore) await new Promise(r => setTimeout(r, 200));
+      }
+
       setLoaded(true);
+      setScanProgress(null);
 
       toast({
         title: 'Pesquisa concluída',
-        description: `${data?.soldItems?.length || 0} produto(s) vendido(s) em ${format(date, 'dd/MM/yyyy')}.`,
+        description: `${allSoldItems.length} produto(s) vendido(s). ${totalPages} página(s) varridas.`,
       });
     } catch (err: any) {
       console.error('Error fetching purchase orders:', err);
-      toast({ title: 'Erro', description: err.message || 'Erro ao buscar ordens de compra', variant: 'destructive' });
+      toast({ title: 'Erro', description: err.message || 'Erro ao buscar vendas', variant: 'destructive' });
     } finally {
       setLoading(false);
+      setScanProgress(null);
     }
   };
 
-  // All sold items enriched with local stock data
   const enrichedItems = useMemo(() => {
     const items = soldItems
       .filter(item => !removedProducts.has(item.productCode.toLowerCase()))
@@ -96,22 +150,23 @@ export function PurchaseOrdersView() {
     return items;
   }, [soldItems, localProductMap, removedProducts, sortAlpha]);
 
-  // Filtered: only negative stock
-  const negativeStockItems = useMemo(() => 
+  const negativeStockItems = useMemo(() =>
     enrichedItems.filter(item => item.stockAfterSale < 0 || item.localStock < 0),
     [enrichedItems]
   );
 
   const displayItems = showAll ? enrichedItems : negativeStockItems;
-
   const totalDeficit = negativeStockItems.reduce((sum, p) => sum + p.deficit, 0);
 
   const handleRemoveProduct = (code: string) => {
     setRemovedProducts(prev => new Set(prev).add(code.toLowerCase()));
   };
 
-  const handleRestoreAll = () => {
-    setRemovedProducts(new Set());
+  const handleRestoreAll = () => setRemovedProducts(new Set());
+
+  const handleSetSingleDate = (d: Date) => {
+    setDateFrom(d);
+    setDateTo(d);
   };
 
   const exportToExcel = () => {
@@ -126,8 +181,13 @@ export function PurchaseOrdersView() {
     }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Ordens de Compra');
-    XLSX.writeFile(wb, `compras_${format(date, 'yyyy-MM-dd')}.xlsx`);
+    const fname = dateFrom === dateTo
+      ? `compras_${format(dateFrom, 'yyyy-MM-dd')}.xlsx`
+      : `compras_${format(dateFrom, 'yyyy-MM-dd')}_a_${format(dateTo, 'yyyy-MM-dd')}.xlsx`;
+    XLSX.writeFile(wb, fname);
   };
+
+  const isSameDate = format(dateFrom, 'yyyy-MM-dd') === format(dateTo, 'yyyy-MM-dd');
 
   return (
     <div className="space-y-4">
@@ -145,34 +205,51 @@ export function PurchaseOrdersView() {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-3">
+            {/* Date From */}
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-[220px] justify-start text-left font-normal")}>
+                <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(date, 'dd/MM/yyyy')}
+                  {format(dateFrom, 'dd/MM/yyyy')}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} locale={pt} className="p-3 pointer-events-auto" />
+                <Calendar mode="single" selected={dateFrom} onSelect={(d) => d && setDateFrom(d)} locale={pt} className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
 
+            <span className="text-sm text-muted-foreground">até</span>
+
+            {/* Date To */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(dateTo, 'dd/MM/yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateTo} onSelect={(d) => d && setDateTo(d)} locale={pt} className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+
+            {/* Quick presets */}
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" className="text-xs h-8 px-2" onClick={() => handleSetSingleDate(new Date())}>Hoje</Button>
+              <Button variant="outline" size="sm" className="text-xs h-8 px-2" onClick={() => handleSetSingleDate(subDays(new Date(), 1))}>Ontem</Button>
+              <Button variant="outline" size="sm" className="text-xs h-8 px-2" onClick={() => { setDateFrom(subDays(new Date(), 7)); setDateTo(new Date()); }}>7 dias</Button>
+            </div>
+
             <Button onClick={fetchPurchaseOrders} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingBag className="h-4 w-4 mr-2" />}
-              {loading ? 'A carregar...' : 'Buscar Vendas do Dia'}
+              {loading ? 'A varrer...' : 'Buscar Vendas'}
             </Button>
 
             {loaded && soldItems.length > 0 && (
-              <>
-                <Button
-                  variant={showAll ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setShowAll(!showAll)}
-                >
-                  {showAll ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
-                  {showAll ? 'Todos' : 'Só Negativos'}
-                </Button>
-              </>
+              <Button variant={showAll ? 'default' : 'outline'} size="sm" onClick={() => setShowAll(!showAll)}>
+                {showAll ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
+                {showAll ? 'Todos' : 'Só Negativos'}
+              </Button>
             )}
 
             {displayItems.length > 0 && (
@@ -180,11 +257,7 @@ export function PurchaseOrdersView() {
                 <Button variant="outline" onClick={exportToExcel}>
                   <Download className="h-4 w-4 mr-2" /> Exportar
                 </Button>
-                <Button
-                  variant={sortAlpha ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSortAlpha(!sortAlpha)}
-                >
+                <Button variant={sortAlpha ? 'default' : 'outline'} size="sm" onClick={() => setSortAlpha(!sortAlpha)}>
                   <SortAsc className="h-4 w-4 mr-1" />
                   {sortAlpha ? 'A-Z' : 'Ordenar A-Z'}
                 </Button>
@@ -196,6 +269,17 @@ export function PurchaseOrdersView() {
               </>
             )}
           </div>
+
+          {/* Scan progress */}
+          {scanProgress && (
+            <div className="mt-3 space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>A varrer páginas... {scanProgress.current}/{scanProgress.total}</span>
+                <span>{soldItems.length} produto(s) encontrado(s)</span>
+              </div>
+              <Progress value={(scanProgress.current / scanProgress.total) * 100} className="h-2" />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -222,8 +306,10 @@ export function PurchaseOrdersView() {
           </Card>
           <Card>
             <CardContent className="p-3 text-center">
-              <p className="text-2xl font-bold">{format(date, 'dd/MM')}</p>
-              <p className="text-xs text-muted-foreground">Data Referência</p>
+              <p className="text-2xl font-bold">
+                {isSameDate ? format(dateFrom, 'dd/MM') : `${format(dateFrom, 'dd/MM')} - ${format(dateTo, 'dd/MM')}`}
+              </p>
+              <p className="text-xs text-muted-foreground">Período</p>
             </CardContent>
           </Card>
         </div>
@@ -303,27 +389,25 @@ export function PurchaseOrdersView() {
         </Card>
       )}
 
-      {/* All sold items (no negative stock) */}
       {loaded && negativeStockItems.length === 0 && soldItems.length > 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <ShoppingBag className="h-12 w-12 mx-auto text-green-600 mb-3" />
             <h3 className="text-lg font-semibold mb-1">Nenhum produto com stock negativo</h3>
             <p className="text-sm text-muted-foreground">
-              Todos os {soldItems.length} produto(s) vendido(s) em {format(date, 'dd/MM/yyyy')} têm stock suficiente.
+              Todos os {soldItems.length} produto(s) vendido(s) têm stock suficiente.
             </p>
           </CardContent>
         </Card>
       )}
 
-      {/* Empty state */}
       {loaded && soldItems.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
             <h3 className="text-lg font-semibold mb-1">Sem vendas encontradas</h3>
             <p className="text-sm text-muted-foreground">
-              Nenhuma venda registada para {format(date, 'dd/MM/yyyy')}.
+              Nenhuma venda registada para o período selecionado.
             </p>
           </CardContent>
         </Card>
