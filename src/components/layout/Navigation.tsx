@@ -159,6 +159,39 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Grupo Operações */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={isOperationsActive ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  'flex items-center gap-2 whitespace-nowrap',
+                  isOperationsActive && 'shadow-sm'
+                )}
+              >
+                <Scale className="h-4 w-4" />
+                {isOperationsActive ? getActiveOperationsLabel() : 'Operações'}
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {operationsItems.map((item) => (
+                <DropdownMenuItem
+                  key={item.id}
+                  onClick={() => onTabChange(item.id)}
+                  className={cn(
+                    'flex items-center gap-2 cursor-pointer',
+                    activeTab === item.id && 'bg-accent'
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* Items finais */}
           {endTabs.map((tab) => (
             <Button
