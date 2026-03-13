@@ -250,6 +250,7 @@ export function ERPReconciliationView() {
               <SelectItem value="surplus">Excesso Local</SelectItem>
               <SelectItem value="erp_only">Só no ERP</SelectItem>
               <SelectItem value="local_only">Só Local</SelectItem>
+              <SelectItem value="duplicate_suspect">Possíveis Duplicados</SelectItem>
             </SelectContent>
           </Select>
         </div>
