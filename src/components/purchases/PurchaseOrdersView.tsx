@@ -372,9 +372,10 @@ export function PurchaseOrdersView() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-8"></TableHead>
                     <TableHead>Código</TableHead>
                     <TableHead>Produto</TableHead>
-                    <TableHead>Nº Venda(s)</TableHead>
+                    <TableHead className="text-center">Vendas</TableHead>
                     <TableHead className="text-right">Vendido</TableHead>
                     <TableHead className="text-right">Stock Atual</TableHead>
                     <TableHead className="text-right">Após Venda</TableHead>
@@ -383,44 +384,85 @@ export function PurchaseOrdersView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayItems.map(p => (
-                    <TableRow key={p.productCode}>
-                      <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
-                      <TableCell>{p.productName}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {p.vendas.map((v, i) => (
-                            <Badge key={i} variant="outline" className="text-[10px] font-mono px-1.5 py-0">
-                              #{v.codigo}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{p.totalSold}</TableCell>
-                      <TableCell className="text-right">
-                        <span className={cn("font-medium", p.localStock < 0 && "text-destructive")}>
-                          {p.isRegistered ? p.localStock : '—'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={cn("font-medium", p.stockAfterSale < 0 && "text-destructive")}>
-                          {p.stockAfterSale}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {p.deficit > 0 ? (
-                          <Badge variant="destructive" className="font-bold">{p.deficit} un.</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
+                  {displayItems.map(p => {
+                    const isExpanded = expandedRows.has(p.productCode);
+                    const isNegative = p.stockAfterSale < 0 || p.localStock < 0;
+                    return (
+                      <>
+                        <TableRow 
+                          key={p.productCode} 
+                          className={cn(
+                            "cursor-pointer",
+                            isNegative && "bg-destructive/5 hover:bg-destructive/10"
+                          )}
+                          onClick={() => toggleExpand(p.productCode)}
+                        >
+                          <TableCell className="px-2">
+                            {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
+                          <TableCell className="font-medium">{p.productName}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary" className="text-xs">{p.vendas.length}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">{p.totalSold}</TableCell>
+                          <TableCell className="text-right">
+                            <span className={cn("font-medium", p.localStock < 0 && "text-destructive font-bold")}>
+                              {p.isRegistered ? p.localStock : '—'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className={cn("font-medium", p.stockAfterSale < 0 && "text-destructive font-bold")}>
+                              {p.stockAfterSale}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {p.deficit > 0 ? (
+                              <Badge variant="destructive" className="font-bold">{p.deficit} un.</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleRemoveProduct(p.productCode); }} title="Remover da lista">
+                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow key={`${p.productCode}-detail`} className="bg-muted/30 hover:bg-muted/40">
+                            <TableCell colSpan={9} className="p-0">
+                              <div className="px-6 py-3">
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">Detalhes das Vendas ({p.vendas.length})</p>
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="text-xs text-muted-foreground border-b">
+                                      <th className="text-left pb-1 pr-4">Nº Venda</th>
+                                      <th className="text-left pb-1 pr-4">Cliente</th>
+                                      <th className="text-left pb-1 pr-4">Situação</th>
+                                      <th className="text-right pb-1">Qtd</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {p.vendas.map((v, i) => (
+                                      <tr key={i} className="border-b border-muted/50 last:border-0">
+                                        <td className="py-1.5 pr-4 font-mono">#{v.codigo}</td>
+                                        <td className="py-1.5 pr-4">{v.cliente}</td>
+                                        <td className="py-1.5 pr-4">
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">{v.situacao}</Badge>
+                                        </td>
+                                        <td className="py-1.5 text-right font-medium">{v.quantidade}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </TableCell>
+                          </TableRow>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveProduct(p.productCode)} title="Remover da lista">
-                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                      </>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
