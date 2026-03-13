@@ -221,6 +221,16 @@ export function ERPReconciliationView() {
                     <TableHead>Código</TableHead>
                     <TableHead>Produto</TableHead>
                     <TableHead className="text-right">Stock ERP</TableHead>
+                    <TableHead className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        Stock Vendido
+                        {!salesLoaded && (
+                          <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={fetchSales} disabled={salesLoading}>
+                            {salesLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Carregar'}
+                          </Button>
+                        )}
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Stock Local</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Estado</TableHead>
