@@ -308,7 +308,21 @@ export function ERPReconciliationView() {
                       <>
                         <TableRow key={rowKey}>
                           <TableCell className="font-mono text-sm">{item.productCode}</TableCell>
-                          <TableCell>{item.productName}</TableCell>
+                          <TableCell>
+                            <div>{item.productName}</div>
+                            {item.possibleMatch && (
+                              <div className="mt-1 text-[11px] bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded px-2 py-1">
+                                <Copy className="h-3 w-3 inline mr-1 text-yellow-600" />
+                                <span className="text-yellow-700 dark:text-yellow-300 font-medium">
+                                  Possível duplicado {item.possibleMatch.source === 'local' ? 'local' : 'no ERP'}:
+                                </span>{' '}
+                                <span className="font-mono">{item.possibleMatch.code}</span>
+                                {' — '}
+                                <span>{item.possibleMatch.name}</span>
+                                {' (stock: '}{item.possibleMatch.stock}{')'}
+                              </div>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right font-medium">{item.erpStock}</TableCell>
                           <TableCell className="text-right font-medium">
                             {salesLoaded ? (
