@@ -253,6 +253,52 @@ export function useERPReconciliation() {
     }
   }, [toast]);
 
+  const unifyDuplicate = useCallback(async (item: ERPComparisonItem) => {
+    if (!item.possibleMatch) return false;
+
+    // The local product has a different code - update it to match the ERP code
+    if (item.possibleMatch.source === 'local') {
+      // item.productCode = ERP code, item.possibleMatch.code = local code
+      const { error } = await supabase
+        .from('products')
+        .update({ code: item.productCode })
+        .eq('code', item.possibleMatch.code);
+
+      if (error) {
+        toast({ title: 'Erro', description: error.message.includes('duplicate') 
+          ? 'Já existe um produto com este código no sistema local' 
+          : error.message, variant: 'destructive' });
+        return false;
+      }
+
+      toast({ title: 'Unificado', description: `Código local "${item.possibleMatch.code}" atualizado para "${item.productCode}" (código ERP).` });
+    } else {
+      // item.productCode = local code, item.possibleMatch.code = ERP code
+      const { error } = await supabase
+        .from('products')
+        .update({ code: item.possibleMatch.code })
+        .eq('code', item.productCode);
+
+      if (error) {
+        toast({ title: 'Erro', description: error.message.includes('duplicate') 
+          ? 'Já existe um produto com este código no sistema local' 
+          : error.message, variant: 'destructive' });
+        return false;
+      }
+
+      toast({ title: 'Unificado', description: `Código local "${item.productCode}" atualizado para "${item.possibleMatch.code}" (código ERP).` });
+    }
+
+    // Remove the unified items from the list
+    setComparisonItems(prev => prev.filter(i => {
+      if (i.productCode === item.productCode && i.status === 'duplicate_suspect') return false;
+      if (item.possibleMatch && i.productCode === item.possibleMatch.code && i.status === 'duplicate_suspect') return false;
+      return true;
+    }));
+
+    return true;
+  }, [toast]);
+
   const registerERPProducts = useCallback(async (items: ERPComparisonItem[], categoryOverride?: string) => {
     if (items.length === 0) return;
 
