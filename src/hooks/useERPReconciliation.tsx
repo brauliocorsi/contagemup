@@ -16,8 +16,14 @@ export interface ERPComparisonItem {
   erpStock: number;
   localStock: number;
   difference: number;
-  status: 'match' | 'surplus' | 'shortage' | 'erp_only' | 'local_only';
+  status: 'match' | 'surplus' | 'shortage' | 'erp_only' | 'local_only' | 'duplicate_suspect';
   location?: string | null;
+  possibleMatch?: {
+    code: string;
+    name: string;
+    stock: number;
+    source: 'erp' | 'local';
+  };
 }
 
 export function useERPReconciliation() {
