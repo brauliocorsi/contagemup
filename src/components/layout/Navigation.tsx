@@ -55,7 +55,6 @@ const endTabs = [
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const isStockActive = stockItems.some(item => item.id === activeTab);
   const isManagementActive = managementItems.some(item => item.id === activeTab);
-  const isOperationsActive = operationsItems.some(item => item.id === activeTab);
   
   const getActiveStockLabel = () => {
     const active = stockItems.find(item => item.id === activeTab);
@@ -67,17 +66,29 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
     return active?.label || 'Gestão';
   };
 
-  const getActiveOperationsLabel = () => {
-    const active = operationsItems.find(item => item.id === activeTab);
-    return active?.label || 'Operações';
-  };
-
   return (
     <nav className="border-b bg-background">
       <div className="container">
         <div className="flex gap-1 overflow-x-auto py-2">
           {/* Contagem - sempre visível */}
           {mainTabs.map((tab) => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => onTabChange(tab.id)}
+              className={cn(
+                'flex items-center gap-2 whitespace-nowrap',
+                activeTab === tab.id && 'shadow-sm'
+              )}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+            </Button>
+          ))}
+
+          {/* Menus ERP fixos */}
+          {operationsItems.map((tab) => (
             <Button
               key={tab.id}
               variant={activeTab === tab.id ? 'default' : 'ghost'}
@@ -144,39 +155,6 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               {stockItems.map((item) => (
-                <DropdownMenuItem
-                  key={item.id}
-                  onClick={() => onTabChange(item.id)}
-                  className={cn(
-                    'flex items-center gap-2 cursor-pointer',
-                    activeTab === item.id && 'bg-accent'
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Grupo Operações */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant={isOperationsActive ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'flex items-center gap-2 whitespace-nowrap',
-                  isOperationsActive && 'shadow-sm'
-                )}
-              >
-                <Scale className="h-4 w-4" />
-                {isOperationsActive ? getActiveOperationsLabel() : 'Operações'}
-                <ChevronDown className="h-3 w-3 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {operationsItems.map((item) => (
                 <DropdownMenuItem
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
