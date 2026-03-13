@@ -14,6 +14,7 @@ export function RoutesView() {
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [suggestDialogOpen, setSuggestDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
   const { routes, isLoading, createRoute, deleteRoute, updateRouteStatus } = useRoutes();
 
   const handleSuggestRoute = async (data: {
