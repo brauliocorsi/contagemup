@@ -106,7 +106,7 @@ export function SuggestRouteDialog({ open, onOpenChange, onCreateRoute }: Sugges
   const fetchStatuses = async () => {
     setStatusesLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('gestaoclick-vendas');
+      const { data, error } = await supabase.functions.invoke('gestaoclick-vendas', { body: { skipCache: true } });
       if (error) throw error;
 
       setSalesData(data);
