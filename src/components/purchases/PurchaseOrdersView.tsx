@@ -325,7 +325,13 @@ export function PurchaseOrdersView() {
 
       {/* Summary */}
       {loaded && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold">{totalVendas}</p>
+              <p className="text-xs text-muted-foreground">Total Vendas</p>
+            </CardContent>
+          </Card>
           <Card>
             <CardContent className="p-3 text-center">
               <p className="text-2xl font-bold">{soldItems.length}</p>
