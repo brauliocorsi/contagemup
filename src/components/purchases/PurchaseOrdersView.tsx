@@ -158,6 +158,7 @@ export function PurchaseOrdersView() {
 
   const displayItems = showAll ? enrichedItems : negativeStockItems;
   const totalDeficit = negativeStockItems.reduce((sum, p) => sum + p.deficit, 0);
+  const totalVendas = enrichedItems.reduce((sum, p) => sum + p.vendas.length, 0);
 
   const handleRemoveProduct = (code: string) => {
     setRemovedProducts(prev => new Set(prev).add(code.toLowerCase()));
