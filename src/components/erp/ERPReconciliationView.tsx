@@ -92,8 +92,11 @@ export function ERPReconciliationView() {
       'Stock Vendido': getSoldStock(item.productCode),
       'Stock Local': item.localStock,
       'Diferença': item.difference,
-      'Estado': STATUS_CONFIG[item.status].label,
+      'Estado': STATUS_CONFIG[item.status]?.label || item.status,
       'Localização': item.location || '',
+      'Possível Duplicado - Código': item.possibleMatch?.code || '',
+      'Possível Duplicado - Nome': item.possibleMatch?.name || '',
+      'Possível Duplicado - Stock': item.possibleMatch ? item.possibleMatch.stock : '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
