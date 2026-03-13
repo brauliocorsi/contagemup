@@ -231,22 +231,44 @@ Deno.serve(async (req) => {
 
     for (const venda of matchingVendas) {
       const items = venda.produtos || venda.itens || [];
+      const vendaSituacao = situacaoLookup[String(venda.situacao_id)] || 'Desconhecida';
+      const vendaCliente = venda.cliente_nome || venda.cliente?.nome || 'N/A';
+      const vendaCodigo = String(venda.codigo || '');
+
+      if (items.length === 0) {
+        // Venda without items — still register it
+        const key = `__venda_sem_itens_${vendaCodigo}`;
+        soldMap.set(key, {
+          productCode: '—',
+          productName: `Venda #${vendaCodigo} (sem itens detalhados)`,
+          totalSold: 0,
+          vendas: [{ codigo: vendaCodigo, cliente: vendaCliente, situacao: vendaSituacao, quantidade: 0 }],
+        });
+        continue;
+      }
+
       for (const item of items) {
         const refs = extractProductReferences(item);
         const resolvedCode = refs.productCode
           || (refs.variationId ? productCodeByVariationId[refs.variationId] : '')
           || (refs.productId ? productCodeByProductId[refs.productId] : '');
 
-        if (!resolvedCode) continue;
+        // Use item name as fallback key when code can't be resolved
+        const itemName = item.nome || item.produto_nome || item.produto?.nome_produto || item.descricao || item.produto?.descricao || '';
+        const finalCode = resolvedCode || itemName.toLowerCase().replace(/\s+/g, '_').substring(0, 50) || `desconhecido_${vendaCodigo}`;
+        
+        if (!resolvedCode) {
+          console.log(`Unresolved product in venda #${vendaCodigo}: productId=${refs.productId}, variationId=${refs.variationId}, name="${itemName}", raw keys: ${Object.keys(item).join(',')}`);
+        }
 
         const qty = parseInt(String(item.quantidade || item.produto?.quantidade || '1'), 10) || 1;
-        const key = resolvedCode.toLowerCase();
+        const key = finalCode.toLowerCase();
         const existing = soldMap.get(key);
 
         const vendaInfo = {
-          codigo: String(venda.codigo || ''),
-          cliente: venda.cliente_nome || venda.cliente?.nome || 'N/A',
-          situacao: situacaoLookup[String(venda.situacao_id)] || 'Desconhecida',
+          codigo: vendaCodigo,
+          cliente: vendaCliente,
+          situacao: vendaSituacao,
           quantidade: qty,
         };
 
@@ -255,8 +277,8 @@ Deno.serve(async (req) => {
           existing.vendas.push(vendaInfo);
         } else {
           soldMap.set(key, {
-            productCode: resolvedCode,
-            productName: item.nome || item.produto_nome || item.produto?.nome_produto || '',
+            productCode: resolvedCode || '(sem código)',
+            productName: itemName || 'Produto desconhecido',
             totalSold: qty,
             vendas: [vendaInfo],
           });
