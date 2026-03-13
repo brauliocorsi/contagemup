@@ -35,7 +35,7 @@ export function PurchaseOrdersView() {
   const [loaded, setLoaded] = useState(false);
   const [removedProducts, setRemovedProducts] = useState<Set<string>>(new Set());
   const [sortAlpha, setSortAlpha] = useState(true);
-  const [showAll, setShowAll] = useState(true);
+  const [showAll, setShowAll] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number } | null>(null);
   const { toast } = useToast();
