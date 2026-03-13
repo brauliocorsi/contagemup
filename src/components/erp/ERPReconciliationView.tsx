@@ -256,6 +256,7 @@ export function ERPReconciliationView() {
                     const isExpanded = expandedRow === rowKey;
                     const sales = salesLoaded ? getSalesForProduct(item.productCode) : [];
                     const salesCount = sales.length;
+                    const soldStock = getSoldStock(item.productCode);
 
                     return (
                       <>
@@ -263,6 +264,17 @@ export function ERPReconciliationView() {
                           <TableCell className="font-mono text-sm">{item.productCode}</TableCell>
                           <TableCell>{item.productName}</TableCell>
                           <TableCell className="text-right font-medium">{item.erpStock}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {salesLoaded ? (
+                              soldStock > 0 ? (
+                                <span className="text-amber-600 font-semibold">{soldStock}</span>
+                              ) : (
+                                <span className="text-muted-foreground">0</span>
+                              )
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right font-medium">{item.localStock}</TableCell>
                           <TableCell className={`text-right font-bold ${item.difference > 0 ? 'text-blue-600' : item.difference < 0 ? 'text-red-600' : ''}`}>
                             {item.difference > 0 ? '+' : ''}{item.difference}
