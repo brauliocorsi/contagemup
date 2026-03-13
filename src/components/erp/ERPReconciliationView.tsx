@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus, Copy, Link } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
 
@@ -35,6 +36,7 @@ export function ERPReconciliationView() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Geral');
+  const [unifyConfirmItem, setUnifyConfirmItem] = useState<ERPComparisonItem | null>(null);
 
   // Auto-load sales on mount
   useEffect(() => {
@@ -383,11 +385,7 @@ export function ERPReconciliationView() {
                                 variant="outline"
                                 size="sm"
                                 className="h-7 gap-1 px-2 text-xs bg-yellow-50 text-yellow-800 border-yellow-300 hover:bg-yellow-100"
-                                onClick={async () => {
-                                  setUnifying(prev => new Set(prev).add(item.productCode));
-                                  await unifyDuplicate(item);
-                                  setUnifying(prev => { const s = new Set(prev); s.delete(item.productCode); return s; });
-                                }}
+                                onClick={() => setUnifyConfirmItem(item)}
                                 disabled={unifying.has(item.productCode)}
                               >
                                 {unifying.has(item.productCode) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link className="h-3 w-3" />}
@@ -489,6 +487,50 @@ export function ERPReconciliationView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!unifyConfirmItem} onOpenChange={(open) => !open && setUnifyConfirmItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Unificação de Código</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Tem a certeza que deseja unificar este produto?</p>
+                {unifyConfirmItem?.possibleMatch && (
+                  <div className="rounded-md border p-3 space-y-1 text-sm">
+                    <p><strong>Produto:</strong> {unifyConfirmItem.productName}</p>
+                    {unifyConfirmItem.possibleMatch.source === 'local' ? (
+                      <>
+                        <p><strong>Código local atual:</strong> {unifyConfirmItem.possibleMatch.code}</p>
+                        <p><strong>Será alterado para:</strong> {unifyConfirmItem.productCode} (código ERP)</p>
+                      </>
+                    ) : (
+                      <>
+                        <p><strong>Código local atual:</strong> {unifyConfirmItem.productCode}</p>
+                        <p><strong>Será alterado para:</strong> {unifyConfirmItem.possibleMatch.code} (código ERP)</p>
+                      </>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">Esta ação não pode ser desfeita.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!unifyConfirmItem) return;
+                setUnifying(prev => new Set(prev).add(unifyConfirmItem.productCode));
+                setUnifyConfirmItem(null);
+                await unifyDuplicate(unifyConfirmItem);
+                setUnifying(prev => { const s = new Set(prev); s.delete(unifyConfirmItem.productCode); return s; });
+              }}
+            >
+              Confirmar Unificação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
