@@ -24,6 +24,9 @@ interface SoldItem {
 
 const PAGES_PER_CHUNK = 20;
 
+const getSoldItemKey = (item: Pick<SoldItem, 'productCode' | 'productName'>) =>
+  `${item.productCode.trim().toLowerCase()}::${item.productName.trim().toLowerCase()}`;
+
 export function PurchaseOrdersView() {
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 1));
   const [dateTo, setDateTo] = useState<Date>(subDays(new Date(), 1));
@@ -49,24 +52,28 @@ export function PurchaseOrdersView() {
   const mergeSoldItems = useCallback((existing: SoldItem[], newItems: SoldItem[]): SoldItem[] => {
     const map = new Map<string, SoldItem>();
     for (const item of existing) {
-      map.set(item.productCode.toLowerCase(), { ...item });
+      map.set(getSoldItemKey(item), { ...item, vendas: [...item.vendas] });
     }
+
     for (const item of newItems) {
-      const key = item.productCode.toLowerCase();
+      const key = getSoldItemKey(item);
       const ex = map.get(key);
+
       if (ex) {
-        // Merge vendas, avoiding duplicates by codigo
-        const existingCodigos = new Set(ex.vendas.map(v => v.codigo));
+        const existingVendas = new Set(ex.vendas.map(v => `${v.codigo}|${v.cliente}|${v.situacao}|${v.quantidade}`));
         for (const v of item.vendas) {
-          if (!existingCodigos.has(v.codigo)) {
+          const vendaKey = `${v.codigo}|${v.cliente}|${v.situacao}|${v.quantidade}`;
+          if (!existingVendas.has(vendaKey)) {
             ex.vendas.push(v);
             ex.totalSold += v.quantidade;
+            existingVendas.add(vendaKey);
           }
         }
       } else {
-        map.set(key, { ...item });
+        map.set(key, { ...item, vendas: [...item.vendas] });
       }
     }
+
     return Array.from(map.values());
   }, []);
 
@@ -106,7 +113,6 @@ export function PurchaseOrdersView() {
         hasMore = data?.hasMorePages === true;
         startPage = data?.nextStartPage || (startPage + PAGES_PER_CHUNK);
         
-        // Small delay between chunks
         if (hasMore) await new Promise(r => setTimeout(r, 200));
       }
 
@@ -128,7 +134,8 @@ export function PurchaseOrdersView() {
 
   const enrichedItems = useMemo(() => {
     const items = soldItems
-      .filter(item => !removedProducts.has(item.productCode.toLowerCase()))
+      .map(item => ({ ...item, itemKey: getSoldItemKey(item) }))
+      .filter(item => !removedProducts.has(item.itemKey))
       .map(item => {
         const local = localProductMap.get(item.productCode.toLowerCase());
         const currentStock = local?.current_stock ?? 0;
@@ -160,14 +167,14 @@ export function PurchaseOrdersView() {
   const totalDeficit = negativeStockItems.reduce((sum, p) => sum + p.deficit, 0);
   const totalVendas = enrichedItems.reduce((sum, p) => sum + p.vendas.length, 0);
 
-  const handleRemoveProduct = (code: string) => {
-    setRemovedProducts(prev => new Set(prev).add(code.toLowerCase()));
+  const handleRemoveProduct = (itemKey: string) => {
+    setRemovedProducts(prev => new Set(prev).add(itemKey));
   };
 
-  const toggleExpand = (code: string) => {
+  const toggleExpand = (itemKey: string) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
-      if (next.has(code)) next.delete(code); else next.add(code);
+      if (next.has(itemKey)) next.delete(itemKey); else next.add(itemKey);
       return next;
     });
   };
