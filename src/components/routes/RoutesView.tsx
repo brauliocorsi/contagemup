@@ -67,7 +67,7 @@ export function RoutesView() {
       setSuggestDialogOpen(false);
 
       // Refresh routes and open the new one
-      createRoute.reset();
+      queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
       setSelectedRouteId(routeData.id);
     } catch (err: any) {
       toast.error('Erro ao criar rota: ' + err.message);
