@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { format, subDays } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Loader2, ShoppingBag, Package, Download, SortAsc, Trash2, AlertTriangle, CalendarIcon, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ShoppingBag, Package, Download, SortAsc, Trash2, AlertTriangle, CalendarIcon, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,7 @@ export function PurchaseOrdersView() {
   const [removedProducts, setRemovedProducts] = useState<Set<string>>(new Set());
   const [sortAlpha, setSortAlpha] = useState(true);
   const [showAll, setShowAll] = useState(true);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number } | null>(null);
   const { toast } = useToast();
   const { products } = useProducts();
@@ -157,9 +158,18 @@ export function PurchaseOrdersView() {
 
   const displayItems = showAll ? enrichedItems : negativeStockItems;
   const totalDeficit = negativeStockItems.reduce((sum, p) => sum + p.deficit, 0);
+  const totalVendas = enrichedItems.reduce((sum, p) => sum + p.vendas.length, 0);
 
   const handleRemoveProduct = (code: string) => {
     setRemovedProducts(prev => new Set(prev).add(code.toLowerCase()));
+  };
+
+  const toggleExpand = (code: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      return next;
+    });
   };
 
   const handleRestoreAll = () => setRemovedProducts(new Set());
@@ -170,18 +180,48 @@ export function PurchaseOrdersView() {
   };
 
   const exportToExcel = () => {
-    const data = displayItems.map(p => ({
+    // Sheet 1: Resumo por produto
+    const resumo = displayItems.map(p => ({
       'Código': p.productCode,
       'Produto': p.productName,
       'Nº Venda(s)': p.vendas.map(v => v.codigo).join(', '),
-      'Vendido': p.totalSold,
+      'Total Vendido': p.totalSold,
       'Stock Atual': p.localStock,
       'Stock Após Venda': p.stockAfterSale,
       'Deficit (Comprar)': p.deficit,
     }));
+    // Sheet 2: Detalhes de vendas
+    const detalhes: any[] = [];
+    for (const p of displayItems) {
+      for (const v of p.vendas) {
+        detalhes.push({
+          'Código Produto': p.productCode,
+          'Produto': p.productName,
+          'Nº Venda': v.codigo,
+          'Cliente': v.cliente,
+          'Situação': v.situacao,
+          'Quantidade': v.quantidade,
+        });
+      }
+    }
+    // Sheet 3: Produtos com stock negativo
+    const negativos = displayItems.filter(p => p.stockAfterSale < 0 || p.localStock < 0).map(p => ({
+      'Código': p.productCode,
+      'Produto': p.productName,
+      'Stock Atual': p.localStock,
+      'Total Vendido': p.totalSold,
+      'Stock Após Venda': p.stockAfterSale,
+      'Deficit (Comprar)': p.deficit,
+      'Vendas': p.vendas.map(v => `#${v.codigo} (${v.cliente} - ${v.quantidade}un)`).join(' | '),
+    }));
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Ordens de Compra');
-    const fname = dateFrom === dateTo
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumo), 'Resumo');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalhes), 'Detalhes Vendas');
+    if (negativos.length > 0) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(negativos), 'Stock Negativo');
+    }
+    const fname = isSameDate
       ? `compras_${format(dateFrom, 'yyyy-MM-dd')}.xlsx`
       : `compras_${format(dateFrom, 'yyyy-MM-dd')}_a_${format(dateTo, 'yyyy-MM-dd')}.xlsx`;
     XLSX.writeFile(wb, fname);
@@ -285,7 +325,13 @@ export function PurchaseOrdersView() {
 
       {/* Summary */}
       {loaded && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold">{totalVendas}</p>
+              <p className="text-xs text-muted-foreground">Total Vendas</p>
+            </CardContent>
+          </Card>
           <Card>
             <CardContent className="p-3 text-center">
               <p className="text-2xl font-bold">{soldItems.length}</p>
@@ -333,9 +379,10 @@ export function PurchaseOrdersView() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-8"></TableHead>
                     <TableHead>Código</TableHead>
                     <TableHead>Produto</TableHead>
-                    <TableHead>Nº Venda(s)</TableHead>
+                    <TableHead className="text-center">Vendas</TableHead>
                     <TableHead className="text-right">Vendido</TableHead>
                     <TableHead className="text-right">Stock Atual</TableHead>
                     <TableHead className="text-right">Após Venda</TableHead>
@@ -344,44 +391,85 @@ export function PurchaseOrdersView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayItems.map(p => (
-                    <TableRow key={p.productCode}>
-                      <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
-                      <TableCell>{p.productName}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {p.vendas.map((v, i) => (
-                            <Badge key={i} variant="outline" className="text-[10px] font-mono px-1.5 py-0">
-                              #{v.codigo}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{p.totalSold}</TableCell>
-                      <TableCell className="text-right">
-                        <span className={cn("font-medium", p.localStock < 0 && "text-destructive")}>
-                          {p.isRegistered ? p.localStock : '—'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={cn("font-medium", p.stockAfterSale < 0 && "text-destructive")}>
-                          {p.stockAfterSale}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {p.deficit > 0 ? (
-                          <Badge variant="destructive" className="font-bold">{p.deficit} un.</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
+                  {displayItems.map(p => {
+                    const isExpanded = expandedRows.has(p.productCode);
+                    const isNegative = p.stockAfterSale < 0 || p.localStock < 0;
+                    return (
+                      <>
+                        <TableRow 
+                          key={p.productCode} 
+                          className={cn(
+                            "cursor-pointer",
+                            isNegative && "bg-destructive/5 hover:bg-destructive/10"
+                          )}
+                          onClick={() => toggleExpand(p.productCode)}
+                        >
+                          <TableCell className="px-2">
+                            {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
+                          <TableCell className="font-medium">{p.productName}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary" className="text-xs">{p.vendas.length}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">{p.totalSold}</TableCell>
+                          <TableCell className="text-right">
+                            <span className={cn("font-medium", p.localStock < 0 && "text-destructive font-bold")}>
+                              {p.isRegistered ? p.localStock : '—'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className={cn("font-medium", p.stockAfterSale < 0 && "text-destructive font-bold")}>
+                              {p.stockAfterSale}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {p.deficit > 0 ? (
+                              <Badge variant="destructive" className="font-bold">{p.deficit} un.</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleRemoveProduct(p.productCode); }} title="Remover da lista">
+                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow key={`${p.productCode}-detail`} className="bg-muted/30 hover:bg-muted/40">
+                            <TableCell colSpan={9} className="p-0">
+                              <div className="px-6 py-3">
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">Detalhes das Vendas ({p.vendas.length})</p>
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="text-xs text-muted-foreground border-b">
+                                      <th className="text-left pb-1 pr-4">Nº Venda</th>
+                                      <th className="text-left pb-1 pr-4">Cliente</th>
+                                      <th className="text-left pb-1 pr-4">Situação</th>
+                                      <th className="text-right pb-1">Qtd</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {p.vendas.map((v, i) => (
+                                      <tr key={i} className="border-b border-muted/50 last:border-0">
+                                        <td className="py-1.5 pr-4 font-mono">#{v.codigo}</td>
+                                        <td className="py-1.5 pr-4">{v.cliente}</td>
+                                        <td className="py-1.5 pr-4">
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">{v.situacao}</Badge>
+                                        </td>
+                                        <td className="py-1.5 text-right font-medium">{v.quantidade}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </TableCell>
+                          </TableRow>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveProduct(p.productCode)} title="Remover da lista">
-                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                      </>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
