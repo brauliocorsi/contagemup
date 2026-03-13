@@ -100,7 +100,7 @@ export function ProductSalesPopover({ salesCount, sales, productCode }: ProductS
                 {salesCount} venda(s) ativa(s)
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Excluindo: conferido, agendado entrega, cancelado
+                Excluindo: conferido, produto entregue, levantado, cancelado
               </p>
             </div>
             <ScrollArea className="max-h-[300px]">
