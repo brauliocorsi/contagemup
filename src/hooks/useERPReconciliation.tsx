@@ -16,8 +16,14 @@ export interface ERPComparisonItem {
   erpStock: number;
   localStock: number;
   difference: number;
-  status: 'match' | 'surplus' | 'shortage' | 'erp_only' | 'local_only';
+  status: 'match' | 'surplus' | 'shortage' | 'erp_only' | 'local_only' | 'duplicate_suspect';
   location?: string | null;
+  possibleMatch?: {
+    code: string;
+    name: string;
+    stock: number;
+    source: 'erp' | 'local';
+  };
 }
 
 export function useERPReconciliation() {
@@ -122,8 +128,56 @@ export function useERPReconciliation() {
         }
       }
 
+      // Duplicate detection by normalized name
+      const normalizeName = (n: string) => n.trim().toLowerCase().replace(/\s+/g, ' ');
+      
+      const erpOnlyItems = items.filter(i => i.status === 'erp_only');
+      const localOnlyItems = items.filter(i => i.status === 'local_only');
+      
+      // Build name lookup for local products (all, not just local_only)
+      const localByName = new Map<string, typeof localProducts[0]>();
+      for (const lp of (localProducts || [])) {
+        localByName.set(normalizeName(lp.name), lp);
+      }
+      
+      // Build name lookup for ERP products
+      const erpByName = new Map<string, ERPProduct>();
+      for (const ep of erp) {
+        erpByName.set(normalizeName(ep.nome), ep);
+      }
+
+      // Mark erp_only items that have a name match in local
+      for (const item of erpOnlyItems) {
+        const normalizedName = normalizeName(item.productName);
+        const localMatch = localByName.get(normalizedName);
+        if (localMatch && localMatch.code.toLowerCase() !== item.productCode.toLowerCase()) {
+          item.status = 'duplicate_suspect';
+          item.possibleMatch = {
+            code: localMatch.code,
+            name: localMatch.name,
+            stock: localMatch.current_stock - (localMatch.damaged_stock || 0),
+            source: 'local',
+          };
+        }
+      }
+      
+      // Mark local_only items that have a name match in ERP
+      for (const item of localOnlyItems) {
+        const normalizedName = normalizeName(item.productName);
+        const erpMatch = erpByName.get(normalizedName);
+        if (erpMatch && erpMatch.codigo_interno.toLowerCase() !== item.productCode.toLowerCase()) {
+          item.status = 'duplicate_suspect';
+          item.possibleMatch = {
+            code: erpMatch.codigo_interno,
+            name: erpMatch.nome,
+            stock: Math.round(erpMatch.estoque_atual),
+            source: 'erp',
+          };
+        }
+      }
+
       items.sort((a, b) => {
-        const order = { shortage: 0, surplus: 1, erp_only: 2, local_only: 3, match: 4 };
+        const order = { duplicate_suspect: 0, shortage: 1, surplus: 2, erp_only: 3, local_only: 4, match: 5 };
         return order[a.status] - order[b.status];
       });
 

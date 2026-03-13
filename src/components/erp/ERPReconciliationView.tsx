@@ -7,18 +7,19 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus } from 'lucide-react';
+import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus, Copy } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   match: { label: 'OK', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle2 },
   surplus: { label: 'Excesso Local', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: ArrowUp },
   shortage: { label: 'Falta Local', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: ArrowDown },
   erp_only: { label: 'Só no ERP', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200', icon: HelpCircle },
   local_only: { label: 'Só Local', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: AlertTriangle },
+  duplicate_suspect: { label: 'Possível Duplicado', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: Copy },
 };
 
 export function ERPReconciliationView() {
@@ -78,7 +79,7 @@ export function ERPReconciliationView() {
   }, [comparisonItems, search, statusFilter]);
 
   const summary = useMemo(() => {
-    const s = { total: comparisonItems.length, match: 0, surplus: 0, shortage: 0, erp_only: 0, local_only: 0 };
+    const s = { total: comparisonItems.length, match: 0, surplus: 0, shortage: 0, erp_only: 0, local_only: 0, duplicate_suspect: 0 };
     comparisonItems.forEach(i => { s[i.status]++; });
     return s;
   }, [comparisonItems]);
@@ -91,8 +92,11 @@ export function ERPReconciliationView() {
       'Stock Vendido': getSoldStock(item.productCode),
       'Stock Local': item.localStock,
       'Diferença': item.difference,
-      'Estado': STATUS_CONFIG[item.status].label,
+      'Estado': STATUS_CONFIG[item.status]?.label || item.status,
       'Localização': item.location || '',
+      'Possível Duplicado - Código': item.possibleMatch?.code || '',
+      'Possível Duplicado - Nome': item.possibleMatch?.name || '',
+      'Possível Duplicado - Stock': item.possibleMatch ? item.possibleMatch.stock : '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -181,7 +185,7 @@ export function ERPReconciliationView() {
 
       {/* Summary cards */}
       {comparisonItems.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className={`grid grid-cols-2 ${summary.duplicate_suspect > 0 ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-3`}>
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('all')}>
             <CardContent className="p-3 text-center">
               <p className="text-2xl font-bold">{summary.total}</p>
@@ -212,6 +216,14 @@ export function ERPReconciliationView() {
               <p className="text-xs text-muted-foreground">Só num sistema</p>
             </CardContent>
           </Card>
+          {summary.duplicate_suspect > 0 && (
+            <Card className="cursor-pointer hover:shadow-md transition-shadow border-yellow-200" onClick={() => setStatusFilter(statusFilter === 'duplicate_suspect' ? 'all' : 'duplicate_suspect')}>
+              <CardContent className="p-3 text-center">
+                <p className="text-2xl font-bold text-yellow-600">{summary.duplicate_suspect}</p>
+                <p className="text-xs text-muted-foreground">Possíveis Duplicados</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -238,6 +250,7 @@ export function ERPReconciliationView() {
               <SelectItem value="surplus">Excesso Local</SelectItem>
               <SelectItem value="erp_only">Só no ERP</SelectItem>
               <SelectItem value="local_only">Só Local</SelectItem>
+              <SelectItem value="duplicate_suspect">Possíveis Duplicados</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -295,7 +308,21 @@ export function ERPReconciliationView() {
                       <>
                         <TableRow key={rowKey}>
                           <TableCell className="font-mono text-sm">{item.productCode}</TableCell>
-                          <TableCell>{item.productName}</TableCell>
+                          <TableCell>
+                            <div>{item.productName}</div>
+                            {item.possibleMatch && (
+                              <div className="mt-1 text-[11px] bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded px-2 py-1">
+                                <Copy className="h-3 w-3 inline mr-1 text-yellow-600" />
+                                <span className="text-yellow-700 dark:text-yellow-300 font-medium">
+                                  Possível duplicado {item.possibleMatch.source === 'local' ? 'local' : 'no ERP'}:
+                                </span>{' '}
+                                <span className="font-mono">{item.possibleMatch.code}</span>
+                                {' — '}
+                                <span>{item.possibleMatch.name}</span>
+                                {' (stock: '}{item.possibleMatch.stock}{')'}
+                              </div>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right font-medium">{item.erpStock}</TableCell>
                           <TableCell className="text-right font-medium">
                             {salesLoaded ? (
