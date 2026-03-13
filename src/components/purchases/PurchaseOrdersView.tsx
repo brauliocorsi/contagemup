@@ -179,18 +179,48 @@ export function PurchaseOrdersView() {
   };
 
   const exportToExcel = () => {
-    const data = displayItems.map(p => ({
+    // Sheet 1: Resumo por produto
+    const resumo = displayItems.map(p => ({
       'Código': p.productCode,
       'Produto': p.productName,
       'Nº Venda(s)': p.vendas.map(v => v.codigo).join(', '),
-      'Vendido': p.totalSold,
+      'Total Vendido': p.totalSold,
       'Stock Atual': p.localStock,
       'Stock Após Venda': p.stockAfterSale,
       'Deficit (Comprar)': p.deficit,
     }));
+    // Sheet 2: Detalhes de vendas
+    const detalhes: any[] = [];
+    for (const p of displayItems) {
+      for (const v of p.vendas) {
+        detalhes.push({
+          'Código Produto': p.productCode,
+          'Produto': p.productName,
+          'Nº Venda': v.codigo,
+          'Cliente': v.cliente,
+          'Situação': v.situacao,
+          'Quantidade': v.quantidade,
+        });
+      }
+    }
+    // Sheet 3: Produtos com stock negativo
+    const negativos = displayItems.filter(p => p.stockAfterSale < 0 || p.localStock < 0).map(p => ({
+      'Código': p.productCode,
+      'Produto': p.productName,
+      'Stock Atual': p.localStock,
+      'Total Vendido': p.totalSold,
+      'Stock Após Venda': p.stockAfterSale,
+      'Deficit (Comprar)': p.deficit,
+      'Vendas': p.vendas.map(v => `#${v.codigo} (${v.cliente} - ${v.quantidade}un)`).join(' | '),
+    }));
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Ordens de Compra');
-    const fname = dateFrom === dateTo
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumo), 'Resumo');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalhes), 'Detalhes Vendas');
+    if (negativos.length > 0) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(negativos), 'Stock Negativo');
+    }
+    const fname = isSameDate
       ? `compras_${format(dateFrom, 'yyyy-MM-dd')}.xlsx`
       : `compras_${format(dateFrom, 'yyyy-MM-dd')}_a_${format(dateTo, 'yyyy-MM-dd')}.xlsx`;
     XLSX.writeFile(wb, fname);
