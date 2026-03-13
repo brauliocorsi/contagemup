@@ -126,29 +126,11 @@ Deno.serve(async (req) => {
     const matchingVendas: any[] = [];
     const matchingVendaIds = new Set<string>();
 
-    let debugLogged = false;
     const processVendas = (vendas: any[]) => {
       for (const venda of vendas) {
-        // Log first 3 vendas to understand the date field structure
-        if (!debugLogged && matchingVendas.length === 0) {
-          const sample = vendas.slice(0, 3).map(v => ({
-            id: v.id, codigo: v.codigo,
-            data: v.data, data_venda: v.data_venda, data_emissao: v.data_emissao,
-            data_criacao: v.data_criacao, created_at: v.created_at,
-            allKeys: Object.keys(v).filter(k => k.includes('data') || k.includes('date') || k.includes('criacao')),
-          }));
-          console.log('SAMPLE VENDAS STRUCTURE:', JSON.stringify(sample));
-          debugLogged = true;
-        }
-
-        // Try multiple date fields
-        const rawDate = venda.data || venda.data_venda || venda.data_emissao || venda.data_criacao || '';
+        const rawDate = venda.data || venda.data_venda || venda.data_emissao || venda.data_criacao || venda.created_at || '';
         const vendaDate = normalizeDateStr(rawDate);
         const vendaId = String(venda.id || venda.codigo || '');
-        
-        if (!vendaDate && !debugLogged) {
-          console.log('VENDA WITHOUT DATE:', JSON.stringify({ id: vendaId, keys: Object.keys(venda) }));
-        }
 
         if (isDateInRange(vendaDate, dateFrom, dateTo) && !matchingVendaIds.has(vendaId)) {
           matchingVendaIds.add(vendaId);
@@ -252,7 +234,7 @@ Deno.serve(async (req) => {
     for (const venda of matchingVendas) {
       const items = venda.produtos || venda.itens || [];
       const vendaSituacao = situacaoLookup[String(venda.situacao_id)] || 'Desconhecida';
-      const vendaCliente = venda.cliente_nome || venda.cliente?.nome || 'N/A';
+      const vendaCliente = venda.cliente_nome || venda.nome_cliente || (typeof venda.cliente === 'string' ? venda.cliente : '') || venda.cliente?.nome || venda.cliente?.razao_social || venda.pessoa?.nome || venda.contato?.nome || 'N/A';
       const vendaCodigo = String(venda.codigo || '');
 
       if (items.length === 0) {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { Fragment, useState, useMemo, useCallback } from 'react';
 import { format, subDays } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Loader2, ShoppingBag, Package, Download, SortAsc, Trash2, AlertTriangle, CalendarIcon, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react';
@@ -23,6 +23,9 @@ interface SoldItem {
 }
 
 const PAGES_PER_CHUNK = 20;
+
+const getSoldItemKey = (item: Pick<SoldItem, 'productCode' | 'productName'>) =>
+  `${item.productCode.trim().toLowerCase()}::${item.productName.trim().toLowerCase()}`;
 
 export function PurchaseOrdersView() {
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 1));
@@ -49,24 +52,28 @@ export function PurchaseOrdersView() {
   const mergeSoldItems = useCallback((existing: SoldItem[], newItems: SoldItem[]): SoldItem[] => {
     const map = new Map<string, SoldItem>();
     for (const item of existing) {
-      map.set(item.productCode.toLowerCase(), { ...item });
+      map.set(getSoldItemKey(item), { ...item, vendas: [...item.vendas] });
     }
+
     for (const item of newItems) {
-      const key = item.productCode.toLowerCase();
+      const key = getSoldItemKey(item);
       const ex = map.get(key);
+
       if (ex) {
-        // Merge vendas, avoiding duplicates by codigo
-        const existingCodigos = new Set(ex.vendas.map(v => v.codigo));
+        const existingVendas = new Set(ex.vendas.map(v => `${v.codigo}|${v.cliente}|${v.situacao}|${v.quantidade}`));
         for (const v of item.vendas) {
-          if (!existingCodigos.has(v.codigo)) {
+          const vendaKey = `${v.codigo}|${v.cliente}|${v.situacao}|${v.quantidade}`;
+          if (!existingVendas.has(vendaKey)) {
             ex.vendas.push(v);
             ex.totalSold += v.quantidade;
+            existingVendas.add(vendaKey);
           }
         }
       } else {
-        map.set(key, { ...item });
+        map.set(key, { ...item, vendas: [...item.vendas] });
       }
     }
+
     return Array.from(map.values());
   }, []);
 
@@ -106,7 +113,6 @@ export function PurchaseOrdersView() {
         hasMore = data?.hasMorePages === true;
         startPage = data?.nextStartPage || (startPage + PAGES_PER_CHUNK);
         
-        // Small delay between chunks
         if (hasMore) await new Promise(r => setTimeout(r, 200));
       }
 
@@ -128,7 +134,8 @@ export function PurchaseOrdersView() {
 
   const enrichedItems = useMemo(() => {
     const items = soldItems
-      .filter(item => !removedProducts.has(item.productCode.toLowerCase()))
+      .map(item => ({ ...item, itemKey: getSoldItemKey(item) }))
+      .filter(item => !removedProducts.has(item.itemKey))
       .map(item => {
         const local = localProductMap.get(item.productCode.toLowerCase());
         const currentStock = local?.current_stock ?? 0;
@@ -160,14 +167,14 @@ export function PurchaseOrdersView() {
   const totalDeficit = negativeStockItems.reduce((sum, p) => sum + p.deficit, 0);
   const totalVendas = enrichedItems.reduce((sum, p) => sum + p.vendas.length, 0);
 
-  const handleRemoveProduct = (code: string) => {
-    setRemovedProducts(prev => new Set(prev).add(code.toLowerCase()));
+  const handleRemoveProduct = (itemKey: string) => {
+    setRemovedProducts(prev => new Set(prev).add(itemKey));
   };
 
-  const toggleExpand = (code: string) => {
+  const toggleExpand = (itemKey: string) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
-      if (next.has(code)) next.delete(code); else next.add(code);
+      if (next.has(itemKey)) next.delete(itemKey); else next.add(itemKey);
       return next;
     });
   };
@@ -392,17 +399,17 @@ export function PurchaseOrdersView() {
                 </TableHeader>
                 <TableBody>
                   {displayItems.map(p => {
-                    const isExpanded = expandedRows.has(p.productCode);
+                    const isExpanded = expandedRows.has(p.itemKey);
                     const isNegative = p.stockAfterSale < 0 || p.localStock < 0;
                     return (
-                      <>
+                      <Fragment key={p.itemKey}>
                         <TableRow 
-                          key={p.productCode} 
+                          key={p.itemKey}
                           className={cn(
                             "cursor-pointer",
                             isNegative && "bg-destructive/5 hover:bg-destructive/10"
                           )}
-                          onClick={() => toggleExpand(p.productCode)}
+                          onClick={() => toggleExpand(p.itemKey)}
                         >
                           <TableCell className="px-2">
                             {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
@@ -410,7 +417,17 @@ export function PurchaseOrdersView() {
                           <TableCell className="font-mono text-sm">{p.productCode}</TableCell>
                           <TableCell className="font-medium">{p.productName}</TableCell>
                           <TableCell className="text-center">
-                            <Badge variant="secondary" className="text-xs">{p.vendas.length}</Badge>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <Badge variant="secondary" className="text-xs">{p.vendas.length}</Badge>
+                              {p.vendas.slice(0, 2).map((v, idx) => (
+                                <span key={`${v.codigo}-${idx}`} className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                  #{v.codigo} · {v.cliente}
+                                </span>
+                              ))}
+                              {p.vendas.length > 2 && (
+                                <span className="text-[10px] text-muted-foreground">+{p.vendas.length - 2}</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right font-medium">{p.totalSold}</TableCell>
                           <TableCell className="text-right">
@@ -431,13 +448,13 @@ export function PurchaseOrdersView() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleRemoveProduct(p.productCode); }} title="Remover da lista">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleRemoveProduct(p.itemKey); }} title="Remover da lista">
                               <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
                             </Button>
                           </TableCell>
                         </TableRow>
                         {isExpanded && (
-                          <TableRow key={`${p.productCode}-detail`} className="bg-muted/30 hover:bg-muted/40">
+                          <TableRow key={`${p.itemKey}-detail`} className="bg-muted/30 hover:bg-muted/40">
                             <TableCell colSpan={9} className="p-0">
                               <div className="px-6 py-3">
                                 <p className="text-xs font-semibold text-muted-foreground mb-2">Detalhes das Vendas ({p.vendas.length})</p>
@@ -467,7 +484,7 @@ export function PurchaseOrdersView() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </TableBody>
