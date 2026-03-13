@@ -124,7 +124,23 @@ export function ERPReconciliationView() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Conciliação ERP</h2>
           <p className="text-sm text-muted-foreground">Compare o stock local com o GestãoClick</p>
-        </div>
+          {(productsCachedAt || salesCachedAt) && (
+            <div className="flex items-center gap-3 mt-1">
+              {productsCachedAt && (
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  Produtos: cache {getCacheAge(productsCachedAt)}
+                </span>
+              )}
+              {salesCachedAt && (
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  Vendas: cache {getCacheAge(salesCachedAt)}
+                </span>
+              )}
+              <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => { fetchAndCompare(true); fetchSales(true); }} disabled={loading || salesLoading}>
+                Forçar refresh
+              </Button>
+            </div>
+          )}
         <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center">
           <div className="flex gap-2">
             <div className="relative">
