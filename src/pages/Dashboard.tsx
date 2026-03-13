@@ -20,6 +20,7 @@ const SettingsView = lazy(() => import('@/components/settings/SettingsView').the
 const RecentProductsView = lazy(() => import('@/components/products/RecentProductsView').then(m => ({ default: m.RecentProductsView })));
 const ERPReconciliationView = lazy(() => import('@/components/erp/ERPReconciliationView').then(m => ({ default: m.ERPReconciliationView })));
 const PurchaseOrdersView = lazy(() => import('@/components/purchases/PurchaseOrdersView').then(m => ({ default: m.PurchaseOrdersView })));
+const RoutesView = lazy(() => import('@/components/routes/RoutesView').then(m => ({ default: m.RoutesView })));
 
 // Loading skeleton component
 function ViewLoader() {
@@ -92,6 +93,7 @@ export default function Dashboard() {
           {activeTab === 'reconciliation' && <ReconciliationView />}
           {activeTab === 'erp' && <ERPReconciliationView />}
           {activeTab === 'purchases' && <PurchaseOrdersView />}
+          {activeTab === 'routes' && <RoutesView />}
           {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
           {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
           {activeTab === 'recent' && <RecentProductsView />}

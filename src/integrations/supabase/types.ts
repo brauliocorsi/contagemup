@@ -719,6 +719,101 @@ export type Database = {
         }
         Relationships: []
       }
+      route_schedules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          scheduled_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          scheduled_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          scheduled_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      route_stops: {
+        Row: {
+          address: string | null
+          city: string | null
+          client_name: string
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          order_number: number
+          postal_code: string | null
+          route_id: string
+          status: string
+          updated_at: string
+          venda_codigo: string | null
+          venda_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          client_name: string
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          order_number?: number
+          postal_code?: string | null
+          route_id: string
+          status?: string
+          updated_at?: string
+          venda_codigo?: string | null
+          venda_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          client_name?: string
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          order_number?: number
+          postal_code?: string | null
+          route_id?: string
+          status?: string
+          updated_at?: string
+          venda_codigo?: string | null
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_stops_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movements: {
         Row: {
           created_at: string

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { 
   Package, ClipboardList, History, BarChart3, Tags, Scale, 
   TrendingUp, TrendingDown, Warehouse, AlertTriangle, AlertOctagon,
-  ChevronDown, Settings, ArrowLeftRight, ShoppingBag
+  ChevronDown, Settings, ArrowLeftRight, ShoppingBag, MapPin
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -43,6 +43,7 @@ const operationsItems = [
   { id: 'reconciliation', label: 'Separação', icon: Scale },
   { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
   { id: 'purchases', label: 'Compras', icon: ShoppingBag },
+  { id: 'routes', label: 'Rotas', icon: MapPin },
 ];
 
 // Items finais
