@@ -34,6 +34,24 @@ export function ERPReconciliationView() {
   const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Geral');
 
+  // Calculate sold stock per product from active sales
+  const getSoldStock = (productCode: string): number => {
+    if (!salesLoaded) return 0;
+    const sales = getSalesForProduct(productCode);
+    let total = 0;
+    for (const venda of sales) {
+      if (venda.produtos && Array.isArray(venda.produtos)) {
+        for (const prod of venda.produtos) {
+          const code = (prod.codigo || '').trim().toLowerCase();
+          if (code === productCode.trim().toLowerCase()) {
+            total += parseFloat(prod.quantidade || '0') || 0;
+          }
+        }
+      }
+    }
+    return Math.round(total);
+  };
+
   const filtered = useMemo(() => {
     return comparisonItems.filter(item => {
       const matchesSearch = !search ||
@@ -55,6 +73,7 @@ export function ERPReconciliationView() {
       'Código': item.productCode,
       'Produto': item.productName,
       'Stock ERP': item.erpStock,
+      'Stock Vendido': getSoldStock(item.productCode),
       'Stock Local': item.localStock,
       'Diferença': item.difference,
       'Estado': STATUS_CONFIG[item.status].label,
@@ -203,6 +222,16 @@ export function ERPReconciliationView() {
                     <TableHead>Código</TableHead>
                     <TableHead>Produto</TableHead>
                     <TableHead className="text-right">Stock ERP</TableHead>
+                    <TableHead className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        Stock Vendido
+                        {!salesLoaded && (
+                          <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={fetchSales} disabled={salesLoading}>
+                            {salesLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Carregar'}
+                          </Button>
+                        )}
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Stock Local</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Estado</TableHead>
@@ -228,6 +257,7 @@ export function ERPReconciliationView() {
                     const isExpanded = expandedRow === rowKey;
                     const sales = salesLoaded ? getSalesForProduct(item.productCode) : [];
                     const salesCount = sales.length;
+                    const soldStock = getSoldStock(item.productCode);
 
                     return (
                       <>
@@ -235,6 +265,17 @@ export function ERPReconciliationView() {
                           <TableCell className="font-mono text-sm">{item.productCode}</TableCell>
                           <TableCell>{item.productName}</TableCell>
                           <TableCell className="text-right font-medium">{item.erpStock}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {salesLoaded ? (
+                              soldStock > 0 ? (
+                                <span className="text-amber-600 font-semibold">{soldStock}</span>
+                              ) : (
+                                <span className="text-muted-foreground">0</span>
+                              )
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right font-medium">{item.localStock}</TableCell>
                           <TableCell className={`text-right font-bold ${item.difference > 0 ? 'text-blue-600' : item.difference < 0 ? 'text-red-600' : ''}`}>
                             {item.difference > 0 ? '+' : ''}{item.difference}
@@ -281,7 +322,7 @@ export function ERPReconciliationView() {
                         </TableRow>
                         {isExpanded && salesCount > 0 && (
                           <TableRow key={`${rowKey}-sales`} className="bg-muted/30">
-                            <TableCell colSpan={9} className="p-0">
+                            <TableCell colSpan={10} className="p-0">
                               <div className="px-4 py-3 space-y-1.5">
                                 <p className="text-xs font-semibold text-muted-foreground mb-2">
                                   <ShoppingCart className="h-3 w-3 inline mr-1" />
