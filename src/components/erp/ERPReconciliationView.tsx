@@ -370,7 +370,7 @@ export function ERPReconciliationView() {
             <p className="text-muted-foreground mb-4">
               Clique em "Sincronizar com ERP" para buscar os produtos do GestãoClick e comparar com o stock local.
             </p>
-            <Button onClick={fetchAndCompare}>
+            <Button onClick={() => fetchAndCompare()}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Sincronizar com ERP
             </Button>
