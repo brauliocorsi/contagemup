@@ -4,7 +4,7 @@ import { useRouteStops } from '@/hooks/useRoutes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter, FileText, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter, FileText, RefreshCw, Scissors } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { AddStopDialog } from './AddStopDialog';
 import { StopSaleDetailDialog } from './StopSaleDetailDialog';
+import { SplitRouteDialog } from './SplitRouteDialog';
 import { RouteMap } from './RouteMap';
 
 interface RouteDetailProps {
@@ -47,6 +48,51 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const queryClient = useQueryClient();
   const [reloading, setReloading] = useState(false);
   const [updatedStopIds, setUpdatedStopIds] = useState<Set<string>>(new Set());
+  const [splitOpen, setSplitOpen] = useState(false);
+
+  const handleSplitRoute = async (groups: { name: string; stops: any[] }[]) => {
+    try {
+      for (const group of groups) {
+        const { data: newRoute, error: routeErr } = await supabase
+          .from('route_schedules')
+          .insert({
+            name: group.name,
+            scheduled_date: route.scheduled_date,
+            notes: `Dividida de: ${route.name}`,
+          })
+          .select()
+          .single();
+        if (routeErr) throw routeErr;
+
+        const stopsToInsert = group.stops.map((stop: any, idx: number) => ({
+          route_id: newRoute.id,
+          client_name: stop.client_name,
+          address: stop.address || null,
+          postal_code: stop.postal_code || null,
+          city: stop.city || null,
+          latitude: stop.latitude,
+          longitude: stop.longitude,
+          order_number: idx,
+          venda_id: stop.venda_id || null,
+          venda_codigo: stop.venda_codigo || null,
+          freguesia: stop.freguesia || null,
+          municipio: stop.municipio || null,
+          venda_status: stop.venda_status || null,
+          venda_data: stop.venda_data || null,
+          status: 'pending',
+        }));
+
+        const { error: stopsErr } = await supabase.from('route_stops').insert(stopsToInsert);
+        if (stopsErr) throw stopsErr;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
+      toast.success(`Rota dividida em ${groups.length} sub-rotas!`);
+      onBack();
+    } catch (err: any) {
+      toast.error('Erro ao dividir rota: ' + err.message);
+    }
+  };
 
   const handleReloadNotas = async () => {
     const stopsWithVenda = stops.filter(s => s.venda_id);
@@ -185,6 +231,12 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             {reloading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
             Recarregar Notas
           </Button>
+          {stops.length >= 2 && (
+            <Button variant="outline" onClick={() => setSplitOpen(true)}>
+              <Scissors className="h-4 w-4 mr-1" />
+              Dividir Rota
+            </Button>
+          )}
           <Button onClick={() => setAddStopOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Adicionar Paragem
@@ -355,6 +407,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
         onOpenChange={setSaleDetailOpen}
         vendaId={saleDetailVendaId}
         vendaCodigo={saleDetailVendaCodigo}
+      />
+      <SplitRouteDialog
+        open={splitOpen}
+        onOpenChange={setSplitOpen}
+        stops={stops}
+        routeName={route.name}
+        scheduledDate={route.scheduled_date}
+        onSplit={handleSplitRoute}
       />
     </div>
   );
