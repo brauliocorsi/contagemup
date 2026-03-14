@@ -622,6 +622,20 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 </div>
                 );
               })}
+              {/* Return to base distance */}
+              {returnToBase && departureLat && departureLon && filteredStops.length > 0 && (() => {
+                const lastStop = filteredStops[filteredStops.length - 1];
+                if (!lastStop.latitude || !lastStop.longitude) return null;
+                const returnDist = haversineKm(lastStop.latitude, lastStop.longitude, departureLat, departureLon);
+                return (
+                  <div className="flex items-center justify-center py-1">
+                    <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Navigation className="h-3 w-3" />
+                      → 🏠 {returnDist.toFixed(1)} km (volta)
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </CardContent>
