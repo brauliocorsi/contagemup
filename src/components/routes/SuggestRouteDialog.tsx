@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 
 interface SaleClient {
   clientName: string;
+  clienteId?: string;
   address: string;
   postalCode: string;
   city: string;
