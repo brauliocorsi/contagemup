@@ -520,16 +520,21 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 const vs = (stop as any).venda_status as string | undefined;
                 const color = vs ? (vendaStatusColors[vs] || defaultVendaColor) : null;
                 const prevStop = idx > 0 ? filteredStops[idx - 1] : null;
-                const distKm = prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude
-                  ? haversineKm(prevStop.latitude, prevStop.longitude, stop.latitude, stop.longitude)
-                  : null;
+                let distKm: number | null = null;
+                let distLabel = '';
+                if (idx === 0 && departureLat && departureLon && stop.latitude && stop.longitude) {
+                  distKm = haversineKm(departureLat, departureLon, stop.latitude, stop.longitude);
+                  distLabel = '🏠 → ';
+                } else if (prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude) {
+                  distKm = haversineKm(prevStop.latitude, prevStop.longitude, stop.latitude, stop.longitude);
+                }
                 return (
                 <div key={stop.id}>
                   {distKm !== null && (
                     <div className="flex items-center justify-center py-1">
                       <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                         <Navigation className="h-3 w-3" />
-                        {distKm.toFixed(1)} km
+                        {distLabel}{distKm.toFixed(1)} km
                       </span>
                     </div>
                   )}
