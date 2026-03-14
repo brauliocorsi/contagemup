@@ -90,6 +90,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
       venda_id: data.venda_id || null,
       venda_codigo: data.venda_codigo || null,
       venda_status: null,
+      venda_data: null,
       status: 'pending',
       notes: null,
     });
