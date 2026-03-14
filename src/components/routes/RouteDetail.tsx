@@ -288,6 +288,12 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
         onOpenChange={setAddStopOpen}
         onSubmit={handleAddStop}
       />
+      <StopSaleDetailDialog
+        open={saleDetailOpen}
+        onOpenChange={setSaleDetailOpen}
+        vendaId={saleDetailVendaId}
+        vendaCodigo={saleDetailVendaCodigo}
+      />
     </div>
   );
 }
