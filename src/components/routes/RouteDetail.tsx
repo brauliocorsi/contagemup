@@ -572,6 +572,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 <Badge variant="secondary" className="text-xs">
                   <Navigation className="h-3 w-3 mr-1" />
                   {departureToFirstKm.toFixed(1)} km até 1ª paragem
+                  {departureToFirstDur !== null && ` • ${formatDuration(departureToFirstDur)}`}
                 </Badge>
               )}
               {returnLegKm !== null && stopsWithCoords.length > 0 && (
