@@ -41,6 +41,7 @@ export function RoutesView() {
       freguesia?: string;
       municipio?: string;
       venda_status?: string;
+      venda_data?: string;
     }[];
   }) => {
     try {
@@ -70,6 +71,7 @@ export function RoutesView() {
         freguesia: stop.freguesia || null,
         municipio: stop.municipio || null,
         venda_status: stop.venda_status || null,
+        venda_data: stop.venda_data || null,
         status: 'pending',
       }));
 

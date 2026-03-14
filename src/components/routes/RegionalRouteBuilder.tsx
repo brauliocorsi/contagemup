@@ -22,6 +22,7 @@ interface SaleClient {
   vendaIds: string[];
   vendaCodigos: string[];
   vendaSituacoes: string[];
+  vendaDatas: string[];
   lat?: number;
   lon?: number;
   selected: boolean;
@@ -193,6 +194,7 @@ export function RegionalRouteBuilder({ open, onOpenChange, onCreateRoute }: Regi
               vendaIds: [venda.venda_id],
               vendaCodigos: [venda.codigo],
               vendaSituacoes: [venda.situacao],
+              vendaDatas: [venda.data || ''],
               selected: true,
             });
           } else {
@@ -200,6 +202,7 @@ export function RegionalRouteBuilder({ open, onOpenChange, onCreateRoute }: Regi
             if (!existing.vendaIds.includes(venda.venda_id)) {
               existing.vendaIds.push(venda.venda_id);
               existing.vendaCodigos.push(venda.codigo);
+              existing.vendaDatas.push(venda.data || '');
               if (!existing.vendaSituacoes.includes(venda.situacao)) {
                 existing.vendaSituacoes.push(venda.situacao);
               }
@@ -290,6 +293,7 @@ export function RegionalRouteBuilder({ open, onOpenChange, onCreateRoute }: Regi
         freguesia: c.freguesia,
         municipio: c.municipio,
         venda_status: c.vendaSituacoes[0] || null,
+        venda_data: c.vendaDatas[0] || null,
       })),
     });
   };

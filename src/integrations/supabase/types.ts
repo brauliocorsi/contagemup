@@ -814,6 +814,7 @@ export type Database = {
           status: string
           updated_at: string
           venda_codigo: string | null
+          venda_data: string | null
           venda_id: string | null
           venda_status: string | null
         }
@@ -834,6 +835,7 @@ export type Database = {
           status?: string
           updated_at?: string
           venda_codigo?: string | null
+          venda_data?: string | null
           venda_id?: string | null
           venda_status?: string | null
         }
@@ -854,6 +856,7 @@ export type Database = {
           status?: string
           updated_at?: string
           venda_codigo?: string | null
+          venda_data?: string | null
           venda_id?: string | null
           venda_status?: string | null
         }
