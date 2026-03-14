@@ -46,6 +46,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
   const queryClient = useQueryClient();
   const [reloading, setReloading] = useState(false);
+  const [updatedStopIds, setUpdatedStopIds] = useState<Set<string>>(new Set());
 
   const handleReloadNotas = async () => {
     const stopsWithVenda = stops.filter(s => s.venda_id);
