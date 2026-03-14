@@ -41,16 +41,27 @@ const vendaStatusColors: Record<string, { bg: string; border: string; badge: str
 };
 const defaultVendaColor = { bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-300 dark:border-purple-700', badge: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700' };
 
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  if (h > 0) return `${h}h${m > 0 ? m.toString().padStart(2, '0') + 'min' : ''}`;
+  return `${m}min`;
+}
+
 // OSRM road distances hook
 function useOSRMDistances(waypoints: [number, number][]) {
   const [legDistances, setLegDistances] = useState<number[]>([]);
+  const [legDurations, setLegDurations] = useState<number[]>([]);
   const [totalDistance, setTotalDistance] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (waypoints.length < 2) {
       setLegDistances([]);
+      setLegDurations([]);
       setTotalDistance(0);
+      setTotalDuration(0);
       return;
     }
 
@@ -63,16 +74,23 @@ function useOSRMDistances(waypoints: [number, number][]) {
         );
         const data = await response.json();
         if (data.code === 'Ok' && data.routes?.[0]?.legs) {
-          const legs = data.routes[0].legs.map((leg: any) => leg.distance / 1000); // meters to km
+          const legs = data.routes[0].legs.map((leg: any) => leg.distance / 1000);
+          const durations = data.routes[0].legs.map((leg: any) => leg.duration);
           setLegDistances(legs);
+          setLegDurations(durations);
           setTotalDistance(data.routes[0].distance / 1000);
+          setTotalDuration(data.routes[0].duration);
         } else {
           setLegDistances([]);
+          setLegDurations([]);
           setTotalDistance(0);
+          setTotalDuration(0);
         }
       } catch {
         setLegDistances([]);
+        setLegDurations([]);
         setTotalDistance(0);
+        setTotalDuration(0);
       } finally {
         setLoading(false);
       }
@@ -81,7 +99,7 @@ function useOSRMDistances(waypoints: [number, number][]) {
     fetchDistances();
   }, [JSON.stringify(waypoints)]);
 
-  return { legDistances, totalDistance, loading };
+  return { legDistances, legDurations, totalDistance, totalDuration, loading };
 }
 
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
@@ -424,14 +442,16 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     return wp;
   }, [stopsWithCoords, departureLat, departureLon, returnToBase]);
 
-  const { legDistances: osrmLegs, totalDistance: totalDistanceKm } = useOSRMDistances(osrmWaypoints);
+  const { legDistances: osrmLegs, legDurations: osrmDurations, totalDistance: totalDistanceKm, totalDuration: totalDurationSec } = useOSRMDistances(osrmWaypoints);
 
   // Map leg index to: legOffset is the index where stop-to-stop legs start (after departure leg if present)
   const hasDeparture = !!(departureLat && departureLon);
   const departureToFirstKm = hasDeparture && osrmLegs.length > 0 ? osrmLegs[0] : null;
+  const departureToFirstDur = hasDeparture && osrmDurations.length > 0 ? osrmDurations[0] : null;
   const stopLegOffset = hasDeparture ? 1 : 0;
   // Return leg is the last one if returnToBase
   const returnLegKm = returnToBase && hasDeparture && osrmLegs.length > 0 ? osrmLegs[osrmLegs.length - 1] : null;
+  const returnLegDur = returnToBase && hasDeparture && osrmDurations.length > 0 ? osrmDurations[osrmDurations.length - 1] : null;
 
   return (
     <div className="space-y-4">
@@ -447,6 +467,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
               {totalDistanceKm > 0 && (
                 <span className="ml-2 font-medium text-foreground">
                   • {totalDistanceKm.toFixed(1)} km total
+                  {totalDurationSec > 0 && ` • ${formatDuration(totalDurationSec)}`}
                 </span>
               )}
             </p>
@@ -499,6 +520,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 <Badge variant="secondary" className="text-xs ml-2">
                   <Navigation className="h-3 w-3 mr-1" />
                   {totalDistanceKm.toFixed(1)} km
+                  {totalDurationSec > 0 && ` • ${formatDuration(totalDurationSec)}`}
                 </Badge>
               )}
             </CardTitle>
@@ -550,12 +572,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 <Badge variant="secondary" className="text-xs">
                   <Navigation className="h-3 w-3 mr-1" />
                   {departureToFirstKm.toFixed(1)} km até 1ª paragem
+                  {departureToFirstDur !== null && ` • ${formatDuration(departureToFirstDur)}`}
                 </Badge>
               )}
               {returnLegKm !== null && stopsWithCoords.length > 0 && (
                 <Badge variant="secondary" className="text-xs">
                   <Navigation className="h-3 w-3 mr-1" />
                   {returnLegKm.toFixed(1)} km volta
+                  {returnLegDur !== null && ` • ${formatDuration(returnLegDur)}`}
                 </Badge>
               )}
             </div>
@@ -612,15 +636,18 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 const color = vs ? (vendaStatusColors[vs] || defaultVendaColor) : null;
                 const prevStop = idx > 0 ? filteredStops[idx - 1] : null;
                 let distKm: number | null = null;
+                let distDur: number | null = null;
                 let distLabel = '';
                 // Find this stop's index in stopsWithCoords to map to osrmLegs
                 const stopIdxInAll = stopsWithCoords.findIndex(s => s.id === stop.id);
                 if (idx === 0 && hasDeparture && stop.latitude && stop.longitude) {
                   distKm = departureToFirstKm;
+                  distDur = departureToFirstDur;
                   distLabel = '🏠 → ';
                 } else if (prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude && stopIdxInAll > 0) {
                   const legIdx = stopLegOffset + stopIdxInAll - 1;
                   distKm = osrmLegs[legIdx] ?? null;
+                  distDur = osrmDurations[legIdx] ?? null;
                 }
                 return (
                 <div key={stop.id}>
@@ -629,6 +656,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                       <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                         <Navigation className="h-3 w-3" />
                         {distLabel}{distKm.toFixed(1)} km
+                        {distDur !== null && distDur > 0 && ` • ${formatDuration(distDur)}`}
                       </span>
                     </div>
                   )}
@@ -721,7 +749,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 <div className="flex items-center justify-center py-1">
                   <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                     <Navigation className="h-3 w-3" />
-                    → 🏠 {returnLegKm.toFixed(1)} km (volta)
+                    → 🏠 {returnLegKm.toFixed(1)} km (volta){returnLegDur !== null && returnLegDur > 0 && ` • ${formatDuration(returnLegDur)}`}
                   </span>
                 </div>
               )}
