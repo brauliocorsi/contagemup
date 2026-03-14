@@ -153,16 +153,18 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     }
   };
 
-  const handleGeocodeAll = async () => {
-    const stopsWithoutCoords = stops.filter(s => (!s.latitude || !s.longitude) && s.postal_code);
-    if (stopsWithoutCoords.length === 0) {
-      toast.info('Todas as paragens já têm coordenadas GPS ou não têm código postal');
+  const handleGeocodeAll = async (forceAll = false) => {
+    const targetStops = forceAll
+      ? stops.filter(s => s.postal_code)
+      : stops.filter(s => (!s.latitude || !s.longitude) && s.postal_code);
+    if (targetStops.length === 0) {
+      toast.info('Nenhuma paragem com código postal para geocodificar');
       return;
     }
     setGeocoding(true);
     let geocoded = 0;
     try {
-      for (const stop of stopsWithoutCoords) {
+      for (const stop of targetStops) {
         try {
           const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined);
           if (coords) {
@@ -175,7 +177,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
         } catch { /* skip individual */ }
       }
       queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
-      toast.success(`${geocoded} de ${stopsWithoutCoords.length} paragem(ns) geocodificada(s)`);
+      toast.success(`${geocoded} de ${targetStops.length} paragem(ns) geocodificada(s)`);
     } catch (err: any) {
       toast.error('Erro ao geocodificar: ' + err.message);
     } finally {
@@ -291,10 +293,10 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             {reloading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
             Recarregar Notas
           </Button>
-          {stops.some(s => (!s.latitude || !s.longitude) && s.postal_code) && (
-            <Button variant="outline" onClick={handleGeocodeAll} disabled={geocoding}>
+          {stops.some(s => s.postal_code) && (
+            <Button variant="outline" onClick={() => handleGeocodeAll(stops.every(s => s.latitude && s.longitude))} disabled={geocoding}>
               {geocoding ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MapPin className="h-4 w-4 mr-1" />}
-              Geocodificar
+              {stops.some(s => (!s.latitude || !s.longitude) && s.postal_code) ? 'Geocodificar' : 'Regeocodificar'}
             </Button>
           )}
           {stops.length >= 2 && (
