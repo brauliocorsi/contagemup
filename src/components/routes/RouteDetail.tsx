@@ -218,9 +218,9 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                     {stop.venda_codigo && (
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <p className="text-xs text-muted-foreground">Venda: {stop.venda_codigo}</p>
-                        {(stop as any).venda_status && (
-                          <Badge variant="outline" className="text-[10px] py-0 px-1.5">
-                            {(stop as any).venda_status}
+                        {vs && (
+                          <Badge variant="outline" className={`text-[10px] py-0 px-1.5 border ${color ? color.badge : ''}`}>
+                            {vs}
                           </Badge>
                         )}
                       </div>
