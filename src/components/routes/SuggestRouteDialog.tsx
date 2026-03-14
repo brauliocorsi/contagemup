@@ -227,21 +227,37 @@ export function SuggestRouteDialog({ open, onOpenChange, onCreateRoute }: Sugges
     for (let i = 0; i < clientsList.length; i++) {
       const client = { ...clientsList[i] };
       try {
-        const query = client.city
-          ? `${client.postalCode}, ${client.city}, Portugal`
-          : `${client.postalCode}, Portugal`;
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
-        );
-        const data = await response.json();
-        if (data && data.length > 0) {
-          client.lat = parseFloat(data[0].lat);
-          client.lon = parseFloat(data[0].lon);
+        // Use GeoAPI.pt for Portuguese postal codes - returns parish, municipality and coordinates
+        const cp = client.postalCode.replace(/[^0-9-]/g, '');
+        const response = await fetch(`https://geoapi.pt/cp/${cp}?json=1`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data) {
+            // GeoAPI returns coordinates as strings or numbers
+            if (data.lat || data.latitude) {
+              client.lat = parseFloat(String(data.lat || data.latitude));
+            }
+            if (data.lng || data.lon || data.longitude) {
+              client.lon = parseFloat(String(data.lng || data.lon || data.longitude));
+            }
+            // Extract parish and municipality
+            if (data.Freguesia || data.freguesia) {
+              client.freguesia = data.Freguesia || data.freguesia;
+            }
+            if (data.Concelho || data.concelho || data.Municipio || data.municipio) {
+              client.municipio = data.Concelho || data.concelho || data.Municipio || data.municipio;
+            }
+            // Use municipality as city if city was empty
+            if (!client.city && client.municipio) {
+              client.city = client.municipio;
+            }
+          }
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore geocoding errors */ }
       results.push(client);
+      // GeoAPI.pt rate limit - be respectful
       if (i < clientsList.length - 1) {
-        await new Promise(r => setTimeout(r, 1100));
+        await new Promise(r => setTimeout(r, 500));
       }
     }
     return results;
