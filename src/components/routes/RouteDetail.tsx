@@ -57,6 +57,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
       order_number: stops.length,
       venda_id: data.venda_id || null,
       venda_codigo: data.venda_codigo || null,
+      venda_status: null,
       status: 'pending',
       notes: null,
     });
