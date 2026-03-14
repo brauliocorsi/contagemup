@@ -153,6 +153,36 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     }
   };
 
+  const handleGeocodeAll = async () => {
+    const stopsWithoutCoords = stops.filter(s => (!s.latitude || !s.longitude) && s.postal_code);
+    if (stopsWithoutCoords.length === 0) {
+      toast.info('Todas as paragens já têm coordenadas GPS ou não têm código postal');
+      return;
+    }
+    setGeocoding(true);
+    let geocoded = 0;
+    try {
+      for (const stop of stopsWithoutCoords) {
+        try {
+          const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined);
+          if (coords) {
+            const updatePayload: Record<string, any> = { latitude: coords.lat, longitude: coords.lon };
+            if ((coords as any).freguesia) updatePayload.freguesia = (coords as any).freguesia;
+            if ((coords as any).municipio) updatePayload.municipio = (coords as any).municipio;
+            await supabase.from('route_stops').update(updatePayload).eq('id', stop.id);
+            geocoded++;
+          }
+        } catch { /* skip individual */ }
+      }
+      queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
+      toast.success(`${geocoded} de ${stopsWithoutCoords.length} paragem(ns) geocodificada(s)`);
+    } catch (err: any) {
+      toast.error('Erro ao geocodificar: ' + err.message);
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
   const vendaStatuses = useMemo(() => {
     const set = new Set<string>();
     stops.forEach(s => {
