@@ -634,17 +634,18 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
               {filteredStops.map((stop, idx) => {
                 const vs = (stop as any).venda_status as string | undefined;
                 const color = vs ? (vendaStatusColors[vs] || defaultVendaColor) : null;
-                const prevStop = idx > 0 ? filteredStops[idx - 1] : null;
                 let distKm: number | null = null;
                 let distDur: number | null = null;
                 let distLabel = '';
                 // Find this stop's index in stopsWithCoords to map to osrmLegs
                 const stopIdxInAll = stopsWithCoords.findIndex(s => s.id === stop.id);
-                if (idx === 0 && hasDeparture && stop.latitude && stop.longitude) {
+                if (stopIdxInAll === 0 && hasDeparture) {
+                  // First geocoded stop with departure configured
                   distKm = departureToFirstKm;
                   distDur = departureToFirstDur;
                   distLabel = '🏠 → ';
-                } else if (prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude && stopIdxInAll > 0) {
+                } else if (stopIdxInAll > 0) {
+                  // Any subsequent geocoded stop — show leg from previous geocoded stop
                   const legIdx = stopLegOffset + stopIdxInAll - 1;
                   distKm = osrmLegs[legIdx] ?? null;
                   distDur = osrmDurations[legIdx] ?? null;
