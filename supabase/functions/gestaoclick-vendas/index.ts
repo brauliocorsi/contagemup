@@ -361,25 +361,26 @@ Deno.serve(async (req) => {
     if (allVendas.length > 0) {
       const sample = allVendas[0];
       console.log('Sample venda keys:', Object.keys(sample));
-      console.log('Sample venda (partial):', JSON.stringify({
-        id: sample.id,
-        codigo: sample.codigo,
-        cliente_nome: sample.cliente_nome,
-        cliente: sample.cliente,
-        endereco: sample.endereco,
-        endereco_entrega: sample.endereco_entrega,
-        cep: sample.cep,
-        codigo_postal: sample.codigo_postal,
-        cidade: sample.cidade,
-        estado: sample.estado,
-        bairro: sample.bairro,
-        numero: sample.numero,
-        complemento: sample.complemento,
-        contato: sample.contato,
-        contato_nome: sample.contato_nome,
-        nome_cliente: sample.nome_cliente,
-        razao_social: sample.razao_social,
-      }, null, 2));
+      console.log('Sample venda nome_cliente:', sample.nome_cliente);
+      console.log('Sample venda enderecos (raw):', JSON.stringify(sample.enderecos, null, 2));
+      
+      // Fetch individual client data for debugging
+      if (sample.cliente_id) {
+        try {
+          const clientRes = await fetchWithRetry(
+            `https://api.gestaoclick.com/api/clientes/${sample.cliente_id}`,
+            { method: 'GET', headers: apiHeaders }
+          );
+          if (clientRes.ok) {
+            const clientData = await clientRes.json();
+            console.log('Sample client data:', JSON.stringify(clientData, null, 2));
+          } else {
+            console.log('Client fetch failed:', clientRes.status);
+          }
+        } catch (e) {
+          console.log('Client fetch error:', e);
+        }
+      }
     }
 
     for (const venda of allVendas) {
