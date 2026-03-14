@@ -200,6 +200,17 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
 
   const stopsWithCoords = stops.filter(s => s.latitude && s.longitude);
 
+  const totalDistanceKm = useMemo(() => {
+    if (stopsWithCoords.length < 2) return 0;
+    let total = 0;
+    for (let i = 0; i < stopsWithCoords.length - 1; i++) {
+      const a = stopsWithCoords[i];
+      const b = stopsWithCoords[i + 1];
+      total += haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!);
+    }
+    return total;
+  }, [stopsWithCoords]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
