@@ -4,10 +4,11 @@ import { useRouteStops } from '@/hooks/useRoutes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter } from 'lucide-react';
+import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { AddStopDialog } from './AddStopDialog';
+import { StopSaleDetailDialog } from './StopSaleDetailDialog';
 import { RouteMap } from './RouteMap';
 
 interface RouteDetailProps {
