@@ -749,7 +749,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 <div className="flex items-center justify-center py-1">
                   <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                     <Navigation className="h-3 w-3" />
-                    → 🏠 {returnLegKm.toFixed(1)} km (volta)
+                    → 🏠 {returnLegKm.toFixed(1)} km (volta){returnLegDur !== null && returnLegDur > 0 && ` • ${formatDuration(returnLegDur)}`}
                   </span>
                 </div>
               )}
