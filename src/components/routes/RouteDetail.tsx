@@ -579,6 +579,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 <Badge variant="secondary" className="text-xs">
                   <Navigation className="h-3 w-3 mr-1" />
                   {returnLegKm.toFixed(1)} km volta
+                  {returnLegDur !== null && ` • ${formatDuration(returnLegDur)}`}
                 </Badge>
               )}
             </div>
