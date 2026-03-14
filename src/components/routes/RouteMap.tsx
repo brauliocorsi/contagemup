@@ -224,11 +224,11 @@ export function RouteMap({ stops, departureLat, departureLon, departureLabel, re
           <Marker
             key={stop.id}
             position={[stop.latitude, stop.longitude]}
-            icon={createNumberedIcon(idx + 1)}
+            icon={createNumberedIcon((stop.order_number ?? idx) + 1)}
           >
             <Popup>
               <div className="text-sm">
-                <p className="font-bold">{idx + 1}. {stop.client_name}</p>
+                <p className="font-bold">{(stop.order_number ?? idx) + 1}. {stop.client_name}</p>
                 {stop.postal_code && <p>📮 {stop.postal_code}</p>}
                 {stop.city && <p>🏙️ {stop.city}</p>}
                 {stop.address && <p>📍 {stop.address}</p>}

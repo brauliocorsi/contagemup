@@ -107,12 +107,19 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   // Validate if coord matches postal code region (first digit)
   const isCoordSuspicious = (postalCode: string, lat: number | null, lon: number | null): boolean => {
     if (!lat || !lon || !postalCode) return false;
-    const prefix = postalCode.charAt(0);
-    // Simple check: 4xxx codes should be north of 40.5 lat
-    if (prefix === '4' && lat < 40.5) return true;
-    // 1xxx codes should be around Lisbon (38.6-38.85)
-    if (prefix === '1' && (lat > 39.0 || lat < 38.5)) return true;
-    return false;
+    const ranges: Record<string, { minLat: number; maxLat: number; minLon: number; maxLon: number }> = {
+      '1': { minLat: 38.6, maxLat: 38.85, minLon: -9.3, maxLon: -9.05 },
+      '2': { minLat: 38.4, maxLat: 39.5, minLon: -9.5, maxLon: -8.5 },
+      '3': { minLat: 39.5, maxLat: 40.7, minLon: -8.8, maxLon: -7.3 },
+      '4': { minLat: 40.6, maxLat: 42.2, minLon: -8.9, maxLon: -7.3 },
+      '5': { minLat: 40.5, maxLat: 42.0, minLon: -8.3, maxLon: -6.1 },
+      '6': { minLat: 39.0, maxLat: 41.0, minLon: -8.0, maxLon: -6.5 },
+      '7': { minLat: 37.5, maxLat: 39.5, minLon: -8.8, maxLon: -7.0 },
+      '8': { minLat: 36.9, maxLat: 37.6, minLon: -9.0, maxLon: -7.3 },
+    };
+    const range = ranges[postalCode.charAt(0)];
+    if (!range) return false;
+    return lat < range.minLat || lat > range.maxLat || lon < range.minLon || lon > range.maxLon;
   };
 
   // Auto-geocode stops without coordinates or with suspicious coords on load
@@ -595,7 +602,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                   }`}
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold shrink-0">
-                    {idx + 1}
+                    {(stop.order_number ?? idx) + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
