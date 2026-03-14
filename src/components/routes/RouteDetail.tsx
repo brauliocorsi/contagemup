@@ -408,6 +408,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
         vendaId={saleDetailVendaId}
         vendaCodigo={saleDetailVendaCodigo}
       />
+      <SplitRouteDialog
+        open={splitOpen}
+        onOpenChange={setSplitOpen}
+        stops={stops}
+        routeName={route.name}
+        scheduledDate={route.scheduled_date}
+        onSplit={handleSplitRoute}
+      />
     </div>
   );
 }
