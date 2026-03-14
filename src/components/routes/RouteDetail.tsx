@@ -613,11 +613,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 const prevStop = idx > 0 ? filteredStops[idx - 1] : null;
                 let distKm: number | null = null;
                 let distLabel = '';
-                if (idx === 0 && departureLat && departureLon && stop.latitude && stop.longitude) {
-                  distKm = haversineKm(departureLat, departureLon, stop.latitude, stop.longitude);
+                // Find this stop's index in stopsWithCoords to map to osrmLegs
+                const stopIdxInAll = stopsWithCoords.findIndex(s => s.id === stop.id);
+                if (idx === 0 && hasDeparture && stop.latitude && stop.longitude) {
+                  distKm = departureToFirstKm;
                   distLabel = '🏠 → ';
-                } else if (prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude) {
-                  distKm = haversineKm(prevStop.latitude, prevStop.longitude, stop.latitude, stop.longitude);
+                } else if (prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude && stopIdxInAll > 0) {
+                  const legIdx = stopLegOffset + stopIdxInAll - 1;
+                  distKm = osrmLegs[legIdx] ?? null;
                 }
                 return (
                 <div key={stop.id}>
