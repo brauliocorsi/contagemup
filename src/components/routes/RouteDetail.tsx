@@ -38,6 +38,14 @@ const vendaStatusColors: Record<string, { bg: string; border: string; badge: str
 };
 const defaultVendaColor = { bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-300 dark:border-purple-700', badge: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700' };
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
   const [addStopOpen, setAddStopOpen] = useState(false);
   const [selectedVendaStatuses, setSelectedVendaStatuses] = useState<Set<string>>(new Set());
@@ -200,6 +208,17 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
 
   const stopsWithCoords = stops.filter(s => s.latitude && s.longitude);
 
+  const totalDistanceKm = useMemo(() => {
+    if (stopsWithCoords.length < 2) return 0;
+    let total = 0;
+    for (let i = 0; i < stopsWithCoords.length - 1; i++) {
+      const a = stopsWithCoords[i];
+      const b = stopsWithCoords[i + 1];
+      total += haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!);
+    }
+    return total;
+  }, [stopsWithCoords]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -251,6 +270,12 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             <CardTitle className="text-lg flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" />
               Mapa da Rota ({stopsWithCoords.length} pontos)
+              {totalDistanceKm > 0 && (
+                <Badge variant="secondary" className="text-xs ml-2">
+                  <Navigation className="h-3 w-3 mr-1" />
+                  {totalDistanceKm.toFixed(1)} km
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
