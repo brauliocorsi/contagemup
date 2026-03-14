@@ -246,6 +246,10 @@ Deno.serve(async (req) => {
     const allVendas: any[] = [];
     const totalPages = firstVendasPage.meta.total_paginas || 1;
 
+    // Process first page of vendas
+    const allVendas: any[] = [];
+    const totalPages = firstVendasPage.meta.total_paginas || 1;
+
     for (const venda of firstVendasPage.data) {
       if (!excludedIds.has(String(venda.situacao_id))) {
         allVendas.push(venda);
@@ -357,143 +361,23 @@ Deno.serve(async (req) => {
       situacaoLookup[String(sit.id)] = sit.nome;
     }
 
-    // Log first venda's raw structure for debugging
-    if (allVendas.length > 0) {
-      const sample = allVendas[0];
-      console.log('Sample venda keys:', Object.keys(sample));
-      console.log('Sample venda (partial):', JSON.stringify({
-        id: sample.id,
-        codigo: sample.codigo,
-        cliente_nome: sample.cliente_nome,
-        cliente: sample.cliente,
-        endereco: sample.endereco,
-        endereco_entrega: sample.endereco_entrega,
-        cep: sample.cep,
-        codigo_postal: sample.codigo_postal,
-        cidade: sample.cidade,
-        estado: sample.estado,
-        bairro: sample.bairro,
-        numero: sample.numero,
-        complemento: sample.complemento,
-        contato: sample.contato,
-        contato_nome: sample.contato_nome,
-        nome_cliente: sample.nome_cliente,
-        razao_social: sample.razao_social,
-      }, null, 2));
-    }
-
     for (const venda of allVendas) {
-      const cliente = venda.cliente || {};
-      const contato = venda.contato || {};
-      const addressEntries = extractAddressEntries(venda);
-
       const clienteNome = firstNonEmpty(
-        venda.cliente_nome,
         venda.nome_cliente,
+        venda.cliente_nome,
         venda.razao_social,
-        cliente.nome,
-        cliente.razao_social,
-        contato.nome,
         'N/A'
       );
-
-      const enderecosFromClientRecord = addressEntries
-        .map((entry: any) => [
-          entry.endereco,
-          entry.morada,
-          entry.logradouro,
-          entry.rua,
-          entry.numero,
-          entry.complemento,
-          entry.bairro,
-        ].map((v) => String(v ?? '').trim()).filter(Boolean).join(', '))
-        .filter(Boolean);
-
-      const fallbackAddress = [
-        venda.endereco_entrega,
-        venda.endereco,
-        cliente.endereco,
-        venda.numero,
-        cliente.numero,
-        venda.complemento,
-        cliente.complemento,
-        venda.bairro,
-        cliente.bairro,
-      ].map((v) => String(v ?? '').trim()).filter(Boolean).join(', ');
-
-      const enderecoPartes = firstNonEmpty(enderecosFromClientRecord[0], fallbackAddress);
-
-      const cidade = firstNonEmpty(
-        venda.cidade,
-        cliente.cidade,
-        contato.cidade,
-        addressEntries[0]?.cidade,
-        addressEntries[0]?.municipio,
-        addressEntries[0]?.concelho
-      );
-
-      const estado = firstNonEmpty(
-        venda.estado,
-        cliente.estado,
-        contato.estado,
-        addressEntries[0]?.estado,
-        addressEntries[0]?.distrito
-      );
-
-      let cep = '';
-      const cepCandidates = [
-        venda.cep,
-        venda.codigo_postal,
-        venda.cliente_cep,
-        cliente.cep,
-        cliente.codigo_postal,
-        contato.cep,
-        contato.codigo_postal,
-        ...addressEntries.map((entry: any) => entry.cep),
-        ...addressEntries.map((entry: any) => entry.codigo_postal),
-        ...addressEntries.map((entry: any) => entry.postal_code),
-      ];
-
-      for (const candidate of cepCandidates) {
-        cep = normalizePostalCode(candidate);
-        if (cep) break;
-      }
-
-      if (!cep) {
-        const textCandidates = [
-          enderecoPartes,
-          ...enderecosFromClientRecord,
-          ...addressEntries.map((entry: any) => [
-            entry.endereco,
-            entry.morada,
-            entry.logradouro,
-            entry.rua,
-            entry.cep,
-            entry.codigo_postal,
-            entry.postal_code,
-            entry.cidade,
-            entry.municipio,
-            entry.concelho,
-          ].map((v) => String(v ?? '').trim()).filter(Boolean).join(' ')),
-          venda.endereco_entrega,
-          venda.endereco,
-          JSON.stringify(venda.enderecos || []),
-        ];
-
-        for (const textCandidate of textCandidates) {
-          cep = extractPostalCodeFromText(textCandidate);
-          if (cep) break;
-        }
-      }
 
       const vendaInfo = {
         venda_id: String(venda.id),
         codigo: String(venda.codigo || ''),
+        cliente_id: String(venda.cliente_id || ''),
         cliente_nome: clienteNome,
-        cliente_endereco: enderecoPartes,
-        cliente_cidade: cidade,
-        cliente_cep: cep,
-        cliente_estado: estado,
+        cliente_endereco: '',
+        cliente_cidade: '',
+        cliente_cep: '',
+        cliente_estado: '',
         situacao: situacaoLookup[String(venda.situacao_id)] || 'Desconhecida',
         data: venda.data || '',
         valor_total: String(venda.valor_total || '0'),
