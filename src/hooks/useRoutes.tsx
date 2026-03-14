@@ -28,6 +28,7 @@ export interface RouteStop {
   venda_codigo: string | null;
   status: string;
   notes: string | null;
+  venda_status: string | null;
   created_at: string;
   updated_at: string;
 }

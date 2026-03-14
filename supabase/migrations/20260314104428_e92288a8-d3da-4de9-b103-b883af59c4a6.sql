@@ -1,0 +1,1 @@
+ALTER TABLE public.route_stops ADD COLUMN venda_status text DEFAULT NULL;
