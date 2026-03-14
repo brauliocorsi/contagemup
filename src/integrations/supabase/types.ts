@@ -179,6 +179,39 @@ export type Database = {
           },
         ]
       }
+      delivery_regions: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          default_weekday: number | null
+          id: string
+          name: string
+          postal_prefix_end: string
+          postal_prefix_start: string
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          default_weekday?: number | null
+          id?: string
+          name: string
+          postal_prefix_end: string
+          postal_prefix_start: string
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          default_weekday?: number | null
+          id?: string
+          name?: string
+          postal_prefix_end?: string
+          postal_prefix_start?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       erp_products_cache: {
         Row: {
           code: string
@@ -726,6 +759,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          region_id: string | null
           scheduled_date: string
           status: string
           updated_at: string
@@ -736,6 +770,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          region_id?: string | null
           scheduled_date: string
           status?: string
           updated_at?: string
@@ -746,11 +781,20 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          region_id?: string | null
           scheduled_date?: string
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "route_schedules_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_regions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       route_stops: {
         Row: {
@@ -758,9 +802,11 @@ export type Database = {
           city: string | null
           client_name: string
           created_at: string
+          freguesia: string | null
           id: string
           latitude: number | null
           longitude: number | null
+          municipio: string | null
           notes: string | null
           order_number: number
           postal_code: string | null
@@ -775,9 +821,11 @@ export type Database = {
           city?: string | null
           client_name: string
           created_at?: string
+          freguesia?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
+          municipio?: string | null
           notes?: string | null
           order_number?: number
           postal_code?: string | null
@@ -792,9 +840,11 @@ export type Database = {
           city?: string | null
           client_name?: string
           created_at?: string
+          freguesia?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
+          municipio?: string | null
           notes?: string | null
           order_number?: number
           postal_code?: string | null
