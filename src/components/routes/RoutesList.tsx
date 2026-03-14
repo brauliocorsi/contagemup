@@ -31,6 +31,8 @@ const statusColors: Record<string, string> = {
 };
 
 export function RoutesList({ routes, isLoading, onSelect, onDelete, regions = [] }: RoutesListProps) {
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -50,6 +52,8 @@ export function RoutesList({ routes, isLoading, onSelect, onDelete, regions = []
       </Card>
     );
   }
+
+  const filteredRoutes = statusFilter ? routes.filter(r => r.status === statusFilter) : routes;
 
   const getRegion = (route: RouteSchedule) => {
     const regionId = (route as any).region_id;
