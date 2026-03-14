@@ -169,13 +169,13 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : stops.length === 0 ? (
+          ) : filteredStops.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Nenhuma paragem adicionada. Adicione clientes à rota.
+              {vendaStatusFilter ? 'Nenhuma paragem com este estado de venda.' : 'Nenhuma paragem adicionada. Adicione clientes à rota.'}
             </p>
           ) : (
             <div className="space-y-2">
-              {stops.map((stop, idx) => (
+              {filteredStops.map((stop, idx) => (
                 <div
                   key={stop.id}
                   className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
