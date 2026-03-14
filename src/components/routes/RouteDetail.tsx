@@ -25,7 +25,7 @@ const statusLabels: Record<string, string> = {
 
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
   const [addStopOpen, setAddStopOpen] = useState(false);
-  const [vendaStatusFilter, setVendaStatusFilter] = useState<string | null>(null);
+  const [selectedVendaStatuses, setSelectedVendaStatuses] = useState<Set<string>>(new Set());
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
 
   const vendaStatuses = useMemo(() => {
@@ -37,9 +37,17 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     return Array.from(set).sort();
   }, [stops]);
 
-  const filteredStops = vendaStatusFilter
-    ? stops.filter(s => (s as any).venda_status === vendaStatusFilter)
-    : stops;
+  const filteredStops = selectedVendaStatuses.size === 0
+    ? stops
+    : stops.filter(s => selectedVendaStatuses.has((s as any).venda_status || ''));
+
+  const toggleVendaStatus = (status: string) => {
+    setSelectedVendaStatuses(prev => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status); else next.add(status);
+      return next;
+    });
+  };
 
   const handleAddStop = async (data: {
     client_name: string;
@@ -136,15 +144,15 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">
-              Paragens ({filteredStops.length}{vendaStatusFilter ? ` de ${stops.length}` : ''})
+              Paragens ({filteredStops.length}{selectedVendaStatuses.size > 0 ? ` de ${stops.length}` : ''})
             </CardTitle>
           </div>
           {vendaStatuses.length > 0 && (
             <div className="flex gap-1.5 flex-wrap pt-2">
               <Badge
-                variant={vendaStatusFilter === null ? 'default' : 'outline'}
+                variant={selectedVendaStatuses.size === 0 ? 'default' : 'outline'}
                 className="text-xs cursor-pointer"
-                onClick={() => setVendaStatusFilter(null)}
+                onClick={() => setSelectedVendaStatuses(new Set())}
               >
                 Todos
               </Badge>
@@ -153,9 +161,9 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 return (
                   <Badge
                     key={status}
-                    variant={vendaStatusFilter === status ? 'default' : 'outline'}
+                    variant={selectedVendaStatuses.has(status) ? 'default' : 'outline'}
                     className="text-xs cursor-pointer"
-                    onClick={() => setVendaStatusFilter(vendaStatusFilter === status ? null : status)}
+                    onClick={() => toggleVendaStatus(status)}
                   >
                     {status} ({count})
                   </Badge>
@@ -171,7 +179,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             </div>
           ) : filteredStops.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              {vendaStatusFilter ? 'Nenhuma paragem com este estado de venda.' : 'Nenhuma paragem adicionada. Adicione clientes à rota.'}
+              {selectedVendaStatuses.size > 0 ? 'Nenhuma paragem com os estados selecionados.' : 'Nenhuma paragem adicionada. Adicione clientes à rota.'}
             </p>
           ) : (
             <div className="space-y-2">
