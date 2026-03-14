@@ -242,6 +242,29 @@ Deno.serve(async (req) => {
     console.log('Situações encontradas:', situacoes.map((s: any) => `${s.id}: ${s.nome}`));
     console.log('IDs excluídos:', [...excludedIds]);
 
+    // DEBUG: Log enderecos from first venda immediately
+    if (firstVendasPage.data.length > 0) {
+      const sample = firstVendasPage.data[0];
+      console.log('DEBUG sample venda cliente_id:', sample.cliente_id, 'nome_cliente:', sample.nome_cliente);
+      console.log('DEBUG sample venda enderecos:', JSON.stringify(sample.enderecos, null, 2));
+      
+      // Fetch individual client
+      if (sample.cliente_id) {
+        try {
+          const clientRes = await fetchWithRetry(
+            `https://api.gestaoclick.com/api/clientes/${sample.cliente_id}`,
+            { method: 'GET', headers: apiHeaders }
+          );
+          if (clientRes.ok) {
+            const clientData = await clientRes.json();
+            console.log('DEBUG client data:', JSON.stringify(clientData, null, 2));
+          }
+        } catch (e) {
+          console.log('DEBUG client fetch error:', e);
+        }
+      }
+    }
+
     // Process first page of vendas
     const allVendas: any[] = [];
     const totalPages = firstVendasPage.meta.total_paginas || 1;
