@@ -153,6 +153,23 @@ export function SuggestRouteDialog({ open, onOpenChange, onCreateRoute }: Sugges
     setLoading(true);
 
     try {
+      // Fetch clients to get addresses and postal codes
+      const { data: clientsData, error: clientsError } = await supabase.functions.invoke('gestaoclick-clients', { body: {} });
+      if (clientsError) throw clientsError;
+
+      // Build client lookup by ID
+      const clientLookup = new Map<string, { endereco: string; cep: string; cidade: string; estado: string }>();
+      for (const client of (clientsData?.clients || [])) {
+        clientLookup.set(client.id, {
+          endereco: client.endereco || '',
+          cep: client.cep || '',
+          cidade: client.cidade || '',
+          estado: client.estado || '',
+        });
+      }
+
+      console.log(`Client lookup built: ${clientLookup.size} clients, ${Array.from(clientLookup.values()).filter(c => c.cep).length} with CEP`);
+
       const productSalesMap = salesData?.productSalesMap || {};
       const clientMap = new Map<string, SaleClient>();
 
@@ -164,19 +181,26 @@ export function SuggestRouteDialog({ open, onOpenChange, onCreateRoute }: Sugges
           const clientKey = venda.cliente_nome?.toLowerCase().trim();
           if (!clientKey || clientKey === 'n/a') continue;
 
-          // Try cliente_cep first, then extract from address
-          let postalCode = (venda.cliente_cep || '').trim();
-          if (!postalCode) {
-            postalCode = extractPostalCode(venda.cliente_endereco || '');
-          }
+          // Get address info from client lookup using cliente_id
+          const clientInfo = clientLookup.get(venda.cliente_id || '') || null;
+
+          // Try client lookup CEP first, then venda fields, then extract from address
+          let postalCode = clientInfo?.cep || '';
+          if (!postalCode) postalCode = (venda.cliente_cep || '').trim();
+          if (!postalCode) postalCode = extractPostalCode(clientInfo?.endereco || '');
+          if (!postalCode) postalCode = extractPostalCode(venda.cliente_endereco || '');
           if (!postalCode) continue;
+
+          const address = clientInfo?.endereco || venda.cliente_endereco || '';
+          const city = clientInfo?.cidade || venda.cliente_cidade || '';
 
           if (!clientMap.has(clientKey)) {
             clientMap.set(clientKey, {
               clientName: venda.cliente_nome,
-              address: venda.cliente_endereco || '',
+              clienteId: venda.cliente_id,
+              address,
               postalCode,
-              city: venda.cliente_cidade || '',
+              city,
               vendaIds: [venda.venda_id],
               vendaCodigos: [venda.codigo],
               vendaSituacoes: [venda.situacao],
