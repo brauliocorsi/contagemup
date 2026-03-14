@@ -756,10 +756,15 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          departure_address: string | null
+          departure_lat: number | null
+          departure_lon: number | null
+          departure_postal_code: string | null
           id: string
           name: string
           notes: string | null
           region_id: string | null
+          return_to_base: boolean
           scheduled_date: string
           status: string
           updated_at: string
@@ -767,10 +772,15 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          departure_address?: string | null
+          departure_lat?: number | null
+          departure_lon?: number | null
+          departure_postal_code?: string | null
           id?: string
           name: string
           notes?: string | null
           region_id?: string | null
+          return_to_base?: boolean
           scheduled_date: string
           status?: string
           updated_at?: string
@@ -778,10 +788,15 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          departure_address?: string | null
+          departure_lat?: number | null
+          departure_lon?: number | null
+          departure_postal_code?: string | null
           id?: string
           name?: string
           notes?: string | null
           region_id?: string | null
+          return_to_base?: boolean
           scheduled_date?: string
           status?: string
           updated_at?: string
