@@ -197,12 +197,30 @@ export function useRouteStops(routeId: string | null) {
     },
   });
 
-  // Geocode postal code using Nominatim (free, OpenStreetMap)
-  const geocodePostalCode = async (postalCode: string, city?: string): Promise<{ lat: number; lon: number } | null> => {
+  // Geocode postal code using GeoAPI.pt (accurate for Portugal), fallback to Nominatim
+  const geocodePostalCode = async (postalCode: string, city?: string): Promise<{ lat: number; lon: number; freguesia?: string; municipio?: string } | null> => {
+    // Try GeoAPI.pt first (most accurate for Portuguese postal codes)
+    try {
+      const cleanCp = postalCode.replace(/\s/g, '');
+      const geoResponse = await fetch(`https://json.geoapi.pt/cp/${cleanCp}`);
+      if (geoResponse.ok) {
+        const geoData = await geoResponse.json();
+        if (geoData && (geoData.centro || (geoData.latitude && geoData.longitude))) {
+          return {
+            lat: geoData.centro?.[0] || parseFloat(geoData.latitude),
+            lon: geoData.centro?.[1] || parseFloat(geoData.longitude),
+            freguesia: geoData.Freguesia || geoData.freguesia || undefined,
+            municipio: geoData.Concelho || geoData.concelho || geoData.Municipio || undefined,
+          };
+        }
+      }
+    } catch { /* fallback to Nominatim */ }
+
+    // Fallback: Nominatim
     try {
       const query = city ? `${postalCode}, ${city}, Portugal` : `${postalCode}, Portugal`;
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=pt`
       );
       const data = await response.json();
       if (data && data.length > 0) {
