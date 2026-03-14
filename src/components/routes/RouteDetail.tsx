@@ -4,7 +4,10 @@ import { useRouteStops } from '@/hooks/useRoutes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter, FileText, RefreshCw, Scissors } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter, FileText, RefreshCw, Scissors, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -58,6 +61,48 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const [reloading, setReloading] = useState(false);
   const [updatedStopIds, setUpdatedStopIds] = useState<Set<string>>(new Set());
   const [splitOpen, setSplitOpen] = useState(false);
+  const [departureAddress, setDepartureAddress] = useState(route.departure_address || '');
+  const [departurePostalCode, setDeparturePostalCode] = useState(route.departure_postal_code || '');
+  const [returnToBase, setReturnToBase] = useState(route.return_to_base || false);
+  const [savingDeparture, setSavingDeparture] = useState(false);
+
+  const departureLat = route.departure_lat;
+  const departureLon = route.departure_lon;
+
+  const handleSaveDeparture = async () => {
+    setSavingDeparture(true);
+    try {
+      let lat: number | null = null;
+      let lon: number | null = null;
+      if (departurePostalCode) {
+        const coords = await geocodePostalCode(departurePostalCode, undefined, departureAddress || undefined);
+        if (coords) {
+          lat = coords.lat;
+          lon = coords.lon;
+        }
+      }
+      const { error } = await supabase.from('route_schedules').update({
+        departure_address: departureAddress || null,
+        departure_postal_code: departurePostalCode || null,
+        departure_lat: lat,
+        departure_lon: lon,
+        return_to_base: returnToBase,
+      }).eq('id', route.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
+      toast.success('Ponto de saída guardado');
+    } catch (err: any) {
+      toast.error('Erro ao guardar: ' + err.message);
+    } finally {
+      setSavingDeparture(false);
+    }
+  };
+
+  const handleToggleReturn = async (val: boolean) => {
+    setReturnToBase(val);
+    await supabase.from('route_schedules').update({ return_to_base: val }).eq('id', route.id);
+    queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
+  };
 
   const handleSplitRoute = async (groups: { name: string; stops: any[] }[]) => {
     try {
@@ -277,15 +322,25 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const stopsWithCoords = stops.filter(s => s.latitude && s.longitude);
 
   const totalDistanceKm = useMemo(() => {
-    if (stopsWithCoords.length < 2) return 0;
     let total = 0;
+    // Departure to first stop
+    if (departureLat && departureLon && stopsWithCoords.length > 0) {
+      const first = stopsWithCoords[0];
+      total += haversineKm(departureLat, departureLon, first.latitude!, first.longitude!);
+    }
+    // Between stops
     for (let i = 0; i < stopsWithCoords.length - 1; i++) {
       const a = stopsWithCoords[i];
       const b = stopsWithCoords[i + 1];
       total += haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!);
     }
+    // Return to base
+    if (returnToBase && departureLat && departureLon && stopsWithCoords.length > 0) {
+      const last = stopsWithCoords[stopsWithCoords.length - 1];
+      total += haversineKm(last.latitude!, last.longitude!, departureLat, departureLon);
+    }
     return total;
-  }, [stopsWithCoords]);
+  }, [stopsWithCoords, departureLat, departureLon, returnToBase]);
 
   return (
     <div className="space-y-4">
@@ -359,11 +414,63 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
           </CardHeader>
           <CardContent className="p-0">
             <div className="h-[400px] rounded-b-lg overflow-hidden">
-              <RouteMap stops={stopsWithCoords} />
+              <RouteMap stops={stopsWithCoords} departureLat={departureLat} departureLon={departureLon} departureLabel={departureAddress || departurePostalCode || 'Base'} returnToBase={returnToBase} />
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Departure / Return config */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Home className="h-5 w-5 text-primary" />
+            Ponto de Saída / Volta
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div>
+              <Label className="text-xs">Morada de Saída</Label>
+              <Input value={departureAddress} onChange={e => setDepartureAddress(e.target.value)} placeholder="Ex: Rua da Fábrica, 123" className="h-9" />
+            </div>
+            <div>
+              <Label className="text-xs">Código Postal</Label>
+              <Input value={departurePostalCode} onChange={e => setDeparturePostalCode(e.target.value)} placeholder="Ex: 4400-001" className="h-9" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Button size="sm" onClick={handleSaveDeparture} disabled={savingDeparture}>
+                {savingDeparture ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <MapPin className="h-4 w-4 mr-1" />}
+                Guardar
+              </Button>
+              <div className="flex items-center gap-2">
+                <Switch checked={returnToBase} onCheckedChange={handleToggleReturn} id="return-toggle" />
+                <Label htmlFor="return-toggle" className="text-xs cursor-pointer">Volta ao ponto de saída</Label>
+              </div>
+            </div>
+          </div>
+          {departureLat && departureLon && (
+            <div className="mt-2 flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                <MapPin className="h-3 w-3 mr-1" />
+                GPS: {departureLat.toFixed(4)}, {departureLon.toFixed(4)}
+              </Badge>
+              {stopsWithCoords.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  <Navigation className="h-3 w-3 mr-1" />
+                  {haversineKm(departureLat, departureLon, stopsWithCoords[0].latitude!, stopsWithCoords[0].longitude!).toFixed(1)} km até 1ª paragem
+                </Badge>
+              )}
+              {returnToBase && stopsWithCoords.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  <Navigation className="h-3 w-3 mr-1" />
+                  {haversineKm(stopsWithCoords[stopsWithCoords.length - 1].latitude!, stopsWithCoords[stopsWithCoords.length - 1].longitude!, departureLat, departureLon).toFixed(1)} km volta
+                </Badge>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Stops list */}
       <Card>
@@ -413,16 +520,21 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 const vs = (stop as any).venda_status as string | undefined;
                 const color = vs ? (vendaStatusColors[vs] || defaultVendaColor) : null;
                 const prevStop = idx > 0 ? filteredStops[idx - 1] : null;
-                const distKm = prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude
-                  ? haversineKm(prevStop.latitude, prevStop.longitude, stop.latitude, stop.longitude)
-                  : null;
+                let distKm: number | null = null;
+                let distLabel = '';
+                if (idx === 0 && departureLat && departureLon && stop.latitude && stop.longitude) {
+                  distKm = haversineKm(departureLat, departureLon, stop.latitude, stop.longitude);
+                  distLabel = '🏠 → ';
+                } else if (prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude) {
+                  distKm = haversineKm(prevStop.latitude, prevStop.longitude, stop.latitude, stop.longitude);
+                }
                 return (
                 <div key={stop.id}>
                   {distKm !== null && (
                     <div className="flex items-center justify-center py-1">
                       <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                         <Navigation className="h-3 w-3" />
-                        {distKm.toFixed(1)} km
+                        {distLabel}{distKm.toFixed(1)} km
                       </span>
                     </div>
                   )}
@@ -510,6 +622,20 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 </div>
                 );
               })}
+              {/* Return to base distance */}
+              {returnToBase && departureLat && departureLon && filteredStops.length > 0 && (() => {
+                const lastStop = filteredStops[filteredStops.length - 1];
+                if (!lastStop.latitude || !lastStop.longitude) return null;
+                const returnDist = haversineKm(lastStop.latitude, lastStop.longitude, departureLat, departureLon);
+                return (
+                  <div className="flex items-center justify-center py-1">
+                    <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Navigation className="h-3 w-3" />
+                      → 🏠 {returnDist.toFixed(1)} km (volta)
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </CardContent>

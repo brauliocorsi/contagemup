@@ -12,6 +12,11 @@ export interface RouteSchedule {
   created_at: string;
   updated_at: string;
   stops?: RouteStop[];
+  departure_address: string | null;
+  departure_postal_code: string | null;
+  departure_lat: number | null;
+  departure_lon: number | null;
+  return_to_base: boolean;
 }
 
 export interface RouteStop {
