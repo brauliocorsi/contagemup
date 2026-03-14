@@ -193,10 +193,15 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             </p>
           ) : (
             <div className="space-y-2">
-              {filteredStops.map((stop, idx) => (
+              {filteredStops.map((stop, idx) => {
+                const vs = (stop as any).venda_status as string | undefined;
+                const color = vs ? (vendaStatusColors[vs] || defaultVendaColor) : null;
+                return (
                 <div
                   key={stop.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
+                    color ? `${color.bg} ${color.border}` : 'border bg-card hover:bg-accent/50'
+                  }`}
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold shrink-0">
                     {idx + 1}
