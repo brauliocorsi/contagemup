@@ -104,6 +104,36 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
   };
 
+  // Auto-geocode stops without coordinates on load
+  const autoGeocodedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading || autoGeocodedRef.current || stops.length === 0) return;
+    const needsGeocode = stops.filter(s => (!s.latitude || !s.longitude) && s.postal_code);
+    if (needsGeocode.length === 0) return;
+    autoGeocodedRef.current = true;
+    (async () => {
+      setGeocoding(true);
+      let geocoded = 0;
+      for (const stop of needsGeocode) {
+        try {
+          const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined, stop.address || undefined);
+          if (coords) {
+            const updatePayload: Record<string, any> = { latitude: coords.lat, longitude: coords.lon };
+            if (coords.freguesia) updatePayload.freguesia = coords.freguesia;
+            if (coords.municipio) updatePayload.municipio = coords.municipio;
+            await supabase.from('route_stops').update(updatePayload).eq('id', stop.id);
+            geocoded++;
+          }
+        } catch { /* skip */ }
+      }
+      if (geocoded > 0) {
+        queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
+        toast.success(`${geocoded} paragem(ns) geocodificada(s) automaticamente`);
+      }
+      setGeocoding(false);
+    })();
+  }, [isLoading, stops]);
+
   const handleSplitRoute = async (groups: { name: string; stops: any[] }[]) => {
     try {
       for (const group of groups) {
