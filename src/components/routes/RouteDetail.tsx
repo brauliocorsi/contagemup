@@ -150,9 +150,9 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
           {vendaStatuses.length > 0 && (
             <div className="flex gap-1.5 flex-wrap pt-2">
               <Badge
-                variant={vendaStatusFilter === null ? 'default' : 'outline'}
+                variant={selectedVendaStatuses.size === 0 ? 'default' : 'outline'}
                 className="text-xs cursor-pointer"
-                onClick={() => setVendaStatusFilter(null)}
+                onClick={() => setSelectedVendaStatuses(new Set())}
               >
                 Todos
               </Badge>
@@ -161,9 +161,9 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 return (
                   <Badge
                     key={status}
-                    variant={vendaStatusFilter === status ? 'default' : 'outline'}
+                    variant={selectedVendaStatuses.has(status) ? 'default' : 'outline'}
                     className="text-xs cursor-pointer"
-                    onClick={() => setVendaStatusFilter(vendaStatusFilter === status ? null : status)}
+                    onClick={() => toggleVendaStatus(status)}
                   >
                     {status} ({count})
                   </Badge>
@@ -179,7 +179,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             </div>
           ) : filteredStops.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              {vendaStatusFilter ? 'Nenhuma paragem com este estado de venda.' : 'Nenhuma paragem adicionada. Adicione clientes à rota.'}
+              {selectedVendaStatuses.size > 0 ? 'Nenhuma paragem com os estados selecionados.' : 'Nenhuma paragem adicionada. Adicione clientes à rota.'}
             </p>
           ) : (
             <div className="space-y-2">
