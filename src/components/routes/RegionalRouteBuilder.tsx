@@ -22,6 +22,7 @@ interface SaleClient {
   vendaIds: string[];
   vendaCodigos: string[];
   vendaSituacoes: string[];
+  vendaDatas: string[];
   lat?: number;
   lon?: number;
   selected: boolean;
