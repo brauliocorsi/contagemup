@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { AddStopDialog } from './AddStopDialog';
 import { StopSaleDetailDialog } from './StopSaleDetailDialog';
+import { SplitRouteDialog } from './SplitRouteDialog';
 import { RouteMap } from './RouteMap';
 
 interface RouteDetailProps {
