@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { RouteSchedule } from '@/hooks/useRoutes';
 import { useRouteStops } from '@/hooks/useRoutes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical } from 'lucide-react';
+import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { AddStopDialog } from './AddStopDialog';
@@ -25,7 +25,21 @@ const statusLabels: Record<string, string> = {
 
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
   const [addStopOpen, setAddStopOpen] = useState(false);
+  const [vendaStatusFilter, setVendaStatusFilter] = useState<string | null>(null);
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
+
+  const vendaStatuses = useMemo(() => {
+    const set = new Set<string>();
+    stops.forEach(s => {
+      const vs = (s as any).venda_status;
+      if (vs) set.add(vs);
+    });
+    return Array.from(set).sort();
+  }, [stops]);
+
+  const filteredStops = vendaStatusFilter
+    ? stops.filter(s => (s as any).venda_status === vendaStatusFilter)
+    : stops;
 
   const handleAddStop = async (data: {
     client_name: string;
@@ -120,22 +134,48 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
       {/* Stops list */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">
-            Paragens ({stops.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">
+              Paragens ({filteredStops.length}{vendaStatusFilter ? ` de ${stops.length}` : ''})
+            </CardTitle>
+          </div>
+          {vendaStatuses.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap pt-2">
+              <Badge
+                variant={vendaStatusFilter === null ? 'default' : 'outline'}
+                className="text-xs cursor-pointer"
+                onClick={() => setVendaStatusFilter(null)}
+              >
+                Todos
+              </Badge>
+              {vendaStatuses.map(status => {
+                const count = stops.filter(s => (s as any).venda_status === status).length;
+                return (
+                  <Badge
+                    key={status}
+                    variant={vendaStatusFilter === status ? 'default' : 'outline'}
+                    className="text-xs cursor-pointer"
+                    onClick={() => setVendaStatusFilter(vendaStatusFilter === status ? null : status)}
+                  >
+                    {status} ({count})
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : stops.length === 0 ? (
+          ) : filteredStops.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Nenhuma paragem adicionada. Adicione clientes à rota.
+              {vendaStatusFilter ? 'Nenhuma paragem com este estado de venda.' : 'Nenhuma paragem adicionada. Adicione clientes à rota.'}
             </p>
           ) : (
             <div className="space-y-2">
-              {stops.map((stop, idx) => (
+              {filteredStops.map((stop, idx) => (
                 <div
                   key={stop.id}
                   className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
