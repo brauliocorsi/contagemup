@@ -425,135 +425,21 @@ Deno.serve(async (req) => {
       situacaoLookup[String(sit.id)] = sit.nome;
     }
 
-    // Log first venda's raw structure for debugging
-    if (allVendas.length > 0) {
-      const sample = allVendas[0];
-      console.log('Sample venda keys:', Object.keys(sample));
-      console.log('Sample venda nome_cliente:', sample.nome_cliente);
-      console.log('Sample venda enderecos (raw):', JSON.stringify(sample.enderecos, null, 2));
-      
-      // Fetch individual client data for debugging
-      if (sample.cliente_id) {
-        try {
-          const clientRes = await fetchWithRetry(
-            `https://api.gestaoclick.com/api/clientes/${sample.cliente_id}`,
-            { method: 'GET', headers: apiHeaders }
-          );
-          if (clientRes.ok) {
-            const clientData = await clientRes.json();
-            console.log('Sample client data:', JSON.stringify(clientData, null, 2));
-          } else {
-            console.log('Client fetch failed:', clientRes.status);
-          }
-        } catch (e) {
-          console.log('Client fetch error:', e);
-        }
-      }
-    }
-
     for (const venda of allVendas) {
-      const cliente = venda.cliente || {};
-      const contato = venda.contato || {};
-      const addressEntries = extractAddressEntries(venda);
+      const clienteId = String(venda.cliente_id || '');
+      const clientData = clientMap[clienteId] || { endereco: '', cep: '', cidade: '', estado: '' };
 
       const clienteNome = firstNonEmpty(
-        venda.cliente_nome,
         venda.nome_cliente,
+        venda.cliente_nome,
         venda.razao_social,
-        cliente.nome,
-        cliente.razao_social,
-        contato.nome,
         'N/A'
       );
 
-      const enderecosFromClientRecord = addressEntries
-        .map((entry: any) => [
-          entry.endereco,
-          entry.morada,
-          entry.logradouro,
-          entry.rua,
-          entry.numero,
-          entry.complemento,
-          entry.bairro,
-        ].map((v) => String(v ?? '').trim()).filter(Boolean).join(', '))
-        .filter(Boolean);
-
-      const fallbackAddress = [
-        venda.endereco_entrega,
-        venda.endereco,
-        cliente.endereco,
-        venda.numero,
-        cliente.numero,
-        venda.complemento,
-        cliente.complemento,
-        venda.bairro,
-        cliente.bairro,
-      ].map((v) => String(v ?? '').trim()).filter(Boolean).join(', ');
-
-      const enderecoPartes = firstNonEmpty(enderecosFromClientRecord[0], fallbackAddress);
-
-      const cidade = firstNonEmpty(
-        venda.cidade,
-        cliente.cidade,
-        contato.cidade,
-        addressEntries[0]?.cidade,
-        addressEntries[0]?.municipio,
-        addressEntries[0]?.concelho
-      );
-
-      const estado = firstNonEmpty(
-        venda.estado,
-        cliente.estado,
-        contato.estado,
-        addressEntries[0]?.estado,
-        addressEntries[0]?.distrito
-      );
-
-      let cep = '';
-      const cepCandidates = [
-        venda.cep,
-        venda.codigo_postal,
-        venda.cliente_cep,
-        cliente.cep,
-        cliente.codigo_postal,
-        contato.cep,
-        contato.codigo_postal,
-        ...addressEntries.map((entry: any) => entry.cep),
-        ...addressEntries.map((entry: any) => entry.codigo_postal),
-        ...addressEntries.map((entry: any) => entry.postal_code),
-      ];
-
-      for (const candidate of cepCandidates) {
-        cep = normalizePostalCode(candidate);
-        if (cep) break;
-      }
-
-      if (!cep) {
-        const textCandidates = [
-          enderecoPartes,
-          ...enderecosFromClientRecord,
-          ...addressEntries.map((entry: any) => [
-            entry.endereco,
-            entry.morada,
-            entry.logradouro,
-            entry.rua,
-            entry.cep,
-            entry.codigo_postal,
-            entry.postal_code,
-            entry.cidade,
-            entry.municipio,
-            entry.concelho,
-          ].map((v) => String(v ?? '').trim()).filter(Boolean).join(' ')),
-          venda.endereco_entrega,
-          venda.endereco,
-          JSON.stringify(venda.enderecos || []),
-        ];
-
-        for (const textCandidate of textCandidates) {
-          cep = extractPostalCodeFromText(textCandidate);
-          if (cep) break;
-        }
-      }
+      const enderecoPartes = clientData.endereco;
+      const cidade = clientData.cidade;
+      const estado = clientData.estado;
+      const cep = clientData.cep;
 
       const vendaInfo = {
         venda_id: String(venda.id),
