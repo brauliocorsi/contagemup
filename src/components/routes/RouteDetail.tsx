@@ -235,6 +235,11 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             <h1 className="text-2xl font-bold">{route.name}</h1>
             <p className="text-sm text-muted-foreground">
               {format(new Date(route.scheduled_date + 'T00:00:00'), "dd 'de' MMMM yyyy", { locale: pt })}
+              {totalDistanceKm > 0 && (
+                <span className="ml-2 font-medium text-foreground">
+                  • {totalDistanceKm.toFixed(1)} km total
+                </span>
+              )}
             </p>
           </div>
         </div>
