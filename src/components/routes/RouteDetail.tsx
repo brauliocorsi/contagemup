@@ -41,16 +41,27 @@ const vendaStatusColors: Record<string, { bg: string; border: string; badge: str
 };
 const defaultVendaColor = { bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-300 dark:border-purple-700', badge: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700' };
 
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  if (h > 0) return `${h}h${m > 0 ? m.toString().padStart(2, '0') + 'min' : ''}`;
+  return `${m}min`;
+}
+
 // OSRM road distances hook
 function useOSRMDistances(waypoints: [number, number][]) {
   const [legDistances, setLegDistances] = useState<number[]>([]);
+  const [legDurations, setLegDurations] = useState<number[]>([]);
   const [totalDistance, setTotalDistance] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (waypoints.length < 2) {
       setLegDistances([]);
+      setLegDurations([]);
       setTotalDistance(0);
+      setTotalDuration(0);
       return;
     }
 
@@ -63,16 +74,23 @@ function useOSRMDistances(waypoints: [number, number][]) {
         );
         const data = await response.json();
         if (data.code === 'Ok' && data.routes?.[0]?.legs) {
-          const legs = data.routes[0].legs.map((leg: any) => leg.distance / 1000); // meters to km
+          const legs = data.routes[0].legs.map((leg: any) => leg.distance / 1000);
+          const durations = data.routes[0].legs.map((leg: any) => leg.duration);
           setLegDistances(legs);
+          setLegDurations(durations);
           setTotalDistance(data.routes[0].distance / 1000);
+          setTotalDuration(data.routes[0].duration);
         } else {
           setLegDistances([]);
+          setLegDurations([]);
           setTotalDistance(0);
+          setTotalDuration(0);
         }
       } catch {
         setLegDistances([]);
+        setLegDurations([]);
         setTotalDistance(0);
+        setTotalDuration(0);
       } finally {
         setLoading(false);
       }
@@ -81,7 +99,7 @@ function useOSRMDistances(waypoints: [number, number][]) {
     fetchDistances();
   }, [JSON.stringify(waypoints)]);
 
-  return { legDistances, totalDistance, loading };
+  return { legDistances, legDurations, totalDistance, totalDuration, loading };
 }
 
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
