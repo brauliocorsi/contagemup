@@ -65,19 +65,50 @@ Deno.serve(async (req) => {
 
     const processClients = (data: any[]) => {
       for (const client of data) {
+        // Extract address from nested enderecos[].endereco structure
+        const enderecos = Array.isArray(client.enderecos) ? client.enderecos : [];
+        const addr = enderecos[0]?.endereco || enderecos[0] || {};
+        
+        const addressParts = [
+          addr.logradouro, addr.rua, addr.endereco, addr.morada,
+          addr.numero, addr.complemento, addr.bairro,
+        ].map((v: any) => String(v ?? '').trim()).filter(Boolean);
+        
+        const fullAddress = addressParts.join(', ');
+        
+        // Extract postal code from all text fields (CEP is often in 'numero' field)
+        const allText = [
+          addr.cep, addr.codigo_postal, addr.postal_code,
+          addr.numero, addr.logradouro, addr.complemento,
+          fullAddress,
+        ].map((v: any) => String(v ?? '').trim()).filter(Boolean).join(' ');
+        
+        // Match XXXX-XXX pattern
+        let cep = '';
+        const formattedMatch = allText.match(/\b(\d{4})\s*-\s*(\d{3})\b/);
+        if (formattedMatch) {
+          cep = `${formattedMatch[1]}-${formattedMatch[2]}`;
+        } else {
+          const compactMatch = allText.match(/\b(\d{7})\b/);
+          if (compactMatch) {
+            const d = compactMatch[1];
+            cep = `${d.slice(0, 4)}-${d.slice(4)}`;
+          }
+        }
+
         const clientInfo = {
           id: String(client.id || ''),
           nome: client.nome || client.razao_social || '',
-          endereco: client.endereco || '',
-          numero: client.numero || '',
-          bairro: client.bairro || '',
-          cidade: client.cidade || '',
-          estado: client.estado || '',
-          cep: client.cep || client.codigo_postal || '',
-          complemento: client.complemento || '',
+          endereco: fullAddress || client.endereco || '',
+          numero: addr.numero || client.numero || '',
+          bairro: addr.bairro || client.bairro || '',
+          cidade: addr.nome_cidade || client.cidade || '',
+          estado: addr.estado || client.estado || '',
+          cep: cep || addr.cep || client.cep || client.codigo_postal || '',
+          complemento: addr.complemento || client.complemento || '',
           email: client.email || '',
           telefone: client.telefone || client.celular || '',
-          pais: client.pais || 'Portugal',
+          pais: addr.pais || client.pais || 'Portugal',
         };
 
         // If searching, filter by name
