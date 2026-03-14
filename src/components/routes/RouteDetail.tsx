@@ -546,16 +546,16 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 <MapPin className="h-3 w-3 mr-1" />
                 GPS: {departureLat.toFixed(4)}, {departureLon.toFixed(4)}
               </Badge>
-              {stopsWithCoords.length > 0 && (
+              {departureToFirstKm !== null && stopsWithCoords.length > 0 && (
                 <Badge variant="secondary" className="text-xs">
                   <Navigation className="h-3 w-3 mr-1" />
-                  {haversineKm(departureLat, departureLon, stopsWithCoords[0].latitude!, stopsWithCoords[0].longitude!).toFixed(1)} km até 1ª paragem
+                  {departureToFirstKm.toFixed(1)} km até 1ª paragem
                 </Badge>
               )}
-              {returnToBase && stopsWithCoords.length > 0 && (
+              {returnLegKm !== null && stopsWithCoords.length > 0 && (
                 <Badge variant="secondary" className="text-xs">
                   <Navigation className="h-3 w-3 mr-1" />
-                  {haversineKm(stopsWithCoords[stopsWithCoords.length - 1].latitude!, stopsWithCoords[stopsWithCoords.length - 1].longitude!, departureLat, departureLon).toFixed(1)} km volta
+                  {returnLegKm.toFixed(1)} km volta
                 </Badge>
               )}
             </div>
