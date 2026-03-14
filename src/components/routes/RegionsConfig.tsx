@@ -124,7 +124,7 @@ export function RegionsConfig({ onBack }: RegionsConfigProps) {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? 'Editar Região' : 'Nova Região'}</DialogTitle>
           </DialogHeader>
