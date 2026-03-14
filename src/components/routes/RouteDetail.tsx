@@ -4,10 +4,11 @@ import { useRouteStops } from '@/hooks/useRoutes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter } from 'lucide-react';
+import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { AddStopDialog } from './AddStopDialog';
+import { StopSaleDetailDialog } from './StopSaleDetailDialog';
 import { RouteMap } from './RouteMap';
 
 interface RouteDetailProps {
@@ -36,6 +37,9 @@ const defaultVendaColor = { bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'b
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
   const [addStopOpen, setAddStopOpen] = useState(false);
   const [selectedVendaStatuses, setSelectedVendaStatuses] = useState<Set<string>>(new Set());
+  const [saleDetailOpen, setSaleDetailOpen] = useState(false);
+  const [saleDetailVendaId, setSaleDetailVendaId] = useState<string | null>(null);
+  const [saleDetailVendaCodigo, setSaleDetailVendaCodigo] = useState<string | null>(null);
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
 
   const vendaStatuses = useMemo(() => {
@@ -230,7 +234,22 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
+                   <div className="flex items-center gap-1">
+                    {stop.venda_id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => {
+                          setSaleDetailVendaId(stop.venda_id);
+                          setSaleDetailVendaCodigo(stop.venda_codigo);
+                          setSaleDetailOpen(true);
+                        }}
+                      >
+                        <FileText className="h-3 w-3" />
+                        Ver Nota
+                      </Button>
+                    )}
                     <Badge
                       variant={stop.status === 'delivered' ? 'default' : 'secondary'}
                       className="text-xs cursor-pointer"
@@ -268,6 +287,12 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
         open={addStopOpen}
         onOpenChange={setAddStopOpen}
         onSubmit={handleAddStop}
+      />
+      <StopSaleDetailDialog
+        open={saleDetailOpen}
+        onOpenChange={setSaleDetailOpen}
+        vendaId={saleDetailVendaId}
+        vendaCodigo={saleDetailVendaCodigo}
       />
     </div>
   );
