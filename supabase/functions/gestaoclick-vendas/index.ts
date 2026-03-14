@@ -52,6 +52,59 @@ function normalizeIdentifier(value: unknown): string {
   return String(value ?? '').trim();
 }
 
+function normalizePostalCode(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const formattedMatch = raw.match(/\b(\d{4})\s*-\s*(\d{3})\b/);
+  if (formattedMatch) {
+    return `${formattedMatch[1]}-${formattedMatch[2]}`;
+  }
+
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 7) {
+    return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  }
+
+  return '';
+}
+
+function extractPostalCodeFromText(value: unknown): string {
+  const text = String(value ?? '');
+  if (!text) return '';
+
+  const formattedMatch = text.match(/\b\d{4}\s*-\s*\d{3}\b/);
+  if (formattedMatch) {
+    return normalizePostalCode(formattedMatch[0]);
+  }
+
+  const compactMatch = text.match(/\b\d{7}\b/);
+  if (compactMatch) {
+    return normalizePostalCode(compactMatch[0]);
+  }
+
+  return '';
+}
+
+function extractAddressEntries(venda: any): any[] {
+  const enderecos = Array.isArray(venda?.enderecos) ? venda.enderecos : [];
+  return enderecos.map((entry: any) => {
+    const nestedEndereco = entry?.endereco && typeof entry.endereco === 'object'
+      ? entry.endereco
+      : {};
+
+    return { ...nestedEndereco, ...entry };
+  });
+}
+
+function firstNonEmpty(...values: unknown[]): string {
+  for (const value of values) {
+    const parsed = String(value ?? '').trim();
+    if (parsed) return parsed;
+  }
+  return '';
+}
+
 function extractProductReferences(item: any): { productCode: string; productId: string; variationId: string } {
   const product = item?.produto || {};
 
@@ -330,31 +383,107 @@ Deno.serve(async (req) => {
     }
 
     for (const venda of allVendas) {
-      // Try multiple field paths for client info
       const cliente = venda.cliente || {};
       const contato = venda.contato || {};
+      const addressEntries = extractAddressEntries(venda);
 
-      const clienteNome = venda.cliente_nome || venda.nome_cliente || venda.razao_social
-        || cliente.nome || cliente.razao_social || contato.nome || 'N/A';
+      const clienteNome = firstNonEmpty(
+        venda.cliente_nome,
+        venda.nome_cliente,
+        venda.razao_social,
+        cliente.nome,
+        cliente.razao_social,
+        contato.nome,
+        'N/A'
+      );
 
-      // Build full address from parts
-      const enderecoPartes = [
-        venda.endereco || venda.endereco_entrega || cliente.endereco || '',
-        venda.numero || cliente.numero || '',
-        venda.complemento || cliente.complemento || '',
-        venda.bairro || cliente.bairro || '',
-      ].filter(Boolean).join(', ');
+      const enderecosFromClientRecord = addressEntries
+        .map((entry: any) => [
+          entry.endereco,
+          entry.morada,
+          entry.logradouro,
+          entry.rua,
+          entry.numero,
+          entry.complemento,
+          entry.bairro,
+        ].map((v) => String(v ?? '').trim()).filter(Boolean).join(', '))
+        .filter(Boolean);
 
-      const cidade = venda.cidade || cliente.cidade || contato.cidade || '';
-      const estado = venda.estado || cliente.estado || contato.estado || '';
-      
-      // Try multiple fields for postal code, also extract from address
-      let cep = venda.cep || venda.codigo_postal || cliente.cep || cliente.codigo_postal || '';
+      const fallbackAddress = [
+        venda.endereco_entrega,
+        venda.endereco,
+        cliente.endereco,
+        venda.numero,
+        cliente.numero,
+        venda.complemento,
+        cliente.complemento,
+        venda.bairro,
+        cliente.bairro,
+      ].map((v) => String(v ?? '').trim()).filter(Boolean).join(', ');
+
+      const enderecoPartes = firstNonEmpty(enderecosFromClientRecord[0], fallbackAddress);
+
+      const cidade = firstNonEmpty(
+        venda.cidade,
+        cliente.cidade,
+        contato.cidade,
+        addressEntries[0]?.cidade,
+        addressEntries[0]?.municipio,
+        addressEntries[0]?.concelho
+      );
+
+      const estado = firstNonEmpty(
+        venda.estado,
+        cliente.estado,
+        contato.estado,
+        addressEntries[0]?.estado,
+        addressEntries[0]?.distrito
+      );
+
+      let cep = '';
+      const cepCandidates = [
+        venda.cep,
+        venda.codigo_postal,
+        venda.cliente_cep,
+        cliente.cep,
+        cliente.codigo_postal,
+        contato.cep,
+        contato.codigo_postal,
+        ...addressEntries.map((entry: any) => entry.cep),
+        ...addressEntries.map((entry: any) => entry.codigo_postal),
+        ...addressEntries.map((entry: any) => entry.postal_code),
+      ];
+
+      for (const candidate of cepCandidates) {
+        cep = normalizePostalCode(candidate);
+        if (cep) break;
+      }
+
       if (!cep) {
-        // Try to extract Portuguese postal code (XXXX-XXX) from address parts
-        const fullText = `${enderecoPartes} ${cidade} ${clienteNome}`;
-        const postalMatch = fullText.match(/\d{4}-\d{3}/);
-        if (postalMatch) cep = postalMatch[0];
+        const textCandidates = [
+          enderecoPartes,
+          ...enderecosFromClientRecord,
+          ...addressEntries.map((entry: any) => [
+            entry.endereco,
+            entry.morada,
+            entry.logradouro,
+            entry.rua,
+            entry.cep,
+            entry.codigo_postal,
+            entry.postal_code,
+            entry.cidade,
+            entry.municipio,
+            entry.concelho,
+          ].map((v) => String(v ?? '').trim()).filter(Boolean).join(' ')),
+          venda.endereco_entrega,
+          venda.endereco,
+          JSON.stringify(venda.enderecos || []),
+        ];
+
+        for (const textCandidate of textCandidates) {
+          cep = extractPostalCodeFromText(textCandidate);
+          if (cep) break;
+        }
       }
 
       const vendaInfo = {
