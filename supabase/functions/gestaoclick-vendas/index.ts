@@ -246,10 +246,6 @@ Deno.serve(async (req) => {
     const allVendas: any[] = [];
     const totalPages = firstVendasPage.meta.total_paginas || 1;
 
-    // Process first page of vendas
-    const allVendas: any[] = [];
-    const totalPages = firstVendasPage.meta.total_paginas || 1;
-
     for (const venda of firstVendasPage.data) {
       if (!excludedIds.has(String(venda.situacao_id))) {
         allVendas.push(venda);
