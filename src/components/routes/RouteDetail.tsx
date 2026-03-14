@@ -23,6 +23,16 @@ const statusLabels: Record<string, string> = {
   delivered: 'Entregue',
 };
 
+const vendaStatusColors: Record<string, { bg: string; border: string; badge: string }> = {
+  'Agendado Entrega': { bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-300 dark:border-blue-700', badge: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700' },
+  'Em Produção': { bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-300 dark:border-amber-700', badge: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700' },
+  'Pronto': { bg: 'bg-green-50 dark:bg-green-950/30', border: 'border-green-300 dark:border-green-700', badge: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-700' },
+  'Entregue': { bg: 'bg-emerald-50 dark:bg-emerald-950/30', border: 'border-emerald-300 dark:border-emerald-700', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700' },
+  'Cancelada': { bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-red-300 dark:border-red-700', badge: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-700' },
+  'Pendente': { bg: 'bg-orange-50 dark:bg-orange-950/30', border: 'border-orange-300 dark:border-orange-700', badge: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700' },
+};
+const defaultVendaColor = { bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-300 dark:border-purple-700', badge: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700' };
+
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
   const [addStopOpen, setAddStopOpen] = useState(false);
   const [selectedVendaStatuses, setSelectedVendaStatuses] = useState<Set<string>>(new Set());
