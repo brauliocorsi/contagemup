@@ -602,7 +602,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                   }`}
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold shrink-0">
-                    {idx + 1}
+                    {(stop.order_number ?? idx) + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
