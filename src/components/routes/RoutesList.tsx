@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import { RouteSchedule } from '@/hooks/useRoutes';
 import { DeliveryRegion } from '@/hooks/useDeliveryRegions';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Trash2, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Trash2, Loader2, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
@@ -30,6 +31,8 @@ const statusColors: Record<string, string> = {
 };
 
 export function RoutesList({ routes, isLoading, onSelect, onDelete, regions = [] }: RoutesListProps) {
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -50,14 +53,44 @@ export function RoutesList({ routes, isLoading, onSelect, onDelete, regions = []
     );
   }
 
+  const filteredRoutes = statusFilter ? routes.filter(r => r.status === statusFilter) : routes;
+
   const getRegion = (route: RouteSchedule) => {
     const regionId = (route as any).region_id;
     return regionId ? regions.find(r => r.id === regionId) : null;
   };
 
   return (
-    <div className="grid gap-3">
-      {routes.map((route) => {
+    <div className="space-y-3">
+      {/* Status Filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        <Badge
+          variant={statusFilter === null ? 'default' : 'outline'}
+          className="cursor-pointer text-xs"
+          onClick={() => setStatusFilter(null)}
+        >
+          Todas ({routes.length})
+        </Badge>
+        {Object.entries(statusLabels).map(([key, label]) => {
+          const count = routes.filter(r => r.status === key).length;
+          if (count === 0) return null;
+          return (
+            <Badge
+              key={key}
+              variant={statusFilter === key ? 'default' : 'outline'}
+              className={`cursor-pointer text-xs ${statusFilter === key ? '' : statusColors[key]}`}
+              onClick={() => setStatusFilter(statusFilter === key ? null : key)}
+            >
+              {label} ({count})
+            </Badge>
+          );
+        })}
+      </div>
+
+      {/* Routes Grid */}
+      <div className="grid gap-3">
+      {filteredRoutes.map((route) => {
         const region = getRegion(route);
         return (
           <Card
@@ -110,6 +143,7 @@ export function RoutesList({ routes, isLoading, onSelect, onDelete, regions = []
           </Card>
         );
       })}
+      </div>
     </div>
   );
 }
