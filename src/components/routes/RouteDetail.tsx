@@ -4,7 +4,10 @@ import { useRouteStops } from '@/hooks/useRoutes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter, FileText } from 'lucide-react';
+import { ArrowLeft, Plus, MapPin, Navigation, Trash2, CheckCircle, Loader2, GripVertical, Filter, FileText, RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { AddStopDialog } from './AddStopDialog';
@@ -41,6 +44,50 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const [saleDetailVendaId, setSaleDetailVendaId] = useState<string | null>(null);
   const [saleDetailVendaCodigo, setSaleDetailVendaCodigo] = useState<string | null>(null);
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
+  const queryClient = useQueryClient();
+  const [reloading, setReloading] = useState(false);
+
+  const handleReloadNotas = async () => {
+    const stopsWithVenda = stops.filter(s => s.venda_id);
+    if (stopsWithVenda.length === 0) {
+      toast.info('Nenhuma paragem com venda associada');
+      return;
+    }
+
+    setReloading(true);
+    let updated = 0;
+    try {
+      for (const stop of stopsWithVenda) {
+        try {
+          const { data, error } = await supabase.functions.invoke('gestaoclick-venda-detail', {
+            body: { venda_id: stop.venda_id },
+          });
+          if (error || !data) continue;
+
+          const newStatus = data.situacao || null;
+          const newData = data.data || null;
+
+          const updatePayload: Record<string, string | null> = {};
+          if (newStatus && newStatus !== stop.venda_status) updatePayload.venda_status = newStatus;
+          if (newData && newData !== stop.venda_data) updatePayload.venda_data = newData;
+
+          if (Object.keys(updatePayload).length > 0) {
+            await supabase.from('route_stops').update(updatePayload).eq('id', stop.id);
+            updated++;
+          }
+        } catch {
+          // skip individual errors
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
+      toast.success(`${updated} paragem(ns) atualizada(s) de ${stopsWithVenda.length}`);
+    } catch (err: any) {
+      toast.error('Erro ao recarregar: ' + err.message);
+    } finally {
+      setReloading(false);
+    }
+  };
 
   const vendaStatuses = useMemo(() => {
     const set = new Set<string>();
@@ -130,6 +177,10 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
               Concluir Rota
             </Button>
           )}
+          <Button variant="outline" onClick={handleReloadNotas} disabled={reloading}>
+            {reloading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+            Recarregar Notas
+          </Button>
           <Button onClick={() => setAddStopOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Adicionar Paragem
