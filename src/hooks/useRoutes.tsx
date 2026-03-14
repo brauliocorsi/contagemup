@@ -202,7 +202,7 @@ export function useRouteStops(routeId: string | null) {
     postalCode: string,
     city?: string,
     address?: string
-  ): Promise<{ lat: number; lon: number; freguesia?: string; municipio?: string } | null> => {
+  ): Promise<{ lat: number; lon: number; freguesia?: string; municipio?: string; provider?: string } | null> => {
     const match = postalCode.match(/(\d{4})[-\s]?(\d{3})/);
     if (!match) return null;
     const normalizedCp = `${match[1]}-${match[2]}`;
@@ -219,6 +219,7 @@ export function useRouteStops(routeId: string | null) {
             lon: geoData.centro?.[1] || parseFloat(geoData.longitude),
             freguesia: geoData.Freguesia || geoData.freguesia || undefined,
             municipio: geoData.Concelho || geoData.concelho || geoData.Municipio || undefined,
+            provider: 'GeoAPI.pt',
           };
         }
       }
@@ -238,6 +239,7 @@ export function useRouteStops(routeId: string | null) {
             lon: parseFloat(place.longitude),
             municipio: place['place name'] || undefined,
             freguesia: undefined,
+            provider: 'Zippopotam',
           };
         }
       }
@@ -265,6 +267,7 @@ export function useRouteStops(routeId: string | null) {
             lon: parseFloat(valid.lon),
             freguesia: valid?.address?.suburb || valid?.address?.village || undefined,
             municipio: valid?.address?.city || valid?.address?.town || valid?.address?.county || undefined,
+            provider: 'Nominatim',
           };
         }
       }
