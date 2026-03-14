@@ -48,6 +48,51 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const queryClient = useQueryClient();
   const [reloading, setReloading] = useState(false);
   const [updatedStopIds, setUpdatedStopIds] = useState<Set<string>>(new Set());
+  const [splitOpen, setSplitOpen] = useState(false);
+
+  const handleSplitRoute = async (groups: { name: string; stops: any[] }[]) => {
+    try {
+      for (const group of groups) {
+        const { data: newRoute, error: routeErr } = await supabase
+          .from('route_schedules')
+          .insert({
+            name: group.name,
+            scheduled_date: route.scheduled_date,
+            notes: `Dividida de: ${route.name}`,
+          })
+          .select()
+          .single();
+        if (routeErr) throw routeErr;
+
+        const stopsToInsert = group.stops.map((stop: any, idx: number) => ({
+          route_id: newRoute.id,
+          client_name: stop.client_name,
+          address: stop.address || null,
+          postal_code: stop.postal_code || null,
+          city: stop.city || null,
+          latitude: stop.latitude,
+          longitude: stop.longitude,
+          order_number: idx,
+          venda_id: stop.venda_id || null,
+          venda_codigo: stop.venda_codigo || null,
+          freguesia: stop.freguesia || null,
+          municipio: stop.municipio || null,
+          venda_status: stop.venda_status || null,
+          venda_data: stop.venda_data || null,
+          status: 'pending',
+        }));
+
+        const { error: stopsErr } = await supabase.from('route_stops').insert(stopsToInsert);
+        if (stopsErr) throw stopsErr;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
+      toast.success(`Rota dividida em ${groups.length} sub-rotas!`);
+      onBack();
+    } catch (err: any) {
+      toast.error('Erro ao dividir rota: ' + err.message);
+    }
+  };
 
   const handleReloadNotas = async () => {
     const stopsWithVenda = stops.filter(s => s.venda_id);
