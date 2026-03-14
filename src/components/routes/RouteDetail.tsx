@@ -52,6 +52,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const [saleDetailOpen, setSaleDetailOpen] = useState(false);
   const [saleDetailVendaId, setSaleDetailVendaId] = useState<string | null>(null);
   const [saleDetailVendaCodigo, setSaleDetailVendaCodigo] = useState<string | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
   const queryClient = useQueryClient();
   const [reloading, setReloading] = useState(false);
@@ -149,6 +150,36 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
       toast.error('Erro ao recarregar: ' + err.message);
     } finally {
       setReloading(false);
+    }
+  };
+
+  const handleGeocodeAll = async () => {
+    const stopsWithoutCoords = stops.filter(s => (!s.latitude || !s.longitude) && s.postal_code);
+    if (stopsWithoutCoords.length === 0) {
+      toast.info('Todas as paragens já têm coordenadas GPS ou não têm código postal');
+      return;
+    }
+    setGeocoding(true);
+    let geocoded = 0;
+    try {
+      for (const stop of stopsWithoutCoords) {
+        try {
+          const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined);
+          if (coords) {
+            await supabase.from('route_stops').update({
+              latitude: coords.lat,
+              longitude: coords.lon,
+            }).eq('id', stop.id);
+            geocoded++;
+          }
+        } catch { /* skip individual */ }
+      }
+      queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
+      toast.success(`${geocoded} de ${stopsWithoutCoords.length} paragem(ns) geocodificada(s)`);
+    } catch (err: any) {
+      toast.error('Erro ao geocodificar: ' + err.message);
+    } finally {
+      setGeocoding(false);
     }
   };
 
@@ -260,6 +291,12 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             {reloading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
             Recarregar Notas
           </Button>
+          {stops.some(s => (!s.latitude || !s.longitude) && s.postal_code) && (
+            <Button variant="outline" onClick={handleGeocodeAll} disabled={geocoding}>
+              {geocoding ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MapPin className="h-4 w-4 mr-1" />}
+              Geocodificar
+            </Button>
+          )}
           {stops.length >= 2 && (
             <Button variant="outline" onClick={() => setSplitOpen(true)}>
               <Scissors className="h-4 w-4 mr-1" />
