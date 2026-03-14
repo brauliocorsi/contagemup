@@ -1,5 +1,6 @@
 import { RouteSchedule } from '@/hooks/useRoutes';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DeliveryRegion } from '@/hooks/useDeliveryRegions';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, MapPin, Trash2, Loader2 } from 'lucide-react';
@@ -11,6 +12,7 @@ interface RoutesListProps {
   isLoading: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  regions?: DeliveryRegion[];
 }
 
 const statusLabels: Record<string, string> = {
@@ -27,7 +29,7 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-800 border-red-300',
 };
 
-export function RoutesList({ routes, isLoading, onSelect, onDelete }: RoutesListProps) {
+export function RoutesList({ routes, isLoading, onSelect, onDelete, regions = [] }: RoutesListProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -48,47 +50,66 @@ export function RoutesList({ routes, isLoading, onSelect, onDelete }: RoutesList
     );
   }
 
+  const getRegion = (route: RouteSchedule) => {
+    const regionId = (route as any).region_id;
+    return regionId ? regions.find(r => r.id === regionId) : null;
+  };
+
   return (
     <div className="grid gap-3">
-      {routes.map((route) => (
-        <Card
-          key={route.id}
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => onSelect(route.id)}
-        >
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  {format(new Date(route.scheduled_date + 'T00:00:00'), "dd MMM yyyy", { locale: pt })}
-                </span>
+      {routes.map((route) => {
+        const region = getRegion(route);
+        return (
+          <Card
+            key={route.id}
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => onSelect(route.id)}
+            style={region ? { borderLeftWidth: 4, borderLeftColor: region.color } : undefined}
+          >
+            <CardContent className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-sm font-medium">
+                    {format(new Date(route.scheduled_date + 'T00:00:00'), "dd MMM yyyy", { locale: pt })}
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">{route.name}</h3>
+                    {region && (
+                      <Badge
+                        className="text-[10px] py-0 px-1.5"
+                        style={{ backgroundColor: region.color, color: 'white' }}
+                      >
+                        {region.name}
+                      </Badge>
+                    )}
+                  </div>
+                  {route.notes && (
+                    <p className="text-sm text-muted-foreground">{route.notes}</p>
+                  )}
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold">{route.name}</h3>
-                {route.notes && (
-                  <p className="text-sm text-muted-foreground">{route.notes}</p>
-                )}
+              <div className="flex items-center gap-2">
+                <Badge className={statusColors[route.status] || ''}>
+                  {statusLabels[route.status] || route.status}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(route.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className={statusColors[route.status] || ''}>
-                {statusLabels[route.status] || route.status}
-              </Badge>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(route.id);
-                }}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
