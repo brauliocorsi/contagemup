@@ -218,7 +218,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     let lon: number | null = null;
 
     if (data.postal_code) {
-      const coords = await geocodePostalCode(data.postal_code, data.city);
+      const coords = await geocodePostalCode(data.postal_code, data.city, data.address);
       if (coords) {
         lat = coords.lat;
         lon = coords.lon;
