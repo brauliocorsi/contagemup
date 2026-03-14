@@ -61,6 +61,48 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const [reloading, setReloading] = useState(false);
   const [updatedStopIds, setUpdatedStopIds] = useState<Set<string>>(new Set());
   const [splitOpen, setSplitOpen] = useState(false);
+  const [departureAddress, setDepartureAddress] = useState(route.departure_address || '');
+  const [departurePostalCode, setDeparturePostalCode] = useState(route.departure_postal_code || '');
+  const [returnToBase, setReturnToBase] = useState(route.return_to_base || false);
+  const [savingDeparture, setSavingDeparture] = useState(false);
+
+  const departureLat = route.departure_lat;
+  const departureLon = route.departure_lon;
+
+  const handleSaveDeparture = async () => {
+    setSavingDeparture(true);
+    try {
+      let lat: number | null = null;
+      let lon: number | null = null;
+      if (departurePostalCode) {
+        const coords = await geocodePostalCode(departurePostalCode, undefined, departureAddress || undefined);
+        if (coords) {
+          lat = coords.lat;
+          lon = coords.lon;
+        }
+      }
+      const { error } = await supabase.from('route_schedules').update({
+        departure_address: departureAddress || null,
+        departure_postal_code: departurePostalCode || null,
+        departure_lat: lat,
+        departure_lon: lon,
+        return_to_base: returnToBase,
+      }).eq('id', route.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
+      toast.success('Ponto de saída guardado');
+    } catch (err: any) {
+      toast.error('Erro ao guardar: ' + err.message);
+    } finally {
+      setSavingDeparture(false);
+    }
+  };
+
+  const handleToggleReturn = async (val: boolean) => {
+    setReturnToBase(val);
+    await supabase.from('route_schedules').update({ return_to_base: val }).eq('id', route.id);
+    queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
+  };
 
   const handleSplitRoute = async (groups: { name: string; stops: any[] }[]) => {
     try {
