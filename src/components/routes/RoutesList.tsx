@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import { RouteSchedule } from '@/hooks/useRoutes';
 import { DeliveryRegion } from '@/hooks/useDeliveryRegions';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Trash2, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Trash2, Loader2, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
