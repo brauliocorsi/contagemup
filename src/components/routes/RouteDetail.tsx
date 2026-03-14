@@ -44,6 +44,50 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const [saleDetailVendaId, setSaleDetailVendaId] = useState<string | null>(null);
   const [saleDetailVendaCodigo, setSaleDetailVendaCodigo] = useState<string | null>(null);
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
+  const queryClient = useQueryClient();
+  const [reloading, setReloading] = useState(false);
+
+  const handleReloadNotas = async () => {
+    const stopsWithVenda = stops.filter(s => s.venda_id);
+    if (stopsWithVenda.length === 0) {
+      toast.info('Nenhuma paragem com venda associada');
+      return;
+    }
+
+    setReloading(true);
+    let updated = 0;
+    try {
+      for (const stop of stopsWithVenda) {
+        try {
+          const { data, error } = await supabase.functions.invoke('gestaoclick-venda-detail', {
+            body: { venda_id: stop.venda_id },
+          });
+          if (error || !data) continue;
+
+          const newStatus = data.situacao || null;
+          const newData = data.data || null;
+
+          const updatePayload: Record<string, string | null> = {};
+          if (newStatus && newStatus !== stop.venda_status) updatePayload.venda_status = newStatus;
+          if (newData && newData !== stop.venda_data) updatePayload.venda_data = newData;
+
+          if (Object.keys(updatePayload).length > 0) {
+            await supabase.from('route_stops').update(updatePayload).eq('id', stop.id);
+            updated++;
+          }
+        } catch {
+          // skip individual errors
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
+      toast.success(`${updated} paragem(ns) atualizada(s) de ${stopsWithVenda.length}`);
+    } catch (err: any) {
+      toast.error('Erro ao recarregar: ' + err.message);
+    } finally {
+      setReloading(false);
+    }
+  };
 
   const vendaStatuses = useMemo(() => {
     const set = new Set<string>();
