@@ -61,8 +61,36 @@ export function RoutesList({ routes, isLoading, onSelect, onDelete, regions = []
   };
 
   return (
-    <div className="grid gap-3">
-      {routes.map((route) => {
+    <div className="space-y-3">
+      {/* Status Filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        <Badge
+          variant={statusFilter === null ? 'default' : 'outline'}
+          className="cursor-pointer text-xs"
+          onClick={() => setStatusFilter(null)}
+        >
+          Todas ({routes.length})
+        </Badge>
+        {Object.entries(statusLabels).map(([key, label]) => {
+          const count = routes.filter(r => r.status === key).length;
+          if (count === 0) return null;
+          return (
+            <Badge
+              key={key}
+              variant={statusFilter === key ? 'default' : 'outline'}
+              className={`cursor-pointer text-xs ${statusFilter === key ? '' : statusColors[key]}`}
+              onClick={() => setStatusFilter(statusFilter === key ? null : key)}
+            >
+              {label} ({count})
+            </Badge>
+          );
+        })}
+      </div>
+
+      {/* Routes Grid */}
+      <div className="grid gap-3">
+      {filteredRoutes.map((route) => {
         const region = getRegion(route);
         return (
           <Card
