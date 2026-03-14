@@ -467,6 +467,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
               {totalDistanceKm > 0 && (
                 <span className="ml-2 font-medium text-foreground">
                   • {totalDistanceKm.toFixed(1)} km total
+                  {totalDurationSec > 0 && ` • ${formatDuration(totalDurationSec)}`}
                 </span>
               )}
             </p>
