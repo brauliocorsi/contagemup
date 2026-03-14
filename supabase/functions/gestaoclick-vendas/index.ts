@@ -52,6 +52,59 @@ function normalizeIdentifier(value: unknown): string {
   return String(value ?? '').trim();
 }
 
+function normalizePostalCode(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const formattedMatch = raw.match(/\b(\d{4})\s*-\s*(\d{3})\b/);
+  if (formattedMatch) {
+    return `${formattedMatch[1]}-${formattedMatch[2]}`;
+  }
+
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 7) {
+    return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  }
+
+  return '';
+}
+
+function extractPostalCodeFromText(value: unknown): string {
+  const text = String(value ?? '');
+  if (!text) return '';
+
+  const formattedMatch = text.match(/\b\d{4}\s*-\s*\d{3}\b/);
+  if (formattedMatch) {
+    return normalizePostalCode(formattedMatch[0]);
+  }
+
+  const compactMatch = text.match(/\b\d{7}\b/);
+  if (compactMatch) {
+    return normalizePostalCode(compactMatch[0]);
+  }
+
+  return '';
+}
+
+function extractAddressEntries(venda: any): any[] {
+  const enderecos = Array.isArray(venda?.enderecos) ? venda.enderecos : [];
+  return enderecos.map((entry: any) => {
+    const nestedEndereco = entry?.endereco && typeof entry.endereco === 'object'
+      ? entry.endereco
+      : {};
+
+    return { ...nestedEndereco, ...entry };
+  });
+}
+
+function firstNonEmpty(...values: unknown[]): string {
+  for (const value of values) {
+    const parsed = String(value ?? '').trim();
+    if (parsed) return parsed;
+  }
+  return '';
+}
+
 function extractProductReferences(item: any): { productCode: string; productId: string; variationId: string } {
   const product = item?.produto || {};
 
