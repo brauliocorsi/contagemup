@@ -293,10 +293,10 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             {reloading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
             Recarregar Notas
           </Button>
-          {stops.some(s => (!s.latitude || !s.longitude) && s.postal_code) && (
-            <Button variant="outline" onClick={handleGeocodeAll} disabled={geocoding}>
+          {stops.some(s => s.postal_code) && (
+            <Button variant="outline" onClick={() => handleGeocodeAll(stops.every(s => s.latitude && s.longitude))} disabled={geocoding}>
               {geocoding ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MapPin className="h-4 w-4 mr-1" />}
-              Geocodificar
+              {stops.some(s => (!s.latitude || !s.longitude) && s.postal_code) ? 'Geocodificar' : 'Regeocodificar'}
             </Button>
           )}
           {stops.length >= 2 && (
