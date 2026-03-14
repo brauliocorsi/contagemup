@@ -322,15 +322,25 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const stopsWithCoords = stops.filter(s => s.latitude && s.longitude);
 
   const totalDistanceKm = useMemo(() => {
-    if (stopsWithCoords.length < 2) return 0;
     let total = 0;
+    // Departure to first stop
+    if (departureLat && departureLon && stopsWithCoords.length > 0) {
+      const first = stopsWithCoords[0];
+      total += haversineKm(departureLat, departureLon, first.latitude!, first.longitude!);
+    }
+    // Between stops
     for (let i = 0; i < stopsWithCoords.length - 1; i++) {
       const a = stopsWithCoords[i];
       const b = stopsWithCoords[i + 1];
       total += haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!);
     }
+    // Return to base
+    if (returnToBase && departureLat && departureLon && stopsWithCoords.length > 0) {
+      const last = stopsWithCoords[stopsWithCoords.length - 1];
+      total += haversineKm(last.latitude!, last.longitude!, departureLat, departureLon);
+    }
     return total;
-  }, [stopsWithCoords]);
+  }, [stopsWithCoords, departureLat, departureLon, returnToBase]);
 
   return (
     <div className="space-y-4">
