@@ -143,6 +143,7 @@ export function RoutesList({ routes, isLoading, onSelect, onDelete, regions = []
           </Card>
         );
       })}
+      </div>
     </div>
   );
 }
