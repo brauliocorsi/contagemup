@@ -94,8 +94,13 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
         if (stopsErr) throw stopsErr;
       }
 
+      // Delete original route stops and route
+      await supabase.from('route_stops').delete().eq('route_id', route.id);
+      await supabase.from('route_schedules').delete().eq('id', route.id);
+
       queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
-      toast.success(`Rota dividida em ${groups.length} sub-rotas!`);
+      queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
+      toast.success(`Rota dividida em ${groups.length} sub-rotas! Rota original eliminada.`);
       onBack();
     } catch (err: any) {
       toast.error('Erro ao dividir rota: ' + err.message);
