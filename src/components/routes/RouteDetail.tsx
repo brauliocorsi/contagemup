@@ -146,7 +146,9 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                     <p className="font-medium truncate">{stop.client_name}</p>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       {stop.postal_code && <span>{stop.postal_code}</span>}
-                      {stop.city && <span>• {stop.city}</span>}
+                      {(stop as any).freguesia && <span>• {(stop as any).freguesia}</span>}
+                      {(stop as any).municipio && <span>• {(stop as any).municipio}</span>}
+                      {!(stop as any).freguesia && stop.city && <span>• {stop.city}</span>}
                       {stop.address && <span>• {stop.address}</span>}
                     </div>
                     {stop.venda_codigo && (
