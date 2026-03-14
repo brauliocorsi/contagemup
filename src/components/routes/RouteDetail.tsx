@@ -144,7 +144,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">
-              Paragens ({filteredStops.length}{vendaStatusFilter ? ` de ${stops.length}` : ''})
+              Paragens ({filteredStops.length}{selectedVendaStatuses.size > 0 ? ` de ${stops.length}` : ''})
             </CardTitle>
           </div>
           {vendaStatuses.length > 0 && (
