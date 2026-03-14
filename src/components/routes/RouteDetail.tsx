@@ -25,7 +25,7 @@ const statusLabels: Record<string, string> = {
 
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
   const [addStopOpen, setAddStopOpen] = useState(false);
-  const [vendaStatusFilter, setVendaStatusFilter] = useState<string | null>(null);
+  const [selectedVendaStatuses, setSelectedVendaStatuses] = useState<Set<string>>(new Set());
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
 
   const vendaStatuses = useMemo(() => {
@@ -37,9 +37,17 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     return Array.from(set).sort();
   }, [stops]);
 
-  const filteredStops = vendaStatusFilter
-    ? stops.filter(s => (s as any).venda_status === vendaStatusFilter)
-    : stops;
+  const filteredStops = selectedVendaStatuses.size === 0
+    ? stops
+    : stops.filter(s => selectedVendaStatuses.has((s as any).venda_status || ''));
+
+  const toggleVendaStatus = (status: string) => {
+    setSelectedVendaStatuses(prev => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status); else next.add(status);
+      return next;
+    });
+  };
 
   const handleAddStop = async (data: {
     client_name: string;
