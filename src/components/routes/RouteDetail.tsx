@@ -46,6 +46,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
   const queryClient = useQueryClient();
   const [reloading, setReloading] = useState(false);
+  const [updatedStopIds, setUpdatedStopIds] = useState<Set<string>>(new Set());
 
   const handleReloadNotas = async () => {
     const stopsWithVenda = stops.filter(s => s.venda_id);
@@ -56,6 +57,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
 
     setReloading(true);
     let updated = 0;
+    const newlyUpdated = new Set<string>();
     try {
       for (const stop of stopsWithVenda) {
         try {
@@ -74,12 +76,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
           if (Object.keys(updatePayload).length > 0) {
             await supabase.from('route_stops').update(updatePayload).eq('id', stop.id);
             updated++;
+            newlyUpdated.add(stop.id);
           }
         } catch {
           // skip individual errors
         }
       }
 
+      setUpdatedStopIds(newlyUpdated);
       queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
       toast.success(`${updated} paragem(ns) atualizada(s) de ${stopsWithVenda.length}`);
     } catch (err: any) {
@@ -263,7 +267,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                     {idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{stop.client_name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium truncate">{stop.client_name}</p>
+                      {updatedStopIds.has(stop.id) && (
+                        <Badge className="text-[10px] py-0 px-1.5 bg-emerald-500 text-white border-0 animate-pulse">
+                          Nova
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       {stop.postal_code && <span>{stop.postal_code}</span>}
                       {(stop as any).freguesia && <span>• {(stop as any).freguesia}</span>}
