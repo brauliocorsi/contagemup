@@ -41,6 +41,7 @@ export function RoutesView() {
       freguesia?: string;
       municipio?: string;
       venda_status?: string;
+      venda_data?: string;
     }[];
   }) => {
     try {
