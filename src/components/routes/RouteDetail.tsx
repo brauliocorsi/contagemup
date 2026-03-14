@@ -270,6 +270,12 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             <CardTitle className="text-lg flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" />
               Mapa da Rota ({stopsWithCoords.length} pontos)
+              {totalDistanceKm > 0 && (
+                <Badge variant="secondary" className="text-xs ml-2">
+                  <Navigation className="h-3 w-3 mr-1" />
+                  {totalDistanceKm.toFixed(1)} km
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
