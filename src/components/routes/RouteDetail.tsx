@@ -520,6 +520,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 <Badge variant="secondary" className="text-xs ml-2">
                   <Navigation className="h-3 w-3 mr-1" />
                   {totalDistanceKm.toFixed(1)} km
+                  {totalDurationSec > 0 && ` • ${formatDuration(totalDurationSec)}`}
                 </Badge>
               )}
             </CardTitle>
