@@ -442,14 +442,16 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     return wp;
   }, [stopsWithCoords, departureLat, departureLon, returnToBase]);
 
-  const { legDistances: osrmLegs, totalDistance: totalDistanceKm } = useOSRMDistances(osrmWaypoints);
+  const { legDistances: osrmLegs, legDurations: osrmDurations, totalDistance: totalDistanceKm, totalDuration: totalDurationSec } = useOSRMDistances(osrmWaypoints);
 
   // Map leg index to: legOffset is the index where stop-to-stop legs start (after departure leg if present)
   const hasDeparture = !!(departureLat && departureLon);
   const departureToFirstKm = hasDeparture && osrmLegs.length > 0 ? osrmLegs[0] : null;
+  const departureToFirstDur = hasDeparture && osrmDurations.length > 0 ? osrmDurations[0] : null;
   const stopLegOffset = hasDeparture ? 1 : 0;
   // Return leg is the last one if returnToBase
   const returnLegKm = returnToBase && hasDeparture && osrmLegs.length > 0 ? osrmLegs[osrmLegs.length - 1] : null;
+  const returnLegDur = returnToBase && hasDeparture && osrmDurations.length > 0 ? osrmDurations[osrmDurations.length - 1] : null;
 
   return (
     <div className="space-y-4">
