@@ -166,10 +166,10 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
         try {
           const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined);
           if (coords) {
-            await supabase.from('route_stops').update({
-              latitude: coords.lat,
-              longitude: coords.lon,
-            }).eq('id', stop.id);
+            const updatePayload: Record<string, any> = { latitude: coords.lat, longitude: coords.lon };
+            if (coords.freguesia) updatePayload.freguesia = coords.freguesia;
+            if (coords.municipio) updatePayload.municipio = coords.municipio;
+            await supabase.from('route_stops').update(updatePayload).eq('id', stop.id);
             geocoded++;
           }
         } catch { /* skip individual */ }
