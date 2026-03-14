@@ -242,27 +242,72 @@ Deno.serve(async (req) => {
     console.log('Situações encontradas:', situacoes.map((s: any) => `${s.id}: ${s.nome}`));
     console.log('IDs excluídos:', [...excludedIds]);
 
-    // DEBUG: Log enderecos from first venda immediately
-    if (firstVendasPage.data.length > 0) {
-      const sample = firstVendasPage.data[0];
-      console.log('DEBUG sample venda cliente_id:', sample.cliente_id, 'nome_cliente:', sample.nome_cliente);
-      console.log('DEBUG sample venda enderecos:', JSON.stringify(sample.enderecos, null, 2));
+    // Fetch clients in parallel with vendas processing
+    const clientsBaseUrl = 'https://api.gestaoclick.com/api/clientes';
+    const [firstClientsPage] = await Promise.all([
+      fetchPage(clientsBaseUrl, 1, apiHeaders),
+    ]);
+
+    const clientMap: Record<string, { endereco: string; cep: string; cidade: string; estado: string }> = {};
+    
+    const processClientForMap = (client: any) => {
+      const id = String(client.id || '');
+      if (!id) return;
       
-      // Fetch individual client
-      if (sample.cliente_id) {
-        try {
-          const clientRes = await fetchWithRetry(
-            `https://api.gestaoclick.com/api/clientes/${sample.cliente_id}`,
-            { method: 'GET', headers: apiHeaders }
-          );
-          if (clientRes.ok) {
-            const clientData = await clientRes.json();
-            console.log('DEBUG client data:', JSON.stringify(clientData, null, 2));
-          }
-        } catch (e) {
-          console.log('DEBUG client fetch error:', e);
+      const enderecos = Array.isArray(client.enderecos) ? client.enderecos : [];
+      const addr = enderecos[0]?.endereco || enderecos[0] || {};
+      
+      // Build full address from client fields
+      const addressParts = [
+        addr.logradouro, addr.rua, addr.endereco, addr.morada,
+        addr.numero, addr.complemento, addr.bairro,
+      ].map(v => String(v ?? '').trim()).filter(Boolean);
+      
+      const fullAddress = addressParts.join(', ');
+      
+      // Extract postal code from all text fields
+      const allText = [
+        addr.cep, addr.codigo_postal, addr.postal_code,
+        addr.numero, addr.logradouro, addr.complemento,
+        fullAddress,
+        addr.nome_cidade, client.cidade,
+      ].map(v => String(v ?? '').trim()).filter(Boolean).join(' ');
+      
+      const cep = extractPostalCodeFromText(allText);
+      
+      clientMap[id] = {
+        endereco: fullAddress,
+        cep,
+        cidade: String(addr.nome_cidade || addr.cidade || client.cidade || '').trim(),
+        estado: String(addr.estado || client.estado || '').trim(),
+      };
+    };
+
+    for (const client of firstClientsPage.data) {
+      processClientForMap(client);
+    }
+
+    const totalClientPages = firstClientsPage.meta.total_paginas || 1;
+    for (let batchStart = 2; batchStart <= totalClientPages; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalClientPages);
+      const pages: number[] = [];
+      for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
+      const results = await Promise.all(pages.map(p => fetchPage(clientsBaseUrl, p, apiHeaders)));
+      for (const result of results) {
+        for (const client of result.data) {
+          processClientForMap(client);
         }
       }
+      if (batchEnd < totalClientPages) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+      }
+    }
+
+    console.log(`Client map built: ${Object.keys(clientMap).length} clients`);
+    // Log a sample client with CEP for debugging
+    const sampleWithCep = Object.entries(clientMap).find(([_, v]) => v.cep);
+    if (sampleWithCep) {
+      console.log('Sample client with CEP:', sampleWithCep[0], JSON.stringify(sampleWithCep[1]));
     }
 
     // Process first page of vendas
