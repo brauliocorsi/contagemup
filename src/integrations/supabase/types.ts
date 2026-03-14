@@ -815,6 +815,7 @@ export type Database = {
           updated_at: string
           venda_codigo: string | null
           venda_id: string | null
+          venda_status: string | null
         }
         Insert: {
           address?: string | null
@@ -834,6 +835,7 @@ export type Database = {
           updated_at?: string
           venda_codigo?: string | null
           venda_id?: string | null
+          venda_status?: string | null
         }
         Update: {
           address?: string | null
@@ -853,6 +855,7 @@ export type Database = {
           updated_at?: string
           venda_codigo?: string | null
           venda_id?: string | null
+          venda_status?: string | null
         }
         Relationships: [
           {
