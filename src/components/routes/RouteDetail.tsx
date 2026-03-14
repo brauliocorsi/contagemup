@@ -414,11 +414,63 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
           </CardHeader>
           <CardContent className="p-0">
             <div className="h-[400px] rounded-b-lg overflow-hidden">
-              <RouteMap stops={stopsWithCoords} />
+              <RouteMap stops={stopsWithCoords} departureLat={departureLat} departureLon={departureLon} departureLabel={departureAddress || departurePostalCode || 'Base'} returnToBase={returnToBase} />
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Departure / Return config */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Home className="h-5 w-5 text-primary" />
+            Ponto de Saída / Volta
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div>
+              <Label className="text-xs">Morada de Saída</Label>
+              <Input value={departureAddress} onChange={e => setDepartureAddress(e.target.value)} placeholder="Ex: Rua da Fábrica, 123" className="h-9" />
+            </div>
+            <div>
+              <Label className="text-xs">Código Postal</Label>
+              <Input value={departurePostalCode} onChange={e => setDeparturePostalCode(e.target.value)} placeholder="Ex: 4400-001" className="h-9" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Button size="sm" onClick={handleSaveDeparture} disabled={savingDeparture}>
+                {savingDeparture ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <MapPin className="h-4 w-4 mr-1" />}
+                Guardar
+              </Button>
+              <div className="flex items-center gap-2">
+                <Switch checked={returnToBase} onCheckedChange={handleToggleReturn} id="return-toggle" />
+                <Label htmlFor="return-toggle" className="text-xs cursor-pointer">Volta ao ponto de saída</Label>
+              </div>
+            </div>
+          </div>
+          {departureLat && departureLon && (
+            <div className="mt-2 flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                <MapPin className="h-3 w-3 mr-1" />
+                GPS: {departureLat.toFixed(4)}, {departureLon.toFixed(4)}
+              </Badge>
+              {stopsWithCoords.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  <Navigation className="h-3 w-3 mr-1" />
+                  {haversineKm(departureLat, departureLon, stopsWithCoords[0].latitude!, stopsWithCoords[0].longitude!).toFixed(1)} km até 1ª paragem
+                </Badge>
+              )}
+              {returnToBase && stopsWithCoords.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  <Navigation className="h-3 w-3 mr-1" />
+                  {haversineKm(stopsWithCoords[stopsWithCoords.length - 1].latitude!, stopsWithCoords[stopsWithCoords.length - 1].longitude!, departureLat, departureLon).toFixed(1)} km volta
+                </Badge>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Stops list */}
       <Card>
