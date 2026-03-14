@@ -57,6 +57,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
 
     setReloading(true);
     let updated = 0;
+    const newlyUpdated = new Set<string>();
     try {
       for (const stop of stopsWithVenda) {
         try {
@@ -75,12 +76,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
           if (Object.keys(updatePayload).length > 0) {
             await supabase.from('route_stops').update(updatePayload).eq('id', stop.id);
             updated++;
+            newlyUpdated.add(stop.id);
           }
         } catch {
           // skip individual errors
         }
       }
 
+      setUpdatedStopIds(newlyUpdated);
       queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
       toast.success(`${updated} paragem(ns) atualizada(s) de ${stopsWithVenda.length}`);
     } catch (err: any) {
