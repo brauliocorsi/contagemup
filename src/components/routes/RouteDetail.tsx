@@ -253,7 +253,8 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
