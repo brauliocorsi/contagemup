@@ -217,8 +217,11 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                       {stop.address && <span>• {stop.address}</span>}
                     </div>
                     {stop.venda_codigo && (
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         <p className="text-xs text-muted-foreground">Venda: {stop.venda_codigo}</p>
+                        {(stop as any).venda_data && (
+                          <span className="text-[10px] text-muted-foreground">📅 {(stop as any).venda_data}</span>
+                        )}
                         {vs && (
                           <Badge variant="outline" className={`text-[10px] py-0 px-1.5 border ${color ? color.badge : ''}`}>
                             {vs}
