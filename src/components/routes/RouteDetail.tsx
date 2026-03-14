@@ -104,11 +104,27 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     queryClient.invalidateQueries({ queryKey: ['route-schedules'] });
   };
 
-  // Auto-geocode stops without coordinates on load
+  // Validate if coord matches postal code region (first digit)
+  const isCoordSuspicious = (postalCode: string, lat: number | null, lon: number | null): boolean => {
+    if (!lat || !lon || !postalCode) return false;
+    const prefix = postalCode.charAt(0);
+    // Simple check: 4xxx codes should be north of 40.5 lat
+    if (prefix === '4' && lat < 40.5) return true;
+    // 1xxx codes should be around Lisbon (38.6-38.85)
+    if (prefix === '1' && (lat > 39.0 || lat < 38.5)) return true;
+    return false;
+  };
+
+  // Auto-geocode stops without coordinates or with suspicious coords on load
   const autoGeocodedRef = useRef(false);
   useEffect(() => {
     if (isLoading || autoGeocodedRef.current || stops.length === 0) return;
-    const needsGeocode = stops.filter(s => (!s.latitude || !s.longitude) && s.postal_code);
+    const needsGeocode = stops.filter(s =>
+      s.postal_code && (
+        !s.latitude || !s.longitude ||
+        isCoordSuspicious(s.postal_code, s.latitude, s.longitude)
+      )
+    );
     if (needsGeocode.length === 0) return;
     autoGeocodedRef.current = true;
     (async () => {
@@ -116,6 +132,8 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
       let geocoded = 0;
       for (const stop of needsGeocode) {
         try {
+          // Add delay between API calls to avoid rate limiting
+          if (geocoded > 0) await new Promise(r => setTimeout(r, 300));
           const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined, stop.address || undefined);
           if (coords) {
             const updatePayload: Record<string, any> = { latitude: coords.lat, longitude: coords.lon };
@@ -242,7 +260,9 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     const fallbackStops: { name: string; cp: string; provider: string }[] = [];
     const failedStops: { name: string; cp: string }[] = [];
     try {
-      for (const stop of targetStops) {
+      for (let i = 0; i < targetStops.length; i++) {
+        const stop = targetStops[i];
+        if (i > 0) await new Promise(r => setTimeout(r, 300)); // rate limit delay
         try {
           const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined, stop.address || undefined);
           if (coords) {
