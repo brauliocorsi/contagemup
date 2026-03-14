@@ -52,6 +52,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
   const [saleDetailOpen, setSaleDetailOpen] = useState(false);
   const [saleDetailVendaId, setSaleDetailVendaId] = useState<string | null>(null);
   const [saleDetailVendaCodigo, setSaleDetailVendaCodigo] = useState<string | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
   const queryClient = useQueryClient();
   const [reloading, setReloading] = useState(false);
