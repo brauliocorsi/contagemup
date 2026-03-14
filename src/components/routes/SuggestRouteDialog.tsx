@@ -468,7 +468,9 @@ export function SuggestRouteDialog({ open, onOpenChange, onCreateRoute }: Sugges
                       <p className="font-medium text-sm truncate">{client.clientName}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>📮 {client.postalCode}</span>
-                        {client.city && <span>• {client.city}</span>}
+                        {client.freguesia && <span>• {client.freguesia}</span>}
+                        {client.municipio && <span>• {client.municipio}</span>}
+                        {!client.freguesia && client.city && <span>• {client.city}</span>}
                         {client.lat && <span className="text-green-600">✓ GPS</span>}
                       </div>
                       <div className="flex gap-1 mt-0.5 flex-wrap">
