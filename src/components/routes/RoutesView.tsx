@@ -40,6 +40,7 @@ export function RoutesView() {
       venda_codigo: string | null;
       freguesia?: string;
       municipio?: string;
+      venda_status?: string;
     }[];
   }) => {
     try {

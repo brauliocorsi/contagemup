@@ -289,6 +289,7 @@ export function RegionalRouteBuilder({ open, onOpenChange, onCreateRoute }: Regi
         venda_codigo: c.vendaCodigos[0] || null,
         freguesia: c.freguesia,
         municipio: c.municipio,
+        venda_status: c.vendaSituacoes[0] || null,
       })),
     });
   };
