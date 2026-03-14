@@ -233,7 +233,7 @@ export function RouteMap({ stops, departureLat, departureLon, departureLabel, re
                 {stop.venda_status && <p>📦 {stop.venda_status}</p>}
                 {stop.postal_code && <p>📮 {stop.postal_code}</p>}
                 {stop.city && <p>🏙️ {stop.city}</p>}
-                {stop.municipio && <p>🏛️ {stop.municipio}</p>}
+                
                 {stop.address && <p>📍 {stop.address}</p>}
                 {stop.notes && <p>📝 {stop.notes}</p>}
               </div>
