@@ -636,15 +636,18 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 const color = vs ? (vendaStatusColors[vs] || defaultVendaColor) : null;
                 const prevStop = idx > 0 ? filteredStops[idx - 1] : null;
                 let distKm: number | null = null;
+                let distDur: number | null = null;
                 let distLabel = '';
                 // Find this stop's index in stopsWithCoords to map to osrmLegs
                 const stopIdxInAll = stopsWithCoords.findIndex(s => s.id === stop.id);
                 if (idx === 0 && hasDeparture && stop.latitude && stop.longitude) {
                   distKm = departureToFirstKm;
+                  distDur = departureToFirstDur;
                   distLabel = '🏠 → ';
                 } else if (prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude && stopIdxInAll > 0) {
                   const legIdx = stopLegOffset + stopIdxInAll - 1;
                   distKm = osrmLegs[legIdx] ?? null;
+                  distDur = osrmDurations[legIdx] ?? null;
                 }
                 return (
                 <div key={stop.id}>
@@ -653,6 +656,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                       <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                         <Navigation className="h-3 w-3" />
                         {distLabel}{distKm.toFixed(1)} km
+                        {distDur !== null && distDur > 0 && ` • ${formatDuration(distDur)}`}
                       </span>
                     </div>
                   )}
