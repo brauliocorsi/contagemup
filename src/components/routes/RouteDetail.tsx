@@ -231,6 +231,12 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             {reloading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
             Recarregar Notas
           </Button>
+          {stops.length >= 2 && (
+            <Button variant="outline" onClick={() => setSplitOpen(true)}>
+              <Scissors className="h-4 w-4 mr-1" />
+              Dividir Rota
+            </Button>
+          )}
           <Button onClick={() => setAddStopOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Adicionar Paragem
