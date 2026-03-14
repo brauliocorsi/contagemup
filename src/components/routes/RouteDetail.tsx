@@ -41,12 +41,47 @@ const vendaStatusColors: Record<string, { bg: string; border: string; badge: str
 };
 const defaultVendaColor = { bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-300 dark:border-purple-700', badge: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700' };
 
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+// OSRM road distances hook
+function useOSRMDistances(waypoints: [number, number][]) {
+  const [legDistances, setLegDistances] = useState<number[]>([]);
+  const [totalDistance, setTotalDistance] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (waypoints.length < 2) {
+      setLegDistances([]);
+      setTotalDistance(0);
+      return;
+    }
+
+    const fetchDistances = async () => {
+      setLoading(true);
+      try {
+        const coords = waypoints.map(([lat, lon]) => `${lon},${lat}`).join(';');
+        const response = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false&steps=false`
+        );
+        const data = await response.json();
+        if (data.code === 'Ok' && data.routes?.[0]?.legs) {
+          const legs = data.routes[0].legs.map((leg: any) => leg.distance / 1000); // meters to km
+          setLegDistances(legs);
+          setTotalDistance(data.routes[0].distance / 1000);
+        } else {
+          setLegDistances([]);
+          setTotalDistance(0);
+        }
+      } catch {
+        setLegDistances([]);
+        setTotalDistance(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDistances();
+  }, [JSON.stringify(waypoints)]);
+
+  return { legDistances, totalDistance, loading };
 }
 
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
@@ -378,26 +413,25 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
 
   const stopsWithCoords = stops.filter(s => s.latitude && s.longitude);
 
-  const totalDistanceKm = useMemo(() => {
-    let total = 0;
-    // Departure to first stop
-    if (departureLat && departureLon && stopsWithCoords.length > 0) {
-      const first = stopsWithCoords[0];
-      total += haversineKm(departureLat, departureLon, first.latitude!, first.longitude!);
-    }
-    // Between stops
-    for (let i = 0; i < stopsWithCoords.length - 1; i++) {
-      const a = stopsWithCoords[i];
-      const b = stopsWithCoords[i + 1];
-      total += haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!);
-    }
-    // Return to base
+  // Build OSRM waypoints: departure → stops → (return to departure)
+  const osrmWaypoints = useMemo<[number, number][]>(() => {
+    const wp: [number, number][] = [];
+    if (departureLat && departureLon) wp.push([departureLat, departureLon]);
+    stopsWithCoords.forEach(s => wp.push([s.latitude!, s.longitude!]));
     if (returnToBase && departureLat && departureLon && stopsWithCoords.length > 0) {
-      const last = stopsWithCoords[stopsWithCoords.length - 1];
-      total += haversineKm(last.latitude!, last.longitude!, departureLat, departureLon);
+      wp.push([departureLat, departureLon]);
     }
-    return total;
+    return wp;
   }, [stopsWithCoords, departureLat, departureLon, returnToBase]);
+
+  const { legDistances: osrmLegs, totalDistance: totalDistanceKm } = useOSRMDistances(osrmWaypoints);
+
+  // Map leg index to: legOffset is the index where stop-to-stop legs start (after departure leg if present)
+  const hasDeparture = !!(departureLat && departureLon);
+  const departureToFirstKm = hasDeparture && osrmLegs.length > 0 ? osrmLegs[0] : null;
+  const stopLegOffset = hasDeparture ? 1 : 0;
+  // Return leg is the last one if returnToBase
+  const returnLegKm = returnToBase && hasDeparture && osrmLegs.length > 0 ? osrmLegs[osrmLegs.length - 1] : null;
 
   return (
     <div className="space-y-4">
@@ -512,16 +546,16 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 <MapPin className="h-3 w-3 mr-1" />
                 GPS: {departureLat.toFixed(4)}, {departureLon.toFixed(4)}
               </Badge>
-              {stopsWithCoords.length > 0 && (
+              {departureToFirstKm !== null && stopsWithCoords.length > 0 && (
                 <Badge variant="secondary" className="text-xs">
                   <Navigation className="h-3 w-3 mr-1" />
-                  {haversineKm(departureLat, departureLon, stopsWithCoords[0].latitude!, stopsWithCoords[0].longitude!).toFixed(1)} km até 1ª paragem
+                  {departureToFirstKm.toFixed(1)} km até 1ª paragem
                 </Badge>
               )}
-              {returnToBase && stopsWithCoords.length > 0 && (
+              {returnLegKm !== null && stopsWithCoords.length > 0 && (
                 <Badge variant="secondary" className="text-xs">
                   <Navigation className="h-3 w-3 mr-1" />
-                  {haversineKm(stopsWithCoords[stopsWithCoords.length - 1].latitude!, stopsWithCoords[stopsWithCoords.length - 1].longitude!, departureLat, departureLon).toFixed(1)} km volta
+                  {returnLegKm.toFixed(1)} km volta
                 </Badge>
               )}
             </div>
@@ -579,11 +613,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 const prevStop = idx > 0 ? filteredStops[idx - 1] : null;
                 let distKm: number | null = null;
                 let distLabel = '';
-                if (idx === 0 && departureLat && departureLon && stop.latitude && stop.longitude) {
-                  distKm = haversineKm(departureLat, departureLon, stop.latitude, stop.longitude);
+                // Find this stop's index in stopsWithCoords to map to osrmLegs
+                const stopIdxInAll = stopsWithCoords.findIndex(s => s.id === stop.id);
+                if (idx === 0 && hasDeparture && stop.latitude && stop.longitude) {
+                  distKm = departureToFirstKm;
                   distLabel = '🏠 → ';
-                } else if (prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude) {
-                  distKm = haversineKm(prevStop.latitude, prevStop.longitude, stop.latitude, stop.longitude);
+                } else if (prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude && stopIdxInAll > 0) {
+                  const legIdx = stopLegOffset + stopIdxInAll - 1;
+                  distKm = osrmLegs[legIdx] ?? null;
                 }
                 return (
                 <div key={stop.id}>
@@ -680,19 +717,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                 );
               })}
               {/* Return to base distance */}
-              {returnToBase && departureLat && departureLon && filteredStops.length > 0 && (() => {
-                const lastStop = filteredStops[filteredStops.length - 1];
-                if (!lastStop.latitude || !lastStop.longitude) return null;
-                const returnDist = haversineKm(lastStop.latitude, lastStop.longitude, departureLat, departureLon);
-                return (
-                  <div className="flex items-center justify-center py-1">
-                    <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                      <Navigation className="h-3 w-3" />
-                      → 🏠 {returnDist.toFixed(1)} km (volta)
-                    </span>
-                  </div>
-                );
-              })()}
+              {returnLegKm !== null && filteredStops.length > 0 && (
+                <div className="flex items-center justify-center py-1">
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Navigation className="h-3 w-3" />
+                    → 🏠 {returnLegKm.toFixed(1)} km (volta)
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
