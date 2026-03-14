@@ -166,7 +166,7 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     try {
       for (const stop of targetStops) {
         try {
-          const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined);
+          const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined, stop.address || undefined);
           if (coords) {
             const updatePayload: Record<string, any> = { latitude: coords.lat, longitude: coords.lon };
             if (coords.freguesia) updatePayload.freguesia = coords.freguesia;
