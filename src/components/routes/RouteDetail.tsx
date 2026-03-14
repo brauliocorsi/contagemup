@@ -338,7 +338,20 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
               {filteredStops.map((stop, idx) => {
                 const vs = (stop as any).venda_status as string | undefined;
                 const color = vs ? (vendaStatusColors[vs] || defaultVendaColor) : null;
+                const prevStop = idx > 0 ? filteredStops[idx - 1] : null;
+                const distKm = prevStop && prevStop.latitude && prevStop.longitude && stop.latitude && stop.longitude
+                  ? haversineKm(prevStop.latitude, prevStop.longitude, stop.latitude, stop.longitude)
+                  : null;
                 return (
+                <div key={stop.id}>
+                  {distKm !== null && (
+                    <div className="flex items-center justify-center py-1">
+                      <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                        <Navigation className="h-3 w-3" />
+                        {distKm.toFixed(1)} km
+                      </span>
+                    </div>
+                  )}
                 <div
                   key={stop.id}
                   className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
