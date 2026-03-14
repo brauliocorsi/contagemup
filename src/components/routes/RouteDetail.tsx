@@ -267,7 +267,14 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                     {idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{stop.client_name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium truncate">{stop.client_name}</p>
+                      {updatedStopIds.has(stop.id) && (
+                        <Badge className="text-[10px] py-0 px-1.5 bg-emerald-500 text-white border-0 animate-pulse">
+                          Nova
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       {stop.postal_code && <span>{stop.postal_code}</span>}
                       {(stop as any).freguesia && <span>• {(stop as any).freguesia}</span>}
