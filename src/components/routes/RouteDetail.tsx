@@ -37,6 +37,9 @@ const defaultVendaColor = { bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'b
 export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps) {
   const [addStopOpen, setAddStopOpen] = useState(false);
   const [selectedVendaStatuses, setSelectedVendaStatuses] = useState<Set<string>>(new Set());
+  const [saleDetailOpen, setSaleDetailOpen] = useState(false);
+  const [saleDetailVendaId, setSaleDetailVendaId] = useState<string | null>(null);
+  const [saleDetailVendaCodigo, setSaleDetailVendaCodigo] = useState<string | null>(null);
   const { stops, isLoading, addStop, removeStop, updateStopStatus, geocodePostalCode } = useRouteStops(route.id);
 
   const vendaStatuses = useMemo(() => {
