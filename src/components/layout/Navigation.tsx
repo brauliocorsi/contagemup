@@ -70,7 +70,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   return (
     <nav className="border-b bg-background">
       <div className="container">
-        <div className="flex gap-1 overflow-x-auto py-2">
+        <div className="flex gap-1 flex-wrap py-2">
           {/* Contagem - sempre visível */}
           {mainTabs.map((tab) => (
             <Button
