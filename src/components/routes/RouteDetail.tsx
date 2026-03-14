@@ -134,9 +134,35 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
       {/* Stops list */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">
-            Paragens ({stops.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">
+              Paragens ({filteredStops.length}{vendaStatusFilter ? ` de ${stops.length}` : ''})
+            </CardTitle>
+          </div>
+          {vendaStatuses.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap pt-2">
+              <Badge
+                variant={vendaStatusFilter === null ? 'default' : 'outline'}
+                className="text-xs cursor-pointer"
+                onClick={() => setVendaStatusFilter(null)}
+              >
+                Todos
+              </Badge>
+              {vendaStatuses.map(status => {
+                const count = stops.filter(s => (s as any).venda_status === status).length;
+                return (
+                  <Badge
+                    key={status}
+                    variant={vendaStatusFilter === status ? 'default' : 'outline'}
+                    className="text-xs cursor-pointer"
+                    onClick={() => setVendaStatusFilter(vendaStatusFilter === status ? null : status)}
+                  >
+                    {status} ({count})
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {isLoading ? (
