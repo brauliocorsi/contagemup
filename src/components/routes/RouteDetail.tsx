@@ -177,6 +177,10 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
               Concluir Rota
             </Button>
           )}
+          <Button variant="outline" onClick={handleReloadNotas} disabled={reloading}>
+            {reloading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+            Recarregar Notas
+          </Button>
           <Button onClick={() => setAddStopOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Adicionar Paragem
