@@ -14,6 +14,8 @@ interface SaleClient {
   address: string;
   postalCode: string;
   city: string;
+  freguesia?: string;
+  municipio?: string;
   vendaIds: string[];
   vendaCodigos: string[];
   vendaSituacoes: string[];
