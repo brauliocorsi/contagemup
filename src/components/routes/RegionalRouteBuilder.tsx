@@ -61,27 +61,12 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 function optimizeRoute(clients: SaleClient[]): SaleClient[] {
-  if (clients.length <= 2) return clients;
-  const withCoords = clients.filter(c => c.lat && c.lon);
-  const withoutCoords = clients.filter(c => !c.lat || !c.lon);
-  if (withCoords.length <= 1) return [...withCoords, ...withoutCoords];
-
-  const ordered: SaleClient[] = [];
-  const remaining = [...withCoords];
-  remaining.sort((a, b) => (b.lat || 0) - (a.lat || 0));
-  ordered.push(remaining.shift()!);
-
-  while (remaining.length > 0) {
-    const last = ordered[ordered.length - 1];
-    let nearestIdx = 0;
-    let nearestDist = Infinity;
-    for (let i = 0; i < remaining.length; i++) {
-      const dist = haversineDistance(last.lat!, last.lon!, remaining[i].lat!, remaining[i].lon!);
-      if (dist < nearestDist) { nearestDist = dist; nearestIdx = i; }
-    }
-    ordered.push(remaining.splice(nearestIdx, 1)[0]);
-  }
-  return [...ordered, ...withoutCoords];
+  // Sort by postal code ascending for logical geographic grouping
+  return [...clients].sort((a, b) => {
+    const cpA = a.postalCode.replace(/[^0-9]/g, '');
+    const cpB = b.postalCode.replace(/[^0-9]/g, '');
+    return cpA.localeCompare(cpB);
+  });
 }
 
 function extractPostalCode(text: string): string {
