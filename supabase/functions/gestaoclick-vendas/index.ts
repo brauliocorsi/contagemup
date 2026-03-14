@@ -362,9 +362,6 @@ Deno.serve(async (req) => {
     }
 
     for (const venda of allVendas) {
-      const clienteId = String(venda.cliente_id || '');
-      const clientData = clientMap[clienteId] || { endereco: '', cep: '', cidade: '', estado: '' };
-
       const clienteNome = firstNonEmpty(
         venda.nome_cliente,
         venda.cliente_nome,
@@ -372,19 +369,15 @@ Deno.serve(async (req) => {
         'N/A'
       );
 
-      const enderecoPartes = clientData.endereco;
-      const cidade = clientData.cidade;
-      const estado = clientData.estado;
-      const cep = clientData.cep;
-
       const vendaInfo = {
         venda_id: String(venda.id),
         codigo: String(venda.codigo || ''),
+        cliente_id: String(venda.cliente_id || ''),
         cliente_nome: clienteNome,
-        cliente_endereco: enderecoPartes,
-        cliente_cidade: cidade,
-        cliente_cep: cep,
-        cliente_estado: estado,
+        cliente_endereco: '',
+        cliente_cidade: '',
+        cliente_cep: '',
+        cliente_estado: '',
         situacao: situacaoLookup[String(venda.situacao_id)] || 'Desconhecida',
         data: venda.data || '',
         valor_total: String(venda.valor_total || '0'),
