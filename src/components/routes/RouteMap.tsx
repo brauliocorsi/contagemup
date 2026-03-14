@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -81,6 +81,90 @@ function FitBounds({ stops, departureLat, departureLon }: { stops: RouteStop[]; 
   return null;
 }
 
+// Decode OSRM polyline (polyline6 format)
+function decodePolyline(encoded: string, precision = 5): [number, number][] {
+  const factor = Math.pow(10, precision);
+  const result: [number, number][] = [];
+  let lat = 0;
+  let lng = 0;
+  let index = 0;
+
+  while (index < encoded.length) {
+    let shift = 0;
+    let b: number;
+    let dlat = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      dlat |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    lat += (dlat & 1) ? ~(dlat >> 1) : (dlat >> 1);
+
+    shift = 0;
+    let dlng = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      dlng |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    lng += (dlng & 1) ? ~(dlng >> 1) : (dlng >> 1);
+
+    result.push([lat / factor, lng / factor]);
+  }
+  return result;
+}
+
+function RoadRoute({ waypoints }: { waypoints: [number, number][] }) {
+  const [roadPath, setRoadPath] = useState<[number, number][]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (waypoints.length < 2) {
+      setRoadPath([]);
+      return;
+    }
+
+    const fetchRoute = async () => {
+      setLoading(true);
+      try {
+        // OSRM expects lon,lat format
+        const coords = waypoints.map(([lat, lon]) => `${lon},${lat}`).join(';');
+        const response = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=polyline`
+        );
+        const data = await response.json();
+        if (data.code === 'Ok' && data.routes?.[0]?.geometry) {
+          const decoded = decodePolyline(data.routes[0].geometry);
+          setRoadPath(decoded);
+        } else {
+          // Fallback to straight lines
+          setRoadPath(waypoints);
+        }
+      } catch {
+        // Fallback to straight lines
+        setRoadPath(waypoints);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRoute();
+  }, [JSON.stringify(waypoints)]);
+
+  if (roadPath.length < 2) return null;
+
+  return (
+    <Polyline
+      positions={roadPath}
+      pathOptions={{
+        color: 'hsl(221, 83%, 53%)',
+        weight: 4,
+        opacity: 0.8,
+      }}
+    />
+  );
+}
+
 export function RouteMap({ stops, departureLat, departureLon, departureLabel, returnToBase }: RouteMapProps) {
   const positions: [number, number][] = stops
     .filter(s => s.latitude && s.longitude)
@@ -88,14 +172,14 @@ export function RouteMap({ stops, departureLat, departureLon, departureLabel, re
 
   const hasDeparture = departureLat != null && departureLon != null;
 
-  // Build polyline: departure → stops → (return to departure)
-  const linePositions: [number, number][] = [];
+  // Build waypoints: departure → stops → (return to departure)
+  const waypoints: [number, number][] = [];
   if (hasDeparture) {
-    linePositions.push([departureLat!, departureLon!]);
+    waypoints.push([departureLat!, departureLon!]);
   }
-  linePositions.push(...positions);
+  waypoints.push(...positions);
   if (returnToBase && hasDeparture && positions.length > 0) {
-    linePositions.push([departureLat!, departureLon!]);
+    waypoints.push([departureLat!, departureLon!]);
   }
 
   const center: [number, number] = positions.length > 0
@@ -117,13 +201,8 @@ export function RouteMap({ stops, departureLat, departureLon, departureLabel, re
       />
       <FitBounds stops={stops} departureLat={departureLat} departureLon={departureLon} />
 
-      {/* Route line */}
-      {linePositions.length > 1 && (
-        <Polyline
-          positions={linePositions}
-          pathOptions={{ color: 'hsl(221, 83%, 53%)', weight: 3, opacity: 0.7, dashArray: '10, 6' }}
-        />
-      )}
+      {/* Road route */}
+      <RoadRoute waypoints={waypoints} />
 
       {/* Departure marker */}
       {hasDeparture && (
