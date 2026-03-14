@@ -202,6 +202,26 @@ export function useRouteStops(routeId: string | null) {
     },
   });
 
+  // Portuguese postal code district lat/lon ranges for validation
+  const ptPostalRanges: Record<string, { minLat: number; maxLat: number; minLon: number; maxLon: number }> = {
+    '1': { minLat: 38.6, maxLat: 38.85, minLon: -9.3, maxLon: -9.05 }, // Lisboa
+    '2': { minLat: 38.4, maxLat: 39.5, minLon: -9.5, maxLon: -8.5 },   // Setúbal/Leiria
+    '3': { minLat: 39.5, maxLat: 40.7, minLon: -8.8, maxLon: -7.3 },   // Coimbra/Aveiro
+    '4': { minLat: 40.6, maxLat: 42.2, minLon: -8.9, maxLon: -7.3 },   // Porto/Braga/Viana
+    '5': { minLat: 40.5, maxLat: 42.0, minLon: -8.3, maxLon: -6.1 },   // Vila Real/Bragança
+    '6': { minLat: 39.0, maxLat: 41.0, minLon: -8.0, maxLon: -6.5 },   // Castelo Branco/Guarda
+    '7': { minLat: 37.5, maxLat: 39.5, minLon: -8.8, maxLon: -7.0 },   // Évora/Beja
+    '8': { minLat: 36.9, maxLat: 37.6, minLon: -9.0, maxLon: -7.3 },   // Faro
+    '9': { minLat: 32.5, maxLat: 39.8, minLon: -17.3, maxLon: -16.2 }, // Madeira/Açores
+  };
+
+  const isValidCoordForPostalCode = (postalCode: string, lat: number, lon: number): boolean => {
+    const prefix = postalCode.charAt(0);
+    const range = ptPostalRanges[prefix];
+    if (!range) return true; // unknown prefix, allow
+    return lat >= range.minLat && lat <= range.maxLat && lon >= range.minLon && lon <= range.maxLon;
+  };
+
   // Geocode postal code with strict PT postcode matching
   const geocodePostalCode = async (
     postalCode: string,
@@ -213,73 +233,78 @@ export function useRouteStops(routeId: string | null) {
     const normalizedCp = `${match[1]}-${match[2]}`;
     const compactCp = `${match[1]}${match[2]}`;
 
-    // 1) GeoAPI.pt
+    // 1) GeoAPI.pt (most accurate for PT)
     try {
       const geoResponse = await fetch(`https://json.geoapi.pt/cp/${normalizedCp}`);
       if (geoResponse.ok) {
         const geoData = await geoResponse.json();
         if (geoData && (geoData.centro || (geoData.latitude && geoData.longitude))) {
-          return {
-            lat: geoData.centro?.[0] || parseFloat(geoData.latitude),
-            lon: geoData.centro?.[1] || parseFloat(geoData.longitude),
-            freguesia: geoData.Freguesia || geoData.freguesia || undefined,
-            municipio: geoData.Concelho || geoData.concelho || geoData.Municipio || undefined,
-            provider: 'GeoAPI.pt',
-          };
+          const lat = geoData.centro?.[0] || parseFloat(geoData.latitude);
+          const lon = geoData.centro?.[1] || parseFloat(geoData.longitude);
+          if (isValidCoordForPostalCode(normalizedCp, lat, lon)) {
+            return {
+              lat, lon,
+              freguesia: geoData.Localidade || geoData.Freguesia || geoData.freguesia || undefined,
+              municipio: geoData.Concelho || geoData.concelho || geoData.Municipio || undefined,
+              provider: 'GeoAPI.pt',
+            };
+          }
         }
       }
     } catch {
       // next fallback
     }
 
-    // 2) Zippopotam (postcode exact match)
+    // 2) Nominatim with postal code + country
     try {
-      const zipResponse = await fetch(`https://api.zippopotam.us/PT/${normalizedCp}`);
+      const searchQuery = `${normalizedCp}, Portugal`;
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&postalcode=${encodeURIComponent(normalizedCp)}&country=Portugal&limit=3&addressdetails=1`
+      );
+      const data = await response.json();
+      if (Array.isArray(data) && data.length > 0) {
+        for (const item of data) {
+          const lat = parseFloat(item.lat);
+          const lon = parseFloat(item.lon);
+          if (isValidCoordForPostalCode(normalizedCp, lat, lon)) {
+            return {
+              lat, lon,
+              freguesia: item?.address?.suburb || item?.address?.village || item?.address?.town || undefined,
+              municipio: item?.address?.city || item?.address?.county || undefined,
+              provider: 'Nominatim',
+            };
+          }
+        }
+      }
+    } catch {
+      // next fallback
+    }
+
+    // 3) Zippopotam (postcode exact match)
+    try {
+      const cp4 = match[1]; // only first 4 digits
+      const zipResponse = await fetch(`https://api.zippopotam.us/PT/${cp4}`);
       if (zipResponse.ok) {
         const zipData = await zipResponse.json();
         const place = zipData?.places?.[0];
         if (place?.latitude && place?.longitude) {
-          return {
-            lat: parseFloat(place.latitude),
-            lon: parseFloat(place.longitude),
-            municipio: place['place name'] || undefined,
-            freguesia: undefined,
-            provider: 'Zippopotam',
-          };
+          const lat = parseFloat(place.latitude);
+          const lon = parseFloat(place.longitude);
+          if (isValidCoordForPostalCode(normalizedCp, lat, lon)) {
+            return {
+              lat, lon,
+              municipio: place['place name'] || undefined,
+              freguesia: undefined,
+              provider: 'Zippopotam',
+            };
+          }
         }
       }
     } catch {
-      // next fallback
+      // no more fallbacks
     }
 
-    // 3) Nominatim with strict postcode validation
-    try {
-      const queryBase = address || (city ? `${normalizedCp}, ${city}, Portugal` : `${normalizedCp}, Portugal`);
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(queryBase)}&limit=5&countrycodes=pt&addressdetails=1`
-      );
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        const valid = data.find((item: any) => {
-          const postcode = String(item?.address?.postcode || '').replace(/\D/g, '');
-          const display = String(item?.display_name || '').replace(/\D/g, '');
-          return postcode.includes(compactCp) || display.includes(compactCp);
-        });
-
-        if (valid?.lat && valid?.lon) {
-          return {
-            lat: parseFloat(valid.lat),
-            lon: parseFloat(valid.lon),
-            freguesia: valid?.address?.suburb || valid?.address?.village || undefined,
-            municipio: valid?.address?.city || valid?.address?.town || valid?.address?.county || undefined,
-            provider: 'Nominatim',
-          };
-        }
-      }
-      return null;
-    } catch {
-      return null;
-    }
+    return null;
   };
 
   return {
