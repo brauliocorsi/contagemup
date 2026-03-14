@@ -260,7 +260,9 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     const fallbackStops: { name: string; cp: string; provider: string }[] = [];
     const failedStops: { name: string; cp: string }[] = [];
     try {
-      for (const stop of targetStops) {
+      for (let i = 0; i < targetStops.length; i++) {
+        const stop = targetStops[i];
+        if (i > 0) await new Promise(r => setTimeout(r, 300)); // rate limit delay
         try {
           const coords = await geocodePostalCode(stop.postal_code!, stop.city || undefined, stop.address || undefined);
           if (coords) {
