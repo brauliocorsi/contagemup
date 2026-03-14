@@ -163,6 +163,9 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
     }
     setGeocoding(true);
     let geocoded = 0;
+    let failed = 0;
+    const fallbackStops: { name: string; cp: string; provider: string }[] = [];
+    const failedStops: { name: string; cp: string }[] = [];
     try {
       for (const stop of targetStops) {
         try {
@@ -173,11 +176,38 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
             if (coords.municipio) updatePayload.municipio = coords.municipio;
             await supabase.from('route_stops').update(updatePayload).eq('id', stop.id);
             geocoded++;
+            if (coords.provider && coords.provider !== 'GeoAPI.pt') {
+              fallbackStops.push({ name: stop.client_name, cp: stop.postal_code!, provider: coords.provider });
+            }
+          } else {
+            failed++;
+            failedStops.push({ name: stop.client_name, cp: stop.postal_code! });
           }
-        } catch { /* skip individual */ }
+        } catch {
+          failed++;
+          failedStops.push({ name: stop.client_name, cp: stop.postal_code! });
+        }
       }
       queryClient.invalidateQueries({ queryKey: ['route-stops', route.id] });
+
+      // Success summary
       toast.success(`${geocoded} de ${targetStops.length} paragem(ns) geocodificada(s)`);
+
+      // Fallback warning
+      if (fallbackStops.length > 0) {
+        toast.warning(
+          `${fallbackStops.length} paragem(ns) usaram fonte alternativa (menos precisa):\n${fallbackStops.map(s => `• ${s.name} (${s.cp}) → ${s.provider}`).join('\n')}`,
+          { duration: 10000 }
+        );
+      }
+
+      // Failed stops alert
+      if (failedStops.length > 0) {
+        toast.error(
+          `${failedStops.length} paragem(ns) ficaram sem coordenadas:\n${failedStops.map(s => `• ${s.name} (${s.cp})`).join('\n')}`,
+          { duration: 10000 }
+        );
+      }
     } catch (err: any) {
       toast.error('Erro ao geocodificar: ' + err.message);
     } finally {
