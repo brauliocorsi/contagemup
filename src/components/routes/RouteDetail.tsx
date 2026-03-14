@@ -234,7 +234,22 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
+                   <div className="flex items-center gap-1">
+                    {stop.venda_id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => {
+                          setSaleDetailVendaId(stop.venda_id);
+                          setSaleDetailVendaCodigo(stop.venda_codigo);
+                          setSaleDetailOpen(true);
+                        }}
+                      >
+                        <FileText className="h-3 w-3" />
+                        Ver Nota
+                      </Button>
+                    )}
                     <Badge
                       variant={stop.status === 'delivered' ? 'default' : 'secondary'}
                       className="text-xs cursor-pointer"
