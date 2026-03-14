@@ -413,26 +413,25 @@ export function RouteDetail({ route, onBack, onUpdateStatus }: RouteDetailProps)
 
   const stopsWithCoords = stops.filter(s => s.latitude && s.longitude);
 
-  const totalDistanceKm = useMemo(() => {
-    let total = 0;
-    // Departure to first stop
-    if (departureLat && departureLon && stopsWithCoords.length > 0) {
-      const first = stopsWithCoords[0];
-      total += haversineKm(departureLat, departureLon, first.latitude!, first.longitude!);
-    }
-    // Between stops
-    for (let i = 0; i < stopsWithCoords.length - 1; i++) {
-      const a = stopsWithCoords[i];
-      const b = stopsWithCoords[i + 1];
-      total += haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!);
-    }
-    // Return to base
+  // Build OSRM waypoints: departure → stops → (return to departure)
+  const osrmWaypoints = useMemo<[number, number][]>(() => {
+    const wp: [number, number][] = [];
+    if (departureLat && departureLon) wp.push([departureLat, departureLon]);
+    stopsWithCoords.forEach(s => wp.push([s.latitude!, s.longitude!]));
     if (returnToBase && departureLat && departureLon && stopsWithCoords.length > 0) {
-      const last = stopsWithCoords[stopsWithCoords.length - 1];
-      total += haversineKm(last.latitude!, last.longitude!, departureLat, departureLon);
+      wp.push([departureLat, departureLon]);
     }
-    return total;
+    return wp;
   }, [stopsWithCoords, departureLat, departureLon, returnToBase]);
+
+  const { legDistances: osrmLegs, totalDistance: totalDistanceKm } = useOSRMDistances(osrmWaypoints);
+
+  // Map leg index to: legOffset is the index where stop-to-stop legs start (after departure leg if present)
+  const hasDeparture = !!(departureLat && departureLon);
+  const departureToFirstKm = hasDeparture && osrmLegs.length > 0 ? osrmLegs[0] : null;
+  const stopLegOffset = hasDeparture ? 1 : 0;
+  // Return leg is the last one if returnToBase
+  const returnLegKm = returnToBase && hasDeparture && osrmLegs.length > 0 ? osrmLegs[osrmLegs.length - 1] : null;
 
   return (
     <div className="space-y-4">
