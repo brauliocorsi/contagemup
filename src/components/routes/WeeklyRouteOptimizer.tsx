@@ -129,6 +129,16 @@ export function WeeklyRouteOptimizer({ onBack }: WeeklyRouteOptimizerProps) {
             <Zap className="h-4 w-4 mr-1" />
             Otimizar Semana
           </Button>
+        </div>
+      </div>
+
+      {/* Optimization Dialog */}
+      <WeeklyOptimizationDialog
+        open={showOptimization}
+        onOpenChange={setShowOptimization}
+        routes={routes.filter(r => weekRouteIds.includes(r.id))}
+        stopsByRoute={stopsByRoute}
+      />
 
       {/* Summary */}
       <div className="flex gap-3">
