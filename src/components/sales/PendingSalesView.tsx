@@ -16,6 +16,12 @@ interface VendaProduto {
   valor_unitario: string;
 }
 
+interface PagamentoInfo {
+  forma: string;
+  valor: string;
+  pendente: boolean;
+}
+
 interface VendaPendente {
   venda_id: string;
   codigo: string;
@@ -29,7 +35,9 @@ interface VendaPendente {
   estado: string;
   cep: string;
   valor_total: string;
-  observacao: string;
+  valor_pago: string;
+  valor_pendente: string;
+  pagamentos: PagamentoInfo[];
   produtos: VendaProduto[];
 }
 
