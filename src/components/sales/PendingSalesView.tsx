@@ -292,6 +292,12 @@ export function PendingSalesView() {
                         )}
                         <span>📅 {venda.data}</span>
                         <span>💰 €{parseFloat(venda.valor_total).toFixed(2)}</span>
+                        {parseFloat(venda.valor_pago) > 0 && (
+                          <span className="text-green-600 dark:text-green-400 font-medium">✅ Pago: €{parseFloat(venda.valor_pago).toFixed(2)}</span>
+                        )}
+                        {parseFloat(venda.valor_pendente) > 0 && (
+                          <span className="text-destructive font-medium">⏳ Pendente: €{parseFloat(venda.valor_pendente).toFixed(2)}</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
