@@ -21,6 +21,7 @@ const RecentProductsView = lazy(() => import('@/components/products/RecentProduc
 const ERPReconciliationView = lazy(() => import('@/components/erp/ERPReconciliationView').then(m => ({ default: m.ERPReconciliationView })));
 const PurchaseOrdersView = lazy(() => import('@/components/purchases/PurchaseOrdersView').then(m => ({ default: m.PurchaseOrdersView })));
 const RoutesView = lazy(() => import('@/components/routes/RoutesView').then(m => ({ default: m.RoutesView })));
+const PendingSalesView = lazy(() => import('@/components/sales/PendingSalesView').then(m => ({ default: m.PendingSalesView })));
 
 // Loading skeleton component
 function ViewLoader() {
@@ -94,6 +95,7 @@ export default function Dashboard() {
           {activeTab === 'erp' && <ERPReconciliationView />}
           {activeTab === 'purchases' && <PurchaseOrdersView />}
           {activeTab === 'routes' && <RoutesView />}
+          {activeTab === 'pending-sales' && <PendingSalesView />}
           {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
           {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
           {activeTab === 'recent' && <RecentProductsView />}
