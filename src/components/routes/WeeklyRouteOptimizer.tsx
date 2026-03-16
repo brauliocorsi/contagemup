@@ -30,6 +30,7 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export function WeeklyRouteOptimizer({ onBack }: WeeklyRouteOptimizerProps) {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [showOptimization, setShowOptimization] = useState(false);
   const { routes } = useRoutes();
   const { regions } = useDeliveryRegions();
 
