@@ -43,6 +43,7 @@ const operationsItems = [
   { id: 'reconciliation', label: 'Separação', icon: Scale },
   { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
   { id: 'purchases', label: 'Compras', icon: ShoppingBag },
+  { id: 'pending-sales', label: 'Vendas Pendentes', icon: FileText },
   { id: 'routes', label: 'Rotas', icon: MapPin },
 ];
 
