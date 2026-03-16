@@ -16,6 +16,12 @@ interface VendaProduto {
   valor_unitario: string;
 }
 
+interface PagamentoInfo {
+  forma: string;
+  valor: string;
+  pendente: boolean;
+}
+
 interface VendaPendente {
   venda_id: string;
   codigo: string;
@@ -29,7 +35,9 @@ interface VendaPendente {
   estado: string;
   cep: string;
   valor_total: string;
-  observacao: string;
+  valor_pago: string;
+  valor_pendente: string;
+  pagamentos: PagamentoInfo[];
   produtos: VendaProduto[];
 }
 
@@ -284,6 +292,12 @@ export function PendingSalesView() {
                         )}
                         <span>📅 {venda.data}</span>
                         <span>💰 €{parseFloat(venda.valor_total).toFixed(2)}</span>
+                        {parseFloat(venda.valor_pago) > 0 && (
+                          <span className="text-green-600 dark:text-green-400 font-medium">✅ Pago: €{parseFloat(venda.valor_pago).toFixed(2)}</span>
+                        )}
+                        {parseFloat(venda.valor_pendente) > 0 && (
+                          <span className="text-destructive font-medium">⏳ Pendente: €{parseFloat(venda.valor_pendente).toFixed(2)}</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -311,6 +325,24 @@ export function PendingSalesView() {
                       <div className="text-sm">
                         <p className="font-medium text-muted-foreground mb-1">✉️ Email</p>
                         <a href={`mailto:${venda.cliente_email}`} className="text-primary hover:underline">{venda.cliente_email}</a>
+                      </div>
+                    )}
+
+                    {/* Payments */}
+                    {venda.pagamentos.length > 0 && (
+                      <div className="text-sm">
+                        <p className="font-medium text-muted-foreground mb-2">💳 Pagamentos</p>
+                        <div className="flex flex-wrap gap-2">
+                          {venda.pagamentos.map((p, i) => (
+                            <Badge key={i} variant={p.pendente ? 'destructive' : 'default'} className="gap-1">
+                              {p.pendente ? '⏳' : '✅'} {p.forma}: €{parseFloat(p.valor).toFixed(2)}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex gap-4 mt-2 font-medium">
+                          <span className="text-green-600 dark:text-green-400">Pago: €{parseFloat(venda.valor_pago).toFixed(2)}</span>
+                          <span className="text-destructive">Pendente: €{parseFloat(venda.valor_pendente).toFixed(2)}</span>
+                        </div>
                       </div>
                     )}
 

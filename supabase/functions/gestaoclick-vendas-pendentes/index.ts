@@ -118,6 +118,35 @@ Deno.serve(async (req) => {
         };
       });
 
+      // Extract payment info
+      const pagamentos = venda.pagamentos || venda.formas_pagamento || [];
+      const PENDING_METHODS = ['pagar na entrega', 'contra entrega', 'pagamento na entrega', 'cobrar na entrega'];
+      let valor_pago = 0;
+      let valor_pendente = 0;
+      const pagamentosList: any[] = [];
+
+      for (const p of (Array.isArray(pagamentos) ? pagamentos : [])) {
+        const forma = String(p.forma_pagamento || p.nome || p.descricao || p.forma || '').trim();
+        const valor = parseFloat(String(p.valor || p.valor_pago || '0')) || 0;
+        const status = String(p.status || '').toLowerCase().trim();
+        const isPending = PENDING_METHODS.some(m => forma.toLowerCase().includes(m))
+          || status.includes('pendente')
+          || status.includes('aberto')
+          || status.includes('aguardando');
+
+        if (isPending) {
+          valor_pendente += valor;
+        } else {
+          valor_pago += valor;
+        }
+        pagamentosList.push({ forma, valor: String(valor), pendente: isPending });
+      }
+
+      // If no payment info, treat full amount as pending
+      if (pagamentosList.length === 0) {
+        valor_pendente = parseFloat(String(venda.valor_total || '0')) || 0;
+      }
+
       allVendas.push({
         venda_id: String(venda.id),
         codigo: String(venda.codigo || ''),
@@ -131,7 +160,9 @@ Deno.serve(async (req) => {
         estado: addr.estado,
         cep: addr.cep,
         valor_total: String(venda.valor_total || '0'),
-        observacao: firstNonEmpty(venda.observacao, venda.observacoes, ''),
+        valor_pago: String(valor_pago.toFixed(2)),
+        valor_pendente: String(valor_pendente.toFixed(2)),
+        pagamentos: pagamentosList,
         produtos,
       });
     };
