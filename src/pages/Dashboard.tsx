@@ -65,7 +65,7 @@ export default function Dashboard() {
   if (activeAuditId) {
     return (
       <div className="min-h-screen bg-background">
-        <Header onNavigateToProducts={handleNavigateToProducts} />
+        <Header onNavigateToProducts={handleNavigateToProducts} activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="container py-4">
           <AuditExecutionView
             auditId={activeAuditId}
