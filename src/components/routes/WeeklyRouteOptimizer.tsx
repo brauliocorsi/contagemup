@@ -5,8 +5,9 @@ import { useDeliveryRegions } from '@/hooks/useDeliveryRegions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, MapPin, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
+import { WeeklyOptimizationDialog } from './WeeklyOptimizationDialog';
 import { pt } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -29,6 +30,7 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export function WeeklyRouteOptimizer({ onBack }: WeeklyRouteOptimizerProps) {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [showOptimization, setShowOptimization] = useState(false);
   const { routes } = useRoutes();
   const { regions } = useDeliveryRegions();
 
@@ -123,8 +125,20 @@ export function WeeklyRouteOptimizer({ onBack }: WeeklyRouteOptimizerProps) {
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setWeekOffset(0)}>Hoje</Button>
+          <Button size="sm" onClick={() => setShowOptimization(true)} disabled={weekRouteIds.length === 0}>
+            <Zap className="h-4 w-4 mr-1" />
+            Otimizar Semana
+          </Button>
         </div>
       </div>
+
+      {/* Optimization Dialog */}
+      <WeeklyOptimizationDialog
+        open={showOptimization}
+        onOpenChange={setShowOptimization}
+        routes={routes.filter(r => weekRouteIds.includes(r.id))}
+        stopsByRoute={stopsByRoute}
+      />
 
       {/* Summary */}
       <div className="flex gap-3">
