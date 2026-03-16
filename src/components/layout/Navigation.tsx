@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { 
-  Package, ClipboardList, History, BarChart3, Tags, Scale, 
+  Package, ClipboardList, History, BarChart3, Tags,
   TrendingUp, TrendingDown, Warehouse, AlertTriangle, AlertOctagon,
-  ChevronDown, Settings, ArrowLeftRight, ShoppingBag, MapPin, FileText
+  ChevronDown, Settings
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -38,14 +38,7 @@ const mainTabs = [
   { id: 'counting', label: 'Contagem', icon: ClipboardList },
 ];
 
-// Grupo de operações
-const operationsItems = [
-  { id: 'reconciliation', label: 'Separação', icon: Scale },
-  { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
-  { id: 'purchases', label: 'Compras', icon: ShoppingBag },
-  { id: 'pending-sales', label: 'Vendas Pendentes', icon: FileText },
-  { id: 'routes', label: 'Rotas', icon: MapPin },
-];
+// Items finais
 
 // Items finais
 const endTabs = [
@@ -74,23 +67,6 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         <div className="flex gap-1 flex-wrap py-2">
           {/* Contagem - sempre visível */}
           {mainTabs.map((tab) => (
-            <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => onTabChange(tab.id)}
-              className={cn(
-                'flex items-center gap-2 whitespace-nowrap',
-                activeTab === tab.id && 'shadow-sm'
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </Button>
-          ))}
-
-          {/* Menus ERP fixos */}
-          {operationsItems.map((tab) => (
             <Button
               key={tab.id}
               variant={activeTab === tab.id ? 'default' : 'ghost'}

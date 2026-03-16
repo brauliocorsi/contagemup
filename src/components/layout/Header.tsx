@@ -4,17 +4,28 @@ import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Package, LogOut, User, ClipboardList, Moon, Sun, Download } from 'lucide-react';
+import { Package, LogOut, User, ClipboardList, Moon, Sun, Download, Scale, ArrowLeftRight, ShoppingBag, FileText, MapPin, ChevronDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { StockAlertsBell } from '@/components/stock/StockAlertsBell';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+const erpItems = [
+  { id: 'reconciliation', label: 'Separação', icon: Scale },
+  { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
+  { id: 'purchases', label: 'Compras', icon: ShoppingBag },
+  { id: 'pending-sales', label: 'Vendas Pendentes', icon: FileText },
+  { id: 'routes', label: 'Rotas', icon: MapPin },
+];
 
 interface HeaderProps {
   onNavigateToProducts?: () => void;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-export function Header({ onNavigateToProducts }: HeaderProps) {
+export function Header({ onNavigateToProducts, activeTab, onTabChange }: HeaderProps) {
   const { profile, signOut } = useAuth();
   const { activeSession } = useActiveSession();
   const { canInstall, isInstalled, install } = usePWAInstall();
@@ -24,6 +35,9 @@ export function Header({ onNavigateToProducts }: HeaderProps) {
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
+
+  const isErpActive = erpItems.some(item => item.id === activeTab);
+  const activeErpLabel = erpItems.find(item => item.id === activeTab)?.label || 'ERP & Operações';
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -45,6 +59,44 @@ export function Header({ onNavigateToProducts }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* ERP & Operations dropdown */}
+          {onTabChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={isErpActive ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    'gap-2 whitespace-nowrap',
+                    isErpActive && 'shadow-sm'
+                  )}
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                  <span className="hidden sm:inline">{isErpActive ? activeErpLabel : 'ERP & Operações'}</span>
+                  <span className="sm:hidden">ERP</span>
+                  <ChevronDown className="h-3 w-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel>ERP & Operações</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {erpItems.map((item) => (
+                  <DropdownMenuItem
+                    key={item.id}
+                    onClick={() => onTabChange(item.id)}
+                    className={cn(
+                      'flex items-center gap-2 cursor-pointer',
+                      activeTab === item.id && 'bg-accent font-medium'
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {!isInstalled && (
             <Button
               variant="outline"
