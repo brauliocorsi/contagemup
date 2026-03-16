@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { 
-  Package, ClipboardList, History, BarChart3, Tags, Scale, 
+  Package, ClipboardList, History, BarChart3, Tags,
   TrendingUp, TrendingDown, Warehouse, AlertTriangle, AlertOctagon,
-  ChevronDown, Settings, ArrowLeftRight, ShoppingBag, MapPin, FileText
+  ChevronDown, Settings
 } from 'lucide-react';
 import {
   DropdownMenu,
