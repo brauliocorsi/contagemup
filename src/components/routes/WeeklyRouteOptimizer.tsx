@@ -125,8 +125,10 @@ export function WeeklyRouteOptimizer({ onBack }: WeeklyRouteOptimizerProps) {
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setWeekOffset(0)}>Hoje</Button>
-        </div>
-      </div>
+          <Button size="sm" onClick={() => setShowOptimization(true)} disabled={weekRouteIds.length === 0}>
+            <Zap className="h-4 w-4 mr-1" />
+            Otimizar Semana
+          </Button>
 
       {/* Summary */}
       <div className="flex gap-3">
