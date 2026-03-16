@@ -299,10 +299,10 @@ export function PendingSalesView() {
                 {isExpanded && (
                   <div className="border-t bg-muted/30 p-4 space-y-3">
                     {/* Address */}
-                    {venda.endereco && (
+                    {(venda.endereco || venda.cidade) && (
                       <div className="text-sm">
                         <p className="font-medium text-muted-foreground mb-1">📍 Morada</p>
-                        <p>{venda.endereco}</p>
+                        {venda.endereco && <p>{venda.endereco}</p>}
                         <p>{[venda.cidade, venda.estado, venda.cep].filter(Boolean).join(' - ')}</p>
                       </div>
                     )}
@@ -311,13 +311,6 @@ export function PendingSalesView() {
                       <div className="text-sm">
                         <p className="font-medium text-muted-foreground mb-1">✉️ Email</p>
                         <a href={`mailto:${venda.cliente_email}`} className="text-primary hover:underline">{venda.cliente_email}</a>
-                      </div>
-                    )}
-
-                    {venda.observacao && (
-                      <div className="text-sm">
-                        <p className="font-medium text-muted-foreground mb-1">📝 Observação</p>
-                        <p>{venda.observacao}</p>
                       </div>
                     )}
 
