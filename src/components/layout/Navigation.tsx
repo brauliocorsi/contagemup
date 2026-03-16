@@ -38,14 +38,7 @@ const mainTabs = [
   { id: 'counting', label: 'Contagem', icon: ClipboardList },
 ];
 
-// Grupo de operações
-const operationsItems = [
-  { id: 'reconciliation', label: 'Separação', icon: Scale },
-  { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
-  { id: 'purchases', label: 'Compras', icon: ShoppingBag },
-  { id: 'pending-sales', label: 'Vendas Pendentes', icon: FileText },
-  { id: 'routes', label: 'Rotas', icon: MapPin },
-];
+// Items finais
 
 // Items finais
 const endTabs = [
