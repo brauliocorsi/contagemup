@@ -43,7 +43,7 @@ function ViewLoader() {
 }
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('counting');
+  const [activeTab, setActiveTab] = useState('home');
   const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
 
   const handleNavigateToProducts = () => {
