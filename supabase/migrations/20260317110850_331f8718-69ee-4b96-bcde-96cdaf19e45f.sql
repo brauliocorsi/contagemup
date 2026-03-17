@@ -1,0 +1,1 @@
+SELECT public.recalculate_all_stock();
