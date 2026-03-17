@@ -84,6 +84,7 @@ export default function Dashboard() {
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="container py-4">
         <Suspense fallback={<ViewLoader />}>
+          {activeTab === 'home' && <DashboardHome onNavigate={setActiveTab} />}
           {activeTab === 'counting' && <CountingView />}
           {activeTab === 'products' && <ProductsView />}
           {activeTab === 'categories' && <CategoriesView />}
