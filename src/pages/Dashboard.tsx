@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header';
 import { Navigation } from '@/components/layout/Navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AuditExecutionView } from '@/components/audit/AuditExecutionView';
+import { DashboardHome } from '@/components/dashboard/DashboardHome';
 
 // Lazy loading - cada view é carregada apenas quando necessária
 const CountingView = lazy(() => import('@/components/counting/CountingView').then(m => ({ default: m.CountingView })));
