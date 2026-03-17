@@ -13,6 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useStockMovements, MovementItem, ParsedCSVItem } from '@/hooks/useStockMovements';
 import { usePickingHistory } from '@/hooks/usePickingHistory';
 import { useDetailedPickingData } from '@/hooks/useDetailedPickingData';
@@ -78,6 +88,17 @@ export function StockExitsView() {
     totalColis: number;
   } | null>(null);
   const [pendingLocationSelections, setPendingLocationSelections] = useState<Map<string, LocationSelection[]>>(new Map());
+  
+  // Incomplete set warning state
+  const [incompleteSetWarnings, setIncompleteSetWarnings] = useState<Array<{
+    product_code: string;
+    product_name: string;
+    totalColis: number;
+    colisBeingRemoved: number[];
+    colisMissing: number[];
+  }>>([]);
+  const [showIncompleteSetWarning, setShowIncompleteSetWarning] = useState(false);
+  const [pendingItemsAfterWarning, setPendingItemsAfterWarning] = useState<MovementItem[]>([]);
 
   // Create stock map for validation
   const stockMap = useMemo(() => {
@@ -208,8 +229,61 @@ export function StockExitsView() {
     }
     setColisValidationMessage(null);
 
+    // Check for incomplete set exits (individual colis mode not covering all parts)
+    const warnings = checkIncompleteSetExits(allItems);
+    if (warnings.length > 0) {
+      setIncompleteSetWarnings(warnings);
+      setPendingItemsAfterWarning(allItems);
+      setShowIncompleteSetWarning(true);
+      return;
+    }
+
+    // Continue with location selection and picking report
+    await proceedAfterIncompleteCheck(allItems);
+  };
+
+  // Check if any item is exiting individual colis without completing the full set
+  const checkIncompleteSetExits = (items: MovementItem[]) => {
+    const warnings: typeof incompleteSetWarnings = [];
+
+    for (const item of items) {
+      // Only check items in individual colis mode
+      if (item.isCompleteSet !== false || !item.colisQuantities) continue;
+
+      const product = products.find(p => p.id === item.product_id);
+      if (!product || product.total_colis <= 1) continue;
+
+      const colisBeingRemoved: number[] = [];
+      const colisMissing: number[] = [];
+
+      for (let i = 1; i <= product.total_colis; i++) {
+        const qty = item.colisQuantities[i] || 0;
+        if (qty > 0) {
+          colisBeingRemoved.push(i);
+        } else {
+          colisMissing.push(i);
+        }
+      }
+
+      // If some colis are being removed but not all, warn
+      if (colisBeingRemoved.length > 0 && colisMissing.length > 0) {
+        warnings.push({
+          product_code: item.product_code,
+          product_name: item.product_name,
+          totalColis: product.total_colis,
+          colisBeingRemoved,
+          colisMissing,
+        });
+      }
+    }
+
+    return warnings;
+  };
+
+  // Proceed after incomplete set warning is acknowledged
+  const proceedAfterIncompleteCheck = async (items: MovementItem[]) => {
     // Check for split colis that need location selection
-    const itemsNeedingLocationSelection = await checkForSplitColis(allItems);
+    const itemsNeedingLocationSelection = await checkForSplitColis(items);
     if (itemsNeedingLocationSelection.length > 0) {
       // Process first item that needs location selection
       const firstItem = itemsNeedingLocationSelection[0];
@@ -219,7 +293,7 @@ export function StockExitsView() {
     }
 
     // All good, show picking report
-    showPickingReportWithItems(allItems);
+    showPickingReportWithItems(items);
   };
 
   // Check for products with colis split across multiple locations
@@ -745,6 +819,59 @@ export function StockExitsView() {
           onConfirm={handleLocationSelectionConfirm}
         />
       )}
+
+      {/* Incomplete Set Warning Dialog */}
+      <AlertDialog open={showIncompleteSetWarning} onOpenChange={setShowIncompleteSetWarning}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Saída Parcial de Produto
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Os seguintes produtos não terão todos os colis retirados, ficando com partes soltas no armazém:</p>
+                {incompleteSetWarnings.map((w, idx) => (
+                  <div key={idx} className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-1">
+                    <p className="font-medium text-sm text-foreground">{w.product_code}</p>
+                    <p className="text-xs text-muted-foreground">{w.product_name}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {Array.from({ length: w.totalColis }, (_, i) => i + 1).map(coli => (
+                        <Badge
+                          key={coli}
+                          variant={w.colisBeingRemoved.includes(coli) ? "destructive" : "secondary"}
+                          className="text-xs"
+                        >
+                          Coli {coli}: {w.colisBeingRemoved.includes(coli) ? 'Sai' : 'Fica'}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <p className="text-sm font-medium">Deseja continuar com a saída parcial?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowIncompleteSetWarning(false);
+              setPendingItemsAfterWarning([]);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setShowIncompleteSetWarning(false);
+                await proceedAfterIncompleteCheck(pendingItemsAfterWarning);
+                setPendingItemsAfterWarning([]);
+              }}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Sim, continuar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
