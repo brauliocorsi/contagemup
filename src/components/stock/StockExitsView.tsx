@@ -229,8 +229,61 @@ export function StockExitsView() {
     }
     setColisValidationMessage(null);
 
+    // Check for incomplete set exits (individual colis mode not covering all parts)
+    const warnings = checkIncompleteSetExits(allItems);
+    if (warnings.length > 0) {
+      setIncompleteSetWarnings(warnings);
+      setPendingItemsAfterWarning(allItems);
+      setShowIncompleteSetWarning(true);
+      return;
+    }
+
+    // Continue with location selection and picking report
+    await proceedAfterIncompleteCheck(allItems);
+  };
+
+  // Check if any item is exiting individual colis without completing the full set
+  const checkIncompleteSetExits = (items: MovementItem[]) => {
+    const warnings: typeof incompleteSetWarnings = [];
+
+    for (const item of items) {
+      // Only check items in individual colis mode
+      if (item.isCompleteSet !== false || !item.colisQuantities) continue;
+
+      const product = products.find(p => p.id === item.product_id);
+      if (!product || product.total_colis <= 1) continue;
+
+      const colisBeingRemoved: number[] = [];
+      const colisMissing: number[] = [];
+
+      for (let i = 1; i <= product.total_colis; i++) {
+        const qty = item.colisQuantities[i] || 0;
+        if (qty > 0) {
+          colisBeingRemoved.push(i);
+        } else {
+          colisMissing.push(i);
+        }
+      }
+
+      // If some colis are being removed but not all, warn
+      if (colisBeingRemoved.length > 0 && colisMissing.length > 0) {
+        warnings.push({
+          product_code: item.product_code,
+          product_name: item.product_name,
+          totalColis: product.total_colis,
+          colisBeingRemoved,
+          colisMissing,
+        });
+      }
+    }
+
+    return warnings;
+  };
+
+  // Proceed after incomplete set warning is acknowledged
+  const proceedAfterIncompleteCheck = async (items: MovementItem[]) => {
     // Check for split colis that need location selection
-    const itemsNeedingLocationSelection = await checkForSplitColis(allItems);
+    const itemsNeedingLocationSelection = await checkForSplitColis(items);
     if (itemsNeedingLocationSelection.length > 0) {
       // Process first item that needs location selection
       const firstItem = itemsNeedingLocationSelection[0];
@@ -240,7 +293,7 @@ export function StockExitsView() {
     }
 
     // All good, show picking report
-    showPickingReportWithItems(allItems);
+    showPickingReportWithItems(items);
   };
 
   // Check for products with colis split across multiple locations
