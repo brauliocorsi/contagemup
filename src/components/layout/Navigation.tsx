@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { 
   Package, ClipboardList, History, BarChart3, Tags,
   TrendingUp, TrendingDown, Warehouse, AlertTriangle, AlertOctagon,
-  ChevronDown, Settings
+  ChevronDown, Settings, LayoutDashboard
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -35,6 +35,7 @@ const managementItems = [
 
 // Items principais (não agrupados)
 const mainTabs = [
+  { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'counting', label: 'Contagem', icon: ClipboardList },
 ];
 

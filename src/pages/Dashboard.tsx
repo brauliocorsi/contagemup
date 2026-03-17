@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header';
 import { Navigation } from '@/components/layout/Navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AuditExecutionView } from '@/components/audit/AuditExecutionView';
+import { DashboardHome } from '@/components/dashboard/DashboardHome';
 
 // Lazy loading - cada view é carregada apenas quando necessária
 const CountingView = lazy(() => import('@/components/counting/CountingView').then(m => ({ default: m.CountingView })));
@@ -42,7 +43,7 @@ function ViewLoader() {
 }
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('counting');
+  const [activeTab, setActiveTab] = useState('home');
   const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
 
   const handleNavigateToProducts = () => {
@@ -83,6 +84,7 @@ export default function Dashboard() {
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="container py-4">
         <Suspense fallback={<ViewLoader />}>
+          {activeTab === 'home' && <DashboardHome onNavigate={setActiveTab} />}
           {activeTab === 'counting' && <CountingView />}
           {activeTab === 'products' && <ProductsView />}
           {activeTab === 'categories' && <CategoriesView />}
