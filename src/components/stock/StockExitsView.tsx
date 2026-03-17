@@ -819,6 +819,59 @@ export function StockExitsView() {
           onConfirm={handleLocationSelectionConfirm}
         />
       )}
+
+      {/* Incomplete Set Warning Dialog */}
+      <AlertDialog open={showIncompleteSetWarning} onOpenChange={setShowIncompleteSetWarning}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Saída Parcial de Produto
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Os seguintes produtos não terão todos os colis retirados, ficando com partes soltas no armazém:</p>
+                {incompleteSetWarnings.map((w, idx) => (
+                  <div key={idx} className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-1">
+                    <p className="font-medium text-sm text-foreground">{w.product_code}</p>
+                    <p className="text-xs text-muted-foreground">{w.product_name}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {Array.from({ length: w.totalColis }, (_, i) => i + 1).map(coli => (
+                        <Badge
+                          key={coli}
+                          variant={w.colisBeingRemoved.includes(coli) ? "destructive" : "secondary"}
+                          className="text-xs"
+                        >
+                          Coli {coli}: {w.colisBeingRemoved.includes(coli) ? 'Sai' : 'Fica'}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <p className="text-sm font-medium">Deseja continuar com a saída parcial?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowIncompleteSetWarning(false);
+              setPendingItemsAfterWarning([]);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setShowIncompleteSetWarning(false);
+                await proceedAfterIncompleteCheck(pendingItemsAfterWarning);
+                setPendingItemsAfterWarning([]);
+              }}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Sim, continuar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
