@@ -483,17 +483,16 @@ export function StockExitsView() {
       items: pickingSessionItems,
     });
 
-    // Decrementar o stock físico na tabela counts para TODOS os colis
-    // Esta é a única forma de reduzir o stock - o trigger apenas lê os counts
+    // Decrementar o stock físico via função atómica da BD
+    // Isto garante que TODOS os decrementos são aplicados de forma fiável
     for (const item of detailedPickingItems) {
       const product = products.find(p => p.id === item.product_id);
       const totalColis = product?.total_colis || 1;
 
-      // Encontrar item original no carrinho para verificar modo set/individual
       const cartItem = allItems.find(ci => ci.product_id === item.product_id);
       const isCompleteSet = cartItem?.isCompleteSet !== false;
 
-      // Se o item tem um orderNumber associado, remover da tabela stock_order_numbers
+      // Remover order number se aplicável
       if (cartItem?.orderNumber) {
         const { data: orderEntry } = await supabase
           .from('stock_order_numbers')
@@ -507,70 +506,34 @@ export function StockExitsView() {
         }
       }
 
-      // Decrementar cada colis do produto
-      // Verificar se temos selecções de localização guardadas para este produto
+      // Preparar selecções de localização
       const locationSelections = pendingLocationSelections.get(item.product_id);
+      const locationSelectionsJson = locationSelections 
+        ? locationSelections.map(s => ({
+            colisNumber: s.colisNumber,
+            countId: s.countId,
+            quantityToDeduct: s.quantityToDeduct,
+          }))
+        : [];
 
-      for (let colisNumber = 1; colisNumber <= totalColis; colisNumber++) {
-        // Determinar quantidade a decrementar para este colis
-        const colisQty = isCompleteSet 
-          ? item.quantity 
-          : (cartItem?.colisQuantities?.[colisNumber] || 0);
+      // Preparar quantidades por coli (modo individual)
+      const colisQuantitiesObj = !isCompleteSet && cartItem?.colisQuantities
+        ? cartItem.colisQuantities
+        : {};
 
-        // Só processar se há quantidade a remover
-        if (colisQty <= 0) continue;
+      // Chamar função atómica da BD
+      const { error: decrError } = await supabase.rpc('decrement_counts_for_picking', {
+        p_product_id: item.product_id,
+        p_total_colis: totalColis,
+        p_is_complete_set: isCompleteSet,
+        p_set_quantity: isCompleteSet ? item.quantity : 0,
+        p_colis_quantities: colisQuantitiesObj,
+        p_location_selections: locationSelectionsJson,
+      });
 
-        // Se temos selecções de localização específicas para este colis, usar essas
-        const colisSelections = locationSelections?.filter(s => s.colisNumber === colisNumber);
-        
-        if (colisSelections && colisSelections.length > 0) {
-          // Usar as selecções específicas do utilizador
-          for (const selection of colisSelections) {
-            if (selection.quantityToDeduct <= 0) continue;
-            
-            // Buscar o count específico
-            const { data: countData } = await supabase
-              .from('counts')
-              .select('id, quantity')
-              .eq('id', selection.countId)
-              .single();
-            
-            if (countData) {
-              const newQty = Math.max(0, countData.quantity - selection.quantityToDeduct);
-              await supabase
-                .from('counts')
-                .update({ quantity: newQty, updated_at: new Date().toISOString() })
-                .eq('id', selection.countId);
-            }
-          }
-        } else {
-          // Comportamento padrão: buscar counts e decrementar do primeiro com stock
-          const { data: existingCounts } = await supabase
-            .from('counts')
-            .select('id, quantity')
-            .eq('product_id', item.product_id)
-            .eq('colis_number', colisNumber)
-            .gt('quantity', 0)
-            .order('quantity', { ascending: false });
-
-          if (existingCounts && existingCounts.length > 0) {
-            let remainingToDeduct = colisQty;
-            
-            for (const count of existingCounts) {
-              if (remainingToDeduct <= 0) break;
-              
-              const deductFromThis = Math.min(count.quantity, remainingToDeduct);
-              const newQty = count.quantity - deductFromThis;
-              
-              await supabase
-                .from('counts')
-                .update({ quantity: newQty, updated_at: new Date().toISOString() })
-                .eq('id', count.id);
-              
-              remainingToDeduct -= deductFromThis;
-            }
-          }
-        }
+      if (decrError) {
+        console.error('Erro ao decrementar stock:', decrError);
+        toast.error(`Erro ao decrementar stock de ${item.product_name}`);
       }
     }
 
