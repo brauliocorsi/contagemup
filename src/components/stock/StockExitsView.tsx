@@ -13,6 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useStockMovements, MovementItem, ParsedCSVItem } from '@/hooks/useStockMovements';
 import { usePickingHistory } from '@/hooks/usePickingHistory';
 import { useDetailedPickingData } from '@/hooks/useDetailedPickingData';
