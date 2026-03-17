@@ -35,6 +35,7 @@ const managementItems = [
 
 // Items principais (não agrupados)
 const mainTabs = [
+  { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'counting', label: 'Contagem', icon: ClipboardList },
 ];
 
