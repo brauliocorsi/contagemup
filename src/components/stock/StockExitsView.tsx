@@ -88,6 +88,17 @@ export function StockExitsView() {
     totalColis: number;
   } | null>(null);
   const [pendingLocationSelections, setPendingLocationSelections] = useState<Map<string, LocationSelection[]>>(new Map());
+  
+  // Incomplete set warning state
+  const [incompleteSetWarnings, setIncompleteSetWarnings] = useState<Array<{
+    product_code: string;
+    product_name: string;
+    totalColis: number;
+    colisBeingRemoved: number[];
+    colisMissing: number[];
+  }>>([]);
+  const [showIncompleteSetWarning, setShowIncompleteSetWarning] = useState(false);
+  const [pendingItemsAfterWarning, setPendingItemsAfterWarning] = useState<MovementItem[]>([]);
 
   // Create stock map for validation
   const stockMap = useMemo(() => {
