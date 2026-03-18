@@ -95,7 +95,7 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
   };
 
   return (
-    <Dialog open={!!productId} onOpenChange={(open) => { if (!open) { onClose(); setShowSales(false); setSelectedVenda(null); } }}>
+    <Dialog open={!!productId} onOpenChange={(open) => { if (!open) { onClose(); setShowSales(false); } }}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
