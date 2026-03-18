@@ -61,9 +61,25 @@ export function CancellationsView() {
 
   const { fetchSales, getSalesForProduct, salesMap, loaded: salesLoaded, loading: salesFetching } = useProductSales();
 
+  // Transform sale-based suggestions into product-based groupings, including products without matches
   const productSuggestions = useMemo<ProductSuggestion[]>(() => {
-    if (suggestions.length === 0) return [];
+    if (!vendaDetail) return [];
     const productMap = new Map<string, ProductSuggestion>();
+
+    // Initialize ALL products from the cancelled sale
+    for (const p of vendaDetail.produtos) {
+      const key = p.codigo.trim().toLowerCase();
+      if (!productMap.has(key)) {
+        productMap.set(key, {
+          codigo: p.codigo,
+          nome: p.nome,
+          qtdOrigem: parseInt(p.quantidade) || 0,
+          vendas: [],
+        });
+      }
+    }
+
+    // Fill in matched sales
     for (const s of suggestions) {
       for (const mp of s.matchingProducts) {
         const key = mp.codigo.trim().toLowerCase();
@@ -75,18 +91,23 @@ export function CancellationsView() {
             vendas: [],
           });
         }
-        productMap.get(key)!.vendas.push({
-          venda_id: s.venda.venda_id,
-          codigo: s.venda.codigo,
-          cliente_nome: s.venda.cliente_nome,
-          situacao: s.venda.situacao,
-          data: s.venda.data,
-          qtdDestino: mp.qtdDestino,
-        });
+        const existing = productMap.get(key)!;
+        const alreadyHas = existing.vendas.some(v => v.venda_id === s.venda.venda_id);
+        if (!alreadyHas) {
+          existing.vendas.push({
+            venda_id: s.venda.venda_id,
+            codigo: s.venda.codigo,
+            cliente_nome: s.venda.cliente_nome,
+            situacao: s.venda.situacao,
+            data: s.venda.data,
+            qtdDestino: mp.qtdDestino,
+          });
+        }
       }
     }
+    // Sort: products with matches first, then by number of matches desc
     return Array.from(productMap.values()).sort((a, b) => b.vendas.length - a.vendas.length);
-  }, [suggestions]);
+  }, [suggestions, vendaDetail]);
 
   const handleSearch = async () => {
     const code = searchCode.trim();
@@ -153,14 +174,17 @@ export function CancellationsView() {
           seenVendas.add(sale.venda_id);
 
           for (const cancelledProd of cancelledProducts) {
-            // Try matching by code first, then by name
             const matchingDestProduct = sale.produtos.find(sp => {
               const spCode = normalize(sp.codigo);
               const spName = normalizeName(sp.nome);
-              // Match by code (if both non-empty)
+              // Match by code (exact)
               if (cancelledProd.normalizedCode && spCode && cancelledProd.normalizedCode === spCode) return true;
-              // Match by name (if both non-empty and code didn't match)
+              // Match by name (exact)
               if (cancelledProd.normalizedName && spName && cancelledProd.normalizedName === spName) return true;
+              // Match by partial name (contains) - at least 5 chars to avoid false positives
+              if (cancelledProd.normalizedName.length >= 5 && spName.length >= 5) {
+                if (spName.includes(cancelledProd.normalizedName) || cancelledProd.normalizedName.includes(spName)) return true;
+              }
               return false;
             });
 
@@ -345,34 +369,45 @@ export function CancellationsView() {
                     {productSuggestions.map((ps) => {
                       const isExpanded = expandedSuggestions.has(ps.codigo);
                       return (
-                        <div key={ps.codigo} className="border rounded-lg overflow-hidden">
+                        <div key={ps.codigo} className={`border rounded-lg overflow-hidden ${ps.vendas.length === 0 ? 'opacity-60' : ''}`}>
                           {/* Product header */}
                           <button
                             onClick={() => {
+                              if (ps.vendas.length === 0) return;
                               setExpandedSuggestions(prev => {
                                 const next = new Set(prev);
                                 next.has(ps.codigo) ? next.delete(ps.codigo) : next.add(ps.codigo);
                                 return next;
                               });
                             }}
-                            className={`w-full text-left p-3 transition-colors ${isExpanded ? 'bg-primary/5' : 'hover:bg-muted/50'}`}
+                            className={`w-full text-left p-3 transition-colors ${
+                              ps.vendas.length === 0 ? 'cursor-default' : isExpanded ? 'bg-primary/5' : 'hover:bg-muted/50'
+                            }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2 min-w-0">
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                {ps.vendas.length > 0 ? (
+                                  isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  )
                                 ) : (
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
                                 )}
                                 <Package className="h-4 w-4 text-primary shrink-0" />
                                 <span className="font-medium text-sm truncate">{ps.nome}</span>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
                                 <Badge variant="destructive" className="text-xs">{ps.qtdOrigem} un.</Badge>
-                                <Badge variant="secondary" className="text-xs gap-1">
-                                  <ShoppingCart className="h-3 w-3" />
-                                  {ps.vendas.length} venda(s)
-                                </Badge>
+                                {ps.vendas.length > 0 ? (
+                                  <Badge variant="secondary" className="text-xs gap-1">
+                                    <ShoppingCart className="h-3 w-3" />
+                                    {ps.vendas.length} venda(s)
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs text-muted-foreground">Sem correspondência</Badge>
+                                )}
                               </div>
                             </div>
                             <div className="text-xs text-muted-foreground ml-8 mt-1">
@@ -381,7 +416,7 @@ export function CancellationsView() {
                           </button>
 
                           {/* Collapsed sales list */}
-                          {isExpanded && (
+                          {isExpanded && ps.vendas.length > 0 && (
                             <div className="border-t bg-muted/20 p-2 space-y-1.5">
                               {ps.vendas.map((v) => (
                                 <div key={v.venda_id} className="flex items-center justify-between p-2 rounded-md bg-background border text-xs">
