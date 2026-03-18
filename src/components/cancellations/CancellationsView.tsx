@@ -61,9 +61,25 @@ export function CancellationsView() {
 
   const { fetchSales, getSalesForProduct, salesMap, loaded: salesLoaded, loading: salesFetching } = useProductSales();
 
+  // Transform sale-based suggestions into product-based groupings, including products without matches
   const productSuggestions = useMemo<ProductSuggestion[]>(() => {
-    if (suggestions.length === 0) return [];
+    if (!vendaDetail) return [];
     const productMap = new Map<string, ProductSuggestion>();
+
+    // Initialize ALL products from the cancelled sale
+    for (const p of vendaDetail.produtos) {
+      const key = p.codigo.trim().toLowerCase();
+      if (!productMap.has(key)) {
+        productMap.set(key, {
+          codigo: p.codigo,
+          nome: p.nome,
+          qtdOrigem: parseInt(p.quantidade) || 0,
+          vendas: [],
+        });
+      }
+    }
+
+    // Fill in matched sales
     for (const s of suggestions) {
       for (const mp of s.matchingProducts) {
         const key = mp.codigo.trim().toLowerCase();
@@ -75,18 +91,23 @@ export function CancellationsView() {
             vendas: [],
           });
         }
-        productMap.get(key)!.vendas.push({
-          venda_id: s.venda.venda_id,
-          codigo: s.venda.codigo,
-          cliente_nome: s.venda.cliente_nome,
-          situacao: s.venda.situacao,
-          data: s.venda.data,
-          qtdDestino: mp.qtdDestino,
-        });
+        const existing = productMap.get(key)!;
+        const alreadyHas = existing.vendas.some(v => v.venda_id === s.venda.venda_id);
+        if (!alreadyHas) {
+          existing.vendas.push({
+            venda_id: s.venda.venda_id,
+            codigo: s.venda.codigo,
+            cliente_nome: s.venda.cliente_nome,
+            situacao: s.venda.situacao,
+            data: s.venda.data,
+            qtdDestino: mp.qtdDestino,
+          });
+        }
       }
     }
+    // Sort: products with matches first, then by number of matches desc
     return Array.from(productMap.values()).sort((a, b) => b.vendas.length - a.vendas.length);
-  }, [suggestions]);
+  }, [suggestions, vendaDetail]);
 
   const handleSearch = async () => {
     const code = searchCode.trim();
