@@ -337,255 +337,248 @@ export function CancellationsView() {
 
       {/* Sale Detail */}
       {vendaDetail && (
-        <div className={`grid grid-cols-1 gap-4 ${bestChoices.length > 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
-          {/* Left: Sale to cancel */}
+        <div className="space-y-4">
+          {/* Top: Cancelled sale info */}
           <Card className="border-destructive/30">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <XCircle className="h-4 w-4 text-destructive" />
-                  Venda a Cancelar
-                </span>
-                <Badge variant="destructive">#{vendaDetail.codigo}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="truncate">{vendaDetail.cliente_nome || '—'}</span>
+            <CardContent className="pt-4">
+              <div className="flex flex-col md:flex-row md:items-start gap-4">
+                <div className="flex items-center gap-2 shrink-0">
+                  <XCircle className="h-5 w-5 text-destructive" />
+                  <span className="font-semibold">Venda a Cancelar</span>
+                  <Badge variant="destructive">#{vendaDetail.codigo}</Badge>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>{vendaDetail.data || '—'}</span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <span className="flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    {vendaDetail.cliente_nome || '—'}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                    {vendaDetail.data || '—'}
+                  </span>
+                  <Badge variant="outline">{vendaDetail.situacao}</Badge>
+                  <span className="text-muted-foreground">€{parseFloat(vendaDetail.valor_total).toFixed(2)}</span>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Badge variant="outline">{vendaDetail.situacao}</Badge>
-                <span className="text-muted-foreground">€{parseFloat(vendaDetail.valor_total).toFixed(2)}</span>
+                <div className="md:ml-auto shrink-0">
+                  <Button
+                    onClick={handleFindTransfers}
+                    disabled={suggestionsLoading || salesFetching}
+                    className="gap-2"
+                    variant="outline"
+                    size="sm"
+                  >
+                    {suggestionsLoading || salesFetching ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShoppingCart className="h-4 w-4" />
+                    )}
+                    Encontrar vendas
+                  </Button>
+                </div>
               </div>
 
-              <Separator />
+              <Separator className="my-3" />
 
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                   <Package className="h-3 w-3" />
                   Produtos ({vendaDetail.produtos.length})
                 </p>
-                <div className="space-y-1">
+                <div className="flex flex-wrap gap-2">
                   {vendaDetail.produtos.map((p, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm py-1 px-2 rounded bg-muted/50">
-                      <div className="min-w-0">
-                        <span className="font-mono text-xs text-muted-foreground mr-2">{p.codigo}</span>
-                        <span className="truncate">{p.nome}</span>
-                      </div>
-                      <Badge variant="secondary" className="shrink-0 text-xs">{p.quantidade} un.</Badge>
+                    <div key={i} className="flex items-center gap-2 text-sm py-1 px-2.5 rounded-md bg-muted/50 border">
+                      <span className="font-mono text-xs text-muted-foreground">{p.codigo}</span>
+                      <span className="truncate max-w-[200px]">{p.nome}</span>
+                      <Badge variant="secondary" className="text-xs shrink-0">{p.quantidade} un.</Badge>
                     </div>
                   ))}
                 </div>
               </div>
-
-              <Button
-                onClick={handleFindTransfers}
-                disabled={suggestionsLoading || salesFetching}
-                className="w-full gap-2 mt-2"
-                variant="outline"
-              >
-                {suggestionsLoading || salesFetching ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ShoppingCart className="h-4 w-4" />
-                )}
-                Encontrar vendas para transferir
-              </Button>
             </CardContent>
           </Card>
 
-          {/* Middle: Best choices card */}
-          {bestChoices.length > 0 && (
-            <Card className="border-yellow-500/40 bg-yellow-50/30 dark:bg-yellow-950/10">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                  Melhores Escolhas
-                  <Badge className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700" variant="outline">
-                    Top {bestChoices.length}
-                  </Badge>
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">Vendas que cobrem mais produtos da nota cancelada</p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {bestChoices.map((choice, idx) => (
-                    <div
-                      key={choice.venda_id}
-                      className={`p-3 rounded-lg border transition-colors ${
-                        idx === 0
-                          ? 'bg-yellow-100/60 dark:bg-yellow-900/20 border-yellow-400/60 dark:border-yellow-600/40 ring-1 ring-yellow-400/30'
-                          : 'bg-background border-border hover:bg-muted/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          {idx === 0 && <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400 fill-yellow-500/50" />}
-                          <span className={`font-mono font-bold text-sm ${idx === 0 ? 'text-yellow-800 dark:text-yellow-300' : ''}`}>
-                            #{choice.codigo}
-                          </span>
-                          <Badge variant="outline" className="text-[10px]">{choice.situacao}</Badge>
+          {/* Best Choices + Suggestions side by side */}
+          {(productSuggestions.length > 0 || suggestionsLoading) && (
+            <div className={`grid grid-cols-1 gap-4 ${bestChoices.length > 0 ? 'lg:grid-cols-3' : ''}`}>
+              {/* Best choices */}
+              {bestChoices.length > 0 && (
+                <Card className="border-yellow-500/40 bg-yellow-50/30 dark:bg-yellow-950/10">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Trophy className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                      Melhores Escolhas
+                      <Badge className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700" variant="outline">
+                        Top {bestChoices.length}
+                      </Badge>
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Vendas que cobrem mais produtos</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {bestChoices.map((choice, idx) => (
+                        <div
+                          key={choice.venda_id}
+                          className={`p-3 rounded-lg border transition-colors ${
+                            idx === 0
+                              ? 'bg-yellow-100/60 dark:bg-yellow-900/20 border-yellow-400/60 dark:border-yellow-600/40 ring-1 ring-yellow-400/30'
+                              : 'bg-background border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2">
+                              {idx === 0 && <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400 fill-yellow-500/50" />}
+                              <span className={`font-mono font-bold text-sm ${idx === 0 ? 'text-yellow-800 dark:text-yellow-300' : ''}`}>
+                                #{choice.codigo}
+                              </span>
+                              <Badge variant="outline" className="text-[10px]">{choice.situacao}</Badge>
+                            </div>
+                            <Badge className={`text-xs gap-1 ${
+                              idx === 0 ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : ''
+                            }`}>
+                              <Package className="h-3 w-3" />
+                              {choice.coverage}/{totalCancelledProducts} prod.
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground truncate flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {choice.cliente_nome}
+                            </span>
+                            <span className="text-muted-foreground flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {choice.data}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {choice.produtos.map((nome, pi) => (
+                              <span key={pi} className="text-[10px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[150px]">
+                                {nome}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                        <Badge className={`text-xs gap-1 ${
-                          idx === 0
-                            ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                            : ''
-                        }`}>
-                          <Package className="h-3 w-3" />
-                          {choice.coverage}/{totalCancelledProducts} prod.
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground truncate flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {choice.cliente_nome}
-                        </span>
-                        <span className="text-muted-foreground flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {choice.data}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {choice.produtos.map((nome, pi) => (
-                          <span key={pi} className="text-[10px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[150px]">
-                            {nome}
-                          </span>
-                        ))}
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Right: Transfer suggestions grouped by product */}
-          <Card className="border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ArrowRight className="h-4 w-4 text-primary" />
-                Sugestões de Transferência
-                {productSuggestions.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">{productSuggestions.length} produto(s)</Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {productSuggestions.length === 0 && !suggestionsLoading ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  {vendaDetail ? 'Clique em "Encontrar vendas" para ver sugestões' : 'Pesquise uma venda primeiro'}
-                </p>
-              ) : suggestionsLoading ? (
-                <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  A procurar vendas compatíveis...
-                </div>
-              ) : (
-                <ScrollArea className="h-[500px]">
-                  <div className="space-y-3 pr-3">
-                    {productSuggestions.map((ps) => {
-                      const isExpanded = expandedSuggestions.has(ps.productKey);
-                      return (
-                        <div key={ps.productKey} className={`border rounded-lg overflow-hidden ${ps.vendas.length === 0 ? 'opacity-60' : ''}`}>
-                          {/* Product header */}
-                          <button
-                            onClick={() => {
-                              if (ps.vendas.length === 0) return;
-                              setExpandedSuggestions(prev => {
-                                const next = new Set(prev);
-                                next.has(ps.productKey) ? next.delete(ps.productKey) : next.add(ps.productKey);
-                                return next;
-                              });
-                            }}
-                            className={`w-full text-left p-3 transition-colors ${
-                              ps.vendas.length === 0 ? 'cursor-default' : isExpanded ? 'bg-primary/5' : 'hover:bg-muted/50'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 min-w-0">
-                                {ps.vendas.length > 0 ? (
-                                  isExpanded ? (
-                                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  )
-                                ) : (
-                                  <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
-                                )}
-                                <Package className="h-4 w-4 text-primary shrink-0" />
-                                <span className="font-medium text-sm truncate">{ps.nome}</span>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <Badge variant="destructive" className="text-xs">{ps.qtdOrigem} un.</Badge>
-                                {ps.vendas.length > 0 ? (
-                                  <Badge variant="secondary" className="text-xs gap-1">
-                                    <ShoppingCart className="h-3 w-3" />
-                                    {ps.vendas.length} venda(s)
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs text-muted-foreground">Sem correspondência</Badge>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-xs text-muted-foreground ml-8 mt-1">
-                              Código: <span className="font-mono">{ps.codigo}</span>
-                            </div>
-                          </button>
-
-                          {/* Collapsed sales list */}
-                          {isExpanded && ps.vendas.length > 0 && (
-                            <div className="border-t bg-muted/20 p-2 space-y-1.5">
-                              {[...ps.vendas].sort((a, b) => (vendaCoverageMap[b.venda_id] || 0) - (vendaCoverageMap[a.venda_id] || 0)).map((v) => {
-                                const coverage = vendaCoverageMap[v.venda_id] || 0;
-                                const isBestMatch = coverage === maxCoverage && maxCoverage > 1;
-                                const isGoodMatch = coverage > 1;
-                                return (
-                                  <div
-                                    key={v.venda_id}
-                                    className={`flex items-center justify-between p-2 rounded-md border text-xs transition-colors ${
-                                      isBestMatch
-                                        ? 'bg-primary/10 border-primary/40 ring-1 ring-primary/20'
-                                        : isGoodMatch
-                                        ? 'bg-accent/50 border-accent'
-                                        : 'bg-background'
-                                    }`}
-                                  >
-                                    <div className="flex items-center gap-3 min-w-0">
-                                      {isBestMatch && <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />}
-                                      <span className={`font-mono font-semibold text-sm ${isBestMatch ? 'text-primary' : ''}`}>#{v.codigo}</span>
-                                      <Badge variant="outline" className="text-[10px] shrink-0">{v.situacao}</Badge>
-                                      <span className="text-muted-foreground truncate">{v.cliente_nome}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      {coverage > 1 && (
-                                        <Badge variant={isBestMatch ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0 gap-1">
-                                          <Package className="h-3 w-3" />
-                                          {coverage}/{totalCancelledProducts} prod.
-                                        </Badge>
-                                      )}
-                                      <span className="text-muted-foreground">{v.data}</span>
-                                      <Badge className="text-[10px] px-1.5 py-0">{v.qtdDestino} un.</Badge>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
+
+              {/* Transfer suggestions grouped by product */}
+              <Card className={`border-primary/20 ${bestChoices.length > 0 ? 'lg:col-span-2' : ''}`}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ArrowRight className="h-4 w-4 text-primary" />
+                    Sugestões de Transferência
+                    {productSuggestions.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">{productSuggestions.length} produto(s)</Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {suggestionsLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      A procurar vendas compatíveis...
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[500px]">
+                      <div className="space-y-3 pr-3">
+                        {productSuggestions.map((ps) => {
+                          const isExpanded = expandedSuggestions.has(ps.productKey);
+                          return (
+                            <div key={ps.productKey} className={`border rounded-lg overflow-hidden ${ps.vendas.length === 0 ? 'opacity-60' : ''}`}>
+                              <button
+                                onClick={() => {
+                                  if (ps.vendas.length === 0) return;
+                                  setExpandedSuggestions(prev => {
+                                    const next = new Set(prev);
+                                    next.has(ps.productKey) ? next.delete(ps.productKey) : next.add(ps.productKey);
+                                    return next;
+                                  });
+                                }}
+                                className={`w-full text-left p-3 transition-colors ${
+                                  ps.vendas.length === 0 ? 'cursor-default' : isExpanded ? 'bg-primary/5' : 'hover:bg-muted/50'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {ps.vendas.length > 0 ? (
+                                      isExpanded ? (
+                                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                      )
+                                    ) : (
+                                      <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    )}
+                                    <Package className="h-4 w-4 text-primary shrink-0" />
+                                    <span className="font-medium text-sm truncate">{ps.nome}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <Badge variant="destructive" className="text-xs">{ps.qtdOrigem} un.</Badge>
+                                    {ps.vendas.length > 0 ? (
+                                      <Badge variant="secondary" className="text-xs gap-1">
+                                        <ShoppingCart className="h-3 w-3" />
+                                        {ps.vendas.length} venda(s)
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs text-muted-foreground">Sem correspondência</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-xs text-muted-foreground ml-8 mt-1">
+                                  Código: <span className="font-mono">{ps.codigo}</span>
+                                </div>
+                              </button>
+
+                              {isExpanded && ps.vendas.length > 0 && (
+                                <div className="border-t bg-muted/20 p-2 space-y-1.5">
+                                  {[...ps.vendas].sort((a, b) => (vendaCoverageMap[b.venda_id] || 0) - (vendaCoverageMap[a.venda_id] || 0)).map((v) => {
+                                    const coverage = vendaCoverageMap[v.venda_id] || 0;
+                                    const isBestMatch = coverage === maxCoverage && maxCoverage > 1;
+                                    const isGoodMatch = coverage > 1;
+                                    return (
+                                      <div
+                                        key={v.venda_id}
+                                        className={`flex items-center justify-between p-2 rounded-md border text-xs transition-colors ${
+                                          isBestMatch
+                                            ? 'bg-primary/10 border-primary/40 ring-1 ring-primary/20'
+                                            : isGoodMatch
+                                            ? 'bg-accent/50 border-accent'
+                                            : 'bg-background'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                          {isBestMatch && <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />}
+                                          <span className={`font-mono font-semibold text-sm ${isBestMatch ? 'text-primary' : ''}`}>#{v.codigo}</span>
+                                          <Badge variant="outline" className="text-[10px] shrink-0">{v.situacao}</Badge>
+                                          <span className="text-muted-foreground truncate">{v.cliente_nome}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          {coverage > 1 && (
+                                            <Badge variant={isBestMatch ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0 gap-1">
+                                              <Package className="h-3 w-3" />
+                                              {coverage}/{totalCancelledProducts} prod.
+                                            </Badge>
+                                          )}
+                                          <span className="text-muted-foreground">{v.data}</span>
+                                          <Badge className="text-[10px] px-1.5 py-0">{v.qtdDestino} un.</Badge>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       )}
     </div>
