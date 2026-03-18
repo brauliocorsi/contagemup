@@ -109,6 +109,7 @@ export function Header({ onNavigateToProducts, activeTab, onTabChange }: HeaderP
               Instalar
             </Button>
           )}
+          <GlobalProductSearch />
           <StockAlertsBell onNavigateToProducts={onNavigateToProducts} />
           
           <DropdownMenu>
