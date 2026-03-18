@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Package, MapPin, Layers, ArrowUpCircle, ArrowDownCircle, AlertTriangle, Truck, Clock, Cloud, ShoppingCart, User, Calendar, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
+import { Package, MapPin, Layers, ArrowUpCircle, ArrowDownCircle, AlertTriangle, Truck, Clock, Cloud, ShoppingCart, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
