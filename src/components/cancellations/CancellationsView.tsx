@@ -174,14 +174,17 @@ export function CancellationsView() {
           seenVendas.add(sale.venda_id);
 
           for (const cancelledProd of cancelledProducts) {
-            // Try matching by code first, then by name
             const matchingDestProduct = sale.produtos.find(sp => {
               const spCode = normalize(sp.codigo);
               const spName = normalizeName(sp.nome);
-              // Match by code (if both non-empty)
+              // Match by code (exact)
               if (cancelledProd.normalizedCode && spCode && cancelledProd.normalizedCode === spCode) return true;
-              // Match by name (if both non-empty and code didn't match)
+              // Match by name (exact)
               if (cancelledProd.normalizedName && spName && cancelledProd.normalizedName === spName) return true;
+              // Match by partial name (contains) - at least 5 chars to avoid false positives
+              if (cancelledProd.normalizedName.length >= 5 && spName.length >= 5) {
+                if (spName.includes(cancelledProd.normalizedName) || cancelledProd.normalizedName.includes(spName)) return true;
+              }
               return false;
             });
 
