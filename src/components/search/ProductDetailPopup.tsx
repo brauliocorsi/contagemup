@@ -1,11 +1,15 @@
 import { useMemo } from 'react';
-import { Package, MapPin, Layers, ArrowUpCircle, ArrowDownCircle, AlertTriangle, Truck, Clock } from 'lucide-react';
+import { Package, MapPin, Layers, ArrowUpCircle, ArrowDownCircle, AlertTriangle, Truck, Clock, Cloud } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useProducts } from '@/hooks/useProducts';
 import { useProductMovementHistory, useMovementUserNames, UnifiedMovement } from '@/hooks/useProductMovementHistory';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
