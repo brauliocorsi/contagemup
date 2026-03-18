@@ -37,6 +37,20 @@ interface TransferSuggestion {
   matchCount: number;
 }
 
+interface ProductSuggestion {
+  codigo: string;
+  nome: string;
+  qtdOrigem: number;
+  vendas: Array<{
+    venda_id: string;
+    codigo: string;
+    cliente_nome: string;
+    situacao: string;
+    data: string;
+    qtdDestino: number;
+  }>;
+}
+
 export function CancellationsView() {
   const [searchCode, setSearchCode] = useState('');
   const [vendaDetail, setVendaDetail] = useState<VendaDetail | null>(null);
@@ -46,6 +60,33 @@ export function CancellationsView() {
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<string>>(new Set());
 
   const { fetchSales, getSalesForProduct, salesMap, loaded: salesLoaded, loading: salesFetching } = useProductSales();
+
+  const productSuggestions = useMemo<ProductSuggestion[]>(() => {
+    if (suggestions.length === 0) return [];
+    const productMap = new Map<string, ProductSuggestion>();
+    for (const s of suggestions) {
+      for (const mp of s.matchingProducts) {
+        const key = mp.codigo.trim().toLowerCase();
+        if (!productMap.has(key)) {
+          productMap.set(key, {
+            codigo: mp.codigo,
+            nome: mp.nome,
+            qtdOrigem: mp.qtdOrigem,
+            vendas: [],
+          });
+        }
+        productMap.get(key)!.vendas.push({
+          venda_id: s.venda.venda_id,
+          codigo: s.venda.codigo,
+          cliente_nome: s.venda.cliente_nome,
+          situacao: s.venda.situacao,
+          data: s.venda.data,
+          qtdDestino: mp.qtdDestino,
+        });
+      }
+    }
+    return Array.from(productMap.values()).sort((a, b) => b.vendas.length - a.vendas.length);
+  }, [suggestions]);
 
   const handleSearch = async () => {
     const code = searchCode.trim();
