@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Package, MapPin, Layers, ArrowUpCircle, ArrowDownCircle, AlertTriangle, Truck, Clock, Cloud, ShoppingCart, User, Calendar, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
+import { Package, MapPin, Layers, ArrowUpCircle, ArrowDownCircle, AlertTriangle, Truck, Clock, Cloud, ShoppingCart, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,6 @@ interface ProductDetailPopupProps {
 
 export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupProps) {
   const [showSales, setShowSales] = useState(false);
-  const [selectedVenda, setSelectedVenda] = useState<VendaInfo | null>(null);
   const { products } = useProducts();
   const { data: movements, isLoading } = useProductMovementHistory(productId);
 
@@ -96,7 +95,7 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
   };
 
   return (
-    <Dialog open={!!productId} onOpenChange={(open) => { if (!open) { onClose(); setShowSales(false); setSelectedVenda(null); } }}>
+    <Dialog open={!!productId} onOpenChange={(open) => { if (!open) { onClose(); setShowSales(false); } }}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
@@ -158,7 +157,7 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
               variant="outline"
               size="sm"
               className="w-full gap-2"
-              onClick={() => { setShowSales(!showSales); setSelectedVenda(null); }}
+              onClick={() => setShowSales(!showSales)}
             >
               <ShoppingCart className="h-4 w-4" />
               {showSales ? 'Ocultar vendas em aberto' : 'Ver vendas em aberto'}
@@ -176,67 +175,21 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
                   <Loader2 className="h-4 w-4 animate-spin" />
                   A carregar vendas...
                 </div>
-              ) : selectedVenda ? (
-                <div className="border rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setSelectedVenda(null)}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="font-semibold text-sm">Venda #{selectedVenda.codigo}</span>
-                    <Badge variant="outline" className="text-xs">{selectedVenda.situacao}</Badge>
-                  </div>
-                  <div className="space-y-1.5 text-sm">
-                    <div className="flex items-center gap-2">
-                      <User className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="font-medium truncate">{selectedVenda.cliente_nome}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>{selectedVenda.data}</span>
-                    </div>
-                    {selectedVenda.produtos.length > 0 && (
-                      <div className="mt-2 pt-2 border-t space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">
-                          <Package className="h-3 w-3 inline mr-1" />Produtos
-                        </p>
-                        {selectedVenda.produtos.map((item, idx) => (
-                          <div key={idx} className={`text-xs p-1.5 rounded ${item.codigo === product.code ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}>
-                            <div className="flex justify-between">
-                              <span className="font-mono text-muted-foreground">{item.codigo}</span>
-                              <span className="font-semibold">{item.quantidade} un.</span>
-                            </div>
-                            <span className="truncate block">{item.nome}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
               ) : salesData && salesData.length > 0 ? (
                 <div className="border rounded-lg divide-y">
-                  {salesData.map((venda) => (
-                    <button
-                      key={venda.venda_id}
-                      className="w-full flex items-center justify-between p-2.5 hover:bg-muted/50 transition-colors text-left first:rounded-t-lg last:rounded-b-lg"
-                      onClick={() => setSelectedVenda(venda)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-medium">#{venda.codigo}</span>
-                          <Badge variant="outline" className="text-[10px] px-1 py-0">{venda.situacao}</Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                          <span className="truncate">{venda.cliente_nome}</span>
-                          <span>•</span>
-                          <span>{venda.data}</span>
-                        </div>
+                  {salesData.map((venda) => {
+                    const prodItem = venda.produtos.find(p => p.codigo === product.code);
+                    const qty = prodItem?.quantidade || '?';
+                    return (
+                      <div key={venda.venda_id} className="flex items-center justify-between px-3 py-2 text-sm">
+                        <span className="font-mono font-medium">#{venda.codigo}</span>
+                        <Badge variant="secondary" className="text-xs">{qty} un.</Badge>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="text-center py-3 text-sm text-muted-foreground">Sem vendas em aberto para este produto</p>
+                <p className="text-center py-3 text-sm text-muted-foreground">Sem vendas em aberto</p>
               )}
             </div>
           )}
