@@ -43,7 +43,7 @@ export function CancellationsView() {
   const [loading, setLoading] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<TransferSuggestion[]>([]);
-  const [selectedTransfer, setSelectedTransfer] = useState<TransferSuggestion | null>(null);
+  const [expandedSuggestions, setExpandedSuggestions] = useState<Set<string>>(new Set());
 
   const { fetchSales, getSalesForProduct, salesMap, loaded: salesLoaded, loading: salesFetching } = useProductSales();
 
