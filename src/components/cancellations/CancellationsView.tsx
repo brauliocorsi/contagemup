@@ -299,55 +299,75 @@ export function CancellationsView() {
                   A procurar vendas compatíveis...
                 </div>
               ) : (
-                <ScrollArea className="max-h-[400px]">
-                  <div className="space-y-2">
-                    {suggestions.map((s) => (
-                      <button
-                        key={s.venda.venda_id}
-                        onClick={() => setSelectedTransfer(selectedTransfer?.venda.venda_id === s.venda.venda_id ? null : s)}
-                        className={`w-full text-left border rounded-lg p-3 transition-colors ${
-                          selectedTransfer?.venda.venda_id === s.venda.venda_id
-                            ? 'border-primary bg-primary/5'
-                            : 'hover:bg-muted/50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-semibold text-sm">#{s.venda.codigo}</span>
-                            <Badge variant="outline" className="text-[10px]">{s.venda.situacao}</Badge>
-                          </div>
-                          <Badge variant="secondary" className="text-xs gap-1">
-                            <CheckCircle2 className="h-3 w-3" />
-                            {s.matchCount} produto(s)
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-2">
-                          <span>{s.venda.cliente_nome}</span>
-                          <span>•</span>
-                          <span>{s.venda.data}</span>
-                        </div>
-
-                        {/* Expanded: show matching products */}
-                        {selectedTransfer?.venda.venda_id === s.venda.venda_id && (
-                          <div className="mt-3 pt-2 border-t space-y-1.5">
-                            <p className="text-xs font-medium text-muted-foreground">Produtos transferíveis:</p>
-                            {s.matchingProducts.map((mp) => (
-                              <div key={mp.codigo} className="flex items-center justify-between text-xs p-1.5 rounded bg-primary/5 border border-primary/10">
-                                <div className="min-w-0">
-                                  <span className="font-mono text-muted-foreground mr-1">{mp.codigo}</span>
-                                  <span className="truncate">{mp.nome}</span>
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <Badge variant="destructive" className="text-[10px] px-1 py-0">{mp.qtdOrigem}</Badge>
-                                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                                  <Badge className="text-[10px] px-1 py-0">{mp.qtdDestino}</Badge>
-                                </div>
+                <ScrollArea className="h-[500px]">
+                  <div className="space-y-2 pr-3">
+                    {suggestions.map((s) => {
+                      const isExpanded = expandedSuggestions.has(s.venda.venda_id);
+                      return (
+                        <div
+                          key={s.venda.venda_id}
+                          className={`border rounded-lg transition-colors ${
+                            isExpanded ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+                          }`}
+                        >
+                          <button
+                            onClick={() => {
+                              setExpandedSuggestions(prev => {
+                                const next = new Set(prev);
+                                if (next.has(s.venda.venda_id)) {
+                                  next.delete(s.venda.venda_id);
+                                } else {
+                                  next.add(s.venda.venda_id);
+                                }
+                                return next;
+                              });
+                            }}
+                            className="w-full text-left p-3"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? (
+                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                ) : (
+                                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                )}
+                                <span className="font-mono font-semibold text-sm">#{s.venda.codigo}</span>
+                                <Badge variant="outline" className="text-[10px]">{s.venda.situacao}</Badge>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </button>
-                    ))}
+                              <Badge variant="secondary" className="text-xs gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                {s.matchCount} produto(s)
+                              </Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-2 ml-5">
+                              <span>{s.venda.cliente_nome}</span>
+                              <span>•</span>
+                              <span>{s.venda.data}</span>
+                            </div>
+                          </button>
+
+                          {/* Collapsed products panel */}
+                          {isExpanded && (
+                            <div className="px-3 pb-3 pt-0 border-t mx-3 mt-1 space-y-1.5">
+                              <p className="text-xs font-medium text-muted-foreground pt-2">Produtos transferíveis:</p>
+                              {s.matchingProducts.map((mp) => (
+                                <div key={mp.codigo} className="flex items-center justify-between text-xs p-1.5 rounded bg-primary/5 border border-primary/10">
+                                  <div className="min-w-0">
+                                    <span className="font-mono text-muted-foreground mr-1">{mp.codigo}</span>
+                                    <span className="truncate">{mp.nome}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Badge variant="destructive" className="text-[10px] px-1 py-0">{mp.qtdOrigem}</Badge>
+                                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                    <Badge className="text-[10px] px-1 py-0">{mp.qtdDestino}</Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               )}
