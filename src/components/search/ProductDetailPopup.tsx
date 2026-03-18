@@ -21,6 +21,23 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
   const { data: movements, isLoading } = useProductMovementHistory(productId);
 
   const product = products?.find(p => p.id === productId);
+  const productCode = product?.code;
+
+  // Fetch ERP stock from cache
+  const { data: erpData } = useQuery({
+    queryKey: ['erp-stock-lookup', productCode],
+    queryFn: async () => {
+      if (!productCode) return null;
+      const { data } = await supabase
+        .from('erp_products_cache')
+        .select('erp_stock, fetched_at')
+        .eq('code', productCode)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!productCode,
+    staleTime: 60000,
+  });
 
   const userIds = movements
     ?.map(m => m.created_by)
@@ -43,6 +60,8 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
 
   const isLowStock = product.current_stock <= product.min_stock;
   const availableStock = product.current_stock - product.damaged_stock;
+  const erpStock = erpData ? Number(erpData.erp_stock) : null;
+  const erpDiff = erpStock !== null ? product.current_stock - product.damaged_stock - erpStock : null;
 
   const typeLabel = (t: string) => {
     switch (t) {
