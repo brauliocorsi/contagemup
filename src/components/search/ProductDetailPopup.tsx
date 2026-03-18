@@ -19,6 +19,8 @@ interface ProductDetailPopupProps {
 }
 
 export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupProps) {
+  const [showSales, setShowSales] = useState(false);
+  const [selectedVenda, setSelectedVenda] = useState<VendaInfo | null>(null);
   const { products } = useProducts();
   const { data: movements, isLoading } = useProductMovementHistory(productId);
 
@@ -39,6 +41,23 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
     },
     enabled: !!productCode,
     staleTime: 60000,
+  });
+
+  // Fetch sales for this product
+  const { data: salesData, isLoading: salesLoading } = useQuery({
+    queryKey: ['product-sales-lookup', productCode],
+    queryFn: async () => {
+      if (!productCode) return [];
+      const { data, error } = await supabase.functions.invoke('gestaoclick-vendas', {
+        body: { skipCache: false },
+      });
+      if (error || data?.error) return [];
+      const rawMap = (data?.productSalesMap || {}) as Record<string, VendaInfo[]>;
+      const normalizedCode = productCode.trim().toLowerCase();
+      return rawMap[normalizedCode] || [];
+    },
+    enabled: !!productCode && showSales,
+    staleTime: 120000,
   });
 
   const userIds = movements
