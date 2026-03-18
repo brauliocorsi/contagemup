@@ -165,12 +165,14 @@ export function CancellationsView() {
 
       const normalize = (s: string) => s.trim().toLowerCase();
       const normalizeName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+      const getProductKey = (code: string, name: string) => normalize(code || '') || normalizeName(name || '');
 
       // Build lookup sets for the cancelled sale's products
-      const cancelledProducts = vendaDetail.produtos.map(p => ({
+      const cancelledProducts = vendaDetail.produtos.map((p, index) => ({
         ...p,
         normalizedCode: normalize(p.codigo),
         normalizedName: normalizeName(p.nome),
+        productKey: getProductKey(p.codigo, p.nome) || `produto-${index}`,
       }));
 
       const allSuggestions = new Map<string, TransferSuggestion>();
@@ -214,9 +216,9 @@ export function CancellationsView() {
 
               const suggestion = allSuggestions.get(sale.venda_id)!;
               const alreadyAdded = suggestion.matchingProducts.some(
-                mp => normalize(mp.codigo) === cancelledProd.normalizedCode ||
-                      normalizeName(mp.nome) === cancelledProd.normalizedName
+                mp => getProductKey(mp.codigo, mp.nome) === cancelledProd.productKey
               );
+
               if (!alreadyAdded) {
                 suggestion.matchingProducts.push({
                   codigo: cancelledProd.codigo,
