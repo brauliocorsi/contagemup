@@ -157,7 +157,7 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
               variant="outline"
               size="sm"
               className="w-full gap-2"
-              onClick={() => { setShowSales(!showSales); setSelectedVenda(null); }}
+              onClick={() => setShowSales(!showSales)}
             >
               <ShoppingCart className="h-4 w-4" />
               {showSales ? 'Ocultar vendas em aberto' : 'Ver vendas em aberto'}
