@@ -449,19 +449,40 @@ export function CancellationsView() {
                           {/* Collapsed sales list */}
                           {isExpanded && ps.vendas.length > 0 && (
                             <div className="border-t bg-muted/20 p-2 space-y-1.5">
-                              {ps.vendas.map((v) => (
-                                <div key={v.venda_id} className="flex items-center justify-between p-2 rounded-md bg-background border text-xs">
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <span className="font-mono font-semibold text-sm">#{v.codigo}</span>
-                                    <Badge variant="outline" className="text-[10px] shrink-0">{v.situacao}</Badge>
-                                    <span className="text-muted-foreground truncate">{v.cliente_nome}</span>
+                              {[...ps.vendas].sort((a, b) => (vendaCoverageMap[b.venda_id] || 0) - (vendaCoverageMap[a.venda_id] || 0)).map((v) => {
+                                const coverage = vendaCoverageMap[v.venda_id] || 0;
+                                const isBestMatch = coverage === maxCoverage && maxCoverage > 1;
+                                const isGoodMatch = coverage > 1;
+                                return (
+                                  <div
+                                    key={v.venda_id}
+                                    className={`flex items-center justify-between p-2 rounded-md border text-xs transition-colors ${
+                                      isBestMatch
+                                        ? 'bg-primary/10 border-primary/40 ring-1 ring-primary/20'
+                                        : isGoodMatch
+                                        ? 'bg-accent/50 border-accent'
+                                        : 'bg-background'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      {isBestMatch && <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />}
+                                      <span className={`font-mono font-semibold text-sm ${isBestMatch ? 'text-primary' : ''}`}>#{v.codigo}</span>
+                                      <Badge variant="outline" className="text-[10px] shrink-0">{v.situacao}</Badge>
+                                      <span className="text-muted-foreground truncate">{v.cliente_nome}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {coverage > 1 && (
+                                        <Badge variant={isBestMatch ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0 gap-1">
+                                          <Package className="h-3 w-3" />
+                                          {coverage}/{totalCancelledProducts} prod.
+                                        </Badge>
+                                      )}
+                                      <span className="text-muted-foreground">{v.data}</span>
+                                      <Badge className="text-[10px] px-1.5 py-0">{v.qtdDestino} un.</Badge>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    <span className="text-muted-foreground">{v.data}</span>
-                                    <Badge className="text-[10px] px-1.5 py-0">{v.qtdDestino} un.</Badge>
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </div>
