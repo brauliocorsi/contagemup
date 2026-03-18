@@ -15,7 +15,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const vendaId = body.venda_id;
-    if (!vendaId) throw new Error('venda_id é obrigatório');
+    const vendaCodigo = body.venda_codigo;
+    if (!vendaId && !vendaCodigo) throw new Error('venda_id ou venda_codigo é obrigatório');
 
     const apiHeaders = {
       'access-token': accessToken,
@@ -23,7 +24,55 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json',
     };
 
-    const response = await fetch(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
+    let internalId = vendaId;
+
+    // If we received a codigo instead of an internal ID, search for it first
+    if (vendaCodigo || (!vendaId || vendaId === vendaCodigo)) {
+      const searchCode = vendaCodigo || vendaId;
+      console.log(`Searching for venda by codigo: ${searchCode}`);
+      
+      // Search through pages to find the venda by codigo
+      let found = false;
+      for (let page = 1; page <= 50; page++) {
+        const searchUrl = `https://api.gestaoclick.com/api/vendas?pagina=${page}`;
+        const searchResp = await fetch(searchUrl, { method: 'GET', headers: apiHeaders });
+        
+        if (!searchResp.ok) {
+          if (searchResp.status === 404) break;
+          const errText = await searchResp.text();
+          console.error(`Search page ${page} error: ${errText}`);
+          break;
+        }
+        
+        const searchData = await searchResp.json();
+        const vendas = searchData?.data || [];
+        
+        if (vendas.length === 0) break;
+        
+        for (const v of vendas) {
+          if (String(v.codigo || '').trim() === String(searchCode).trim()) {
+            internalId = String(v.id);
+            found = true;
+            console.log(`Found venda codigo ${searchCode} -> internal ID ${internalId}`);
+            break;
+          }
+        }
+        
+        if (found) break;
+        
+        const totalPages = searchData?.meta?.total_paginas || searchData?.meta?.last_page || 1;
+        if (page >= totalPages) break;
+      }
+      
+      if (!found) {
+        return new Response(JSON.stringify({ error: `Venda com código ${searchCode} não encontrada` }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    const response = await fetch(`https://api.gestaoclick.com/api/vendas/${internalId}`, {
       method: 'GET',
       headers: apiHeaders,
     });
@@ -63,7 +112,7 @@ Deno.serve(async (req) => {
 
     // Build response
     const detail = {
-      id: String(venda.id || vendaId),
+      id: String(venda.id || internalId),
       codigo: String(venda.codigo || ''),
       data: venda.data || '',
       data_entrega: venda.data_entrega || venda.previsao_entrega || '',
@@ -81,7 +130,6 @@ Deno.serve(async (req) => {
       transportadora: venda.transportadora || '',
       produtos,
       pagamentos,
-      // Raw addresses
       enderecos: (venda.enderecos || []).map((e: any) => {
         const end = e?.endereco || e || {};
         return {
