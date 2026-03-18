@@ -303,7 +303,50 @@ export function CancellationsView() {
     setVendaDetail(null);
     setSuggestions([]);
     setExpandedSuggestions(new Set());
+    setExpandedBestChoice(null);
+    setBestChoiceDetails({});
+    setBestChoiceLoading(null);
+    setBestChoicesStatusFilter(null);
   };
+
+  const handleToggleBestChoiceDetail = async (vendaId: string, vendaCodigo: string) => {
+    if (expandedBestChoice === vendaId) {
+      setExpandedBestChoice(null);
+      return;
+    }
+    setExpandedBestChoice(vendaId);
+    if (bestChoiceDetails[vendaId]) return;
+
+    setBestChoiceLoading(vendaId);
+    try {
+      const { data, error } = await supabase.functions.invoke('gestaoclick-venda-detail', {
+        body: { venda_codigo: vendaCodigo },
+      });
+      if (error || data?.error) {
+        toast.error('Erro ao carregar detalhes da venda');
+        return;
+      }
+      setBestChoiceDetails(prev => ({ ...prev, [vendaId]: data as VendaDetail }));
+    } catch {
+      toast.error('Erro ao carregar detalhes');
+    } finally {
+      setBestChoiceLoading(null);
+    }
+  };
+
+  // Unique statuses from best choices for filter
+  const bestChoicesStatuses = useMemo(() => {
+    const statuses = new Set<string>();
+    for (const c of bestChoices) {
+      if (c.situacao) statuses.add(c.situacao);
+    }
+    return Array.from(statuses);
+  }, [bestChoices]);
+
+  const filteredBestChoices = useMemo(() => {
+    if (!bestChoicesStatusFilter) return bestChoices;
+    return bestChoices.filter(c => c.situacao === bestChoicesStatusFilter);
+  }, [bestChoices, bestChoicesStatusFilter]);
 
   return (
     <div className="space-y-4">
