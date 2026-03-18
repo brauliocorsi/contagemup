@@ -45,7 +45,7 @@ export function CancellationsView() {
   const [suggestions, setSuggestions] = useState<TransferSuggestion[]>([]);
   const [selectedTransfer, setSelectedTransfer] = useState<TransferSuggestion | null>(null);
 
-  const { fetchSales, getSalesForProduct, loaded: salesLoaded, loading: salesFetching } = useProductSales();
+  const { fetchSales, getSalesForProduct, salesMap, loaded: salesLoaded, loading: salesFetching } = useProductSales();
 
   const handleSearch = async () => {
     const code = searchCode.trim();
