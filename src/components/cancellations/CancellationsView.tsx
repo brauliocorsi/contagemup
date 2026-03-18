@@ -38,6 +38,7 @@ interface TransferSuggestion {
 }
 
 interface ProductSuggestion {
+  productKey: string;
   codigo: string;
   nome: string;
   qtdOrigem: number;
@@ -65,26 +66,40 @@ export function CancellationsView() {
   const productSuggestions = useMemo<ProductSuggestion[]>(() => {
     if (!vendaDetail) return [];
     const productMap = new Map<string, ProductSuggestion>();
+    const normalize = (s: string) => s.trim().toLowerCase();
+    const normalizeName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const getProductKey = (code: string, name: string, fallback: string) => {
+      const normalizedCode = normalize(code || '');
+      const normalizedName = normalizeName(name || '');
+      return normalizedCode || normalizedName || fallback;
+    };
 
     // Initialize ALL products from the cancelled sale
-    for (const p of vendaDetail.produtos) {
-      const key = p.codigo.trim().toLowerCase();
+    for (let i = 0; i < vendaDetail.produtos.length; i++) {
+      const p = vendaDetail.produtos[i];
+      const key = getProductKey(p.codigo, p.nome, `produto-${i}`);
+      const qtdOrigem = parseInt(p.quantidade) || 0;
+
       if (!productMap.has(key)) {
         productMap.set(key, {
+          productKey: key,
           codigo: p.codigo,
           nome: p.nome,
-          qtdOrigem: parseInt(p.quantidade) || 0,
+          qtdOrigem,
           vendas: [],
         });
+      } else {
+        productMap.get(key)!.qtdOrigem += qtdOrigem;
       }
     }
 
     // Fill in matched sales
     for (const s of suggestions) {
       for (const mp of s.matchingProducts) {
-        const key = mp.codigo.trim().toLowerCase();
+        const key = getProductKey(mp.codigo, mp.nome, `match-${mp.nome}`);
         if (!productMap.has(key)) {
           productMap.set(key, {
+            productKey: key,
             codigo: mp.codigo,
             nome: mp.nome,
             qtdOrigem: mp.qtdOrigem,
@@ -150,12 +165,14 @@ export function CancellationsView() {
 
       const normalize = (s: string) => s.trim().toLowerCase();
       const normalizeName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+      const getProductKey = (code: string, name: string) => normalize(code || '') || normalizeName(name || '');
 
       // Build lookup sets for the cancelled sale's products
-      const cancelledProducts = vendaDetail.produtos.map(p => ({
+      const cancelledProducts = vendaDetail.produtos.map((p, index) => ({
         ...p,
         normalizedCode: normalize(p.codigo),
         normalizedName: normalizeName(p.nome),
+        productKey: getProductKey(p.codigo, p.nome) || `produto-${index}`,
       }));
 
       const allSuggestions = new Map<string, TransferSuggestion>();
@@ -199,9 +216,9 @@ export function CancellationsView() {
 
               const suggestion = allSuggestions.get(sale.venda_id)!;
               const alreadyAdded = suggestion.matchingProducts.some(
-                mp => normalize(mp.codigo) === cancelledProd.normalizedCode ||
-                      normalizeName(mp.nome) === cancelledProd.normalizedName
+                mp => getProductKey(mp.codigo, mp.nome) === cancelledProd.productKey
               );
+
               if (!alreadyAdded) {
                 suggestion.matchingProducts.push({
                   codigo: cancelledProd.codigo,
@@ -367,16 +384,16 @@ export function CancellationsView() {
                 <ScrollArea className="h-[500px]">
                   <div className="space-y-3 pr-3">
                     {productSuggestions.map((ps) => {
-                      const isExpanded = expandedSuggestions.has(ps.codigo);
+                      const isExpanded = expandedSuggestions.has(ps.productKey);
                       return (
-                        <div key={ps.codigo} className={`border rounded-lg overflow-hidden ${ps.vendas.length === 0 ? 'opacity-60' : ''}`}>
+                        <div key={ps.productKey} className={`border rounded-lg overflow-hidden ${ps.vendas.length === 0 ? 'opacity-60' : ''}`}>
                           {/* Product header */}
                           <button
                             onClick={() => {
                               if (ps.vendas.length === 0) return;
                               setExpandedSuggestions(prev => {
                                 const next = new Set(prev);
-                                next.has(ps.codigo) ? next.delete(ps.codigo) : next.add(ps.codigo);
+                                next.has(ps.productKey) ? next.delete(ps.productKey) : next.add(ps.productKey);
                                 return next;
                               });
                             }}
