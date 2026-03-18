@@ -54,7 +54,7 @@ export function CancellationsView() {
     setLoading(true);
     setVendaDetail(null);
     setSuggestions([]);
-    setSelectedTransfer(null);
+    setExpandedSuggestions(new Set());
 
     try {
       // First try searching by venda_id directly
