@@ -459,53 +459,156 @@ export function CancellationsView() {
                       </Badge>
                     </CardTitle>
                     <p className="text-xs text-muted-foreground">Vendas que cobrem mais produtos</p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {bestChoices.map((choice, idx) => (
-                        <div
-                          key={choice.venda_id}
-                          className={`p-3 rounded-lg border transition-colors ${
-                            idx === 0
-                              ? 'bg-yellow-100/60 dark:bg-yellow-900/20 border-yellow-400/60 dark:border-yellow-600/40 ring-1 ring-yellow-400/30'
-                              : 'bg-background border-border hover:bg-muted/50'
+                    {/* Status filter */}
+                    {bestChoicesStatuses.length > 1 && (
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                        <Filter className="h-3 w-3 text-muted-foreground" />
+                        <button
+                          onClick={() => setBestChoicesStatusFilter(null)}
+                          className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                            !bestChoicesStatusFilter ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 border-border hover:bg-muted'
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-1.5">
-                            <div className="flex items-center gap-2">
-                              {idx === 0 && <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400 fill-yellow-500/50" />}
-                              <span className={`font-mono font-bold text-sm ${idx === 0 ? 'text-yellow-800 dark:text-yellow-300' : ''}`}>
-                                #{choice.codigo}
-                              </span>
-                              <Badge variant="outline" className="text-[10px]">{choice.situacao}</Badge>
+                          Todos
+                        </button>
+                        {bestChoicesStatuses.map(status => (
+                          <button
+                            key={status}
+                            onClick={() => setBestChoicesStatusFilter(bestChoicesStatusFilter === status ? null : status)}
+                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                              bestChoicesStatusFilter === status ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 border-border hover:bg-muted'
+                            }`}
+                          >
+                            {status}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    <ScrollArea className="max-h-[500px]">
+                      <div className="space-y-2">
+                        {filteredBestChoices.map((choice, idx) => {
+                          const isExpanded = expandedBestChoice === choice.venda_id;
+                          const detail = bestChoiceDetails[choice.venda_id];
+                          const isLoading = bestChoiceLoading === choice.venda_id;
+                          return (
+                            <div
+                              key={choice.venda_id}
+                              className={`rounded-lg border transition-colors overflow-hidden ${
+                                idx === 0 && !bestChoicesStatusFilter
+                                  ? 'bg-yellow-100/60 dark:bg-yellow-900/20 border-yellow-400/60 dark:border-yellow-600/40 ring-1 ring-yellow-400/30'
+                                  : 'bg-background border-border hover:bg-muted/50'
+                              }`}
+                            >
+                              <div className="p-3">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <div className="flex items-center gap-2">
+                                    {idx === 0 && !bestChoicesStatusFilter && <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400 fill-yellow-500/50" />}
+                                    <span className={`font-mono font-bold text-sm ${idx === 0 && !bestChoicesStatusFilter ? 'text-yellow-800 dark:text-yellow-300' : ''}`}>
+                                      #{choice.codigo}
+                                    </span>
+                                    <Badge variant="outline" className="text-[10px]">{choice.situacao}</Badge>
+                                  </div>
+                                  <Badge className={`text-xs gap-1 ${
+                                    idx === 0 && !bestChoicesStatusFilter ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : ''
+                                  }`}>
+                                    <Package className="h-3 w-3" />
+                                    {choice.coverage}/{totalCancelledProducts} prod.
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground truncate flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {choice.cliente_nome}
+                                  </span>
+                                  <span className="text-muted-foreground flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {choice.data}
+                                  </span>
+                                </div>
+                                <div className="mt-2 flex items-center justify-between">
+                                  <div className="flex flex-wrap gap-1 flex-1">
+                                    {choice.produtos.map((nome, pi) => (
+                                      <span key={pi} className="text-[10px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[150px]">
+                                        {nome}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 text-[10px] gap-1 shrink-0 ml-2"
+                                    onClick={() => handleToggleBestChoiceDetail(choice.venda_id, choice.codigo)}
+                                  >
+                                    {isLoading ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Eye className="h-3 w-3" />
+                                    )}
+                                    {isExpanded ? 'Ocultar' : 'Ver itens'}
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Expanded detail */}
+                              {isExpanded && (
+                                <div className="border-t bg-muted/30 p-3">
+                                  {isLoading && !detail ? (
+                                    <div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground">
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      A carregar itens...
+                                    </div>
+                                  ) : detail ? (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                        <span>Total: €{parseFloat(detail.valor_total).toFixed(2)}</span>
+                                        <span>{detail.produtos.length} item(ns)</span>
+                                      </div>
+                                      <div className="space-y-1">
+                                        {detail.produtos.map((p, pi) => {
+                                          const isCancelledMatch = vendaDetail?.produtos.some(cp => {
+                                            const cpCode = cp.codigo?.trim().toLowerCase() || '';
+                                            const pCode = p.codigo?.trim().toLowerCase() || '';
+                                            const cpName = cp.nome?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+                                            const pName = p.nome?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+                                            return (cpCode && pCode && cpCode === pCode) || (cpName && pName && (cpName === pName || cpName.includes(pName) || pName.includes(cpName)));
+                                          });
+                                          return (
+                                            <div
+                                              key={pi}
+                                              className={`flex items-center justify-between text-xs py-1.5 px-2 rounded ${
+                                                isCancelledMatch
+                                                  ? 'bg-primary/10 border border-primary/30'
+                                                  : 'bg-background'
+                                              }`}
+                                            >
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                {isCancelledMatch && <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />}
+                                                <span className="font-mono text-muted-foreground">{p.codigo}</span>
+                                                <span className="truncate">{p.nome}</span>
+                                              </div>
+                                              <Badge variant={isCancelledMatch ? 'default' : 'secondary'} className="text-[10px] shrink-0">
+                                                {p.quantidade} un.
+                                              </Badge>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground text-center py-2">Não foi possível carregar os detalhes</p>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <Badge className={`text-xs gap-1 ${
-                              idx === 0 ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : ''
-                            }`}>
-                              <Package className="h-3 w-3" />
-                              {choice.coverage}/{totalCancelledProducts} prod.
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground truncate flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {choice.cliente_nome}
-                            </span>
-                            <span className="text-muted-foreground flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {choice.data}
-                            </span>
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {choice.produtos.map((nome, pi) => (
-                              <span key={pi} className="text-[10px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[150px]">
-                                {nome}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                          );
+                        })}
+                        {filteredBestChoices.length === 0 && (
+                          <p className="text-xs text-muted-foreground text-center py-4">Nenhuma venda com este filtro</p>
+                        )}
+                      </div>
+                    </ScrollArea>
                   </CardContent>
                 </Card>
               )}
