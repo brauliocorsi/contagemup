@@ -8,6 +8,7 @@ import { ProductDetailPopup } from './ProductDetailPopup';
 
 export function GlobalProductSearch() {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const { products } = useProducts();
 
