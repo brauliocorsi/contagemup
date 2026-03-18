@@ -40,15 +40,15 @@ export function GlobalProductSearch() {
       </Button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Pesquisar produto por nome ou código..." />
-        <CommandList>
+        <CommandInput placeholder="Pesquisar produto por nome ou código..." onValueChange={setQuery} />
+        <CommandList className={query.length < 2 ? 'hidden' : ''}>
           <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
-          <CommandGroup heading="Produtos">
+          <CommandGroup>
             {products?.map((product) => (
               <CommandItem
                 key={product.id}
                 value={`${product.code} ${product.name}`}
-                onSelect={() => handleSelect(product.id)}
+                onSelect={() => { handleSelect(product.id); setQuery(''); }}
                 className="flex items-center justify-between gap-3 py-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
