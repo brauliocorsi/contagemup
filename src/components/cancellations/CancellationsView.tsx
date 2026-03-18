@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, XCircle, ArrowRight, ShoppingCart, Package, Calendar, User, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Search, XCircle, ArrowRight, ShoppingCart, Package, Calendar, User, Loader2, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
