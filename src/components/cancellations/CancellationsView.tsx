@@ -38,6 +38,7 @@ interface TransferSuggestion {
 }
 
 interface ProductSuggestion {
+  productKey: string;
   codigo: string;
   nome: string;
   qtdOrigem: number;
@@ -65,26 +66,40 @@ export function CancellationsView() {
   const productSuggestions = useMemo<ProductSuggestion[]>(() => {
     if (!vendaDetail) return [];
     const productMap = new Map<string, ProductSuggestion>();
+    const normalize = (s: string) => s.trim().toLowerCase();
+    const normalizeName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const getProductKey = (code: string, name: string, fallback: string) => {
+      const normalizedCode = normalize(code || '');
+      const normalizedName = normalizeName(name || '');
+      return normalizedCode || normalizedName || fallback;
+    };
 
     // Initialize ALL products from the cancelled sale
-    for (const p of vendaDetail.produtos) {
-      const key = p.codigo.trim().toLowerCase();
+    for (let i = 0; i < vendaDetail.produtos.length; i++) {
+      const p = vendaDetail.produtos[i];
+      const key = getProductKey(p.codigo, p.nome, `produto-${i}`);
+      const qtdOrigem = parseInt(p.quantidade) || 0;
+
       if (!productMap.has(key)) {
         productMap.set(key, {
+          productKey: key,
           codigo: p.codigo,
           nome: p.nome,
-          qtdOrigem: parseInt(p.quantidade) || 0,
+          qtdOrigem,
           vendas: [],
         });
+      } else {
+        productMap.get(key)!.qtdOrigem += qtdOrigem;
       }
     }
 
     // Fill in matched sales
     for (const s of suggestions) {
       for (const mp of s.matchingProducts) {
-        const key = mp.codigo.trim().toLowerCase();
+        const key = getProductKey(mp.codigo, mp.nome, `match-${mp.nome}`);
         if (!productMap.has(key)) {
           productMap.set(key, {
+            productKey: key,
             codigo: mp.codigo,
             nome: mp.nome,
             qtdOrigem: mp.qtdOrigem,
