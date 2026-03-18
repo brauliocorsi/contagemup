@@ -369,34 +369,45 @@ export function CancellationsView() {
                     {productSuggestions.map((ps) => {
                       const isExpanded = expandedSuggestions.has(ps.codigo);
                       return (
-                        <div key={ps.codigo} className="border rounded-lg overflow-hidden">
+                        <div key={ps.codigo} className={`border rounded-lg overflow-hidden ${ps.vendas.length === 0 ? 'opacity-60' : ''}`}>
                           {/* Product header */}
                           <button
                             onClick={() => {
+                              if (ps.vendas.length === 0) return;
                               setExpandedSuggestions(prev => {
                                 const next = new Set(prev);
                                 next.has(ps.codigo) ? next.delete(ps.codigo) : next.add(ps.codigo);
                                 return next;
                               });
                             }}
-                            className={`w-full text-left p-3 transition-colors ${isExpanded ? 'bg-primary/5' : 'hover:bg-muted/50'}`}
+                            className={`w-full text-left p-3 transition-colors ${
+                              ps.vendas.length === 0 ? 'cursor-default' : isExpanded ? 'bg-primary/5' : 'hover:bg-muted/50'
+                            }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2 min-w-0">
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                {ps.vendas.length > 0 ? (
+                                  isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  )
                                 ) : (
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
                                 )}
                                 <Package className="h-4 w-4 text-primary shrink-0" />
                                 <span className="font-medium text-sm truncate">{ps.nome}</span>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
                                 <Badge variant="destructive" className="text-xs">{ps.qtdOrigem} un.</Badge>
-                                <Badge variant="secondary" className="text-xs gap-1">
-                                  <ShoppingCart className="h-3 w-3" />
-                                  {ps.vendas.length} venda(s)
-                                </Badge>
+                                {ps.vendas.length > 0 ? (
+                                  <Badge variant="secondary" className="text-xs gap-1">
+                                    <ShoppingCart className="h-3 w-3" />
+                                    {ps.vendas.length} venda(s)
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs text-muted-foreground">Sem correspondência</Badge>
+                                )}
                               </div>
                             </div>
                             <div className="text-xs text-muted-foreground ml-8 mt-1">
@@ -405,7 +416,7 @@ export function CancellationsView() {
                           </button>
 
                           {/* Collapsed sales list */}
-                          {isExpanded && (
+                          {isExpanded && ps.vendas.length > 0 && (
                             <div className="border-t bg-muted/20 p-2 space-y-1.5">
                               {ps.vendas.map((v) => (
                                 <div key={v.venda_id} className="flex items-center justify-between p-2 rounded-md bg-background border text-xs">
