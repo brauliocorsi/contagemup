@@ -99,7 +99,7 @@ export function CancellationsView() {
       const allSuggestions = new Map<string, TransferSuggestion>();
 
       // Iterate ALL sales in the map to find any that share products
-      const allSalesEntries = Object.values(salesMap);
+      const allSalesEntries = Object.values(salesMap) as VendaInfo[][];
       const seenVendas = new Set<string>();
 
       for (const salesList of allSalesEntries) {
