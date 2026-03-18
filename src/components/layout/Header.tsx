@@ -8,6 +8,7 @@ import { Package, LogOut, User, ClipboardList, Moon, Sun, Download, Scale, Arrow
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { StockAlertsBell } from '@/components/stock/StockAlertsBell';
+import { GlobalProductSearch } from '@/components/search/GlobalProductSearch';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -108,6 +109,7 @@ export function Header({ onNavigateToProducts, activeTab, onTabChange }: HeaderP
               Instalar
             </Button>
           )}
+          <GlobalProductSearch />
           <StockAlertsBell onNavigateToProducts={onNavigateToProducts} />
           
           <DropdownMenu>
