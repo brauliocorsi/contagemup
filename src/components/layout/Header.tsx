@@ -4,7 +4,7 @@ import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Package, LogOut, User, ClipboardList, Moon, Sun, Download, Scale, ArrowLeftRight, ShoppingBag, FileText, MapPin, ChevronDown } from 'lucide-react';
+import { Package, LogOut, User, ClipboardList, Moon, Sun, Download, Scale, ArrowLeftRight, ShoppingBag, FileText, MapPin, ChevronDown, XCircle } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { StockAlertsBell } from '@/components/stock/StockAlertsBell';
@@ -17,6 +17,7 @@ const erpItems = [
   { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
   { id: 'purchases', label: 'Compras', icon: ShoppingBag },
   { id: 'pending-sales', label: 'Vendas Pendentes', icon: FileText },
+  { id: 'cancellations', label: 'Cancelamentos', icon: XCircle },
   { id: 'routes', label: 'Rotas', icon: MapPin },
 ];
 
