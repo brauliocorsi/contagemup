@@ -337,7 +337,7 @@ export function CancellationsView() {
 
       {/* Sale Detail */}
       {vendaDetail && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 gap-4 ${bestChoices.length > 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
           {/* Left: Sale to cancel */}
           <Card className="border-destructive/30">
             <CardHeader className="pb-3">
