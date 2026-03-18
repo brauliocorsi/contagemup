@@ -45,7 +45,7 @@ export function CancellationsView() {
   const [suggestions, setSuggestions] = useState<TransferSuggestion[]>([]);
   const [selectedTransfer, setSelectedTransfer] = useState<TransferSuggestion | null>(null);
 
-  const { fetchSales, getSalesForProduct, loaded: salesLoaded, loading: salesFetching } = useProductSales();
+  const { fetchSales, getSalesForProduct, salesMap, loaded: salesLoaded, loading: salesFetching } = useProductSales();
 
   const handleSearch = async () => {
     const code = searchCode.trim();
@@ -86,51 +86,79 @@ export function CancellationsView() {
         await fetchSales();
       }
 
-      // For each product in the cancelled sale, find open sales that need it
-      const productCodes = vendaDetail.produtos.map(p => p.codigo);
+      const normalize = (s: string) => s.trim().toLowerCase();
+      const normalizeName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+
+      // Build lookup sets for the cancelled sale's products
+      const cancelledProducts = vendaDetail.produtos.map(p => ({
+        ...p,
+        normalizedCode: normalize(p.codigo),
+        normalizedName: normalizeName(p.nome),
+      }));
+
       const allSuggestions = new Map<string, TransferSuggestion>();
 
-      for (const produto of vendaDetail.produtos) {
-        const openSales = getSalesForProduct(produto.codigo);
+      // Iterate ALL sales in the map to find any that share products
+      const allSalesEntries = Object.values(salesMap) as VendaInfo[][];
+      const seenVendas = new Set<string>();
 
-        for (const sale of openSales) {
+      for (const salesList of allSalesEntries) {
+        for (const sale of salesList) {
           // Skip same sale
           if (sale.codigo === vendaDetail.codigo) continue;
-
-          if (!allSuggestions.has(sale.venda_id)) {
-            allSuggestions.set(sale.venda_id, {
-              venda: sale,
-              matchingProducts: [],
-              matchCount: 0,
-            });
+          if (seenVendas.has(sale.venda_id)) {
+            // Already processed this sale, but check for additional product matches
           }
+          seenVendas.add(sale.venda_id);
 
-          const suggestion = allSuggestions.get(sale.venda_id)!;
-          const destProduct = sale.produtos.find(p => p.codigo === produto.codigo);
-          if (destProduct) {
-            // Avoid duplicates
-            if (!suggestion.matchingProducts.some(mp => mp.codigo === produto.codigo)) {
-              suggestion.matchingProducts.push({
-                codigo: produto.codigo,
-                nome: produto.nome,
-                qtdOrigem: parseInt(produto.quantidade) || 0,
-                qtdDestino: parseInt(destProduct.quantidade) || 0,
-              });
-              suggestion.matchCount++;
+          for (const cancelledProd of cancelledProducts) {
+            // Try matching by code first, then by name
+            const matchingDestProduct = sale.produtos.find(sp => {
+              const spCode = normalize(sp.codigo);
+              const spName = normalizeName(sp.nome);
+              // Match by code (if both non-empty)
+              if (cancelledProd.normalizedCode && spCode && cancelledProd.normalizedCode === spCode) return true;
+              // Match by name (if both non-empty and code didn't match)
+              if (cancelledProd.normalizedName && spName && cancelledProd.normalizedName === spName) return true;
+              return false;
+            });
+
+            if (matchingDestProduct) {
+              if (!allSuggestions.has(sale.venda_id)) {
+                allSuggestions.set(sale.venda_id, {
+                  venda: sale,
+                  matchingProducts: [],
+                  matchCount: 0,
+                });
+              }
+
+              const suggestion = allSuggestions.get(sale.venda_id)!;
+              const alreadyAdded = suggestion.matchingProducts.some(
+                mp => normalize(mp.codigo) === cancelledProd.normalizedCode ||
+                      normalizeName(mp.nome) === cancelledProd.normalizedName
+              );
+              if (!alreadyAdded) {
+                suggestion.matchingProducts.push({
+                  codigo: cancelledProd.codigo,
+                  nome: cancelledProd.nome,
+                  qtdOrigem: parseInt(cancelledProd.quantidade) || 0,
+                  qtdDestino: parseInt(matchingDestProduct.quantidade) || 0,
+                });
+                suggestion.matchCount++;
+              }
             }
           }
         }
       }
 
-      // Sort by date (oldest first) and match count
+      // Sort by match count (desc) then date (oldest first)
       const sorted = Array.from(allSuggestions.values()).sort((a, b) => {
-        // More matching products first
         if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
-        // Older sales first
         return (a.venda.data || '').localeCompare(b.venda.data || '');
       });
 
       setSuggestions(sorted);
+      console.log(`Found ${sorted.length} transfer suggestions from ${seenVendas.size} sales scanned`);
 
       if (sorted.length === 0) {
         toast.info('Nenhuma venda em aberto encontrada com os mesmos produtos');
