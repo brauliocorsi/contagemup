@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import { Package, MapPin, Layers, ArrowUpCircle, ArrowDownCircle, AlertTriangle, Truck, Clock } from 'lucide-react';
+import { Package, MapPin, Layers, ArrowUpCircle, ArrowDownCircle, AlertTriangle, Truck, Clock, Cloud } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useProducts } from '@/hooks/useProducts';
 import { useProductMovementHistory, useMovementUserNames, UnifiedMovement } from '@/hooks/useProductMovementHistory';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
@@ -19,6 +21,23 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
   const { data: movements, isLoading } = useProductMovementHistory(productId);
 
   const product = products?.find(p => p.id === productId);
+  const productCode = product?.code;
+
+  // Fetch ERP stock from cache
+  const { data: erpData } = useQuery({
+    queryKey: ['erp-stock-lookup', productCode],
+    queryFn: async () => {
+      if (!productCode) return null;
+      const { data } = await supabase
+        .from('erp_products_cache')
+        .select('erp_stock, fetched_at')
+        .eq('code', productCode)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!productCode,
+    staleTime: 60000,
+  });
 
   const userIds = movements
     ?.map(m => m.created_by)
@@ -41,6 +60,8 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
 
   const isLowStock = product.current_stock <= product.min_stock;
   const availableStock = product.current_stock - product.damaged_stock;
+  const erpStock = erpData ? Number(erpData.erp_stock) : null;
+  const erpDiff = erpStock !== null ? product.current_stock - product.damaged_stock - erpStock : null;
 
   const typeLabel = (t: string) => {
     switch (t) {
@@ -73,7 +94,7 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
           </DialogHeader>
 
           {/* Stock Summary */}
-          <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className="grid grid-cols-4 gap-2 mt-4">
             <div className={`rounded-xl border-2 p-3 text-center ${isLowStock ? 'border-destructive/30 bg-destructive/5' : 'border-border bg-card'}`}>
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Stock</p>
               <p className={`text-2xl font-bold tabular-nums ${isLowStock ? 'text-destructive' : 'text-foreground'}`}>{product.current_stock}</p>
@@ -83,13 +104,29 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
               <p className="text-2xl font-bold tabular-nums text-primary">{availableStock}</p>
             </div>
             <div className="rounded-xl border-2 border-border bg-card p-3 text-center">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">ERP</p>
+              {erpStock !== null ? (
+                <p className="text-2xl font-bold tabular-nums text-foreground">{erpStock}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1">—</p>
+              )}
+            </div>
+            <div className="rounded-xl border-2 border-border bg-card p-3 text-center">
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Mínimo</p>
               <p className="text-2xl font-bold tabular-nums text-muted-foreground">{product.min_stock}</p>
             </div>
           </div>
 
+          {/* ERP Difference */}
+          {erpDiff !== null && erpDiff !== 0 && (
+            <div className={`flex items-center gap-2 mt-2 p-2 rounded-md text-xs ${erpDiff > 0 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-destructive/10 text-destructive'}`}>
+              <Cloud className="h-3.5 w-3.5 shrink-0" />
+              <span>Diferença Local vs ERP: <strong>{erpDiff > 0 ? '+' : ''}{erpDiff}</strong></span>
+            </div>
+          )}
+
           {(isLowStock || product.damaged_stock > 0) && (
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap gap-2 mt-2">
               {isLowStock && <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Stock baixo</Badge>}
               {product.damaged_stock > 0 && <Badge variant="outline" className="gap-1 border-orange-400 text-orange-600 dark:text-orange-400"><AlertTriangle className="h-3 w-3" />{product.damaged_stock} danificado(s)</Badge>}
             </div>
