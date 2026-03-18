@@ -384,16 +384,16 @@ export function CancellationsView() {
                 <ScrollArea className="h-[500px]">
                   <div className="space-y-3 pr-3">
                     {productSuggestions.map((ps) => {
-                      const isExpanded = expandedSuggestions.has(ps.codigo);
+                      const isExpanded = expandedSuggestions.has(ps.productKey);
                       return (
-                        <div key={ps.codigo} className={`border rounded-lg overflow-hidden ${ps.vendas.length === 0 ? 'opacity-60' : ''}`}>
+                        <div key={ps.productKey} className={`border rounded-lg overflow-hidden ${ps.vendas.length === 0 ? 'opacity-60' : ''}`}>
                           {/* Product header */}
                           <button
                             onClick={() => {
                               if (ps.vendas.length === 0) return;
                               setExpandedSuggestions(prev => {
                                 const next = new Set(prev);
-                                next.has(ps.codigo) ? next.delete(ps.codigo) : next.add(ps.codigo);
+                                next.has(ps.productKey) ? next.delete(ps.productKey) : next.add(ps.productKey);
                                 return next;
                               });
                             }}
