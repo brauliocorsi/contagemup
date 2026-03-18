@@ -138,6 +138,34 @@ export function CancellationsView() {
   const maxCoverage = useMemo(() => Math.max(0, ...Object.values(vendaCoverageMap)), [vendaCoverageMap]);
   const totalCancelledProducts = vendaDetail?.produtos.length || 0;
 
+  // Best choices: top sales sorted by coverage, only those covering 2+ products
+  const bestChoices = useMemo(() => {
+    if (productSuggestions.length === 0) return [];
+    const salesInfo = new Map<string, { venda_id: string; codigo: string; cliente_nome: string; situacao: string; data: string; coverage: number; produtos: string[] }>();
+    for (const ps of productSuggestions) {
+      for (const v of ps.vendas) {
+        if (!salesInfo.has(v.venda_id)) {
+          salesInfo.set(v.venda_id, {
+            venda_id: v.venda_id,
+            codigo: v.codigo,
+            cliente_nome: v.cliente_nome,
+            situacao: v.situacao,
+            data: v.data,
+            coverage: 0,
+            produtos: [],
+          });
+        }
+        const info = salesInfo.get(v.venda_id)!;
+        info.coverage++;
+        info.produtos.push(ps.nome);
+      }
+    }
+    return Array.from(salesInfo.values())
+      .filter(s => s.coverage >= 2)
+      .sort((a, b) => b.coverage - a.coverage)
+      .slice(0, 5);
+  }, [productSuggestions]);
+
   const handleSearch = async () => {
     const code = searchCode.trim();
     if (!code) return;
