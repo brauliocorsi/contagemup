@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, XCircle, ArrowRight, ShoppingCart, Package, Calendar, User, Loader2, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, XCircle, ArrowRight, ShoppingCart, Package, Calendar, User, Loader2, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Trophy, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -137,6 +137,34 @@ export function CancellationsView() {
 
   const maxCoverage = useMemo(() => Math.max(0, ...Object.values(vendaCoverageMap)), [vendaCoverageMap]);
   const totalCancelledProducts = vendaDetail?.produtos.length || 0;
+
+  // Best choices: top sales sorted by coverage, only those covering 2+ products
+  const bestChoices = useMemo(() => {
+    if (productSuggestions.length === 0) return [];
+    const salesInfo = new Map<string, { venda_id: string; codigo: string; cliente_nome: string; situacao: string; data: string; coverage: number; produtos: string[] }>();
+    for (const ps of productSuggestions) {
+      for (const v of ps.vendas) {
+        if (!salesInfo.has(v.venda_id)) {
+          salesInfo.set(v.venda_id, {
+            venda_id: v.venda_id,
+            codigo: v.codigo,
+            cliente_nome: v.cliente_nome,
+            situacao: v.situacao,
+            data: v.data,
+            coverage: 0,
+            produtos: [],
+          });
+        }
+        const info = salesInfo.get(v.venda_id)!;
+        info.coverage++;
+        info.produtos.push(ps.nome);
+      }
+    }
+    return Array.from(salesInfo.values())
+      .filter(s => s.coverage >= 2)
+      .sort((a, b) => b.coverage - a.coverage)
+      .slice(0, 5);
+  }, [productSuggestions]);
 
   const handleSearch = async () => {
     const code = searchCode.trim();
@@ -309,7 +337,7 @@ export function CancellationsView() {
 
       {/* Sale Detail */}
       {vendaDetail && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 gap-4 ${bestChoices.length > 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
           {/* Left: Sale to cancel */}
           <Card className="border-destructive/30">
             <CardHeader className="pb-3">
@@ -372,6 +400,71 @@ export function CancellationsView() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Middle: Best choices card */}
+          {bestChoices.length > 0 && (
+            <Card className="border-yellow-500/40 bg-yellow-50/30 dark:bg-yellow-950/10">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                  Melhores Escolhas
+                  <Badge className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700" variant="outline">
+                    Top {bestChoices.length}
+                  </Badge>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Vendas que cobrem mais produtos da nota cancelada</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {bestChoices.map((choice, idx) => (
+                    <div
+                      key={choice.venda_id}
+                      className={`p-3 rounded-lg border transition-colors ${
+                        idx === 0
+                          ? 'bg-yellow-100/60 dark:bg-yellow-900/20 border-yellow-400/60 dark:border-yellow-600/40 ring-1 ring-yellow-400/30'
+                          : 'bg-background border-border hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          {idx === 0 && <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400 fill-yellow-500/50" />}
+                          <span className={`font-mono font-bold text-sm ${idx === 0 ? 'text-yellow-800 dark:text-yellow-300' : ''}`}>
+                            #{choice.codigo}
+                          </span>
+                          <Badge variant="outline" className="text-[10px]">{choice.situacao}</Badge>
+                        </div>
+                        <Badge className={`text-xs gap-1 ${
+                          idx === 0
+                            ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                            : ''
+                        }`}>
+                          <Package className="h-3 w-3" />
+                          {choice.coverage}/{totalCancelledProducts} prod.
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground truncate flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {choice.cliente_nome}
+                        </span>
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {choice.data}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {choice.produtos.map((nome, pi) => (
+                          <span key={pi} className="text-[10px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[150px]">
+                            {nome}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Right: Transfer suggestions grouped by product */}
           <Card className="border-primary/20">
