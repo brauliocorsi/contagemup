@@ -37,6 +37,20 @@ interface TransferSuggestion {
   matchCount: number;
 }
 
+interface ProductSuggestion {
+  codigo: string;
+  nome: string;
+  qtdOrigem: number;
+  vendas: Array<{
+    venda_id: string;
+    codigo: string;
+    cliente_nome: string;
+    situacao: string;
+    data: string;
+    qtdDestino: number;
+  }>;
+}
+
 export function CancellationsView() {
   const [searchCode, setSearchCode] = useState('');
   const [vendaDetail, setVendaDetail] = useState<VendaDetail | null>(null);
@@ -46,6 +60,33 @@ export function CancellationsView() {
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<string>>(new Set());
 
   const { fetchSales, getSalesForProduct, salesMap, loaded: salesLoaded, loading: salesFetching } = useProductSales();
+
+  const productSuggestions = useMemo<ProductSuggestion[]>(() => {
+    if (suggestions.length === 0) return [];
+    const productMap = new Map<string, ProductSuggestion>();
+    for (const s of suggestions) {
+      for (const mp of s.matchingProducts) {
+        const key = mp.codigo.trim().toLowerCase();
+        if (!productMap.has(key)) {
+          productMap.set(key, {
+            codigo: mp.codigo,
+            nome: mp.nome,
+            qtdOrigem: mp.qtdOrigem,
+            vendas: [],
+          });
+        }
+        productMap.get(key)!.vendas.push({
+          venda_id: s.venda.venda_id,
+          codigo: s.venda.codigo,
+          cliente_nome: s.venda.cliente_nome,
+          situacao: s.venda.situacao,
+          data: s.venda.data,
+          qtdDestino: mp.qtdDestino,
+        });
+      }
+    }
+    return Array.from(productMap.values()).sort((a, b) => b.vendas.length - a.vendas.length);
+  }, [suggestions]);
 
   const handleSearch = async () => {
     const code = searchCode.trim();
@@ -277,19 +318,19 @@ export function CancellationsView() {
             </CardContent>
           </Card>
 
-          {/* Right: Transfer suggestions */}
+          {/* Right: Transfer suggestions grouped by product */}
           <Card className="border-primary/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <ArrowRight className="h-4 w-4 text-primary" />
                 Sugestões de Transferência
-                {suggestions.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">{suggestions.length}</Badge>
+                {productSuggestions.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">{productSuggestions.length} produto(s)</Badge>
                 )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {suggestions.length === 0 && !suggestionsLoading ? (
+              {productSuggestions.length === 0 && !suggestionsLoading ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
                   {vendaDetail ? 'Clique em "Encontrar vendas" para ver sugestões' : 'Pesquise uma venda primeiro'}
                 </p>
@@ -300,66 +341,58 @@ export function CancellationsView() {
                 </div>
               ) : (
                 <ScrollArea className="h-[500px]">
-                  <div className="space-y-2 pr-3">
-                    {suggestions.map((s) => {
-                      const isExpanded = expandedSuggestions.has(s.venda.venda_id);
+                  <div className="space-y-3 pr-3">
+                    {productSuggestions.map((ps) => {
+                      const isExpanded = expandedSuggestions.has(ps.codigo);
                       return (
-                        <div
-                          key={s.venda.venda_id}
-                          className={`border rounded-lg transition-colors ${
-                            isExpanded ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
-                          }`}
-                        >
+                        <div key={ps.codigo} className="border rounded-lg overflow-hidden">
+                          {/* Product header */}
                           <button
                             onClick={() => {
                               setExpandedSuggestions(prev => {
                                 const next = new Set(prev);
-                                if (next.has(s.venda.venda_id)) {
-                                  next.delete(s.venda.venda_id);
-                                } else {
-                                  next.add(s.venda.venda_id);
-                                }
+                                next.has(ps.codigo) ? next.delete(ps.codigo) : next.add(ps.codigo);
                                 return next;
                               });
                             }}
-                            className="w-full text-left p-3"
+                            className={`w-full text-left p-3 transition-colors ${isExpanded ? 'bg-primary/5' : 'hover:bg-muted/50'}`}
                           >
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 min-w-0">
                                 {isExpanded ? (
-                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                                 ) : (
-                                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                                 )}
-                                <span className="font-mono font-semibold text-sm">#{s.venda.codigo}</span>
-                                <Badge variant="outline" className="text-[10px]">{s.venda.situacao}</Badge>
+                                <Package className="h-4 w-4 text-primary shrink-0" />
+                                <span className="font-medium text-sm truncate">{ps.nome}</span>
                               </div>
-                              <Badge variant="secondary" className="text-xs gap-1">
-                                <CheckCircle2 className="h-3 w-3" />
-                                {s.matchCount} produto(s)
-                              </Badge>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Badge variant="destructive" className="text-xs">{ps.qtdOrigem} un.</Badge>
+                                <Badge variant="secondary" className="text-xs gap-1">
+                                  <ShoppingCart className="h-3 w-3" />
+                                  {ps.vendas.length} venda(s)
+                                </Badge>
+                              </div>
                             </div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-2 ml-5">
-                              <span>{s.venda.cliente_nome}</span>
-                              <span>•</span>
-                              <span>{s.venda.data}</span>
+                            <div className="text-xs text-muted-foreground ml-8 mt-1">
+                              Código: <span className="font-mono">{ps.codigo}</span>
                             </div>
                           </button>
 
-                          {/* Collapsed products panel */}
+                          {/* Collapsed sales list */}
                           {isExpanded && (
-                            <div className="px-3 pb-3 pt-0 border-t mx-3 mt-1 space-y-1.5">
-                              <p className="text-xs font-medium text-muted-foreground pt-2">Produtos transferíveis:</p>
-                              {s.matchingProducts.map((mp) => (
-                                <div key={mp.codigo} className="flex items-center justify-between text-xs p-1.5 rounded bg-primary/5 border border-primary/10">
-                                  <div className="min-w-0">
-                                    <span className="font-mono text-muted-foreground mr-1">{mp.codigo}</span>
-                                    <span className="truncate">{mp.nome}</span>
+                            <div className="border-t bg-muted/20 p-2 space-y-1.5">
+                              {ps.vendas.map((v) => (
+                                <div key={v.venda_id} className="flex items-center justify-between p-2 rounded-md bg-background border text-xs">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <span className="font-mono font-semibold text-sm">#{v.codigo}</span>
+                                    <Badge variant="outline" className="text-[10px] shrink-0">{v.situacao}</Badge>
+                                    <span className="text-muted-foreground truncate">{v.cliente_nome}</span>
                                   </div>
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <Badge variant="destructive" className="text-[10px] px-1 py-0">{mp.qtdOrigem}</Badge>
-                                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                                    <Badge className="text-[10px] px-1 py-0">{mp.qtdDestino}</Badge>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-muted-foreground">{v.data}</span>
+                                    <Badge className="text-[10px] px-1.5 py-0">{v.qtdDestino} un.</Badge>
                                   </div>
                                 </div>
                               ))}
