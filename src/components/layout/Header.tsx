@@ -17,6 +17,7 @@ const erpItems = [
   { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
   { id: 'purchases', label: 'Compras', icon: ShoppingBag },
   { id: 'pending-sales', label: 'Vendas Pendentes', icon: FileText },
+  { id: 'cancellations', label: 'Cancelamentos', icon: XCircle },
   { id: 'routes', label: 'Rotas', icon: MapPin },
 ];
 
