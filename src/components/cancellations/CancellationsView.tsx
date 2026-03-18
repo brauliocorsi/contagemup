@@ -59,7 +59,7 @@ export function CancellationsView() {
     try {
       // First try searching by venda_id directly
       const { data, error } = await supabase.functions.invoke('gestaoclick-venda-detail', {
-        body: { venda_id: code },
+        body: { venda_codigo: code },
       });
 
       if (error || data?.error) {
