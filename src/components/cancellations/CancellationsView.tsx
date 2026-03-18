@@ -124,6 +124,20 @@ export function CancellationsView() {
     return Array.from(productMap.values()).sort((a, b) => b.vendas.length - a.vendas.length);
   }, [suggestions, vendaDetail]);
 
+  // Compute how many distinct products each destination sale covers
+  const vendaCoverageMap = useMemo<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    for (const ps of productSuggestions) {
+      for (const v of ps.vendas) {
+        map[v.venda_id] = (map[v.venda_id] || 0) + 1;
+      }
+    }
+    return map;
+  }, [productSuggestions]);
+
+  const maxCoverage = useMemo(() => Math.max(0, ...Object.values(vendaCoverageMap)), [vendaCoverageMap]);
+  const totalCancelledProducts = vendaDetail?.produtos.length || 0;
+
   const handleSearch = async () => {
     const code = searchCode.trim();
     if (!code) return;
