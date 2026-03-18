@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Package, MapPin, Layers, ArrowUpCircle, ArrowDownCircle, Clock, ChevronRight, Keyboard } from 'lucide-react';
+import { Search, Package, ChevronRight } from 'lucide-react';
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,6 @@ export function GlobalProductSearch() {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const { products } = useProducts();
 
-  // Ctrl+K / Cmd+K shortcut
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -31,16 +30,13 @@ export function GlobalProductSearch() {
   return (
     <>
       <Button
-        variant="outline"
-        size="sm"
+        variant="ghost"
+        size="icon"
         onClick={() => setOpen(true)}
-        className="gap-2 text-muted-foreground hover:text-foreground"
+        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+        title="Pesquisar (Ctrl+K)"
       >
-        <Search className="h-4 w-4" />
-        <span className="hidden sm:inline">Pesquisar...</span>
-        <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-          <span className="text-xs">⌘</span>K
-        </kbd>
+        <Search className="h-5 w-5" />
       </Button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
