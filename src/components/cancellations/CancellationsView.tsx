@@ -174,7 +174,7 @@ export function CancellationsView() {
     setSearchCode('');
     setVendaDetail(null);
     setSuggestions([]);
-    setSelectedTransfer(null);
+    setExpandedSuggestions(new Set());
   };
 
   return (
