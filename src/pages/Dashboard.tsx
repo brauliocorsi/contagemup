@@ -23,6 +23,7 @@ const ERPReconciliationView = lazy(() => import('@/components/erp/ERPReconciliat
 const PurchaseOrdersView = lazy(() => import('@/components/purchases/PurchaseOrdersView').then(m => ({ default: m.PurchaseOrdersView })));
 const RoutesView = lazy(() => import('@/components/routes/RoutesView').then(m => ({ default: m.RoutesView })));
 const PendingSalesView = lazy(() => import('@/components/sales/PendingSalesView').then(m => ({ default: m.PendingSalesView })));
+const CancellationsView = lazy(() => import('@/components/cancellations/CancellationsView').then(m => ({ default: m.CancellationsView })));
 
 // Loading skeleton component
 function ViewLoader() {
