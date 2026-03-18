@@ -20,7 +20,6 @@ interface ProductDetailPopupProps {
 
 export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupProps) {
   const [showSales, setShowSales] = useState(false);
-  const [selectedVenda, setSelectedVenda] = useState<VendaInfo | null>(null);
   const { products } = useProducts();
   const { data: movements, isLoading } = useProductMovementHistory(productId);
 
