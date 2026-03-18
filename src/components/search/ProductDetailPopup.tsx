@@ -151,21 +151,17 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
               {product.damaged_stock > 0 && <Badge variant="outline" className="gap-1 border-orange-400 text-orange-600 dark:text-orange-400"><AlertTriangle className="h-3 w-3" />{product.damaged_stock} danificado(s)</Badge>}
             </div>
           )}
-          {/* Sales Button */}
-          <div className="mt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-2"
-              onClick={() => setShowSales(!showSales)}
-            >
-              <ShoppingCart className="h-4 w-4" />
-              {showSales ? 'Ocultar vendas em aberto' : 'Ver vendas em aberto'}
-              {salesData && salesData.length > 0 && (
-                <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{salesData.length}</Badge>
-              )}
-            </Button>
-          </div>
+          {/* Sales link */}
+          <button
+            onClick={() => setShowSales(!showSales)}
+            className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ShoppingCart className="h-3 w-3" />
+            <span className="underline underline-offset-2">{showSales ? 'Ocultar vendas' : 'Vendas em aberto'}</span>
+            {salesData && salesData.length > 0 && (
+              <span className="text-[10px] bg-muted rounded-full px-1.5 py-0.5 font-medium">{salesData.length}</span>
+            )}
+          </button>
 
           {/* Sales Section */}
           {showSales && (
