@@ -59,6 +59,10 @@ export function CancellationsView() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<TransferSuggestion[]>([]);
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<string>>(new Set());
+  const [expandedBestChoice, setExpandedBestChoice] = useState<string | null>(null);
+  const [bestChoiceDetails, setBestChoiceDetails] = useState<Record<string, VendaDetail>>({});
+  const [bestChoiceLoading, setBestChoiceLoading] = useState<string | null>(null);
+  const [bestChoicesStatusFilter, setBestChoicesStatusFilter] = useState<string | null>(null);
 
   const { fetchSales, getSalesForProduct, salesMap, loaded: salesLoaded, loading: salesFetching } = useProductSales();
 
