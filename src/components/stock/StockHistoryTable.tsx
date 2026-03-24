@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
+import { Search } from 'lucide-react';
 import { pt } from 'date-fns/locale';
 import { ArrowUpCircle, ArrowDownCircle, Trash2, Download, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
