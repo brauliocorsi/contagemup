@@ -61,7 +61,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
           products (code, name, damaged_stock)
         `)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(500);
 
       if (movementType) {
         query = query.eq('movement_type', movementType);
