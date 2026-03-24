@@ -229,6 +229,17 @@ export function StockHistoryTable({
                   </TableRow>
                 ))}
               </TableBody>
+              <tfoot>
+                <TableRow className="bg-muted/50 font-semibold">
+                  <TableCell colSpan={3} className="text-sm">Total</TableCell>
+                  <TableCell className="text-right text-sm">
+                    <Badge variant="outline" className="font-bold">
+                      {filteredMovements.reduce((sum, m) => sum + m.quantity, 0)} un.
+                    </Badge>
+                  </TableCell>
+                  <TableCell colSpan={onDelete ? 3 : 2}></TableCell>
+                </TableRow>
+              </tfoot>
             </Table>
           </div>
         )}
