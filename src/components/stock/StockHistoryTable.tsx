@@ -35,11 +35,19 @@ export function StockHistoryTable({
 }: StockHistoryTableProps) {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredMovements = useMemo(
-    () => filterByDateRange(movements, dateFrom, dateTo, m => m.created_at),
-    [movements, dateFrom, dateTo]
-  );
+  const filteredMovements = useMemo(() => {
+    let filtered = filterByDateRange(movements, dateFrom, dateTo, m => m.created_at);
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(m =>
+        (m.products?.name || '').toLowerCase().includes(term) ||
+        (m.products?.code || '').toLowerCase().includes(term)
+      );
+    }
+    return filtered;
+  }, [movements, dateFrom, dateTo, searchTerm]);
 
   const typeLabel = movementType === 'entrada' ? 'Entradas' : 'Saídas';
 
