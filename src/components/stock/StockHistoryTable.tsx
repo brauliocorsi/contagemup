@@ -1,8 +1,10 @@
 import { useState, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
+import { Search } from 'lucide-react';
 import { pt } from 'date-fns/locale';
 import { ArrowUpCircle, ArrowDownCircle, Trash2, Download, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -33,11 +35,19 @@ export function StockHistoryTable({
 }: StockHistoryTableProps) {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredMovements = useMemo(
-    () => filterByDateRange(movements, dateFrom, dateTo, m => m.created_at),
-    [movements, dateFrom, dateTo]
-  );
+  const filteredMovements = useMemo(() => {
+    let filtered = filterByDateRange(movements, dateFrom, dateTo, m => m.created_at);
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(m =>
+        (m.products?.name || '').toLowerCase().includes(term) ||
+        (m.products?.code || '').toLowerCase().includes(term)
+      );
+    }
+    return filtered;
+  }, [movements, dateFrom, dateTo, searchTerm]);
 
   const typeLabel = movementType === 'entrada' ? 'Entradas' : 'Saídas';
 
@@ -140,7 +150,18 @@ export function StockHistoryTable({
           </div>
         </div>
         {movements.length > 0 && (
-          <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
+          <div className="flex flex-col gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar por produto ou código..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+            <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
+          </div>
         )}
       </CardHeader>
       <CardContent>
