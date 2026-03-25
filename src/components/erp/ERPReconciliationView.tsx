@@ -321,7 +321,12 @@ export function ERPReconciliationView() {
                     <TableHead className="text-right">Stock Local</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Localização</TableHead>
+                     <TableHead>Localização</TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex items-center justify-center gap-1" title="Stock Local - Stock Vendido = Stock ERP">
+                        Validação
+                      </div>
+                    </TableHead>
                     <TableHead>
                       <div className="flex items-center gap-1">
                         Vendas
