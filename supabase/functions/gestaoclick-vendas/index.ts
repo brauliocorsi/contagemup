@@ -137,6 +137,15 @@ Deno.serve(async (req) => {
 
     const supabase = getSupabaseAdmin();
 
+    // Handle cache save request from frontend
+    if (body.saveCache && body.productSalesMap) {
+      await saveToSalesCache(supabase, body.productSalesMap);
+      return new Response(JSON.stringify({ saved: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Phase 0: Full cache check (only when startPage=0)
     if (startPage === 0 && !skipCache) {
       const cached = await getCachedSales(supabase);
