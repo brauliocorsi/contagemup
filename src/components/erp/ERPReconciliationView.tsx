@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useERPReconciliation, ERPComparisonItem } from '@/hooks/useERPReconciliation';
+import { useERPReconciliation, ERPComparisonItem, SyncValidation } from '@/hooks/useERPReconciliation';
 import { useProductSales, VendaInfo } from '@/hooks/useProductSales';
 import { useCategories } from '@/hooks/useCategories';
 import { Button } from '@/components/ui/button';
