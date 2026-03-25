@@ -312,6 +312,3 @@ function buildProductSalesFromVendas(vendas: any[], situacaoLookup: Record<strin
 
   return { productSalesMap, vendasCount: vendas.length };
 }
-
-// Separate endpoint for saving cache (called by frontend after aggregation)
-// The frontend will call with { action: 'saveCache', productSalesMap }
