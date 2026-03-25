@@ -230,6 +230,44 @@ export function ERPReconciliationView() {
         </div>
       )}
 
+      {/* Sync Validation Banner */}
+      {syncValidation && (
+        <Card className={syncValidation.isValid ? 'border-green-300 bg-green-50 dark:bg-green-950/30 dark:border-green-800' : 'border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800'}>
+          <CardContent className="p-3 flex items-center gap-3">
+            {syncValidation.isValid ? (
+              <ShieldCheck className="h-5 w-5 text-green-600 flex-shrink-0" />
+            ) : (
+              <ShieldAlert className="h-5 w-5 text-red-600 flex-shrink-0" />
+            )}
+            <div className="flex-1">
+              {syncValidation.isValid ? (
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  <span className="font-semibold">Sincronização validada:</span>{' '}
+                  {syncValidation.totalProducts} produtos carregados
+                  {syncValidation.fromCache ? ' (do cache)' : ` de ${syncValidation.totalPages} páginas`}
+                  {syncValidation.expectedTotal && ` — esperados: ${syncValidation.expectedTotal}`}
+                </p>
+              ) : (
+                <div>
+                  <p className="text-sm text-red-800 dark:text-red-200 font-semibold">
+                    Sincronização incompleta: {syncValidation.pagesFetched}/{syncValidation.totalPages} páginas carregadas
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-300 mt-0.5">
+                    Páginas com falha: {syncValidation.failedPages.join(', ')}. Os dados podem estar incompletos. Tente sincronizar novamente.
+                  </p>
+                </div>
+              )}
+            </div>
+            {!syncValidation.isValid && (
+              <Button size="sm" variant="destructive" onClick={() => fetchAndCompare(true)} disabled={loading}>
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Tentar novamente
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters */}
       {comparisonItems.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-2">
