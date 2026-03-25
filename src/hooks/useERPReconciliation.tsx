@@ -64,6 +64,20 @@ export function useERPReconciliation() {
       setCachedAt(null);
     }
 
+    // Build validation info
+    const meta = data?.meta || {};
+    const validation: SyncValidation = {
+      isValid: meta.pages_complete !== false, // true if complete or not specified (cache)
+      totalProducts: products.length,
+      expectedTotal: meta.expected_total || null,
+      pagesFetched: meta.pages_fetched || 0,
+      totalPages: meta.total_paginas || 0,
+      pagesComplete: meta.pages_complete !== false,
+      failedPages: meta.failed_pages || [],
+      fromCache: !!meta.cached,
+    };
+    setSyncValidation(validation);
+
     if (!Array.isArray(products) || products.length === 0) {
       return [];
     }
