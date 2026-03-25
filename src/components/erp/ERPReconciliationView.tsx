@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus, Copy, Link, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus, Copy, Link, ShieldCheck, ShieldAlert, Ban } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -115,6 +115,8 @@ export function ERPReconciliationView() {
     XLSX.writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const canExport = comparisonItems.length > 0 && salesLoaded && syncValidation?.isValid === true;
+
   const erpOnlyItems = useMemo(() => filtered.filter(i => i.status === 'erp_only'), [filtered]);
 
   const openCategoryDialog = (items: ERPComparisonItem[]) => {
@@ -178,10 +180,22 @@ export function ERPReconciliationView() {
           </Button>
           {comparisonItems.length > 0 && (
             <>
-              <Button variant="outline" onClick={exportToExcel}>
-                <Download className="h-4 w-4 mr-2" />
-                Exportar Excel
-              </Button>
+              <div className="relative group">
+                <Button variant="outline" onClick={exportToExcel} disabled={!canExport}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar Excel
+                </Button>
+                {!canExport && comparisonItems.length > 0 && (
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-52 p-2 bg-popover border rounded-md shadow-md text-xs text-muted-foreground hidden group-hover:block z-50">
+                    <p className="font-semibold text-foreground mb-1">Exportação bloqueada:</p>
+                    <ul className="space-y-0.5">
+                      {!salesLoaded && <li className="flex items-center gap-1"><Ban className="h-3 w-3 text-red-500 flex-shrink-0" /> Vendas não carregadas</li>}
+                      {syncValidation && !syncValidation.isValid && <li className="flex items-center gap-1"><Ban className="h-3 w-3 text-red-500 flex-shrink-0" /> Sincronização incompleta</li>}
+                      {!syncValidation && <li className="flex items-center gap-1"><Ban className="h-3 w-3 text-red-500 flex-shrink-0" /> Sincronização não validada</li>}
+                    </ul>
+                  </div>
+                )}
+              </div>
               {erpOnlyItems.length > 0 && (
                 <Button variant="default" onClick={() => openCategoryDialog(erpOnlyItems)} disabled={registering.size > 0}>
                   {registering.size > 0 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
