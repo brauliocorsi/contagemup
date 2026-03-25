@@ -26,12 +26,24 @@ export interface ERPComparisonItem {
   };
 }
 
+export interface SyncValidation {
+  isValid: boolean;
+  totalProducts: number;
+  expectedTotal: number | null;
+  pagesFetched: number;
+  totalPages: number;
+  pagesComplete: boolean;
+  failedPages: number[];
+  fromCache: boolean;
+}
+
 export function useERPReconciliation() {
   const [erpProducts, setErpProducts] = useState<ERPProduct[]>([]);
   const [comparisonItems, setComparisonItems] = useState<ERPComparisonItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [syncValidation, setSyncValidation] = useState<SyncValidation | null>(null);
   const { toast } = useToast();
 
   const fetchAllERPProducts = useCallback(async (skipCache = false): Promise<ERPProduct[]> => {
@@ -51,6 +63,20 @@ export function useERPReconciliation() {
     } else {
       setCachedAt(null);
     }
+
+    // Build validation info
+    const meta = data?.meta || {};
+    const validation: SyncValidation = {
+      isValid: meta.pages_complete !== false, // true if complete or not specified (cache)
+      totalProducts: products.length,
+      expectedTotal: meta.expected_total || null,
+      pagesFetched: meta.pages_fetched || 0,
+      totalPages: meta.total_paginas || 0,
+      pagesComplete: meta.pages_complete !== false,
+      failedPages: meta.failed_pages || [],
+      fromCache: !!meta.cached,
+    };
+    setSyncValidation(validation);
 
     if (!Array.isArray(products) || products.length === 0) {
       return [];
@@ -72,6 +98,7 @@ export function useERPReconciliation() {
     setLoading(true);
     setComparisonItems([]);
     setProgress({ current: 0, total: 0 });
+    setSyncValidation(null);
 
     try {
       toast({ title: 'A carregar', description: 'A buscar produtos do GestãoClick...' });
@@ -336,7 +363,7 @@ export function useERPReconciliation() {
   }, [erpProducts, toast]);
 
   return {
-    erpProducts, comparisonItems, loading, progress, cachedAt,
+    erpProducts, comparisonItems, loading, progress, cachedAt, syncValidation,
     fetchAndCompare, searchSingleProduct, registerERPProducts, unifyDuplicate,
   };
 }

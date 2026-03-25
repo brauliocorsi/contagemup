@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useERPReconciliation, ERPComparisonItem } from '@/hooks/useERPReconciliation';
+import { useERPReconciliation, ERPComparisonItem, SyncValidation } from '@/hooks/useERPReconciliation';
 import { useProductSales, VendaInfo } from '@/hooks/useProductSales';
 import { useCategories } from '@/hooks/useCategories';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus, Copy, Link } from 'lucide-react';
+import { RefreshCw, Search, Download, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown, HelpCircle, Loader2, ShoppingCart, ChevronDown, ChevronUp, User, Calendar, Plus, Copy, Link, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -24,7 +24,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
 };
 
 export function ERPReconciliationView() {
-  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts, unifyDuplicate, cachedAt: productsCachedAt } = useERPReconciliation();
+  const { comparisonItems, loading, fetchAndCompare, searchSingleProduct, registerERPProducts, unifyDuplicate, cachedAt: productsCachedAt, syncValidation } = useERPReconciliation();
   const { salesMap, loading: salesLoading, loaded: salesLoaded, fetchSales, getSalesForProduct, getSalesCount, cachedAt: salesCachedAt } = useProductSales();
   const { categories } = useCategories();
   const [search, setSearch] = useState('');
@@ -228,6 +228,44 @@ export function ERPReconciliationView() {
             </Card>
           )}
         </div>
+      )}
+
+      {/* Sync Validation Banner */}
+      {syncValidation && (
+        <Card className={syncValidation.isValid ? 'border-green-300 bg-green-50 dark:bg-green-950/30 dark:border-green-800' : 'border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800'}>
+          <CardContent className="p-3 flex items-center gap-3">
+            {syncValidation.isValid ? (
+              <ShieldCheck className="h-5 w-5 text-green-600 flex-shrink-0" />
+            ) : (
+              <ShieldAlert className="h-5 w-5 text-red-600 flex-shrink-0" />
+            )}
+            <div className="flex-1">
+              {syncValidation.isValid ? (
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  <span className="font-semibold">Sincronização validada:</span>{' '}
+                  {syncValidation.totalProducts} produtos carregados
+                  {syncValidation.fromCache ? ' (do cache)' : ` de ${syncValidation.totalPages} páginas`}
+                  {syncValidation.expectedTotal && ` — esperados: ${syncValidation.expectedTotal}`}
+                </p>
+              ) : (
+                <div>
+                  <p className="text-sm text-red-800 dark:text-red-200 font-semibold">
+                    Sincronização incompleta: {syncValidation.pagesFetched}/{syncValidation.totalPages} páginas carregadas
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-300 mt-0.5">
+                    Páginas com falha: {syncValidation.failedPages.join(', ')}. Os dados podem estar incompletos. Tente sincronizar novamente.
+                  </p>
+                </div>
+              )}
+            </div>
+            {!syncValidation.isValid && (
+              <Button size="sm" variant="destructive" onClick={() => fetchAndCompare(true)} disabled={loading}>
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Tentar novamente
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Filters */}
