@@ -88,19 +88,26 @@ export function ERPReconciliationView() {
   }, [comparisonItems]);
 
   const exportToExcel = () => {
-    const data = filtered.map(item => ({
-      'Código': item.productCode,
-      'Produto': item.productName,
-      'Stock ERP': item.erpStock,
-      'Stock Vendido': getSoldStock(item.productCode),
-      'Stock Local': item.localStock,
-      'Diferença': item.difference,
-      'Estado': STATUS_CONFIG[item.status]?.label || item.status,
-      'Localização': item.location || '',
-      'Possível Duplicado - Código': item.possibleMatch?.code || '',
-      'Possível Duplicado - Nome': item.possibleMatch?.name || '',
-      'Possível Duplicado - Stock': item.possibleMatch ? item.possibleMatch.stock : '',
-    }));
+    const data = filtered.map(item => {
+      const soldStock = getSoldStock(item.productCode);
+      const expectedErp = item.localStock - soldStock;
+      const isValid = expectedErp === item.erpStock;
+      return {
+        'Código': item.productCode,
+        'Produto': item.productName,
+        'Stock ERP': item.erpStock,
+        'Stock Vendido': soldStock,
+        'Stock Local': item.localStock,
+        'Diferença': item.difference,
+        'Validação': isValid ? 'Validado' : 'Divergente',
+        'Cálculo (Local - Vendido)': expectedErp,
+        'Estado': STATUS_CONFIG[item.status]?.label || item.status,
+        'Localização': item.location || '',
+        'Possível Duplicado - Código': item.possibleMatch?.code || '',
+        'Possível Duplicado - Nome': item.possibleMatch?.name || '',
+        'Possível Duplicado - Stock': item.possibleMatch ? item.possibleMatch.stock : '',
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
