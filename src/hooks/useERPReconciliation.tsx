@@ -26,12 +26,24 @@ export interface ERPComparisonItem {
   };
 }
 
+export interface SyncValidation {
+  isValid: boolean;
+  totalProducts: number;
+  expectedTotal: number | null;
+  pagesFetched: number;
+  totalPages: number;
+  pagesComplete: boolean;
+  failedPages: number[];
+  fromCache: boolean;
+}
+
 export function useERPReconciliation() {
   const [erpProducts, setErpProducts] = useState<ERPProduct[]>([]);
   const [comparisonItems, setComparisonItems] = useState<ERPComparisonItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [syncValidation, setSyncValidation] = useState<SyncValidation | null>(null);
   const { toast } = useToast();
 
   const fetchAllERPProducts = useCallback(async (skipCache = false): Promise<ERPProduct[]> => {
