@@ -613,6 +613,7 @@ export function ERPReconciliationView() {
                 </Button>
               </div>
             </div>
+          </CardContent>
         </Card>
       ) : !loading ? (
         <Card>
