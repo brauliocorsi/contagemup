@@ -30,7 +30,7 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   throw new Error('All retries exhausted');
 }
 
-async function fetchPage(page: number, headers: Record<string, string>): Promise<{ products: any[]; meta: any }> {
+async function fetchPage(page: number, headers: Record<string, string>): Promise<{ products: any[]; meta: any; page: number }> {
   const url = new URL('https://api.gestaoclick.com/api/produtos');
   url.searchParams.set('pagina', String(page));
   url.searchParams.set('ativo', '1');
@@ -39,11 +39,11 @@ async function fetchPage(page: number, headers: Record<string, string>): Promise
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`GestãoClick API error [${response.status}]: ${errorText}`);
+    throw new Error(`GestãoClick API error [${response.status}] page ${page}: ${errorText}`);
   }
 
   const data = await response.json();
-  return { products: data?.data || [], meta: data?.meta || {} };
+  return { products: data?.data || [], meta: data?.meta || {}, page };
 }
 
 async function getCachedProducts(supabase: any): Promise<{ products: any[]; cachedAt: string } | null> {
@@ -246,10 +246,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Fetch from API
+      // Fetch first page to get total pages and expected total
       const first = await fetchPage(1, apiHeaders);
       const totalPages = first.meta.total_paginas || 1;
+      const expectedTotal = first.meta.total || null;
       const allProducts = [...first.products];
+      const fetchedPages = new Set<number>([1]);
+      const failedPages: number[] = [];
 
       for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH_SIZE) {
         const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
@@ -258,13 +261,21 @@ Deno.serve(async (req) => {
           pages.push(p);
         }
 
-        const results = await Promise.all(
+        const results = await Promise.allSettled(
           pages.map(p => fetchPage(p, apiHeaders))
         );
 
-        for (const result of results) {
-          if (Array.isArray(result.products)) {
-            allProducts.push(...result.products);
+        for (let i = 0; i < results.length; i++) {
+          const result = results[i];
+          const pageNum = pages[i];
+          if (result.status === 'fulfilled') {
+            if (Array.isArray(result.value.products)) {
+              allProducts.push(...result.value.products);
+              fetchedPages.add(pageNum);
+            }
+          } else {
+            console.error(`Failed to fetch page ${pageNum}:`, result.reason);
+            failedPages.push(pageNum);
           }
         }
 
@@ -273,12 +284,50 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Save to cache in background (don't await)
-      saveToCache(supabase, allProducts).catch(err => console.error('Cache save error:', err));
+      // Retry failed pages individually
+      if (failedPages.length > 0) {
+        console.log(`Retrying ${failedPages.length} failed pages: ${failedPages.join(', ')}`);
+        for (const pageNum of failedPages) {
+          try {
+            const result = await fetchPage(pageNum, apiHeaders);
+            if (Array.isArray(result.products)) {
+              allProducts.push(...result.products);
+              fetchedPages.add(pageNum);
+            }
+          } catch (err) {
+            console.error(`Retry for page ${pageNum} also failed:`, err);
+          }
+        }
+      }
+
+      // Deduplicate products by ID
+      const uniqueProducts = Array.from(
+        new Map(allProducts.map((p: any) => [String(p.id), p])).values()
+      );
+
+      // Validation: check completeness
+      const pagesComplete = fetchedPages.size === totalPages;
+      const finalFailedPages = Array.from({ length: totalPages }, (_, i) => i + 1)
+        .filter(p => !fetchedPages.has(p));
+
+      console.log(`Sync complete: ${uniqueProducts.length} unique products from ${fetchedPages.size}/${totalPages} pages. Expected: ${expectedTotal || 'unknown'}`);
+
+      // Save to cache only if all pages were fetched
+      if (pagesComplete) {
+        saveToCache(supabase, uniqueProducts).catch(err => console.error('Cache save error:', err));
+      }
 
       return new Response(JSON.stringify({
-        data: allProducts,
-        meta: { total: allProducts.length, total_paginas: totalPages, cached: false },
+        data: uniqueProducts,
+        meta: {
+          total: uniqueProducts.length,
+          total_paginas: totalPages,
+          pages_fetched: fetchedPages.size,
+          pages_complete: pagesComplete,
+          failed_pages: finalFailedPages,
+          expected_total: expectedTotal,
+          cached: false,
+        },
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
