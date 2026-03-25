@@ -90,17 +90,17 @@ export function ERPReconciliationView() {
   const exportToExcel = () => {
     const data = filtered.map(item => {
       const soldStock = getSoldStock(item.productCode);
-      const expectedErp = item.localStock - soldStock;
-      const isValid = expectedErp === item.erpStock;
+      const result = item.localStock - soldStock - item.erpStock;
+      const isValid = result === 0;
       return {
         'Código': item.productCode,
         'Produto': item.productName,
         'Stock ERP': item.erpStock,
-        'Stock Vendido': soldStock,
+        'Stock Vendido': salesLoaded ? soldStock : '',
         'Stock Local': item.localStock,
         'Diferença': item.difference,
-        'Validação': isValid ? 'Validado' : 'Divergente',
-        'Cálculo (Local - Vendido)': expectedErp,
+        'Validação': salesLoaded ? (isValid ? 'Validado' : 'Divergente') : 'Sem dados de vendas',
+        'Resultado (Local - Vendido - ERP)': salesLoaded ? result : '',
         'Estado': STATUS_CONFIG[item.status]?.label || item.status,
         'Localização': item.location || '',
         'Possível Duplicado - Código': item.possibleMatch?.code || '',
