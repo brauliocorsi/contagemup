@@ -111,6 +111,8 @@ export function ERPReconciliationView() {
     return s;
   }, [comparisonItems]);
 
+  const canExport = comparisonItems.length > 0 && salesLoaded && !salesLoading && !loading && syncValidation?.isValid === true;
+
   const exportToExcel = () => {
     if (!canExport) return;
 
