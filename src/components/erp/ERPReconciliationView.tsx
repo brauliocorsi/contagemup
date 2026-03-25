@@ -114,8 +114,20 @@ export function ERPReconciliationView() {
   const exportToExcel = () => {
     if (!canExport) return;
 
-    const data = filtered.map(item => {
-      const soldStock = getSoldStock(item.productCode);
+    // Always export ALL products (comparisonItems), not just filtered
+    const allItems = comparisonItems;
+
+    // Pre-compute sold stock for all items to avoid recalculating
+    const soldStockMap = new Map<string, number>();
+    for (const item of allItems) {
+      const key = item.productCode;
+      if (!soldStockMap.has(key)) {
+        soldStockMap.set(key, getSoldStock(key));
+      }
+    }
+
+    const data = allItems.map(item => {
+      const soldStock = soldStockMap.get(item.productCode) ?? 0;
       const result = item.localStock - soldStock - item.erpStock;
       const isValid = result === 0;
       return {
@@ -137,16 +149,20 @@ export function ERPReconciliationView() {
     });
 
     // Add summary row
-    const totalLocal = filtered.reduce((s, i) => s + i.localStock, 0);
-    const totalSold = filtered.reduce((s, i) => s + getSoldStock(i.productCode), 0);
-    const totalERP = filtered.reduce((s, i) => s + i.erpStock, 0);
+    let totalLocal = 0, totalSold = 0, totalERP = 0, validated = 0;
+    for (const item of allItems) {
+      const soldStock = soldStockMap.get(item.productCode) ?? 0;
+      totalLocal += item.localStock;
+      totalSold += soldStock;
+      totalERP += item.erpStock;
+      if (item.localStock - soldStock - item.erpStock === 0) validated++;
+    }
     const totalResult = totalLocal - totalSold - totalERP;
-    const validated = filtered.filter(i => { const r = i.localStock - getSoldStock(i.productCode) - i.erpStock; return r === 0; }).length;
-    const divergent = filtered.length - validated;
+    const divergent = allItems.length - validated;
 
     data.push({
       'Código': '',
-      'Produto': `TOTAL (${filtered.length} produtos)`,
+      'Produto': `TOTAL (${allItems.length} produtos)`,
       'Stock Local': totalLocal,
       'Stock Vendido': totalSold,
       'Stock ERP': totalERP,
