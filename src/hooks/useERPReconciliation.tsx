@@ -98,6 +98,7 @@ export function useERPReconciliation() {
     setLoading(true);
     setComparisonItems([]);
     setProgress({ current: 0, total: 0 });
+    setSyncValidation(null);
 
     try {
       toast({ title: 'A carregar', description: 'A buscar produtos do GestãoClick...' });
