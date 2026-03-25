@@ -95,9 +95,10 @@ export function ERPReconciliationView() {
   }, [comparisonItems, search, statusFilter, validationFilter, salesLoaded]);
 
   // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [search, statusFilter, validationFilter]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
-  if (safePage !== currentPage) setCurrentPage(safePage);
 
   const paginatedItems = useMemo(() => {
     const start = (safePage - 1) * pageSize;
