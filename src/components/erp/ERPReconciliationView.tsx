@@ -111,6 +111,8 @@ export function ERPReconciliationView() {
     return s;
   }, [comparisonItems]);
 
+  const canExport = comparisonItems.length > 0 && salesLoaded && !salesLoading && !loading && syncValidation?.isValid === true;
+
   const exportToExcel = () => {
     if (!canExport) return;
 
@@ -185,7 +187,6 @@ export function ERPReconciliationView() {
     XLSX.writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const canExport = comparisonItems.length > 0 && salesLoaded && syncValidation?.isValid === true;
 
   const erpOnlyItems = useMemo(() => filtered.filter(i => i.status === 'erp_only'), [filtered]);
 
@@ -252,8 +253,8 @@ export function ERPReconciliationView() {
             <>
               <div className="relative group">
                 <Button variant="outline" onClick={exportToExcel} disabled={!canExport}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar Excel
+                  {salesLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                  {salesLoading ? 'A carregar vendas...' : 'Exportar Excel'}
                 </Button>
                 {!canExport && comparisonItems.length > 0 && (
                   <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-52 p-2 bg-popover border rounded-md shadow-md text-xs text-muted-foreground hidden group-hover:block z-50">
