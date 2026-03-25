@@ -392,6 +392,29 @@ export function ERPReconciliationView() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{item.location || '—'}</TableCell>
+                          <TableCell className="text-center">
+                            {salesLoaded ? (() => {
+                              const expectedErp = item.localStock - soldStock;
+                              const isValid = expectedErp === item.erpStock;
+                              return (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Badge variant="secondary" className={isValid 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 gap-1' 
+                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 gap-1'
+                                  }>
+                                    {isValid ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                                    {isValid ? 'Validado' : 'Divergente'}
+                                  </Badge>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {item.localStock} - {soldStock} = {expectedErp}
+                                    {!isValid && <span className="text-red-500"> (ERP: {item.erpStock})</span>}
+                                  </span>
+                                </div>
+                              );
+                            })() : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {salesLoaded && salesCount > 0 ? (
                               <Button
