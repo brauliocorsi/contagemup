@@ -29,6 +29,7 @@ export function ERPReconciliationView() {
   const { categories } = useCategories();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [validationFilter, setValidationFilter] = useState<string>('all');
   const [quickSearch, setQuickSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [registering, setRegistering] = useState<Set<string>>(new Set());
