@@ -5,10 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const EXCLUDED_STATUSES = ['conferido', 'produto entregue', 'cancelado', 'levantado'];
+const EXCLUDED_STATUSES = ['conferido', 'produto entregue', 'cancelado', 'levantado', 'levantado - conferido', 'produto entregue parcial'];
 const CACHE_TTL_MINUTES = 15;
-const BATCH_SIZE = 10;
-const BATCH_DELAY_MS = 50;
+const PAGES_PER_CHUNK = 5;
 
 function getSupabaseAdmin() {
   return createClient(
@@ -17,15 +16,14 @@ function getSupabaseAdmin() {
   );
 }
 
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2): Promise<Response> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetch(url, options);
       return response;
     } catch (error) {
-      console.error(`Attempt ${attempt}/${maxRetries} failed:`, error);
       if (attempt === maxRetries) throw error;
-      await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
   throw new Error('All retries exhausted');
@@ -34,11 +32,10 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
 async function fetchPage(baseUrl: string, page: number, headers: Record<string, string>): Promise<{ data: any[]; meta: any }> {
   const url = new URL(baseUrl);
   url.searchParams.set('pagina', String(page));
-
   const response = await fetchWithRetry(url.toString(), { method: 'GET', headers });
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`GestãoClick API error [${response.status}]: ${errorText}`);
+    throw new Error(`API error [${response.status}]: ${errorText}`);
   }
   const data = await response.json();
   return { data: data?.data || [], meta: data?.meta || {} };
@@ -48,81 +45,15 @@ function normalizeCode(value: unknown): string {
   return String(value ?? '').trim().toLowerCase();
 }
 
-function normalizeIdentifier(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function normalizePostalCode(value: unknown): string {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-
-  const formattedMatch = raw.match(/\b(\d{4})\s*-\s*(\d{3})\b/);
-  if (formattedMatch) {
-    return `${formattedMatch[1]}-${formattedMatch[2]}`;
-  }
-
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length === 7) {
-    return `${digits.slice(0, 4)}-${digits.slice(4)}`;
-  }
-
-  return '';
-}
-
-function extractPostalCodeFromText(value: unknown): string {
-  const text = String(value ?? '');
-  if (!text) return '';
-
-  const formattedMatch = text.match(/\b\d{4}\s*-\s*\d{3}\b/);
-  if (formattedMatch) {
-    return normalizePostalCode(formattedMatch[0]);
-  }
-
-  const compactMatch = text.match(/\b\d{7}\b/);
-  if (compactMatch) {
-    return normalizePostalCode(compactMatch[0]);
-  }
-
-  return '';
-}
-
-function extractAddressEntries(venda: any): any[] {
-  const enderecos = Array.isArray(venda?.enderecos) ? venda.enderecos : [];
-  return enderecos.map((entry: any) => {
-    const nestedEndereco = entry?.endereco && typeof entry.endereco === 'object'
-      ? entry.endereco
-      : {};
-
-    return { ...nestedEndereco, ...entry };
-  });
-}
-
-function firstNonEmpty(...values: unknown[]): string {
-  for (const value of values) {
-    const parsed = String(value ?? '').trim();
-    if (parsed) return parsed;
-  }
-  return '';
-}
-
-function extractProductReferences(item: any): { productCode: string; productId: string; variationId: string } {
+function extractProductCode(item: any): string {
   const product = item?.produto || {};
-
-  const productCodeCandidates = [
+  const candidates = [
     item?.codigo_interno, item?.codigo, item?.produto_codigo,
     item?.produto_codigo_interno, item?.variacao_codigo, item?.variacao?.codigo,
     product?.codigo_interno, product?.codigo, product?.produto_codigo,
     product?.codigo_produto, product?.variacao_codigo, product?.referencia,
   ];
-
-  const productIdCandidates = [item?.produto_id, item?.product_id, product?.produto_id, product?.id];
-  const variationIdCandidates = [item?.variacao_id, item?.variation_id, item?.variacao?.id, product?.variacao_id, product?.variacao?.id];
-
-  const productCode = normalizeCode(productCodeCandidates.find((v) => String(v ?? '').trim() !== ''));
-  const productId = normalizeIdentifier(productIdCandidates.find((v) => String(v ?? '').trim() !== ''));
-  const variationId = normalizeIdentifier(variationIdCandidates.find((v) => String(v ?? '').trim() !== ''));
-
-  return { productCode, productId, variationId };
+  return normalizeCode(candidates.find((v) => String(v ?? '').trim() !== ''));
 }
 
 async function getCachedSales(supabase: any): Promise<{ salesMap: Record<string, any[]>; totalVendas: number; cachedAt: string } | null> {
@@ -136,12 +67,23 @@ async function getCachedSales(supabase: any): Promise<{ salesMap: Record<string,
 
   if (error || !data || data.length === 0) return null;
 
-  const { data: allData, error: allError } = await supabase
-    .from('erp_sales_cache')
-    .select('product_code, venda_data, fetched_at')
-    .gte('fetched_at', cutoff);
+  // Fetch all cached rows (may be >1000, paginate)
+  let allData: any[] = [];
+  let from = 0;
+  const batchSize = 1000;
+  while (true) {
+    const { data: batch, error: batchError } = await supabase
+      .from('erp_sales_cache')
+      .select('product_code, venda_data, fetched_at')
+      .gte('fetched_at', cutoff)
+      .range(from, from + batchSize - 1);
+    if (batchError || !batch || batch.length === 0) break;
+    allData = allData.concat(batch);
+    if (batch.length < batchSize) break;
+    from += batchSize;
+  }
 
-  if (allError || !allData || allData.length === 0) return null;
+  if (allData.length === 0) return null;
 
   const salesMap: Record<string, any[]> = {};
   let totalVendas = 0;
@@ -185,20 +127,30 @@ Deno.serve(async (req) => {
   try {
     const accessToken = Deno.env.get('GESTAOCLICK_ACCESS_TOKEN');
     const secretToken = Deno.env.get('GESTAOCLICK_SECRET_ACCESS_TOKEN');
-
-    if (!accessToken) throw new Error('GESTAOCLICK_ACCESS_TOKEN não configurado');
-    if (!secretToken) throw new Error('GESTAOCLICK_SECRET_ACCESS_TOKEN não configurado');
+    if (!accessToken || !secretToken) throw new Error('API tokens não configurados');
 
     const body = await req.json().catch(() => ({}));
     const skipCache = body.skipCache || false;
+    // Chunked pagination: startPage (1-based), excludedIds (pre-resolved)
+    const startPage: number = body.startPage || 0;
+    const excludedIdsArr: string[] = body.excludedIds || [];
 
     const supabase = getSupabaseAdmin();
 
-    // Check cache
-    if (!skipCache) {
+    // Handle cache save request from frontend
+    if (body.saveCache && body.productSalesMap) {
+      await saveToSalesCache(supabase, body.productSalesMap);
+      return new Response(JSON.stringify({ saved: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Phase 0: Full cache check (only when startPage=0)
+    if (startPage === 0 && !skipCache) {
       const cached = await getCachedSales(supabase);
       if (cached) {
-        console.log(`Sales cache hit: ${Object.keys(cached.salesMap).length} products from ${cached.cachedAt}`);
+        console.log(`Sales cache hit: ${Object.keys(cached.salesMap).length} products`);
         return new Response(JSON.stringify({
           productSalesMap: cached.salesMap,
           totalVendas: cached.totalVendas,
@@ -218,208 +170,101 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json',
     };
 
-    // Step 1 + first vendas page in parallel
-    const [situacoesRes, firstVendasPage] = await Promise.all([
-      fetchWithRetry('https://api.gestaoclick.com/api/situacoes_vendas', { method: 'GET', headers: apiHeaders }),
-      fetchPage('https://api.gestaoclick.com/api/vendas', 1, apiHeaders),
-    ]);
+    // Phase 1: Init - fetch situacoes + discover total pages
+    if (startPage === 0) {
+      const [situacoesRes, firstPage] = await Promise.all([
+        fetchWithRetry('https://api.gestaoclick.com/api/situacoes_vendas', { method: 'GET', headers: apiHeaders }),
+        fetchPage('https://api.gestaoclick.com/api/vendas', 1, apiHeaders),
+      ]);
 
-    if (!situacoesRes.ok) {
-      throw new Error(`Failed to fetch situacoes_vendas: ${situacoesRes.status}`);
-    }
+      if (!situacoesRes.ok) throw new Error(`Situacoes error: ${situacoesRes.status}`);
+      const situacoesData = await situacoesRes.json();
+      const situacoes = situacoesData?.data || [];
 
-    const situacoesData = await situacoesRes.json();
-    const situacoes = situacoesData?.data || [];
-
-    const excludedIds = new Set<string>();
-    for (const sit of situacoes) {
-      const name = (sit.nome || '').toLowerCase().trim();
-      if (EXCLUDED_STATUSES.some(excluded => name.includes(excluded))) {
-        excludedIds.add(String(sit.id));
-      }
-    }
-
-    console.log('Situações encontradas:', situacoes.map((s: any) => `${s.id}: ${s.nome}`));
-    console.log('IDs excluídos:', [...excludedIds]);
-
-    // Process first page of vendas
-    const allVendas: any[] = [];
-    const totalPages = firstVendasPage.meta.total_paginas || 1;
-
-    for (const venda of firstVendasPage.data) {
-      if (!excludedIds.has(String(venda.situacao_id))) {
-        allVendas.push(venda);
-      }
-    }
-
-    // Fetch remaining pages
-    for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
-      const pages = [];
-      for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
-
-      const results = await Promise.all(
-        pages.map(p => fetchPage('https://api.gestaoclick.com/api/vendas', p, apiHeaders))
-      );
-
-      for (const result of results) {
-        for (const venda of result.data) {
-          if (!excludedIds.has(String(venda.situacao_id))) {
-            allVendas.push(venda);
-          }
+      const excludedIds: string[] = [];
+      for (const sit of situacoes) {
+        const name = (sit.nome || '').toLowerCase().trim();
+        if (EXCLUDED_STATUSES.some(excluded => name.includes(excluded))) {
+          excludedIds.push(String(sit.id));
         }
       }
 
-      if (batchEnd < totalPages) {
-        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+      console.log('Situações encontradas:', situacoes.map((s: any) => `${s.id}: ${s.nome}`));
+      console.log('IDs excluídos:', excludedIds);
+
+      const excludedSet = new Set(excludedIds);
+      const totalPages = firstPage.meta.total_paginas || 1;
+
+      // Process page 1 vendas
+      const vendas = firstPage.data.filter((v: any) => !excludedSet.has(String(v.situacao_id)));
+
+      // Build situacao lookup
+      const situacaoLookup: Record<string, string> = {};
+      for (const sit of situacoes) {
+        situacaoLookup[String(sit.id)] = sit.nome;
       }
+
+      const chunkResult = buildProductSalesFromVendas(vendas, situacaoLookup);
+
+      return new Response(JSON.stringify({
+        phase: 'init',
+        totalPages,
+        excludedIds,
+        situacaoLookup,
+        chunk: chunkResult,
+        startPage: 1,
+        endPage: 1,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Step 3: Build product ID/variation ID map
-    const requiredProductIds = new Set<string>();
-    const requiredVariationIds = new Set<string>();
+    // Phase 2: Continue - fetch a batch of pages
+    const situacaoLookup: Record<string, string> = body.situacaoLookup || {};
+    const totalPages: number = body.totalPages || 1;
+    const excludedSet = new Set(excludedIdsArr);
 
-    for (const venda of allVendas) {
-      const items = venda.produtos || venda.itens || [];
-      for (const item of items) {
-        const refs = extractProductReferences(item);
-        if (!refs.productCode) {
-          if (refs.productId) requiredProductIds.add(refs.productId);
-          if (refs.variationId) requiredVariationIds.add(refs.variationId);
-        }
-      }
-    }
+    const endPage = Math.min(startPage + PAGES_PER_CHUNK - 1, totalPages);
+    const pages: number[] = [];
+    for (let p = startPage; p <= endPage; p++) pages.push(p);
 
-    const productCodeByProductId: Record<string, string> = {};
-    const productCodeByVariationId: Record<string, string> = {};
+    const results = await Promise.all(
+      pages.map(p => fetchPage('https://api.gestaoclick.com/api/vendas', p, apiHeaders))
+    );
 
-    if (requiredProductIds.size > 0 || requiredVariationIds.size > 0) {
-      const productsBaseUrl = 'https://api.gestaoclick.com/api/produtos?ativo=1';
-      const firstProductsPage = await fetchPage(productsBaseUrl, 1, apiHeaders);
-      const totalProductPages = firstProductsPage.meta.total_paginas || 1;
-
-      const pendingProductIds = new Set(requiredProductIds);
-      const pendingVariationIds = new Set(requiredVariationIds);
-
-      const consumeProducts = (products: any[]) => {
-        for (const product of products) {
-          const productId = normalizeIdentifier(product?.id);
-          const fallbackCode = normalizeCode(product?.codigo_interno || product?.codigo);
-
-          if (productId && fallbackCode) {
-            productCodeByProductId[productId] = fallbackCode;
-            pendingProductIds.delete(productId);
-          }
-
-          const variacoes = Array.isArray(product?.variacoes) ? product.variacoes : [];
-          for (const variationWrapper of variacoes) {
-            const variation = variationWrapper?.variacao || variationWrapper || {};
-            const variationId = normalizeIdentifier(variation?.id || variation?.variacao_id);
-            const variationCode = normalizeCode(variation?.codigo || variation?.codigo_interno || fallbackCode);
-
-            if (variationId && variationCode) {
-              productCodeByVariationId[variationId] = variationCode;
-              pendingVariationIds.delete(variationId);
-            }
-          }
-        }
-      };
-
-      consumeProducts(firstProductsPage.data);
-
-      for (
-        let batchStart = 2;
-        batchStart <= totalProductPages && (pendingProductIds.size > 0 || pendingVariationIds.size > 0);
-        batchStart += BATCH_SIZE
-      ) {
-        const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalProductPages);
-        const pages: number[] = [];
-        for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
-
-        const results = await Promise.all(
-          pages.map((p) => fetchPage(productsBaseUrl, p, apiHeaders))
-        );
-
-        for (const result of results) {
-          consumeProducts(result.data);
-        }
-
-        if (batchEnd < totalProductPages) {
-          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+    const vendas: any[] = [];
+    for (const result of results) {
+      for (const venda of result.data) {
+        if (!excludedSet.has(String(venda.situacao_id))) {
+          vendas.push(venda);
         }
       }
     }
 
-    // Step 4: Build product sales map
-    const productSalesMap: Record<string, any[]> = {};
-    const situacaoLookup: Record<string, string> = {};
-    for (const sit of situacoes) {
-      situacaoLookup[String(sit.id)] = sit.nome;
+    const chunkResult = buildProductSalesFromVendas(vendas, situacaoLookup);
+    const done = endPage >= totalPages;
+
+    const response: any = {
+      phase: 'chunk',
+      chunk: chunkResult,
+      startPage,
+      endPage,
+      totalPages,
+      done,
+    };
+
+    // If done, signal to save cache
+    if (done) {
+      response.phase = 'done';
     }
 
-    for (const venda of allVendas) {
-      const clienteNome = firstNonEmpty(
-        venda.nome_cliente,
-        venda.cliente_nome,
-        venda.razao_social,
-        'N/A'
-      );
-
-      const vendaInfo = {
-        venda_id: String(venda.id),
-        codigo: String(venda.codigo || ''),
-        cliente_id: String(venda.cliente_id || ''),
-        cliente_nome: clienteNome,
-        cliente_endereco: '',
-        cliente_cidade: '',
-        cliente_cep: '',
-        cliente_estado: '',
-        situacao: situacaoLookup[String(venda.situacao_id)] || 'Desconhecida',
-        data: venda.data || '',
-        valor_total: String(venda.valor_total || '0'),
-        produtos: [] as any[],
-      };
-
-      const items = venda.produtos || venda.itens || [];
-      for (const item of items) {
-        const refs = extractProductReferences(item);
-        const resolvedCode = refs.productCode
-          || (refs.variationId ? productCodeByVariationId[refs.variationId] : '')
-          || (refs.productId ? productCodeByProductId[refs.productId] : '');
-
-        if (!resolvedCode) continue;
-
-        vendaInfo.produtos.push({
-          nome: item.nome || item.produto_nome || item.produto?.nome_produto || '',
-          codigo: resolvedCode,
-          quantidade: String(item.quantidade || item.produto?.quantidade || '1'),
-          valor_unitario: String(item.valor_unitario || item.produto?.valor_venda || '0'),
-        });
-
-        if (!productSalesMap[resolvedCode]) {
-          productSalesMap[resolvedCode] = [];
-        }
-        if (!productSalesMap[resolvedCode].find((v: any) => v.venda_id === vendaInfo.venda_id)) {
-          productSalesMap[resolvedCode].push(vendaInfo);
-        }
-      }
-    }
-
-    // Save to cache in background
-    saveToSalesCache(supabase, productSalesMap).catch(err => console.error('Sales cache save error:', err));
-
-    return new Response(JSON.stringify({
-      productSalesMap,
-      totalVendas: allVendas.length,
-      excludedStatuses: EXCLUDED_STATUSES,
-      situacoes: situacoes.map((s: any) => ({ id: s.id, nome: s.nome })),
-      cached: false,
-    }), {
+    return new Response(JSON.stringify(response), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    console.error('Error fetching GestãoClick vendas:', error);
+    console.error('Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
@@ -427,3 +272,43 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+function buildProductSalesFromVendas(vendas: any[], situacaoLookup: Record<string, string>) {
+  const productSalesMap: Record<string, any[]> = {};
+
+  for (const venda of vendas) {
+    const clienteNome = String(venda.nome_cliente || venda.cliente_nome || venda.razao_social || 'N/A').trim();
+
+    const vendaInfo = {
+      venda_id: String(venda.id),
+      codigo: String(venda.codigo || ''),
+      cliente_nome: clienteNome,
+      situacao: situacaoLookup[String(venda.situacao_id)] || 'Desconhecida',
+      data: venda.data || '',
+      valor_total: String(venda.valor_total || '0'),
+      produtos: [] as any[],
+    };
+
+    const items = venda.produtos || venda.itens || [];
+    for (const item of items) {
+      const resolvedCode = extractProductCode(item);
+      if (!resolvedCode) continue;
+
+      vendaInfo.produtos.push({
+        nome: item.nome || item.produto_nome || item.produto?.nome_produto || '',
+        codigo: resolvedCode,
+        quantidade: String(item.quantidade || item.produto?.quantidade || '1'),
+        valor_unitario: String(item.valor_unitario || item.produto?.valor_venda || '0'),
+      });
+
+      if (!productSalesMap[resolvedCode]) {
+        productSalesMap[resolvedCode] = [];
+      }
+      if (!productSalesMap[resolvedCode].find((v: any) => v.venda_id === vendaInfo.venda_id)) {
+        productSalesMap[resolvedCode].push(vendaInfo);
+      }
+    }
+  }
+
+  return { productSalesMap, vendasCount: vendas.length };
+}
