@@ -100,6 +100,8 @@ export function ERPReconciliationView() {
   }, [comparisonItems]);
 
   const exportToExcel = () => {
+    if (!canExport) return;
+
     const data = filtered.map(item => {
       const soldStock = getSoldStock(item.productCode);
       const result = item.localStock - soldStock - item.erpStock;
@@ -107,21 +109,49 @@ export function ERPReconciliationView() {
       return {
         'Código': item.productCode,
         'Produto': item.productName,
-        'Stock ERP': item.erpStock,
-        'Stock Vendido': salesLoaded ? soldStock : '',
         'Stock Local': item.localStock,
-        'Diferença': item.difference,
-        'Validação': salesLoaded ? (isValid ? 'Validado' : 'Divergente') : 'Sem dados de vendas',
-        'Resultado (Local - Vendido - ERP)': salesLoaded ? result : '',
-        'Estado': STATUS_CONFIG[item.status]?.label || item.status,
+        'Stock Vendido': soldStock,
+        'Stock ERP': item.erpStock,
+        'Resultado (Local - Vendido - ERP)': result,
+        'Validação': isValid ? 'Validado' : 'Divergente',
+        'Estado Conciliação': STATUS_CONFIG[item.status]?.label || item.status,
         'Localização': item.location || '',
-        'Possível Duplicado - Código': item.possibleMatch?.code || '',
-        'Possível Duplicado - Nome': item.possibleMatch?.name || '',
-        'Possível Duplicado - Stock': item.possibleMatch ? item.possibleMatch.stock : '',
+        ...(item.possibleMatch ? {
+          'Possível Duplicado - Código': item.possibleMatch.code,
+          'Possível Duplicado - Nome': item.possibleMatch.name,
+          'Possível Duplicado - Stock': item.possibleMatch.stock,
+        } : {}),
       };
     });
 
+    // Add summary row
+    const totalLocal = filtered.reduce((s, i) => s + i.localStock, 0);
+    const totalSold = filtered.reduce((s, i) => s + getSoldStock(i.productCode), 0);
+    const totalERP = filtered.reduce((s, i) => s + i.erpStock, 0);
+    const totalResult = totalLocal - totalSold - totalERP;
+    const validated = filtered.filter(i => { const r = i.localStock - getSoldStock(i.productCode) - i.erpStock; return r === 0; }).length;
+    const divergent = filtered.length - validated;
+
+    data.push({
+      'Código': '',
+      'Produto': `TOTAL (${filtered.length} produtos)`,
+      'Stock Local': totalLocal,
+      'Stock Vendido': totalSold,
+      'Stock ERP': totalERP,
+      'Resultado (Local - Vendido - ERP)': totalResult,
+      'Validação': `${validated} Validados / ${divergent} Divergentes`,
+      'Estado Conciliação': '',
+      'Localização': '',
+    } as any);
+
     const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Auto-size columns
+    const colWidths = Object.keys(data[0] || {}).map(key => ({
+      wch: Math.max(key.length, ...data.map(row => String((row as any)[key] ?? '').length)) + 2
+    }));
+    ws['!cols'] = colWidths;
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Conciliação ERP');
     XLSX.writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
