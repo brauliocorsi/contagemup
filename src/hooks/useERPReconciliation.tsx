@@ -362,7 +362,7 @@ export function useERPReconciliation() {
   }, [erpProducts, toast]);
 
   return {
-    erpProducts, comparisonItems, loading, progress, cachedAt,
+    erpProducts, comparisonItems, loading, progress, cachedAt, syncValidation,
     fetchAndCompare, searchSingleProduct, registerERPProducts, unifyDuplicate,
   };
 }
