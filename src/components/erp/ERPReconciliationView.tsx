@@ -187,7 +187,6 @@ export function ERPReconciliationView() {
     XLSX.writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const canExport = comparisonItems.length > 0 && salesLoaded && !salesLoading && !loading && syncValidation?.isValid === true;
 
   const erpOnlyItems = useMemo(() => filtered.filter(i => i.status === 'erp_only'), [filtered]);
 
