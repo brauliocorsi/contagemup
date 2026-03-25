@@ -581,10 +581,38 @@ export function ERPReconciliationView() {
                 </TableBody>
               </Table>
             </div>
-            <div className="p-3 text-sm text-muted-foreground border-t">
-              A mostrar {filtered.length} de {comparisonItems.length} produtos
+            <div className="p-3 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>A mostrar {((safePage - 1) * pageSize) + 1}–{Math.min(safePage * pageSize, filtered.length)} de {filtered.length} produtos</span>
+                <Select value={String(pageSize)} onValueChange={v => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                  <SelectTrigger className="w-[80px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="200">200</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-xs">por página</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentPage(1)} disabled={safePage <= 1}>
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentPage(p => p - 1)} disabled={safePage <= 1}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm px-3 font-medium">{safePage} / {totalPages}</span>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentPage(p => p + 1)} disabled={safePage >= totalPages}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentPage(totalPages)} disabled={safePage >= totalPages}>
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </CardContent>
         </Card>
       ) : !loading ? (
         <Card>
