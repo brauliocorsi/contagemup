@@ -88,19 +88,26 @@ export function ERPReconciliationView() {
   }, [comparisonItems]);
 
   const exportToExcel = () => {
-    const data = filtered.map(item => ({
-      'Código': item.productCode,
-      'Produto': item.productName,
-      'Stock ERP': item.erpStock,
-      'Stock Vendido': getSoldStock(item.productCode),
-      'Stock Local': item.localStock,
-      'Diferença': item.difference,
-      'Estado': STATUS_CONFIG[item.status]?.label || item.status,
-      'Localização': item.location || '',
-      'Possível Duplicado - Código': item.possibleMatch?.code || '',
-      'Possível Duplicado - Nome': item.possibleMatch?.name || '',
-      'Possível Duplicado - Stock': item.possibleMatch ? item.possibleMatch.stock : '',
-    }));
+    const data = filtered.map(item => {
+      const soldStock = getSoldStock(item.productCode);
+      const expectedErp = item.localStock - soldStock;
+      const isValid = expectedErp === item.erpStock;
+      return {
+        'Código': item.productCode,
+        'Produto': item.productName,
+        'Stock ERP': item.erpStock,
+        'Stock Vendido': soldStock,
+        'Stock Local': item.localStock,
+        'Diferença': item.difference,
+        'Validação': isValid ? 'Validado' : 'Divergente',
+        'Cálculo (Local - Vendido)': expectedErp,
+        'Estado': STATUS_CONFIG[item.status]?.label || item.status,
+        'Localização': item.location || '',
+        'Possível Duplicado - Código': item.possibleMatch?.code || '',
+        'Possível Duplicado - Nome': item.possibleMatch?.name || '',
+        'Possível Duplicado - Stock': item.possibleMatch ? item.possibleMatch.stock : '',
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -321,7 +328,12 @@ export function ERPReconciliationView() {
                     <TableHead className="text-right">Stock Local</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Localização</TableHead>
+                     <TableHead>Localização</TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex items-center justify-center gap-1" title="Stock Local - Stock Vendido = Stock ERP">
+                        Validação
+                      </div>
+                    </TableHead>
                     <TableHead>
                       <div className="flex items-center gap-1">
                         Vendas
@@ -387,6 +399,29 @@ export function ERPReconciliationView() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{item.location || '—'}</TableCell>
+                          <TableCell className="text-center">
+                            {salesLoaded ? (() => {
+                              const expectedErp = item.localStock - soldStock;
+                              const isValid = expectedErp === item.erpStock;
+                              return (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Badge variant="secondary" className={isValid 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 gap-1' 
+                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 gap-1'
+                                  }>
+                                    {isValid ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                                    {isValid ? 'Validado' : 'Divergente'}
+                                  </Badge>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {item.localStock} - {soldStock} = {expectedErp}
+                                    {!isValid && <span className="text-red-500"> (ERP: {item.erpStock})</span>}
+                                  </span>
+                                </div>
+                              );
+                            })() : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {salesLoaded && salesCount > 0 ? (
                               <Button
@@ -434,7 +469,7 @@ export function ERPReconciliationView() {
                         </TableRow>
                         {isExpanded && salesCount > 0 && (
                           <TableRow key={`${rowKey}-sales`} className="bg-muted/30">
-                            <TableCell colSpan={10} className="p-0">
+                            <TableCell colSpan={11} className="p-0">
                               <div className="px-4 py-3 space-y-1.5">
                                 <p className="text-xs font-semibold text-muted-foreground mb-2">
                                   <ShoppingCart className="h-3 w-3 inline mr-1" />
