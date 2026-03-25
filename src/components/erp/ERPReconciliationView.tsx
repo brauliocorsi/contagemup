@@ -94,6 +94,16 @@ export function ERPReconciliationView() {
     });
   }, [comparisonItems, search, statusFilter, validationFilter, salesLoaded]);
 
+  // Reset page when filters change
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  if (safePage !== currentPage) setCurrentPage(safePage);
+
+  const paginatedItems = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage, pageSize]);
+
   const summary = useMemo(() => {
     const s = { total: comparisonItems.length, match: 0, surplus: 0, shortage: 0, erp_only: 0, local_only: 0, duplicate_suspect: 0 };
     comparisonItems.forEach(i => { s[i.status]++; });
