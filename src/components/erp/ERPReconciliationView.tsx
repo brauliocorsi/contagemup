@@ -38,7 +38,8 @@ export function ERPReconciliationView() {
   const [pendingRegisterItems, setPendingRegisterItems] = useState<ERPComparisonItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Geral');
   const [unifyConfirmItem, setUnifyConfirmItem] = useState<ERPComparisonItem | null>(null);
-
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   // Auto-load sales on mount
   useEffect(() => {
     if (!salesLoaded && !salesLoading) {
