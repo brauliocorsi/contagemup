@@ -1,4 +1,5 @@
 import { useState, Suspense, lazy } from 'react';
+import { APP_VERSION, APP_BUILD_DATE } from '@/version';
 import { Header } from '@/components/layout/Header';
 import { Navigation } from '@/components/layout/Navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -106,6 +107,11 @@ export default function Dashboard() {
           {activeTab === 'settings' && <SettingsView />}
         </Suspense>
       </main>
+      <footer className="border-t bg-muted/30 py-2 text-center">
+        <p className="text-xs text-muted-foreground">
+          Versão {APP_VERSION} • {APP_BUILD_DATE}
+        </p>
+      </footer>
     </div>
   );
 }

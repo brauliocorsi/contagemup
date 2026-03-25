@@ -245,7 +245,7 @@ export function ERPReconciliationView() {
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </Button>
           </div>
-          <Button onClick={() => fetchAndCompare()} disabled={loading}>
+          <Button onClick={() => { fetchAndCompare(true); fetchSales(true); }} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             {loading ? 'A carregar...' : 'Sincronizar Tudo'}
           </Button>
@@ -641,7 +641,7 @@ export function ERPReconciliationView() {
             <p className="text-muted-foreground mb-4">
               Clique em "Sincronizar com ERP" para buscar os produtos do GestãoClick e comparar com o stock local.
             </p>
-            <Button onClick={() => fetchAndCompare()}>
+            <Button onClick={() => { fetchAndCompare(true); fetchSales(true); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Sincronizar com ERP
             </Button>
