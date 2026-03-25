@@ -29,6 +29,7 @@ export function ERPReconciliationView() {
   const { categories } = useCategories();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [validationFilter, setValidationFilter] = useState<string>('all');
   const [quickSearch, setQuickSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [registering, setRegistering] = useState<Set<string>>(new Set());
@@ -77,9 +78,20 @@ export function ERPReconciliationView() {
         item.productCode.toLowerCase().includes(search.toLowerCase()) ||
         item.productName.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      
+      // Validation filter
+      let matchesValidation = true;
+      if (validationFilter !== 'all' && salesLoaded) {
+        const soldStock = getSoldStock(item.productCode);
+        const result = item.localStock - soldStock - item.erpStock;
+        const isValid = result === 0;
+        if (validationFilter === 'validated') matchesValidation = isValid;
+        else if (validationFilter === 'divergent') matchesValidation = !isValid;
+      }
+      
+      return matchesSearch && matchesStatus && matchesValidation;
     });
-  }, [comparisonItems, search, statusFilter]);
+  }, [comparisonItems, search, statusFilter, validationFilter, salesLoaded]);
 
   const summary = useMemo(() => {
     const s = { total: comparisonItems.length, match: 0, surplus: 0, shortage: 0, erp_only: 0, local_only: 0, duplicate_suspect: 0 };
@@ -313,6 +325,17 @@ export function ERPReconciliationView() {
               <SelectItem value="erp_only">Só no ERP</SelectItem>
               <SelectItem value="local_only">Só Local</SelectItem>
               <SelectItem value="duplicate_suspect">Possíveis Duplicados</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={validationFilter} onValueChange={setValidationFilter} disabled={!salesLoaded}>
+            <SelectTrigger className={`w-[180px] ${validationFilter !== 'all' ? 'border-primary bg-primary/10' : ''}`}>
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Validação" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas validações</SelectItem>
+              <SelectItem value="validated">✅ Validados</SelectItem>
+              <SelectItem value="divergent">❌ Divergentes</SelectItem>
             </SelectContent>
           </Select>
         </div>
