@@ -426,7 +426,7 @@ export function ERPReconciliationView() {
                    </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((item, idx) => {
+                  {paginatedItems.map((item, idx) => {
                     const config = STATUS_CONFIG[item.status];
                     const Icon = config.icon;
                     const rowKey = `${item.productCode}-${idx}`;
