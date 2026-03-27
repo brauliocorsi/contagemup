@@ -444,34 +444,114 @@ function sanitizeVendaPayload(venda: any) {
       case 'search-clients': {
         const searchTerm = body.search;
         if (!searchTerm) throw new Error('search é obrigatório');
-        const url = `https://api.gestaoclick.com/api/clientes?pagina=1&nome=${encodeURIComponent(searchTerm)}`;
-        const resp = await fetchWithRetry(url, { method: 'GET', headers: apiHeaders });
-        const data = await resp.json();
-        result = (data?.data || []).map((c: any) => ({ id: c.id, nome: c.nome || c.razao_social, email: c.email }));
+
+        const allClients: any[] = [];
+        let page = 1;
+        const maxPages = 60;
+        while (page <= maxPages) {
+          const url = `https://api.gestaoclick.com/api/clientes?pagina=${page}`;
+          const resp = await fetchWithRetry(url, { method: 'GET', headers: apiHeaders });
+          if (!resp.ok) break;
+          const data = await resp.json();
+          const clients = data?.data || [];
+          allClients.push(...clients);
+          const totalPages = data?.meta?.total_paginas || 1;
+          if (page >= totalPages) break;
+          page++;
+        }
+
+        const term = String(searchTerm).toLowerCase();
+        result = allClients
+          .filter((c: any) => {
+            const nome = String(c.nome || c.razao_social || '').toLowerCase();
+            const email = String(c.email || '').toLowerCase();
+            return nome.includes(term) || email.includes(term);
+          })
+          .map((c: any) => ({ id: c.id, nome: c.nome || c.razao_social, email: c.email }));
         break;
       }
 
-      case 'update-sale-client': {
-        const vId = body.vendaId;
-        const clienteId = body.clienteId;
-        if (!vId || !clienteId) throw new Error('vendaId e clienteId são obrigatórios');
-        const putResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vId}`, {
+      case 'fix-sale-client-by-email': {
+        const vendaCodigo = body.vendaCodigo;
+        const email = String(body.email || '').trim().toLowerCase();
+        if (!vendaCodigo || !email) throw new Error('vendaCodigo e email são obrigatórios');
+
+        // Find sale by public code
+        let vendaId: string | null = null;
+        let page = 1;
+        while (page <= 80 && !vendaId) {
+          const url = `https://api.gestaoclick.com/api/vendas?pagina=${page}`;
+          const resp = await fetchWithRetry(url, { method: 'GET', headers: apiHeaders });
+          const data = await resp.json();
+          const vendas = data?.data || [];
+          const found = vendas.find((v: any) => String(v.codigo) === String(vendaCodigo));
+          if (found) vendaId = found.id;
+          const totalPages = data?.meta?.total_paginas || 1;
+          if (page >= totalPages) break;
+          page++;
+        }
+
+        if (!vendaId) {
+          result = { success: false, error: `Venda #${vendaCodigo} não encontrada` };
+          break;
+        }
+
+        // Load full sale detail
+        const saleResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
+          method: 'GET', headers: apiHeaders,
+        });
+        const saleData = await saleResp.json();
+        const fullSale = saleData?.data || saleData;
+
+        // Find client by exact email across pages
+        let clientMatch: any = null;
+        let cPage = 1;
+        while (cPage <= 80 && !clientMatch) {
+          const url = `https://api.gestaoclick.com/api/clientes?pagina=${cPage}`;
+          const resp = await fetchWithRetry(url, { method: 'GET', headers: apiHeaders });
+          const data = await resp.json();
+          const clients = data?.data || [];
+          clientMatch = clients.find((c: any) => String(c.email || '').trim().toLowerCase() === email) || null;
+          const totalPages = data?.meta?.total_paginas || 1;
+          if (cPage >= totalPages) break;
+          cPage++;
+        }
+
+        if (!clientMatch) {
+          result = { success: false, error: `Cliente com email ${email} não encontrado` };
+          break;
+        }
+
+        // Safe update: preserve original sale payload and only switch cliente_id
+        const putPayload = sanitizeVendaPayload(fullSale);
+        putPayload.cliente_id = clientMatch.id;
+
+        const putResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
           method: 'PUT',
           headers: apiHeaders,
-          body: JSON.stringify({ cliente_id: clienteId }),
+          body: JSON.stringify(putPayload),
         });
         const putText = await putResp.text();
         let putData: any;
         try { putData = JSON.parse(putText); } catch { putData = { raw: putText }; }
-        // Verify
-        const checkResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vId}`, { method: 'GET', headers: apiHeaders });
-        const checkData = await checkResp.json();
-        const after = checkData?.data || checkData;
+
+        const verifyResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
+          method: 'GET', headers: apiHeaders,
+        });
+        const verifyData = await verifyResp.json();
+        const after = verifyData?.data || verifyData;
+
         result = {
           success: putResp.ok,
+          venda_codigo: vendaCodigo,
+          venda_id: vendaId,
+          cliente_email: email,
+          cliente_id_aplicado: clientMatch.id,
+          cliente_nome_aplicado: clientMatch.nome || clientMatch.razao_social,
           nome_cliente_depois: after?.nome_cliente,
           cliente_id_depois: after?.cliente_id,
           put_status: putResp.status,
+          put_response_status: putData?.status,
         };
         break;
       }
