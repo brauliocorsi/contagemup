@@ -251,7 +251,9 @@ Deno.serve(async (req) => {
           apiHeaders,
           body.nameFilter || 'Cam Estofada',
           body.supplierName || 'UP Fábrica',
-          body.dryRun !== false // default true for safety
+          body.dryRun !== false,
+          body.offset || 0,
+          body.limit || 30
         );
         break;
 
