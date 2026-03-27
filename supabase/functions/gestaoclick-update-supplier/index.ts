@@ -253,9 +253,27 @@ async function bulkUpdateSupplier(
     next_offset: offset + limit,
     results,
   };
+
+function sanitizeVendaPayload(venda: any) {
+  const payload = { ...venda };
+  delete payload.id;
+  delete payload.codigo;
+  delete payload.cadastrado_em;
+  delete payload.modificado_em;
+  delete payload.nome_situacao;
+  delete payload.cor_situacao;
+  delete payload.nome_cliente;
+  delete payload.nome_vendedor;
+  delete payload.nome_forma_pagamento;
+  delete payload.nome_centro_custo;
+  delete payload.nome_canal_venda;
+  delete payload.nome_loja;
+  delete payload.nome_tecnico;
+  delete payload.nome_transportadora;
+  delete payload.hash;
+  return payload;
 }
 
-Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
