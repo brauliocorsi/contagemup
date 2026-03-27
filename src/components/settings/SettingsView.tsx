@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileSettings } from './ProfileSettings';
 import { Separator } from '@/components/ui/separator';
 import { ResetStockDialog } from './ResetStockDialog';
+import { StockDataRepairDialog } from './StockDataRepairDialog';
 
 interface Profile {
   id: string;
@@ -31,6 +32,7 @@ export function SettingsView() {
   const [newUserName, setNewUserName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [repairDialogOpen, setRepairDialogOpen] = useState(false);
   const { toast } = useToast();
   const { profile: currentProfile } = useAuth();
   const queryClient = useQueryClient();
@@ -288,25 +290,48 @@ export function SettingsView() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/20 bg-destructive/5">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-4 rounded-lg border border-amber-500/20 bg-amber-500/5">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <Database className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <h4 className="font-medium">Corrigir Dados Históricos</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Remove movimentos falsos do bug pré-v1.2.0 e recalcula o stock
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-medium">Reset de Stock</h4>
-                <p className="text-sm text-muted-foreground">
-                  Zera todo o stock e histórico, mantendo produtos e localizações
-                </p>
-              </div>
+              <Button 
+                variant="outline"
+                onClick={() => setRepairDialogOpen(true)}
+              >
+                <Database className="h-4 w-4 mr-2" />
+                Corrigir
+              </Button>
             </div>
-            <Button 
-              variant="destructive" 
-              onClick={() => setResetDialogOpen(true)}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Reset
-            </Button>
+
+            <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/20 bg-destructive/5">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <h4 className="font-medium">Reset de Stock</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Zera todo o stock e histórico, mantendo produtos e localizações
+                  </p>
+                </div>
+              </div>
+              <Button 
+                variant="destructive" 
+                onClick={() => setResetDialogOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Reset
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -314,6 +339,11 @@ export function SettingsView() {
       <ResetStockDialog 
         open={resetDialogOpen} 
         onOpenChange={setResetDialogOpen} 
+      />
+
+      <StockDataRepairDialog
+        open={repairDialogOpen}
+        onOpenChange={setRepairDialogOpen}
       />
     </div>
   );
