@@ -423,6 +423,41 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case 'search-clients': {
+        const searchTerm = body.search;
+        if (!searchTerm) throw new Error('search é obrigatório');
+        const url = `https://api.gestaoclick.com/api/clientes?pagina=1&nome=${encodeURIComponent(searchTerm)}`;
+        const resp = await fetchWithRetry(url, { method: 'GET', headers: apiHeaders });
+        const data = await resp.json();
+        result = (data?.data || []).map((c: any) => ({ id: c.id, nome: c.nome || c.razao_social, email: c.email }));
+        break;
+      }
+
+      case 'update-sale-client': {
+        const vId = body.vendaId;
+        const clienteId = body.clienteId;
+        if (!vId || !clienteId) throw new Error('vendaId e clienteId são obrigatórios');
+        const putResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vId}`, {
+          method: 'PUT',
+          headers: apiHeaders,
+          body: JSON.stringify({ cliente_id: clienteId }),
+        });
+        const putText = await putResp.text();
+        let putData: any;
+        try { putData = JSON.parse(putText); } catch { putData = { raw: putText }; }
+        // Verify
+        const checkResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vId}`, { method: 'GET', headers: apiHeaders });
+        const checkData = await checkResp.json();
+        const after = checkData?.data || checkData;
+        result = {
+          success: putResp.ok,
+          nome_cliente_depois: after?.nome_cliente,
+          cliente_id_depois: after?.cliente_id,
+          put_status: putResp.status,
+        };
+        break;
+      }
+
       default:
         throw new Error(`Action desconhecida: ${action}`);
     }
