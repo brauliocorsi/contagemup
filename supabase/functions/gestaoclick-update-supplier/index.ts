@@ -129,10 +129,11 @@ async function bulkUpdateSupplier(
   apiHeaders: Record<string, string>,
   nameFilter: string,
   supplierName: string,
-  dryRun: boolean
+  dryRun: boolean,
+  offset: number = 0,
+  limit: number = 30
 ) {
   // Step 1: Find supplier
-  console.log(`Searching for supplier: ${supplierName}`);
   const suppliers = await listSuppliers(apiHeaders, supplierName);
   const supplier = suppliers.find((s: any) => 
     String(s.nome || s.razao_social || '').toLowerCase().includes(supplierName.toLowerCase())
@@ -142,27 +143,18 @@ async function bulkUpdateSupplier(
     return { 
       success: false, 
       error: `Fornecedor "${supplierName}" não encontrado`,
-      available_suppliers: suppliers.map((s: any) => ({ 
-        id: s.id, 
-        nome: s.nome || s.razao_social,
-      })).slice(0, 20),
+      available_suppliers: suppliers.map((s: any) => ({ id: s.id, nome: s.nome || s.razao_social })).slice(0, 20),
     };
   }
 
-  console.log(`Found supplier: ${supplier.nome || supplier.razao_social} (ID: ${supplier.id})`);
-
   // Step 2: Find products
-  console.log(`Searching for products with: ${nameFilter}`);
   const products = await findProductsByName(apiHeaders, nameFilter);
-  
-  // Filter: all words in nameFilter must appear in product name
-  const filterWords = nameFilter.toLowerCase().split(/\s+/);
   const filtered = products.filter((p: any) => {
     const nome = String(p.nome || '').toLowerCase();
-    return filterWords.every(word => nome.includes(word));
+    return nome.includes('cama estofada') || nome.includes('cam estofada');
   });
 
-  console.log(`Found ${filtered.length} products matching "${nameFilter}"`);
+  const batch = filtered.slice(offset, offset + limit);
 
   if (dryRun) {
     return {
@@ -179,26 +171,22 @@ async function bulkUpdateSupplier(
     };
   }
 
-  // Step 3: Update each product
+  // Step 3: Update batch
   const results: any[] = [];
   let successCount = 0;
   let failCount = 0;
 
-  for (const product of filtered) {
+  for (const product of batch) {
     try {
       const result = await updateProductSupplier(apiHeaders, product.id, supplier.id, product);
       results.push({
         product_id: product.id,
         nome: product.nome,
-        status: result.status,
         ok: result.ok,
-        response: result.data,
       });
       if (result.ok) successCount++;
       else failCount++;
-      
-      // Small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 100));
     } catch (err) {
       failCount++;
       results.push({
@@ -213,8 +201,13 @@ async function bulkUpdateSupplier(
     success: true,
     supplier: { id: supplier.id, nome: supplier.nome || supplier.razao_social },
     total: filtered.length,
+    offset,
+    limit,
+    batch_size: batch.length,
     success_count: successCount,
     fail_count: failCount,
+    has_more: offset + limit < filtered.length,
+    next_offset: offset + limit,
     results,
   };
 }
@@ -258,7 +251,9 @@ Deno.serve(async (req) => {
           apiHeaders,
           body.nameFilter || 'Cam Estofada',
           body.supplierName || 'UP Fábrica',
-          body.dryRun !== false // default true for safety
+          body.dryRun !== false,
+          body.offset || 0,
+          body.limit || 30
         );
         break;
 
