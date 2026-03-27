@@ -371,23 +371,12 @@ Deno.serve(async (req) => {
           await new Promise(r => setTimeout(r, 300));
         }
 
-        // Step 3: GET the sale again to verify
-        const verifyResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
-          method: 'GET', headers: apiHeaders,
-        });
-        const verifyData = await verifyResp.json();
-        const vendaAtualizada = verifyData?.data || verifyData;
-
         result = {
-          success: putResp.ok,
           venda_codigo: vendaCodigo,
           venda_id: vendaId,
-          situacao_antes: vendaOriginal.situacao,
-          situacao_pedida: novaSituacao,
-          situacao_depois: vendaAtualizada?.situacao || 'N/A',
-          campo_alterou: vendaOriginal.situacao !== (vendaAtualizada?.situacao || vendaOriginal.situacao),
-          put_status: putResp.status,
-          put_response: putData,
+          situacao_antes: vendaOriginal.nome_situacao || vendaOriginal.situacao,
+          situacao_id_pedida: novaSituacao,
+          tries: tryResults,
         };
         break;
       }
