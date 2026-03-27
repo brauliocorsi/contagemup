@@ -304,6 +304,74 @@ Deno.serve(async (req) => {
         );
         break;
 
+      case 'api-capabilities': {
+        const capabilities: any = {};
+
+        // Test POST produto with fornecedor_id
+        const postProdResp = await fetchWithRetry('https://api.gestaoclick.com/api/produtos', {
+          method: 'POST', headers: apiHeaders,
+          body: JSON.stringify({nome:"TESTE-APAGAR-API",codigo_interno:"TESTE-DEL-API",fornecedor_id:"1092154",valor_venda:"0.01"}),
+        });
+        const postProdData = await postProdResp.json();
+        capabilities.post_produto = { status: postProdResp.status, result: postProdData };
+        
+        // If created, fetch it back and check for supplier fields, then delete
+        if (postProdResp.ok && postProdData?.data?.id) {
+          const newId = postProdData.data.id;
+          const getResp = await fetchWithRetry(`https://api.gestaoclick.com/api/produtos/${newId}`, { method: 'GET', headers: apiHeaders });
+          const getProd = await getResp.json();
+          const prodData = getProd?.data || getProd;
+          const supplierFields: any = {};
+          if (typeof prodData === 'object') {
+            for (const [k, v] of Object.entries(prodData)) {
+              if (k.toLowerCase().includes('fornec')) supplierFields[k] = v;
+            }
+          }
+          capabilities.created_product_supplier_fields = supplierFields;
+          capabilities.created_product_all_keys = typeof prodData === 'object' ? Object.keys(prodData) : [];
+          
+          // Delete test product
+          const delResp = await fetchWithRetry(`https://api.gestaoclick.com/api/produtos/${newId}`, { method: 'DELETE', headers: apiHeaders });
+          capabilities.delete_produto = { status: delResp.status };
+          await delResp.text();
+        }
+
+        // Test GET vendas
+        const vendasResp = await fetchWithRetry('https://api.gestaoclick.com/api/vendas?pagina=1', { method: 'GET', headers: apiHeaders });
+        const vendasData = await vendasResp.json();
+        const vendas = vendasData?.data || [];
+        capabilities.get_vendas = { status: vendasResp.status, count: Array.isArray(vendas) ? vendas.length : 'not-array' };
+        if (Array.isArray(vendas) && vendas.length > 0) {
+          capabilities.venda_keys = Object.keys(vendas[0]);
+          const vid = vendas[0].id;
+          // Test PUT venda
+          const putVResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vid}`, {
+            method: 'PUT', headers: apiHeaders,
+            body: JSON.stringify({observacao: "test"}),
+          });
+          const putVData = await putVResp.json();
+          capabilities.put_venda = { status: putVResp.status, result_status: putVData?.status };
+        }
+
+        // Test GET compras
+        const comprasResp = await fetchWithRetry('https://api.gestaoclick.com/api/compras?pagina=1', { method: 'GET', headers: apiHeaders });
+        const comprasData = await comprasResp.json();
+        const compras = comprasData?.data || [];
+        capabilities.get_compras = { status: comprasResp.status, count: Array.isArray(compras) ? compras.length : 'not-array' };
+        if (Array.isArray(compras) && compras.length > 0) {
+          capabilities.compra_keys = Object.keys(compras[0]);
+        }
+
+        // Test GET clientes  
+        const cliResp = await fetchWithRetry('https://api.gestaoclick.com/api/clientes?pagina=1', { method: 'GET', headers: apiHeaders });
+        const cliData = await cliResp.json();
+        const clientes = cliData?.data || [];
+        capabilities.get_clientes = { status: cliResp.status, count: Array.isArray(clientes) ? clientes.length : 'not-array' };
+
+        result = capabilities;
+        break;
+      }
+
       default:
         throw new Error(`Action desconhecida: ${action}`);
     }
