@@ -253,6 +253,7 @@ async function bulkUpdateSupplier(
     next_offset: offset + limit,
     results,
   };
+}
 
 function sanitizeVendaPayload(venda: any) {
   const payload = { ...venda };
@@ -274,6 +275,7 @@ function sanitizeVendaPayload(venda: any) {
   return payload;
 }
 
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
