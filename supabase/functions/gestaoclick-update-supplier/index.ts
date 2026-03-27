@@ -182,7 +182,7 @@ async function bulkUpdateSupplier(
 
   for (const product of filtered) {
     try {
-      const result = await updateProductSupplier(apiHeaders, product.id, supplier.id);
+      const result = await updateProductSupplier(apiHeaders, product.id, supplier.id, product);
       results.push({
         product_id: product.id,
         nome: product.nome,
