@@ -1127,6 +1127,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_false_movements: { Args: never; Returns: number }
+      count_false_movements: {
+        Args: never
+        Returns: {
+          affected_products: number
+          total_suspect: number
+        }[]
+      }
       decrement_counts_for_picking: {
         Args: {
           p_colis_quantities?: Json
