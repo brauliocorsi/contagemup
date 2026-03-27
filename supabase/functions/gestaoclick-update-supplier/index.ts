@@ -289,6 +289,10 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case 'test-fields':
+        result = await testSupplierFields(apiHeaders, body.productId || '58325295', body.fornecedorId || '1092154');
+        break;
+
       case 'bulk-update':
         result = await bulkUpdateSupplier(
           apiHeaders,
