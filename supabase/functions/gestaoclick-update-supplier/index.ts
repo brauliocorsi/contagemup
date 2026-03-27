@@ -303,10 +303,43 @@ Deno.serve(async (req) => {
         );
         break;
 
+      case 'get-sale': {
+        const codigo = body.vendaCodigo;
+        if (!codigo) throw new Error('vendaCodigo é obrigatório');
+        
+        let saleId: string | null = null;
+        let saleData: any = null;
+        let pg = 1;
+        while (pg <= 50 && !saleId) {
+          const url = `https://api.gestaoclick.com/api/vendas?pagina=${pg}`;
+          const resp = await fetchWithRetry(url, { method: 'GET', headers: apiHeaders });
+          const data = await resp.json();
+          const vendas = data?.data || [];
+          const found = vendas.find((v: any) => String(v.codigo) === String(codigo));
+          if (found) { saleId = found.id; saleData = found; }
+          const totalPages = data?.meta?.total_paginas || 1;
+          if (pg >= totalPages) break;
+          pg++;
+        }
+        
+        if (!saleId) {
+          result = { error: `Venda #${codigo} não encontrada na listagem` };
+          break;
+        }
+        
+        // Get full details
+        const detailResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${saleId}`, {
+          method: 'GET', headers: apiHeaders,
+        });
+        const detailData = await detailResp.json();
+        result = { listing: saleData, detail: detailData?.data || detailData };
+        break;
+      }
+
       case 'update-sale-status': {
         const vendaCodigo = body.vendaCodigo;
-        const novaSituacao = body.situacao;
-        if (!vendaCodigo || !novaSituacao) {
+        const novaSituacaoId = body.situacao;
+        if (!vendaCodigo || !novaSituacaoId) {
           throw new Error('vendaCodigo e situacao são obrigatórios');
         }
 
@@ -334,49 +367,58 @@ Deno.serve(async (req) => {
           break;
         }
 
-        // Step 2: Try multiple field variations
+        // Step 2: GET full sale details to preserve all data
+        const fullDetailResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
+          method: 'GET', headers: apiHeaders,
+        });
+        const fullDetailData = await fullDetailResp.json();
+        const fullSale = fullDetailData?.data || fullDetailData;
+
+        // Step 3: PUT with all original data + updated situacao_id
         const putUrl = `https://api.gestaoclick.com/api/vendas/${vendaId}`;
-        const variations = [
-          { situacao_id: novaSituacao },
-          { situacao: novaSituacao, situacao_id: novaSituacao },
-          { status_id: novaSituacao },
-        ];
+        const putPayload = { ...fullSale, situacao_id: novaSituacaoId };
+        // Remove read-only/computed fields that might cause issues
+        delete putPayload.id;
+        delete putPayload.codigo;
+        delete putPayload.cadastrado_em;
+        delete putPayload.modificado_em;
+        delete putPayload.nome_situacao;
+        delete putPayload.cor_situacao;
+        delete putPayload.nome_cliente;
+        delete putPayload.nome_vendedor;
+        delete putPayload.nome_forma_pagamento;
+        delete putPayload.nome_centro_custo;
+        delete putPayload.nome_canal_venda;
+        delete putPayload.nome_loja;
+        delete putPayload.nome_tecnico;
+        delete putPayload.nome_transportadora;
+        delete putPayload.hash;
         
-        const tryResults: any[] = [];
-        for (const fields of variations) {
-          const resp = await fetchWithRetry(putUrl, {
-            method: 'PUT',
-            headers: apiHeaders,
-            body: JSON.stringify(fields),
-          });
-          const txt = await resp.text();
-          let parsed: any;
-          try { parsed = JSON.parse(txt); } catch { parsed = { raw: txt }; }
-          
-          // Check if situacao changed
-          const checkResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
-            method: 'GET', headers: apiHeaders,
-          });
-          const checkData = await checkResp.json();
-          const after = checkData?.data || checkData;
-          
-          tryResults.push({
-            fields_sent: fields,
-            put_status: resp.status,
-            situacao_depois: after?.nome_situacao || after?.situacao,
-            changed: after?.nome_situacao !== vendaOriginal.nome_situacao,
-          });
-          
-          if (after?.nome_situacao !== vendaOriginal.nome_situacao) break;
-          await new Promise(r => setTimeout(r, 300));
-        }
+        const putResp = await fetchWithRetry(putUrl, {
+          method: 'PUT',
+          headers: apiHeaders,
+          body: JSON.stringify(putPayload),
+        });
+        const putText = await putResp.text();
+        let putData: any;
+        try { putData = JSON.parse(putText); } catch { putData = { raw: putText }; }
+
+        // Step 4: Verify
+        const verifyResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
+          method: 'GET', headers: apiHeaders,
+        });
+        const verifyData = await verifyResp.json();
+        const vendaDepois = verifyData?.data || verifyData;
 
         result = {
+          success: putResp.ok,
           venda_codigo: vendaCodigo,
           venda_id: vendaId,
           situacao_antes: vendaOriginal.nome_situacao || vendaOriginal.situacao,
-          situacao_id_pedida: novaSituacao,
-          tries: tryResults,
+          situacao_depois: vendaDepois?.nome_situacao || 'N/A',
+          campo_alterou: (vendaOriginal.nome_situacao || vendaOriginal.situacao) !== (vendaDepois?.nome_situacao || vendaDepois?.situacao),
+          put_status: putResp.status,
+          put_response_status: putData?.status,
         };
         break;
       }
