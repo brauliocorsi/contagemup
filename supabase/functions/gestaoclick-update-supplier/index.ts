@@ -144,10 +144,12 @@ async function bulkUpdateSupplier(
   console.log(`Searching for products with: ${nameFilter}`);
   const products = await findProductsByName(apiHeaders, nameFilter);
   
-  // Filter more precisely
-  const filtered = products.filter((p: any) => 
-    String(p.nome || '').toLowerCase().includes(nameFilter.toLowerCase())
-  );
+  // Filter: all words in nameFilter must appear in product name
+  const filterWords = nameFilter.toLowerCase().split(/\s+/);
+  const filtered = products.filter((p: any) => {
+    const nome = String(p.nome || '').toLowerCase();
+    return filterWords.every(word => nome.includes(word));
+  });
 
   console.log(`Found ${filtered.length} products matching "${nameFilter}"`);
 
