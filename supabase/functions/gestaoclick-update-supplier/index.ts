@@ -240,12 +240,18 @@ Deno.serve(async (req) => {
         result = await findProductsByName(apiHeaders, body.nameFilter || 'Cam Estofada');
         break;
 
-      case 'update-product':
+      case 'update-product': {
         if (!body.productId || !body.fornecedorId) {
           throw new Error('productId e fornecedorId são obrigatórios');
         }
-        result = await updateProductSupplier(apiHeaders, body.productId, body.fornecedorId);
+        // Fetch product data first to include required fields
+        const prodUrl = `https://api.gestaoclick.com/api/produtos/${body.productId}`;
+        const prodResp = await fetchWithRetry(prodUrl, { method: 'GET', headers: apiHeaders });
+        const prodJson = await prodResp.json();
+        const prodData = prodJson?.data || prodJson;
+        result = await updateProductSupplier(apiHeaders, body.productId, body.fornecedorId, prodData);
         break;
+      }
 
       case 'bulk-update':
         result = await bulkUpdateSupplier(
