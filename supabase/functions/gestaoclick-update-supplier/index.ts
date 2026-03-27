@@ -89,19 +89,62 @@ async function findProductsByName(apiHeaders: Record<string, string>, nameFilter
 }
 
 // Action: update-product - PUT to update a single product's supplier
+async function testSupplierFields(apiHeaders: Record<string, string>, productId: string, fornecedorId: string) {
+  // First GET the product to have its full data
+  const getUrl = `https://api.gestaoclick.com/api/produtos/${productId}`;
+  const getResp = await fetchWithRetry(getUrl, { method: 'GET', headers: apiHeaders });
+  const getData = await getResp.json();
+  const product = getData?.data || getData;
+
+  // Try different field name variations
+  const fieldVariations = [
+    { fornecedor_id: fornecedorId },
+    { fornecedores: [{ fornecedor_id: fornecedorId }] },
+    { fornecedores: [{ id: fornecedorId }] },
+    { nome_fornecedor: "UP Fábrica" },
+    { fornecedor: fornecedorId },
+    { fornecedores_ids: [fornecedorId] },
+  ];
+
+  const results: any[] = [];
+  
+  for (const fields of fieldVariations) {
+    const payload = {
+      nome: product.nome,
+      codigo_interno: product.codigo_interno,
+      ...fields,
+    };
+
+    const response = await fetchWithRetry(getUrl, {
+      method: 'PUT',
+      headers: apiHeaders,
+      body: JSON.stringify(payload),
+    });
+    const respText = await response.text();
+    let respData: any;
+    try { respData = JSON.parse(respText); } catch { respData = { raw: respText }; }
+    
+    results.push({
+      fields_sent: fields,
+      status: response.status,
+      ok: response.ok,
+      response: respData,
+    });
+    
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+
+  return results;
+}
+
 async function updateProductSupplier(apiHeaders: Record<string, string>, productId: string, fornecedorId: string, productData?: any) {
   const url = `https://api.gestaoclick.com/api/produtos/${productId}`;
   
-  // Build update payload - the API may require nome + codigo_interno
   const payload: any = { fornecedor_id: fornecedorId };
   if (productData) {
     payload.nome = productData.nome;
     if (productData.codigo_interno) payload.codigo_interno = productData.codigo_interno;
-    if (productData.valor_venda) payload.valor_venda = productData.valor_venda;
-    if (productData.valor_custo) payload.valor_custo = productData.valor_custo;
   }
-
-  console.log(`PUT ${url} payload:`, JSON.stringify(payload));
   
   const response = await fetchWithRetry(url, {
     method: 'PUT',
@@ -245,6 +288,10 @@ Deno.serve(async (req) => {
         result = await updateProductSupplier(apiHeaders, body.productId, body.fornecedorId, prodData);
         break;
       }
+
+      case 'test-fields':
+        result = await testSupplierFields(apiHeaders, body.productId || '58325295', body.fornecedorId || '1092154');
+        break;
 
       case 'bulk-update':
         result = await bulkUpdateSupplier(
