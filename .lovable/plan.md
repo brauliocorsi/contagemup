@@ -1,33 +1,40 @@
 
 
-## Plan: Selecao de palete/localizacao por coli na entrada de stock
+# Correcção: Movimentos de stock apenas para sets completos
 
-### Problema actual
-O dialogo `EntryLocationDialog` selecciona **um unico destino** para todo o produto. Todos os colis vao para o mesmo palete/localizacao. O utilizador quer poder escolher destinos diferentes para cada coli, ou manter o mesmo destino para todos.
+## Problema
 
-### Abordagem
+As funções `incrementCountAtLocation` e `decrementCountAtLocation` em `useCounting.tsx` (linhas 820-960) estão a:
+1. Inserir registos em `stock_movements` por cada ajuste individual de coli
+2. Fazer update manual do `current_stock` com +1/-1
 
-**1. Modificar `EntryLocationDialog`** para suportar produtos multi-coli:
-- Adicionar um toggle: "Mesmo destino para todos" vs "Destino por coli"
-- No modo "mesmo destino", funciona como hoje (um destino para tudo)
-- No modo "por coli", mostrar a selecao de localização/palete para cada coli individualmente, com nome do coli se disponivel
-- O resultado passa de um unico `EntryDestination` para um `Map<number, EntryDestination>` (colis_number -> destino)
+Isto é **incorrecto** porque o stock de um produto multi-coli só deve mudar quando **todos os colis** mudam por igual (set completo). O trigger `sync_product_stock` já calcula o stock correcto (mínimo entre todos os colis), mas o código está a sobrepor esse cálculo.
 
-**2. Modificar `StockEntriesView`** para usar destinos por coli:
-- Alterar `pendingEntryDestinations` de `Map<string, EntryDestination>` para `Map<string, Map<number, EntryDestination>>` (product_id -> colis_number -> destino)
-- No `executeEntries`, ao iterar pelos colis, consultar o destino especifico daquele coli
-- Passar `totalColis`, `colisNames` e `categoryColisNamesMap` ao dialogo
+As funções `incrementCount` e `decrementCount` (linhas 213-311) já estão correctas — apenas registam count_logs e deixam o trigger recalcular.
 
-**3. Manter compatibilidade total:**
-- Produtos com 1 coli: comportamento identico ao actual
-- Modo "mesmo destino": gera internamente o mesmo destino para todos os colis
-- Sem "Especificar localizacao" activo e sem multiplas localizacoes: nenhum dialogo aparece (como hoje)
+## Plano
 
-### Ficheiros a modificar
-- `src/components/stock/EntryLocationDialog.tsx` -- adicionar UI per-coli com toggle
-- `src/components/stock/StockEntriesView.tsx` -- adaptar state e logica de destinos por coli
+### 1. Corrigir `incrementCountAtLocation` (linhas 856-876)
+- **Remover** o bloco que faz `products.update({ current_stock: ... })` 
+- **Remover** o bloco que faz `stock_movements.insert(...)` com entrada
+- Manter: update do `counts`, insert no `count_logs`, e `invalidateCounts()`
+- O trigger `sync_product_stock` recalculará automaticamente o `current_stock` baseado no mínimo entre colis
 
-### Riscos mitigados
-- O modo "mesmo destino" e o default, mantendo o fluxo rapido para quem nao precisa separar
-- Nenhuma alteracao na logica de `counts`, `ManualStockSection` ou outros hooks
+### 2. Corrigir `decrementCountAtLocation` (linhas 923-957)
+- **Remover** o bloco que faz `products.update({ current_stock: ... })`
+- **Remover** o bloco que faz `stock_movements.insert(...)` com saída
+- Manter os alertas de stock baixo, mas ler o stock **após o trigger** ter recalculado (aguardar brevemente e re-consultar)
+
+### 3. Bump versão
+- Actualizar `src/version.ts` para `v1.2.0`
+
+## Ficheiros a modificar
+- `src/hooks/useCounting.tsx` — remover inserções manuais de movimentos e updates de stock nas funções de localização específica
+- `src/version.ts` — bump para v1.2.0
+
+## Resultado
+- Ajustes individuais de colis apenas alteram contagens e registam logs
+- O stock (`current_stock`) é **sempre** calculado pelo trigger (mínimo entre colis)
+- Movimentos em `stock_movements` são registados **apenas** pelas operações de entrada/saída manual (StockEntriesView/StockExitsView) que operam em sets completos
+- Histórico de movimentos fica limpo e consistente
 
