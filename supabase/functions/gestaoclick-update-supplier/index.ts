@@ -334,16 +334,42 @@ Deno.serve(async (req) => {
           break;
         }
 
-        // Step 2: Try PUT with situacao
+        // Step 2: Try multiple field variations
         const putUrl = `https://api.gestaoclick.com/api/vendas/${vendaId}`;
-        const putResp = await fetchWithRetry(putUrl, {
-          method: 'PUT',
-          headers: apiHeaders,
-          body: JSON.stringify({ situacao: novaSituacao }),
-        });
-        const putText = await putResp.text();
-        let putData: any;
-        try { putData = JSON.parse(putText); } catch { putData = { raw: putText }; }
+        const variations = [
+          { situacao_id: novaSituacao },
+          { situacao: novaSituacao, situacao_id: novaSituacao },
+          { status_id: novaSituacao },
+        ];
+        
+        const tryResults: any[] = [];
+        for (const fields of variations) {
+          const resp = await fetchWithRetry(putUrl, {
+            method: 'PUT',
+            headers: apiHeaders,
+            body: JSON.stringify(fields),
+          });
+          const txt = await resp.text();
+          let parsed: any;
+          try { parsed = JSON.parse(txt); } catch { parsed = { raw: txt }; }
+          
+          // Check if situacao changed
+          const checkResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
+            method: 'GET', headers: apiHeaders,
+          });
+          const checkData = await checkResp.json();
+          const after = checkData?.data || checkData;
+          
+          tryResults.push({
+            fields_sent: fields,
+            put_status: resp.status,
+            situacao_depois: after?.nome_situacao || after?.situacao,
+            changed: after?.nome_situacao !== vendaOriginal.nome_situacao,
+          });
+          
+          if (after?.nome_situacao !== vendaOriginal.nome_situacao) break;
+          await new Promise(r => setTimeout(r, 300));
+        }
 
         // Step 3: GET the sale again to verify
         const verifyResp = await fetchWithRetry(`https://api.gestaoclick.com/api/vendas/${vendaId}`, {
