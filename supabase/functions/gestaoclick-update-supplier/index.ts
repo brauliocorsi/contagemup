@@ -92,12 +92,16 @@ async function findProductsByName(apiHeaders: Record<string, string>, nameFilter
 async function updateProductSupplier(apiHeaders: Record<string, string>, productId: string, fornecedorId: string, productData?: any) {
   const url = `https://api.gestaoclick.com/api/produtos/${productId}`;
   
-  // Build update payload - include required fields from existing product data
+  // Build update payload - the API may require nome + codigo_interno
   const payload: any = { fornecedor_id: fornecedorId };
   if (productData) {
     payload.nome = productData.nome;
-    payload.codigo_interno = productData.codigo_interno || productData.codigo;
+    if (productData.codigo_interno) payload.codigo_interno = productData.codigo_interno;
+    if (productData.valor_venda) payload.valor_venda = productData.valor_venda;
+    if (productData.valor_custo) payload.valor_custo = productData.valor_custo;
   }
+
+  console.log(`PUT ${url} payload:`, JSON.stringify(payload));
   
   const response = await fetchWithRetry(url, {
     method: 'PUT',
