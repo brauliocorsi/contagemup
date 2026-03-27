@@ -56,6 +56,8 @@ export function useProductSales() {
   const fetchSales = useCallback(async (skipCache = false) => {
     setLoading(true);
     setError(null);
+    setLoaded(false);
+    setSalesMap({});
     setProgress({ current: 0, total: 0 });
 
     try {
