@@ -360,7 +360,46 @@ export function ERPReconciliationView() {
         </Card>
       )}
 
-      {/* Filters */}
+      {/* Sales loading progress */}
+      {salesLoading && (
+        <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
+          <CardContent className="p-3 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-amber-600 animate-spin flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-amber-800 dark:text-amber-200 font-semibold">
+                A carregar vendas do ERP...
+                {salesProgress.total > 0 && (
+                  <span className="font-normal ml-1">
+                    Página {salesProgress.current} de {salesProgress.total}
+                  </span>
+                )}
+              </p>
+              {salesProgress.total > 0 && (
+                <div className="w-full bg-amber-200 dark:bg-amber-800 rounded-full h-1.5 mt-1.5">
+                  <div
+                    className="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.round((salesProgress.current / salesProgress.total) * 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {salesLoaded && !salesLoading && (
+        <Card className="border-green-300 bg-green-50 dark:bg-green-950/30 dark:border-green-800">
+          <CardContent className="p-3 flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+            <p className="text-sm text-green-800 dark:text-green-200">
+              <span className="font-semibold">Vendas carregadas:</span>{' '}
+              {Object.keys(salesMap).length} produtos com vendas ativas
+              {salesCachedAt && <span className="text-xs ml-2 text-muted-foreground">(cache {getCacheAge(salesCachedAt)})</span>}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {comparisonItems.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
