@@ -340,6 +340,11 @@ export function SettingsView() {
         open={resetDialogOpen} 
         onOpenChange={setResetDialogOpen} 
       />
+
+      <StockDataRepairDialog
+        open={repairDialogOpen}
+        onOpenChange={setRepairDialogOpen}
+      />
     </div>
   );
 }
