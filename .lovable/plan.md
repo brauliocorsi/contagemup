@@ -1,40 +1,62 @@
 
 
-# Correcção: Movimentos de stock apenas para sets completos
+# Correcção de Dados Históricos do Bug Pré-v1.2.0
 
-## Problema
+## Contexto
+O bug antigo nas funções `incrementCountAtLocation`/`decrementCountAtLocation` criou registos falsos em `stock_movements` (entradas/saídas de 1 unidade por cada ajuste individual de coli) e fez updates manuais incorrectos ao `current_stock`. O código já foi corrigido na v1.2.0, mas os dados históricos permanecem corrompidos.
 
-As funções `incrementCountAtLocation` e `decrementCountAtLocation` em `useCounting.tsx` (linhas 820-960) estão a:
-1. Inserir registos em `stock_movements` por cada ajuste individual de coli
-2. Fazer update manual do `current_stock` com +1/-1
+## O que será feito
 
-Isto é **incorrecto** porque o stock de um produto multi-coli só deve mudar quando **todos os colis** mudam por igual (set completo). O trigger `sync_product_stock` já calcula o stock correcto (mínimo entre todos os colis), mas o código está a sobrepor esse cálculo.
+### 1. Criar ferramenta de limpeza na área de Definições
+Adicionar um novo botão "Corrigir Dados Históricos" no card "Gestão de Dados" do `SettingsView.tsx`, ao lado do botão de Reset existente. Abre um novo dialog `StockDataRepairDialog`.
 
-As funções `incrementCount` e `decrementCount` (linhas 213-311) já estão correctas — apenas registam count_logs e deixam o trigger recalcular.
+### 2. Criar `StockDataRepairDialog.tsx`
+Dialog com as seguintes acções automáticas (com progresso visual):
 
-## Plano
+**Fase 1 — Identificar e remover movimentos falsos**
+- Identificar `stock_movements` que foram criados pelo bug: movimentos de quantidade 1 com reason `'Contagem'` ou `'Ajuste de localização'` ou sem reason, que coincidem em timestamp com um `count_log` do mesmo produto (dentro de 5 segundos de diferença)
+- Alternativamente, abordagem mais segura: apresentar um relatório dos movimentos suspeitos antes de apagar, permitindo ao utilizador confirmar
 
-### 1. Corrigir `incrementCountAtLocation` (linhas 856-876)
-- **Remover** o bloco que faz `products.update({ current_stock: ... })` 
-- **Remover** o bloco que faz `stock_movements.insert(...)` com entrada
-- Manter: update do `counts`, insert no `count_logs`, e `invalidateCounts()`
-- O trigger `sync_product_stock` recalculará automaticamente o `current_stock` baseado no mínimo entre colis
+**Fase 2 — Recalcular stock de todos os produtos**
+- Chamar a função de base de dados `recalculate_all_stock()` que já existe — percorre todos os produtos e recalcula `current_stock` baseado no mínimo entre todos os colis na tabela `counts`
 
-### 2. Corrigir `decrementCountAtLocation` (linhas 923-957)
-- **Remover** o bloco que faz `products.update({ current_stock: ... })`
-- **Remover** o bloco que faz `stock_movements.insert(...)` com saída
-- Manter os alertas de stock baixo, mas ler o stock **após o trigger** ter recalculado (aguardar brevemente e re-consultar)
+**Fase 3 — Mostrar resumo**
+- Mostrar quantos movimentos falsos foram removidos
+- Mostrar quantos produtos tiveram o stock corrigido
 
-### 3. Bump versão
-- Actualizar `src/version.ts` para `v1.2.0`
+### 3. Abordagem segura: Relatório antes da acção
+Seguindo a metodologia existente (diagnóstico → aprovação → aplicação):
+- **Passo 1**: Botão "Diagnosticar" gera relatório mostrando movimentos suspeitos e produtos com stock potencialmente incorreto
+- **Passo 2**: Botão "Aplicar Correcções" só fica disponível após diagnóstico, com confirmação por texto "CORRIGIR"
 
-## Ficheiros a modificar
-- `src/hooks/useCounting.tsx` — remover inserções manuais de movimentos e updates de stock nas funções de localização específica
-- `src/version.ts` — bump para v1.2.0
+### 4. Migração: Adicionar função de limpeza
+Criar uma função de base de dados `cleanup_false_movements()` que:
+- Apaga registos de `stock_movements` com `quantity = 1` e `reason IS NULL` que têm um `count_log` correspondente no mesmo produto dentro de poucos segundos
+- Retorna o número de registos apagados
 
-## Resultado
-- Ajustes individuais de colis apenas alteram contagens e registam logs
-- O stock (`current_stock`) é **sempre** calculado pelo trigger (mínimo entre colis)
-- Movimentos em `stock_movements` são registados **apenas** pelas operações de entrada/saída manual (StockEntriesView/StockExitsView) que operam em sets completos
-- Histórico de movimentos fica limpo e consistente
+### 5. Recalcular stock
+Após a limpeza, executar `recalculate_all_stock()` para garantir que todos os `current_stock` reflectem o mínimo real entre colis.
+
+### 6. Bump versão
+Actualizar para `v1.3.0`.
+
+## Ficheiros a criar/modificar
+- **Criar** `src/components/settings/StockDataRepairDialog.tsx` — dialog com diagnóstico + limpeza
+- **Editar** `src/components/settings/SettingsView.tsx` — adicionar botão e import do novo dialog
+- **Migração SQL** — função `cleanup_false_movements()` 
+- **Editar** `src/version.ts` — bump para v1.3.0
+
+## Detalhes técnicos
+
+A identificação de movimentos falsos usa a seguinte lógica SQL:
+```text
+stock_movements WHERE quantity = 1 
+  AND reason IS NULL 
+  AND EXISTS (
+    count_log com mesmo product_id 
+    e created_at dentro de ±10 segundos
+  )
+```
+
+A recalculação usa a função `recalculate_all_stock()` já existente no banco, que calcula `MIN(SUM(quantity))` por coli para cada produto.
 
