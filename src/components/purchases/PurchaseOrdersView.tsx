@@ -453,7 +453,7 @@ export function PurchaseOrdersView() {
                     <TableHead>Produto</TableHead>
                     <TableHead className="text-center">Vendas</TableHead>
                     <TableHead className="text-right">Vendido</TableHead>
-                    <TableHead className="text-right">Stock Atual</TableHead>
+                    <TableHead className="text-right">Stock ERP</TableHead>
                     <TableHead className="text-right">Após Venda</TableHead>
                     <TableHead className="text-right text-destructive font-bold">Comprar</TableHead>
                     <TableHead className="w-10"></TableHead>
