@@ -41,6 +41,9 @@ export function PurchaseOrdersView() {
   const { toast } = useToast();
   const { products } = useProducts();
 
+  // ERP stock cache
+  const [erpStockMap, setErpStockMap] = useState<Map<string, number>>(new Map());
+
   const localProductMap = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
     for (const p of products) {
