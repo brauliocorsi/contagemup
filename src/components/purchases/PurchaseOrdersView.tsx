@@ -194,24 +194,20 @@ export function PurchaseOrdersView() {
             }
           }
         }
-        const currentStock = local?.current_stock ?? 0;
+        // Use ERP stock if available, otherwise fall back to local stock
+        const localCode = local?.code?.trim().toLowerCase() || item.productCode.toLowerCase();
+        const erpStock = erpStockMap.get(localCode);
+        const currentStock = erpStock !== undefined ? erpStock : (local?.current_stock ?? 0);
         
-        // Get exits already processed for this product in the period
-        const alreadyExited = local ? (exitsMap.get(local.id) ?? 0) : 0;
-        
-        // Reconstruct stock before exits: current_stock already reflects exits,
-        // so add them back to get the "pre-exit" stock
-        const stockBeforeExits = currentStock + alreadyExited;
-        
-        // Now subtract total sold from pre-exit stock
-        const stockAfterSale = stockBeforeExits - item.totalSold;
+        // ERP stock is the real-time value — subtract sold directly
+        const stockAfterSale = currentStock - item.totalSold;
         
         return {
           ...item,
           localStock: currentStock,
           stockAfterSale,
           deficit: Math.abs(Math.min(0, stockAfterSale)),
-          isRegistered: !!local,
+          isRegistered: !!local || erpStock !== undefined,
         };
       });
 
@@ -222,7 +218,7 @@ export function PurchaseOrdersView() {
     }
 
     return items;
-  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, exitsMap]);
+  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, erpStockMap]);
 
   const negativeStockItems = useMemo(() =>
     enrichedItems.filter(item => item.stockAfterSale < 0 || item.localStock < 0),
