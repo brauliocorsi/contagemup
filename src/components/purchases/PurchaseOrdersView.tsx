@@ -41,6 +41,9 @@ export function PurchaseOrdersView() {
   const { toast } = useToast();
   const { products } = useProducts();
 
+  // ERP stock cache
+  const [erpStockMap, setErpStockMap] = useState<Map<string, number>>(new Map());
+
   const localProductMap = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
     for (const p of products) {
@@ -142,45 +145,34 @@ export function PurchaseOrdersView() {
     }
   };
 
-  // State for exits already processed in the selected period
-  const [exitsMap, setExitsMap] = useState<Map<string, number>>(new Map());
-
-  // Fetch stock exits for the period when data is loaded
+  // Fetch ERP stock when data is loaded
   useEffect(() => {
     if (!loaded || soldItems.length === 0) {
-      setExitsMap(new Map());
+      setErpStockMap(new Map());
       return;
     }
 
-    const fetchExits = async () => {
+    const fetchErpStock = async () => {
       try {
-        const dateFromStr = format(dateFrom, 'yyyy-MM-dd');
-        const dateToStr = format(dateTo, 'yyyy-MM-dd');
-        const nextDay = format(new Date(new Date(dateToStr).getTime() + 86400000), 'yyyy-MM-dd');
-
-        const { data: movements } = await supabase
-          .from('stock_movements')
-          .select('product_id, quantity, movement_type')
-          .in('movement_type', ['exit', 'picking'])
-          .gte('created_at', `${dateFromStr}T00:00:00`)
-          .lt('created_at', `${nextDay}T00:00:00`);
+        const { data: erpProducts } = await supabase
+          .from('erp_products_cache')
+          .select('code, erp_stock');
 
         const map = new Map<string, number>();
-        for (const m of (movements || [])) {
-          if (!m.product_id) continue;
-          const prev = map.get(m.product_id) ?? 0;
-          map.set(m.product_id, prev + Math.abs(m.quantity));
+        for (const ep of (erpProducts || [])) {
+          if (ep.code) {
+            map.set(ep.code.trim().toLowerCase(), ep.erp_stock);
+          }
         }
-
-        setExitsMap(map);
+        setErpStockMap(map);
       } catch (err) {
-        console.error('Error fetching exits for period:', err);
-        setExitsMap(new Map());
+        console.error('Error fetching ERP stock:', err);
+        setErpStockMap(new Map());
       }
     };
 
-    fetchExits();
-  }, [loaded, soldItems.length, dateFrom, dateTo]);
+    fetchErpStock();
+  }, [loaded, soldItems.length]);
 
   const enrichedItems = useMemo(() => {
     const items = soldItems
@@ -202,24 +194,20 @@ export function PurchaseOrdersView() {
             }
           }
         }
-        const currentStock = local?.current_stock ?? 0;
+        // Use ERP stock if available, otherwise fall back to local stock
+        const localCode = local?.code?.trim().toLowerCase() || item.productCode.toLowerCase();
+        const erpStock = erpStockMap.get(localCode);
+        const currentStock = erpStock !== undefined ? erpStock : (local?.current_stock ?? 0);
         
-        // Get exits already processed for this product in the period
-        const alreadyExited = local ? (exitsMap.get(local.id) ?? 0) : 0;
-        
-        // Reconstruct stock before exits: current_stock already reflects exits,
-        // so add them back to get the "pre-exit" stock
-        const stockBeforeExits = currentStock + alreadyExited;
-        
-        // Now subtract total sold from pre-exit stock
-        const stockAfterSale = stockBeforeExits - item.totalSold;
+        // ERP stock is the real-time value — subtract sold directly
+        const stockAfterSale = currentStock - item.totalSold;
         
         return {
           ...item,
           localStock: currentStock,
           stockAfterSale,
           deficit: Math.abs(Math.min(0, stockAfterSale)),
-          isRegistered: !!local,
+          isRegistered: !!local || erpStock !== undefined,
         };
       });
 
@@ -230,7 +218,7 @@ export function PurchaseOrdersView() {
     }
 
     return items;
-  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, exitsMap]);
+  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, erpStockMap]);
 
   const negativeStockItems = useMemo(() =>
     enrichedItems.filter(item => item.stockAfterSale < 0 || item.localStock < 0),
@@ -465,7 +453,7 @@ export function PurchaseOrdersView() {
                     <TableHead>Produto</TableHead>
                     <TableHead className="text-center">Vendas</TableHead>
                     <TableHead className="text-right">Vendido</TableHead>
-                    <TableHead className="text-right">Stock Atual</TableHead>
+                    <TableHead className="text-right">Stock ERP</TableHead>
                     <TableHead className="text-right">Após Venda</TableHead>
                     <TableHead className="text-right text-destructive font-bold">Comprar</TableHead>
                     <TableHead className="w-10"></TableHead>
