@@ -43,6 +43,7 @@ export function PurchaseOrdersView() {
 
   // ERP stock cache
   const [erpStockMap, setErpStockMap] = useState<Map<string, number>>(new Map());
+  const [erpNegativeProducts, setErpNegativeProducts] = useState<Array<{ code: string; name: string; erp_stock: number }>>([]);
 
   const localProductMap = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
