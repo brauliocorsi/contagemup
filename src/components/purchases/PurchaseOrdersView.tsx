@@ -219,6 +219,30 @@ export function PurchaseOrdersView() {
         };
       });
 
+    // Add ERP products with negative stock that weren't sold in this period
+    const soldCodes = new Set(items.map(i => i.productCode.trim().toLowerCase()));
+    const soldNames = new Set(items.map(i => i.productName.trim().toLowerCase()));
+    for (const neg of erpNegativeProducts) {
+      const codeKey = neg.code.trim().toLowerCase();
+      const nameKey = neg.name.trim().toLowerCase();
+      if (!soldCodes.has(codeKey) && !soldNames.has(nameKey)) {
+        const itemKey = getSoldItemKey({ productCode: neg.code, productName: neg.name });
+        if (!removedProducts.has(itemKey)) {
+          items.push({
+            productCode: neg.code,
+            productName: neg.name,
+            totalSold: 0,
+            vendas: [],
+            itemKey,
+            localStock: neg.erp_stock,
+            stockAfterSale: neg.erp_stock,
+            deficit: Math.abs(neg.erp_stock),
+            isRegistered: true,
+          });
+        }
+      }
+    }
+
     if (sortAlpha) {
       items.sort((a, b) => a.productName.localeCompare(b.productName, 'pt'));
     } else {
@@ -226,7 +250,7 @@ export function PurchaseOrdersView() {
     }
 
     return items;
-  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, erpStockMap]);
+  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, erpStockMap, erpNegativeProducts]);
 
   const negativeStockItems = useMemo(() =>
     enrichedItems.filter(item => item.stockAfterSale < 0 || item.localStock < 0),
