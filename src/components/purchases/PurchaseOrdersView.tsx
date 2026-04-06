@@ -43,6 +43,7 @@ export function PurchaseOrdersView() {
 
   // ERP stock cache
   const [erpStockMap, setErpStockMap] = useState<Map<string, number>>(new Map());
+  const [erpNegativeProducts, setErpNegativeProducts] = useState<Array<{ code: string; name: string; erp_stock: number }>>([]);
 
   const localProductMap = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
@@ -149,6 +150,7 @@ export function PurchaseOrdersView() {
   useEffect(() => {
     if (!loaded || soldItems.length === 0) {
       setErpStockMap(new Map());
+      setErpNegativeProducts([]);
       return;
     }
 
@@ -156,18 +158,24 @@ export function PurchaseOrdersView() {
       try {
         const { data: erpProducts } = await supabase
           .from('erp_products_cache')
-          .select('code, erp_stock');
+          .select('code, name, erp_stock');
 
         const map = new Map<string, number>();
+        const negatives: Array<{ code: string; name: string; erp_stock: number }> = [];
         for (const ep of (erpProducts || [])) {
           if (ep.code) {
             map.set(ep.code.trim().toLowerCase(), ep.erp_stock);
+            if (ep.erp_stock < 0) {
+              negatives.push({ code: ep.code, name: ep.name, erp_stock: ep.erp_stock });
+            }
           }
         }
         setErpStockMap(map);
+        setErpNegativeProducts(negatives);
       } catch (err) {
         console.error('Error fetching ERP stock:', err);
         setErpStockMap(new Map());
+        setErpNegativeProducts([]);
       }
     };
 
@@ -211,6 +219,30 @@ export function PurchaseOrdersView() {
         };
       });
 
+    // Add ERP products with negative stock that weren't sold in this period
+    const soldCodes = new Set(items.map(i => i.productCode.trim().toLowerCase()));
+    const soldNames = new Set(items.map(i => i.productName.trim().toLowerCase()));
+    for (const neg of erpNegativeProducts) {
+      const codeKey = neg.code.trim().toLowerCase();
+      const nameKey = neg.name.trim().toLowerCase();
+      if (!soldCodes.has(codeKey) && !soldNames.has(nameKey)) {
+        const itemKey = getSoldItemKey({ productCode: neg.code, productName: neg.name });
+        if (!removedProducts.has(itemKey)) {
+          items.push({
+            productCode: neg.code,
+            productName: neg.name,
+            totalSold: 0,
+            vendas: [],
+            itemKey,
+            localStock: neg.erp_stock,
+            stockAfterSale: neg.erp_stock,
+            deficit: Math.abs(neg.erp_stock),
+            isRegistered: true,
+          });
+        }
+      }
+    }
+
     if (sortAlpha) {
       items.sort((a, b) => a.productName.localeCompare(b.productName, 'pt'));
     } else {
@@ -218,7 +250,7 @@ export function PurchaseOrdersView() {
     }
 
     return items;
-  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, erpStockMap]);
+  }, [soldItems, localProductMap, localProductByNameMap, removedProducts, sortAlpha, erpStockMap, erpNegativeProducts]);
 
   const negativeStockItems = useMemo(() =>
     enrichedItems.filter(item => item.stockAfterSale < 0 || item.localStock < 0),
