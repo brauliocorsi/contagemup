@@ -150,6 +150,7 @@ export function PurchaseOrdersView() {
   useEffect(() => {
     if (!loaded || soldItems.length === 0) {
       setErpStockMap(new Map());
+      setErpNegativeProducts([]);
       return;
     }
 
@@ -157,18 +158,24 @@ export function PurchaseOrdersView() {
       try {
         const { data: erpProducts } = await supabase
           .from('erp_products_cache')
-          .select('code, erp_stock');
+          .select('code, name, erp_stock');
 
         const map = new Map<string, number>();
+        const negatives: Array<{ code: string; name: string; erp_stock: number }> = [];
         for (const ep of (erpProducts || [])) {
           if (ep.code) {
             map.set(ep.code.trim().toLowerCase(), ep.erp_stock);
+            if (ep.erp_stock < 0) {
+              negatives.push({ code: ep.code, name: ep.name, erp_stock: ep.erp_stock });
+            }
           }
         }
         setErpStockMap(map);
+        setErpNegativeProducts(negatives);
       } catch (err) {
         console.error('Error fetching ERP stock:', err);
         setErpStockMap(new Map());
+        setErpNegativeProducts([]);
       }
     };
 
