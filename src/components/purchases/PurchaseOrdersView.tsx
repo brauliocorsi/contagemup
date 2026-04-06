@@ -145,45 +145,34 @@ export function PurchaseOrdersView() {
     }
   };
 
-  // State for exits already processed in the selected period
-  const [exitsMap, setExitsMap] = useState<Map<string, number>>(new Map());
-
-  // Fetch stock exits for the period when data is loaded
+  // Fetch ERP stock when data is loaded
   useEffect(() => {
     if (!loaded || soldItems.length === 0) {
-      setExitsMap(new Map());
+      setErpStockMap(new Map());
       return;
     }
 
-    const fetchExits = async () => {
+    const fetchErpStock = async () => {
       try {
-        const dateFromStr = format(dateFrom, 'yyyy-MM-dd');
-        const dateToStr = format(dateTo, 'yyyy-MM-dd');
-        const nextDay = format(new Date(new Date(dateToStr).getTime() + 86400000), 'yyyy-MM-dd');
-
-        const { data: movements } = await supabase
-          .from('stock_movements')
-          .select('product_id, quantity, movement_type')
-          .in('movement_type', ['exit', 'picking'])
-          .gte('created_at', `${dateFromStr}T00:00:00`)
-          .lt('created_at', `${nextDay}T00:00:00`);
+        const { data: erpProducts } = await supabase
+          .from('erp_products_cache')
+          .select('code, erp_stock');
 
         const map = new Map<string, number>();
-        for (const m of (movements || [])) {
-          if (!m.product_id) continue;
-          const prev = map.get(m.product_id) ?? 0;
-          map.set(m.product_id, prev + Math.abs(m.quantity));
+        for (const ep of (erpProducts || [])) {
+          if (ep.code) {
+            map.set(ep.code.trim().toLowerCase(), ep.erp_stock);
+          }
         }
-
-        setExitsMap(map);
+        setErpStockMap(map);
       } catch (err) {
-        console.error('Error fetching exits for period:', err);
-        setExitsMap(new Map());
+        console.error('Error fetching ERP stock:', err);
+        setErpStockMap(new Map());
       }
     };
 
-    fetchExits();
-  }, [loaded, soldItems.length, dateFrom, dateTo]);
+    fetchErpStock();
+  }, [loaded, soldItems.length]);
 
   const enrichedItems = useMemo(() => {
     const items = soldItems
