@@ -146,7 +146,7 @@ export function PurchaseOrdersView() {
     }
   };
 
-  // Fetch ERP stock when data is loaded
+  // Fetch fresh ERP stock when data is loaded - sync from ERP API first
   useEffect(() => {
     if (!loaded || soldItems.length === 0) {
       setErpStockMap(new Map());
@@ -156,6 +156,18 @@ export function PurchaseOrdersView() {
 
     const fetchErpStock = async () => {
       try {
+        // First, trigger a fresh sync from the ERP API to update the cache
+        console.log('Syncing ERP stock for purchases...');
+        await supabase.functions.invoke('gestaoclick-products', {
+          body: { skipCache: true },
+        });
+        console.log('ERP stock sync completed');
+      } catch (err) {
+        console.error('Error syncing ERP stock (using cached data):', err);
+      }
+
+      try {
+        // Now read the (freshly updated) cache
         const { data: erpProducts } = await supabase
           .from('erp_products_cache')
           .select('code, name, erp_stock');
