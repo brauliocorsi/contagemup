@@ -111,11 +111,27 @@ export function useERPReconciliation() {
         return;
       }
 
-      const { data: localProducts, error: localError } = await supabase
-        .from('products')
-        .select('code, name, current_stock, damaged_stock, location');
+      // Fetch ALL local products with pagination to bypass 1000-row limit
+      const allLocalProducts: any[] = [];
+      let erpFrom = 0;
+      const erpPageSize = 1000;
+      let erpHasMore = true;
+      while (erpHasMore) {
+        const { data: batch, error: batchError } = await supabase
+          .from('products')
+          .select('code, name, current_stock, damaged_stock, location')
+          .range(erpFrom, erpFrom + erpPageSize - 1);
+        if (batchError) throw batchError;
+        if (batch && batch.length > 0) {
+          allLocalProducts.push(...batch);
+          erpFrom += erpPageSize;
+          erpHasMore = batch.length === erpPageSize;
+        } else {
+          erpHasMore = false;
+        }
+      }
+      const localProducts = allLocalProducts;
 
-      if (localError) throw localError;
 
       const localMap = new Map((localProducts || []).map(p => [p.code.toLowerCase(), p]));
       const items: ERPComparisonItem[] = [];

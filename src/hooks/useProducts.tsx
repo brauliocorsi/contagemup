@@ -12,21 +12,37 @@ export function useProducts() {
   const { data: products = [], isLoading: loading, refetch: fetchProducts } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('name');
+      const allProducts: Product[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível carregar os produtos',
-          variant: 'destructive'
-        });
-        throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('name')
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          toast({
+            title: 'Erro',
+            description: 'Não foi possível carregar os produtos',
+            variant: 'destructive'
+          });
+          throw error;
+        }
+
+        if (data && data.length > 0) {
+          allProducts.push(...(data as Product[]));
+          from += pageSize;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
       }
 
-      return (data as Product[]) || [];
+      return allProducts;
     },
     staleTime: 2000, // Consider data fresh for 2 seconds
     refetchOnWindowFocus: true, // Refetch when window regains focus
