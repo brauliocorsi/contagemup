@@ -203,16 +203,6 @@ export function useProducts() {
       }
     }
 
-    const error = null;
-
-    if (error) {
-      toast({
-        title: 'Erro',
-        description: `Erro ao importar produtos: ${error.message}`,
-        variant: 'destructive'
-      });
-      return false;
-    }
 
     const message = duplicatesRemoved > 0 
       ? `${uniqueProducts.length} produtos importados (${duplicatesRemoved} duplicados ignorados)`
