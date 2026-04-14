@@ -132,7 +132,6 @@ export function useERPReconciliation() {
       }
       const localProducts = allLocalProducts;
 
-      if (localError) throw localError;
 
       const localMap = new Map((localProducts || []).map(p => [p.code.toLowerCase(), p]));
       const items: ERPComparisonItem[] = [];
