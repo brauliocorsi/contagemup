@@ -281,10 +281,25 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
         throw new Error('Colunas "codigo" e "quantidade" não encontradas');
       }
 
-      // Fetch all products for validation
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, code, name');
+      // Fetch all products for validation with pagination
+      const allProducts: any[] = [];
+      let prodFrom = 0;
+      const prodPageSize = 1000;
+      let prodHasMore = true;
+      while (prodHasMore) {
+        const { data: batch } = await supabase
+          .from('products')
+          .select('id, code, name')
+          .range(prodFrom, prodFrom + prodPageSize - 1);
+        if (batch && batch.length > 0) {
+          allProducts.push(...batch);
+          prodFrom += prodPageSize;
+          prodHasMore = batch.length === prodPageSize;
+        } else {
+          prodHasMore = false;
+        }
+      }
+      const products = allProducts;
 
       const productMap = new Map(products?.map(p => [p.code.toLowerCase(), p]) || []);
 
