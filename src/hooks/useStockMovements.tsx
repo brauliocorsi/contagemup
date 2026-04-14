@@ -54,22 +54,38 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
   const { data: movements = [], isLoading } = useQuery({
     queryKey: ['stock-movements', movementType],
     queryFn: async () => {
-      let query = supabase
-        .from('stock_movements')
-        .select(`
-          *,
-          products (code, name, damaged_stock)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const allMovements: StockMovement[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (movementType) {
-        query = query.eq('movement_type', movementType);
+      while (hasMore) {
+        let query = supabase
+          .from('stock_movements')
+          .select(`
+            *,
+            products (code, name, damaged_stock)
+          `)
+          .order('created_at', { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (movementType) {
+          query = query.eq('movement_type', movementType);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allMovements.push(...(data as StockMovement[]));
+          from += pageSize;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as StockMovement[];
+      return allMovements;
     },
   });
 

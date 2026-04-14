@@ -175,29 +175,34 @@ export function useProducts() {
     
     const duplicatesRemoved = productsData.length - uniqueProducts.length;
     
-    const { error } = await supabase
-      .from('products')
-      .upsert(
-        uniqueProducts.map(p => ({
-          code: p.code,
-          name: p.name,
-          category: p.category || 'Geral',
-          total_colis: p.total_colis,
-          description: p.description || null,
-          location: p.location || null,
-          pallet_number: p.pallet_number || null
-        })),
-        { onConflict: 'code' }
-      );
+    // Batch import to avoid row limits
+    const BATCH_SIZE = 500;
+    const productsToUpsert = uniqueProducts.map(p => ({
+      code: p.code,
+      name: p.name,
+      category: p.category || 'Geral',
+      total_colis: p.total_colis,
+      description: p.description || null,
+      location: p.location || null,
+      pallet_number: p.pallet_number || null
+    }));
 
-    if (error) {
-      toast({
-        title: 'Erro',
-        description: `Erro ao importar produtos: ${error.message}`,
-        variant: 'destructive'
-      });
-      return false;
+    for (let i = 0; i < productsToUpsert.length; i += BATCH_SIZE) {
+      const batch = productsToUpsert.slice(i, i + BATCH_SIZE);
+      const { error: batchError } = await supabase
+        .from('products')
+        .upsert(batch, { onConflict: 'code' });
+
+      if (batchError) {
+        toast({
+          title: 'Erro',
+          description: `Erro ao importar lote ${Math.floor(i / BATCH_SIZE) + 1}: ${batchError.message}`,
+          variant: 'destructive'
+        });
+        return false;
+      }
     }
+
 
     const message = duplicatesRemoved > 0 
       ? `${uniqueProducts.length} produtos importados (${duplicatesRemoved} duplicados ignorados)`
