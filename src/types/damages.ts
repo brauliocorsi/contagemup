@@ -3,6 +3,7 @@ export const DAMAGE_TYPES = [
   'Amassado',
   'Risco/Arranhão',
   'Molhado/Humidade',
+  'Sujeira',
   'Peça em falta',
   'Embalagem danificada',
   'Defeito de fábrica',
