@@ -27,12 +27,12 @@ export function DamagesView() {
 
   // Export to CSV
   const exportToCSV = useCallback(() => {
-    const activeDamages = filteredDamages.filter(d => d.status === 'active');
+    const damagesToExport = filteredDamages;
     
-    if (activeDamages.length === 0) return;
+    if (damagesToExport.length === 0) return;
 
-    const headers = ['Produto', 'Código', 'Tipo de Dano', 'Quantidade', 'Coli', 'Localização', 'Palete', 'Data', 'Descrição'];
-    const rows = activeDamages.map(d => [
+    const headers = ['Produto', 'Código', 'Tipo de Dano', 'Quantidade', 'Coli', 'Localização', 'Palete', 'Data', 'Descrição', 'Estado', 'Resolução', 'Notas de Resolução', 'Data Resolução'];
+    const rows = damagesToExport.map(d => [
       d.product?.name || '',
       d.product?.code || '',
       d.damage_type,
@@ -41,7 +41,11 @@ export function DamagesView() {
       d.location || '',
       d.pallet_number || '',
       format(new Date(d.created_at), 'dd/MM/yyyy HH:mm', { locale: pt }),
-      d.description || ''
+      d.description || '',
+      d.status === 'active' ? 'Ativo' : 'Resolvido',
+      d.resolution_type || '',
+      d.resolution_notes || '',
+      d.resolved_at ? format(new Date(d.resolved_at), 'dd/MM/yyyy HH:mm', { locale: pt }) : ''
     ]);
 
     const csvContent = [headers, ...rows]
@@ -58,16 +62,16 @@ export function DamagesView() {
 
   // Export to Excel
   const exportToExcel = useCallback(() => {
-    const activeDamages = filteredDamages.filter(d => d.status === 'active');
+    const damagesToExport = filteredDamages;
     
-    if (activeDamages.length === 0) return;
+    if (damagesToExport.length === 0) return;
 
     const data = [
-      ['Relatório de Avarias', '', '', '', '', '', '', '', ''],
-      [`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}`, '', '', '', '', '', '', '', ''],
+      ['Relatório de Avarias', '', '', '', '', '', '', '', '', '', '', '', ''],
+      [`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}`, '', '', '', '', '', '', '', '', '', '', '', ''],
       [''],
-      ['Produto', 'Código', 'Tipo de Dano', 'Quantidade', 'Coli', 'Localização', 'Palete', 'Data', 'Descrição'],
-      ...activeDamages.map(d => [
+      ['Produto', 'Código', 'Tipo de Dano', 'Quantidade', 'Coli', 'Localização', 'Palete', 'Data', 'Descrição', 'Estado', 'Resolução', 'Notas de Resolução', 'Data Resolução'],
+      ...damagesToExport.map(d => [
         d.product?.name || '',
         d.product?.code || '',
         d.damage_type,
@@ -76,16 +80,20 @@ export function DamagesView() {
         d.location || '',
         d.pallet_number || '',
         format(new Date(d.created_at), 'dd/MM/yyyy HH:mm', { locale: pt }),
-        d.description || ''
+        d.description || '',
+        d.status === 'active' ? 'Ativo' : 'Resolvido',
+        d.resolution_type || '',
+        d.resolution_notes || '',
+        d.resolved_at ? format(new Date(d.resolved_at), 'dd/MM/yyyy HH:mm', { locale: pt }) : ''
       ]),
       [''],
-      [`Total de Avarias: ${activeDamages.length}`, '', '', '', '', '', '', '', ''],
-      [`Total de Unidades: ${stats.totalDamagedUnits}`, '', '', '', '', '', '', '', '']
+      [`Total de Avarias: ${damagesToExport.length}`, '', '', '', '', '', '', '', '', '', '', '', ''],
+      [`Ativas: ${damagesToExport.filter(d => d.status === 'active').length}`, '', '', '', '', '', '', '', '', '', '', '', ''],
+      [`Resolvidas: ${damagesToExport.filter(d => d.status === 'resolved').length}`, '', '', '', '', '', '', '', '', '', '', '', '']
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(data);
     
-    // Auto-size columns
     const colWidths = data[3].map((_, colIndex) => {
       const maxLength = Math.max(...data.slice(3).map(row => String(row[colIndex] || '').length));
       return { wch: Math.min(Math.max(maxLength + 2, 10), 40) };
@@ -95,7 +103,7 @@ export function DamagesView() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Avarias');
     XLSX.writeFile(workbook, `avarias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-  }, [filteredDamages, stats.totalDamagedUnits]);
+  }, [filteredDamages]);
 
   if (loading) {
     return (
@@ -221,11 +229,11 @@ export function DamagesView() {
           <div className="flex flex-row items-center justify-between">
             <CardTitle>Lista de Avarias</CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={exportToCSV} disabled={activeDamages.length === 0}>
+              <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredDamages.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
                 CSV
               </Button>
-              <Button variant="outline" size="sm" onClick={exportToExcel} disabled={activeDamages.length === 0}>
+              <Button variant="outline" size="sm" onClick={exportToExcel} disabled={filteredDamages.length === 0}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Excel
               </Button>
