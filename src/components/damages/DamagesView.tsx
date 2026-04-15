@@ -229,11 +229,11 @@ export function DamagesView() {
           <div className="flex flex-row items-center justify-between">
             <CardTitle>Lista de Avarias</CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={exportToCSV} disabled={activeDamages.length === 0}>
+              <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredDamages.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
                 CSV
               </Button>
-              <Button variant="outline" size="sm" onClick={exportToExcel} disabled={activeDamages.length === 0}>
+              <Button variant="outline" size="sm" onClick={exportToExcel} disabled={filteredDamages.length === 0}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Excel
               </Button>
