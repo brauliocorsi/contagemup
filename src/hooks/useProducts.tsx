@@ -22,6 +22,7 @@ export function useProducts() {
           .from('products')
           .select('*')
           .order('name')
+          .order('id')
           .range(from, from + pageSize - 1);
 
         if (error) {
