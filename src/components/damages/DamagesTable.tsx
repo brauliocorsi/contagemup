@@ -122,6 +122,7 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
               <TableHead>Produto</TableHead>
               <TableHead>Tipo de Dano</TableHead>
               <TableHead className="text-center">Qtd</TableHead>
+              <TableHead>Descrição</TableHead>
               <TableHead>Localização</TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Estado</TableHead>
@@ -131,7 +132,7 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
           <TableBody>
             {filteredDamages.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   Nenhuma avaria encontrada
                 </TableCell>
               </TableRow>
@@ -159,6 +160,15 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
                   </TableCell>
                   <TableCell className="text-center font-medium">
                     {damage.quantity}
+                  </TableCell>
+                  <TableCell>
+                    {damage.description ? (
+                      <p className="text-sm text-muted-foreground max-w-[200px] truncate" title={damage.description}>
+                        {damage.description}
+                      </p>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1 text-sm">
