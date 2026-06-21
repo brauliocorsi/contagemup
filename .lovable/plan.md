@@ -1,24 +1,26 @@
+# Limpeza pós Fase 1 (frontend)
 
+## 1. Apagar `StockDataRepairDialog`
+- `rm src/components/settings/StockDataRepairDialog.tsx`
+- Em `src/components/settings/SettingsView.tsx`:
+  - Remover `import { StockDataRepairDialog }`
+  - Remover state `repairDialogOpen` / `setRepairDialogOpen`
+  - Remover o bloco "Corrigir Dados Históricos" (cartão com botão "Corrigir") dentro do card "Gestão de Dados"
+  - Remover `<StockDataRepairDialog ... />` no fim
+  - Limpar import `Database` se deixar de ser usado
 
-# Testar alteração de situação da venda #15815 no GestãoClick
+## 2. `StockIntegrityReport.tsx`
+- Remover a mutation `syncCountsMutation` (linhas ~204–220)
+- Remover o `<Button>` "Sincronizar Contagens" (linhas ~325–334)
+- Manter `syncStockMutation` (usa `recalculate_all_stock`, que não foi removido) e o resto do componente
 
-## Objectivo
-Testar se a API do GestãoClick permite alterar a `situacao` de uma venda via PUT, usando a venda **15815** como cobaia, mudando para **"Agendado Entrega"**.
+## 3. Grep final
+Após as alterações, confirmar com `rg` que não há mais referências em `src/` a:
+- `sync_counts_with_current_stock`
+- `count_false_movements`
+- `cleanup_false_movements`
+- `StockDataRepairDialog`
 
-## Plano
-
-### 1. Actualizar a Edge Function `gestaoclick-update-supplier`
-Adicionar uma nova action `update-sale-status` que:
-- Busca a venda pelo número (GET `/api/vendas` com filtro)
-- Faz PUT em `/api/vendas/{id}` com `{ situacao: "Agendado Entrega" }`
-- Retorna o resultado para confirmar se a API aceitou ou ignorou o campo
-
-### 2. Executar o teste
-Invocar a função com a venda 15815 e verificar se o status foi realmente alterado no ERP.
-
-### 3. Diagnóstico
-Se o campo `situacao` for ignorado (como aconteceu com `fornecedor_id`), testar variações do nome do campo (`status`, `situacao_venda`, etc.).
-
-## Ficheiros a editar
-- `supabase/functions/gestaoclick-update-supplier/index.ts` — adicionar action `update-sale-status`
-
+## 4. Resposta final
+- Listar ficheiros alterados
+- Colar o SQL completo da migration aplicada (`supabase/migrations/20260621100051_*.sql`), com as 4 funções `register_entry`, `commit_exit_cart`, `register_damage`, `resolve_damage` na íntegra

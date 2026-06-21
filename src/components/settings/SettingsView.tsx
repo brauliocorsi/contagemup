@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Settings, Users, UserPlus, Loader2, Trash2, Mail, User, Database, AlertTriangle } from 'lucide-react';
+// StockDataRepairDialog removed: underlying RPCs dropped in stock refactor Phase 1.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileSettings } from './ProfileSettings';
 import { Separator } from '@/components/ui/separator';
 import { ResetStockDialog } from './ResetStockDialog';
-import { StockDataRepairDialog } from './StockDataRepairDialog';
+
 
 interface Profile {
   id: string;
@@ -32,7 +33,7 @@ export function SettingsView() {
   const [newUserName, setNewUserName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
-  const [repairDialogOpen, setRepairDialogOpen] = useState(false);
+  
   const { toast } = useToast();
   const { profile: currentProfile } = useAuth();
   const queryClient = useQueryClient();
@@ -291,27 +292,6 @@ export function SettingsView() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 rounded-lg border border-amber-500/20 bg-amber-500/5">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                  <Database className="h-5 w-5 text-amber-500" />
-                </div>
-                <div>
-                  <h4 className="font-medium">Corrigir Dados Históricos</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Remove movimentos falsos do bug pré-v1.2.0 e recalcula o stock
-                  </p>
-                </div>
-              </div>
-              <Button 
-                variant="outline"
-                onClick={() => setRepairDialogOpen(true)}
-              >
-                <Database className="h-4 w-4 mr-2" />
-                Corrigir
-              </Button>
-            </div>
-
             <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/20 bg-destructive/5">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
@@ -339,11 +319,6 @@ export function SettingsView() {
       <ResetStockDialog 
         open={resetDialogOpen} 
         onOpenChange={setResetDialogOpen} 
-      />
-
-      <StockDataRepairDialog
-        open={repairDialogOpen}
-        onOpenChange={setRepairDialogOpen}
       />
     </div>
   );
