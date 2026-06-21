@@ -265,9 +265,9 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
 
       // Partial — show summary and keep remaining
       const lines: string[] = [];
-      const remainingMap = new Map<string, { requested: number; fulfilled: number; unit: string }>();
+      const remainingMap = new Map<string, { requested: number; fulfilled: number; unit: string; status: 'full' | 'partial' | 'none' }>();
       result.items.forEach(r => {
-        remainingMap.set(r.product_id, r);
+        remainingMap.set(r.product_id, { requested: r.requested, fulfilled: r.fulfilled, unit: r.unit, status: r.status });
         const p = cart.find(c => c.product_id === r.product_id);
         const name = p?.product_name ?? r.product_id.slice(0, 8);
         if (r.status === 'full') {
