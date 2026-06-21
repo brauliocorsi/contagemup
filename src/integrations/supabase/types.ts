@@ -522,6 +522,10 @@ export type Database = {
           resolution_notes: string | null
           resolution_type: string | null
           resolved_at: string | null
+          source_colis_number: number | null
+          source_count_id: string | null
+          source_location: string | null
+          source_pallet_number: string | null
           status: string
           updated_at: string
         }
@@ -539,6 +543,10 @@ export type Database = {
           resolution_notes?: string | null
           resolution_type?: string | null
           resolved_at?: string | null
+          source_colis_number?: number | null
+          source_count_id?: string | null
+          source_location?: string | null
+          source_pallet_number?: string | null
           status?: string
           updated_at?: string
         }
@@ -556,6 +564,10 @@ export type Database = {
           resolution_notes?: string | null
           resolution_type?: string | null
           resolved_at?: string | null
+          source_colis_number?: number | null
+          source_count_id?: string | null
+          source_location?: string | null
+          source_pallet_number?: string | null
           status?: string
           updated_at?: string
         }
@@ -929,6 +941,42 @@ export type Database = {
           },
         ]
       }
+      stock_movements_archive: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          movement_type: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          reason: string | null
+          reference: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          movement_type: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          reason?: string | null
+          reference?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          movement_type?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          reference?: string | null
+        }
+        Relationships: []
+      }
       stock_order_numbers: {
         Row: {
           colis_status: Json
@@ -1127,13 +1175,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cleanup_false_movements: { Args: never; Returns: number }
-      count_false_movements: {
-        Args: never
-        Returns: {
-          affected_products: number
-          total_suspect: number
-        }[]
+      commit_exit_cart: {
+        Args: {
+          p_items: Json
+          p_notes: string
+          p_reason: string
+          p_reference: string
+        }
+        Returns: Json
       }
       decrement_counts_for_picking: {
         Args: {
@@ -1147,7 +1196,80 @@ export type Database = {
         Returns: boolean
       }
       recalculate_all_stock: { Args: never; Returns: undefined }
-      sync_counts_with_current_stock: { Args: never; Returns: undefined }
+      register_damage: {
+        Args: {
+          p_colis_number: number
+          p_damage_type: string
+          p_description: string
+          p_location: string
+          p_pallet_number: string
+          p_product_id: string
+          p_quantity: number
+        }
+        Returns: {
+          colis_number: number | null
+          created_at: string
+          damage_type: string
+          description: string | null
+          id: string
+          location: string | null
+          pallet_number: string | null
+          product_id: string
+          quantity: number
+          reported_by: string | null
+          resolution_notes: string | null
+          resolution_type: string | null
+          resolved_at: string | null
+          source_colis_number: number | null
+          source_count_id: string | null
+          source_location: string | null
+          source_pallet_number: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "product_damages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      register_entry: {
+        Args: {
+          p_colis_quantities: Json
+          p_location: string
+          p_notes: string
+          p_pallet_number: string
+          p_product_id: string
+          p_reason: string
+          p_reference: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          id: string
+          movement_type: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          reason: string | null
+          reference: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "stock_movements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      resolve_damage: {
+        Args: {
+          p_damage_id: string
+          p_resolution_notes: string
+          p_resolution_type: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
