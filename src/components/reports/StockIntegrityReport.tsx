@@ -201,23 +201,7 @@ export function StockIntegrityReport() {
     },
   });
 
-  // Sync counts mutation (aligns counts with current_stock)
-  const syncCountsMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('sync_counts_with_current_stock');
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Contagens sincronizadas com o stock actual!');
-      queryClient.invalidateQueries({ queryKey: ['stock-integrity'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['counts'] });
-      refetch();
-    },
-    onError: (error) => {
-      toast.error('Erro ao sincronizar contagens: ' + (error as Error).message);
-    },
-  });
+  // syncCountsMutation removed in stock refactor Phase 1 (RPC sync_counts_with_current_stock dropped).
 
   const handleExport = () => {
     if (!integrityData) return;
@@ -321,16 +305,6 @@ export function StockIntegrityReport() {
                 >
                   <Database className="h-4 w-4 mr-2" />
                   {syncStockMutation.isPending ? 'A recalcular...' : 'Recalcular Stock'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => syncCountsMutation.mutate()}
-                  disabled={syncCountsMutation.isPending}
-                  title="Sincroniza os counts para corresponder ao current_stock"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  {syncCountsMutation.isPending ? 'A sincronizar...' : 'Sincronizar Contagens'}
                 </Button>
               </>
             )}
