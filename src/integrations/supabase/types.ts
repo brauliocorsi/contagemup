@@ -1172,7 +1172,21 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      stock_movements_unified: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string | null
+          movement_type: string | null
+          notes: string | null
+          origem: string | null
+          product_id: string | null
+          quantity: number | null
+          reason: string | null
+          reference: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       commit_exit_cart: {
