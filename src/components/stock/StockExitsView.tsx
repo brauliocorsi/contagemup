@@ -1,840 +1,884 @@
-import { useState, useCallback, useMemo } from 'react';
-import { TrendingDown, History, AlertTriangle, ClipboardList, Upload, Truck } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import {
+  TrendingDown, History, Truck, Search, Package, Layers, Plus, X,
+  MapPin, Box, Star, AlertTriangle, ShoppingCart, Check,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { useStockMovements, MovementItem, ParsedCSVItem } from '@/hooks/useStockMovements';
-import { usePickingHistory } from '@/hooks/usePickingHistory';
-import { useDetailedPickingData } from '@/hooks/useDetailedPickingData';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { NumericInput } from '@/components/ui/numeric-input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useProducts } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
-import { StockUploadSection, ParsedItemsPreview } from './StockUploadSection';
-import { ManualStockSection } from './ManualStockSection';
-import { StockHistoryTable } from './StockHistoryTable';
-import { PickingHistoryView } from './PickingHistoryView';
-import { StockValidationDialog, StockValidationError } from './StockValidationDialog';
-import { PickingReportDialog } from './PickingReportDialog';
-import { LocationSelectionDialog, LocationSelection, ColisLocationData } from './LocationSelectionDialog';
-import { removeOrderNumberAfterExit } from '@/hooks/useOrderNumbers';
-import { ERPExitsView, ERPExitCartItem } from './ERPExitsView';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import type { Product } from '@/types/stock';
+import { PickingHistoryView } from './PickingHistoryView';
+import { ERPExitsView, ERPExitCartItem } from './ERPExitsView';
 
 const EXIT_REASONS = [
-  'Venda',
-  'Quebra',
-  'Perda',
-  'Transferência',
-  'Devolução a fornecedor',
-  'Ajuste de inventário',
-  'Amostra',
-  'Outro',
+  'Venda', 'Quebra', 'Perda', 'Transferência',
+  'Devolução a fornecedor', 'Ajuste de inventário', 'Amostra', 'Outro',
 ];
 
+// ---------------------------------------------------------------------------
+// Cart item types
+// ---------------------------------------------------------------------------
+interface CartItem {
+  product_id: string;
+  product_code: string;
+  product_name: string;
+  total_colis: number;
+  mode: 'set' | 'individual';
+  setQuantity: number;
+  colisQuantities: Record<number, number>;
+  // selections: per coli, map countId -> qty chosen
+  selections: Record<number, Record<string, number>>;
+}
+
+interface CountLocationRow {
+  id: string; // count id
+  quantity: number;
+  location: string | null;
+  pallet_number: string | null;
+  level_number: number | null;
+  requires_forklift: boolean;
+}
+
+type LocationsByColi = Record<number, CountLocationRow[]>;
+
+// ---------------------------------------------------------------------------
+// Wrapper view (tabs)
+// ---------------------------------------------------------------------------
 export function StockExitsView() {
+  const [activeTab, setActiveTab] = useState('carrinho');
+  const [externalAdd, setExternalAdd] = useState<ERPExitCartItem[] | null>(null);
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="carrinho" className="flex items-center gap-2">
+          <TrendingDown className="h-4 w-4" /> Saídas
+        </TabsTrigger>
+        <TabsTrigger value="historico" className="flex items-center gap-2">
+          <History className="h-4 w-4" /> Histórico de Picking
+        </TabsTrigger>
+        <TabsTrigger value="erp" className="flex items-center gap-2">
+          <Truck className="h-4 w-4" /> Saídas do ERP
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="carrinho" className="space-y-6">
+        <ExitCart externalAdd={externalAdd} onExternalConsumed={() => setExternalAdd(null)} />
+      </TabsContent>
+
+      <TabsContent value="historico">
+        <PickingHistoryView />
+      </TabsContent>
+
+      <TabsContent value="erp">
+        <ERPExitsView onSendToCart={(items) => {
+          setExternalAdd(items);
+          setActiveTab('carrinho');
+        }} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Exit Cart
+// ---------------------------------------------------------------------------
+interface ExitCartProps {
+  externalAdd: ERPExitCartItem[] | null;
+  onExternalConsumed: () => void;
+}
+
+function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
   const queryClient = useQueryClient();
-  const {
-    movements,
-    isLoading,
-    isProcessing,
-    parseStockFile,
-    deleteMovement,
-  } = useStockMovements('saida');
-
-  const { createSession } = usePickingHistory();
   const { products } = useProducts();
+  const { categories } = useCategories();
 
-  const [parsedItems, setParsedItems] = useState<ParsedCSVItem[]>([]);
-  const [cart, setCart] = useState<MovementItem[]>([]);
-  const [reason, setReason] = useState<string>('');
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [reason, setReason] = useState('');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
-  const [activeTab, setActiveTab] = useState('saidas');
-  
-  // Validation dialog state
-  const [validationErrors, setValidationErrors] = useState<StockValidationError[]>([]);
-  const [showValidationDialog, setShowValidationDialog] = useState(false);
-  const [colisValidationMessage, setColisValidationMessage] = useState<string | null>(null);
-  
-  // Picking report dialog state
-  const [showPickingReport, setShowPickingReport] = useState(false);
-  const [itemsForPicking, setItemsForPicking] = useState<MovementItem[]>([]);
-  
-  // Location selection dialog state for split colis
-  const [showLocationSelection, setShowLocationSelection] = useState(false);
-  const [locationSelectionItem, setLocationSelectionItem] = useState<{
-    item: MovementItem;
-    colisData: ColisLocationData[];
-    totalColis: number;
-  } | null>(null);
-  const [pendingLocationSelections, setPendingLocationSelections] = useState<Map<string, LocationSelection[]>>(new Map());
-  
-  // Incomplete set warning state
-  const [incompleteSetWarnings, setIncompleteSetWarnings] = useState<Array<{
-    product_code: string;
-    product_name: string;
-    totalColis: number;
-    colisBeingRemoved: number[];
-    colisMissing: number[];
-  }>>([]);
-  const [showIncompleteSetWarning, setShowIncompleteSetWarning] = useState(false);
-  const [pendingItemsAfterWarning, setPendingItemsAfterWarning] = useState<MovementItem[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Create stock map for validation
-  const stockMap = useMemo(() => {
-    return products.reduce((acc, p) => {
-      acc[p.id] = p.current_stock ?? 0;
-      return acc;
-    }, {} as Record<string, number>);
-  }, [products]);
+  // Product picker
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [search, setSearch] = useState('');
 
-  // Combine CSV items and manual cart
-  const allItems: MovementItem[] = useMemo(() => [
-    ...parsedItems
-      .filter(i => i.valid && i.product_id)
-      .map(i => ({
-        product_id: i.product_id!,
-        product_code: i.code,
-        product_name: i.product_name || '',
-        quantity: i.quantity,
-      })),
-    ...cart,
-  ], [parsedItems, cart]);
+  const categoryColisCount = useCallback((category: string) => {
+    const cat = categories.find(c => c.name === category);
+    if (!cat?.colis_names) return 0;
+    return Object.keys(cat.colis_names).length;
+  }, [categories]);
 
-  // Check for stock validation errors
-  const stockErrors = useMemo(() => {
-    return allItems.filter(item => {
-      const available = stockMap[item.product_id] || 0;
-      return item.quantity > available;
-    }).map(item => ({
-      product_id: item.product_id,
-      product_code: item.product_code,
-      product_name: item.product_name,
-      requested: item.quantity,
-      available: stockMap[item.product_id] || 0,
-    }));
-  }, [allItems, stockMap]);
+  const effectiveColis = useCallback((p: Product) => {
+    return Math.max(p.total_colis || 1, categoryColisCount(p.category) || 0, 1);
+  }, [categoryColisCount]);
 
-  const hasStockErrors = stockErrors.length > 0;
+  const filteredProducts = useMemo(() => {
+    const term = search.toLowerCase().trim();
+    const list = !term
+      ? products.slice(0, 50)
+      : products
+          .filter(p => p.code.toLowerCase().includes(term) || p.name.toLowerCase().includes(term))
+          .slice(0, 50);
+    return list;
+  }, [products, search]);
 
-  // Fetch detailed picking data when showing report
-  const { data: detailedPickingItems = [], isLoading: isLoadingPickingData } = useDetailedPickingData(
-    showPickingReport ? itemsForPicking : []
-  );
-
-  const handleAddToCart = useCallback((item: MovementItem) => {
+  const addProductToCart = useCallback((p: Product) => {
     setCart(prev => {
-      const existing = prev.find(i => i.product_id === item.product_id);
-      if (existing) {
-        return prev.map(i =>
-          i.product_id === item.product_id
-            ? { ...i, quantity: i.quantity + item.quantity }
-            : i
-        );
+      if (prev.some(i => i.product_id === p.id)) {
+        toast.info(`${p.name} já está no carrinho`);
+        return prev;
       }
-      return [...prev, item];
+      const totalColis = effectiveColis(p);
+      return [...prev, {
+        product_id: p.id,
+        product_code: p.code,
+        product_name: p.name,
+        total_colis: totalColis,
+        mode: 'set',
+        setQuantity: 1,
+        colisQuantities: Object.fromEntries(
+          Array.from({ length: totalColis }, (_, i) => [i + 1, 0])
+        ),
+        selections: {},
+      }];
     });
+  }, [effectiveColis]);
+
+  // Handle external (ERP) additions
+  useEffect(() => {
+    if (!externalAdd || externalAdd.length === 0) return;
+    externalAdd.forEach(item => {
+      const p = products.find(pp => pp.id === item.product_id);
+      if (!p) return;
+      setCart(prev => {
+        const existing = prev.find(i => i.product_id === p.id);
+        if (existing) {
+          return prev.map(i => i.product_id === p.id
+            ? { ...i, setQuantity: i.setQuantity + (item.quantity || 1) }
+            : i);
+        }
+        const totalColis = effectiveColis(p);
+        return [...prev, {
+          product_id: p.id,
+          product_code: p.code,
+          product_name: p.name,
+          total_colis: totalColis,
+          mode: 'set',
+          setQuantity: item.quantity || 1,
+          colisQuantities: Object.fromEntries(
+            Array.from({ length: totalColis }, (_, i) => [i + 1, 0])
+          ),
+          selections: {},
+        }];
+      });
+    });
+    onExternalConsumed();
+  }, [externalAdd, products, effectiveColis, onExternalConsumed]);
+
+  const updateItem = useCallback((productId: string, patch: Partial<CartItem>) => {
+    setCart(prev => prev.map(i => i.product_id === productId ? { ...i, ...patch } : i));
   }, []);
 
-  const handleUpdateQuantity = useCallback((productId: string, quantity: number) => {
-    setCart(prev =>
-      prev.map(item =>
-        item.product_id === productId ? { ...item, quantity } : item
-      )
-    );
+  const removeItem = useCallback((productId: string) => {
+    setCart(prev => prev.filter(i => i.product_id !== productId));
   }, []);
 
-  const handleRemoveFromCart = useCallback((productId: string) => {
-    setCart(prev => prev.filter(item => item.product_id !== productId));
-  }, []);
-
-  // Validate colis stock for complete sets
-  const validateColisStock = async (items: MovementItem[]): Promise<{ valid: boolean; message?: string }> => {
-    for (const item of items) {
-      // Only validate complete set mode for multi-colis products
-      if (item.isCompleteSet === false) continue;
-      
-      const product = products.find(p => p.id === item.product_id);
-      if (!product || product.total_colis <= 1) continue;
-      
-      // Fetch stock for each coli
-      const { data: counts } = await supabase
-        .from('counts')
-        .select('colis_number, quantity')
-        .eq('product_id', item.product_id);
-      
-      if (!counts) continue;
-      
-      // Calculate stock per coli
-      const colisStock: Record<number, number> = {};
-      for (let i = 1; i <= product.total_colis; i++) {
-        colisStock[i] = 0;
+  // ---- Build p_items for commit_exit_cart -------------------------------
+  // This is the function that converts cart UI state into the RPC payload.
+  const buildPItems = useCallback(() => {
+    return cart.map(item => {
+      const location_selections: Array<{ colisNumber: number; countId: string; quantityToDeduct: number }> = [];
+      for (const [coliStr, sel] of Object.entries(item.selections)) {
+        const colisNumber = Number(coliStr);
+        for (const [countId, qty] of Object.entries(sel)) {
+          if (qty > 0) location_selections.push({ colisNumber, countId, quantityToDeduct: qty });
+        }
       }
-      counts.forEach(c => {
-        if (colisStock[c.colis_number] !== undefined) {
-          colisStock[c.colis_number] += c.quantity;
+      if (item.mode === 'set') {
+        return {
+          product_id: item.product_id,
+          is_complete_set: true,
+          set_quantity: item.setQuantity,
+          colis_quantities: {},
+          location_selections,
+        };
+      }
+      return {
+        product_id: item.product_id,
+        is_complete_set: false,
+        set_quantity: 0,
+        colis_quantities: item.colisQuantities,
+        location_selections,
+      };
+    });
+  }, [cart]);
+
+  // ---- Submit ------------------------------------------------------------
+  const handleSubmit = async () => {
+    if (cart.length === 0) return;
+    if (!reason) { toast.error('Selecione um motivo'); return; }
+
+    setSubmitting(true);
+    try {
+      const p_items = buildPItems();
+      const { data, error } = await supabase.rpc('commit_exit_cart', {
+        p_items: p_items as unknown as never,
+        p_reason: reason,
+        p_reference: reference || null,
+        p_notes: notes || null,
+      });
+      if (error) throw error;
+
+      const result = data as unknown as {
+        items: Array<{ product_id: string; unit: string; requested: number; fulfilled: number; status: 'full' | 'partial' | 'none' }>;
+        fully_fulfilled: boolean;
+      };
+
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['counts'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-exits'] });
+      queryClient.invalidateQueries({ queryKey: ['exit-locations'] });
+
+      if (result.fully_fulfilled) {
+        toast.success('Saída concluída — stock atualizado.');
+        setCart([]);
+        setReference(''); setNotes('');
+        return;
+      }
+
+      // Partial — show summary and keep remaining
+      const lines: string[] = [];
+      const remainingMap = new Map<string, { requested: number; fulfilled: number; unit: string }>();
+      result.items.forEach(r => {
+        remainingMap.set(r.product_id, r);
+        const p = cart.find(c => c.product_id === r.product_id);
+        const name = p?.product_name ?? r.product_id.slice(0, 8);
+        if (r.status === 'full') {
+          lines.push(`✓ ${name}: ${r.fulfilled}/${r.requested} ${r.unit}`);
+        } else if (r.status === 'partial') {
+          lines.push(`⚠ ${name}: ${r.fulfilled}/${r.requested} ${r.unit} (falta ${r.requested - r.fulfilled})`);
+        } else {
+          lines.push(`✗ ${name}: 0/${r.requested} ${r.unit}`);
         }
       });
-      
-      // Check if any coli has insufficient stock
-      for (let i = 1; i <= product.total_colis; i++) {
-        if (colisStock[i] < item.quantity) {
-          const minStock = Math.min(...Object.values(colisStock));
-          return {
-            valid: false,
-            message: `Produto "${item.product_name}" só tem ${minStock} sets completos disponíveis (Coli ${i} limita com ${colisStock[i]} un.). Pedido: ${item.quantity} sets.`
-          };
-        }
-      }
+      toast.warning('Saída parcial', { description: lines.join('\n'), duration: 10000 });
+
+      // Keep only items with shortfall, reduce quantities to the missing part
+      setCart(prev => prev
+        .map(it => {
+          const r = remainingMap.get(it.product_id);
+          if (!r || r.status === 'full') return null;
+          const missing = r.requested - r.fulfilled;
+          if (missing <= 0) return null;
+          if (it.mode === 'set') {
+            return { ...it, setQuantity: missing, selections: {} };
+          }
+          // individual: shrink each coli quantity proportionally is complex; simplest: reset selections, keep quantities
+          return { ...it, selections: {} };
+        })
+        .filter((x): x is CartItem => x !== null));
+    } catch (e) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : 'Erro desconhecido';
+      toast.error(`Falha na saída: ${msg}`);
+    } finally {
+      setSubmitting(false);
     }
-    return { valid: true };
   };
 
-  // Validate and show picking report
-  const handleValidateAndConfirm = async () => {
-    if (allItems.length === 0) return;
+  const totalItems = cart.length;
 
-    // Check for stock validation errors (total stock)
-    if (hasStockErrors) {
-      setValidationErrors(stockErrors);
-      setShowValidationDialog(true);
-      return;
-    }
-    
-    // Check colis-level stock for complete sets
-    const colisValidation = await validateColisStock(allItems);
-    if (!colisValidation.valid) {
-      setColisValidationMessage(colisValidation.message || null);
-      return;
-    }
-    setColisValidationMessage(null);
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-red-600" />
+            Carrinho de saída
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Rascunho — nada sai do stock até clicar em <span className="font-medium">"Concluir e retirar do stock"</span>.
+          </p>
+        </div>
+      </div>
 
-    // Check for incomplete set exits (individual colis mode not covering all parts)
-    const warnings = checkIncompleteSetExits(allItems);
-    if (warnings.length > 0) {
-      setIncompleteSetWarnings(warnings);
-      setPendingItemsAfterWarning(allItems);
-      setShowIncompleteSetWarning(true);
-      return;
-    }
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Main */}
+        <div className="xl:col-span-2 space-y-4">
+          {/* Product picker */}
+          <Card>
+            <CardContent className="pt-6">
+              <Label className="mb-2 block">Adicionar produto</Label>
+              <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start gap-2">
+                    <Search className="h-4 w-4" />
+                    Procurar por código ou nome…
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[min(640px,90vw)]" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="código ou nome…"
+                      value={search}
+                      onValueChange={setSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Sem resultados</CommandEmpty>
+                      <CommandGroup>
+                        {filteredProducts.map(p => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.id}
+                            onSelect={() => {
+                              addProductToCart(p);
+                              setPickerOpen(false);
+                              setSearch('');
+                            }}
+                          >
+                            <Package className="h-4 w-4 mr-2 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{p.name}</div>
+                              <div className="text-xs text-muted-foreground font-mono">
+                                {p.code} · stock {p.current_stock ?? 0}
+                              </div>
+                            </div>
+                            <Plus className="h-4 w-4 ml-2" />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </CardContent>
+          </Card>
 
-    // Continue with location selection and picking report
-    await proceedAfterIncompleteCheck(allItems);
-  };
+          {/* Cart items */}
+          {cart.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Carrinho vazio. Adicione produtos para iniciar uma saída.
+              </CardContent>
+            </Card>
+          ) : (
+            cart.map(item => (
+              <CartItemCard
+                key={item.product_id}
+                item={item}
+                onChange={(patch) => updateItem(item.product_id, patch)}
+                onRemove={() => removeItem(item.product_id)}
+              />
+            ))
+          )}
+        </div>
 
-  // Check if any item is exiting individual colis without completing the full set
-  const checkIncompleteSetExits = (items: MovementItem[]) => {
-    const warnings: typeof incompleteSetWarnings = [];
+        {/* Sidebar */}
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="space-y-2">
+                <Label>Motivo</Label>
+                <Select value={reason} onValueChange={setReason}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um motivo…" /></SelectTrigger>
+                  <SelectContent>
+                    {EXIT_REASONS.map(r => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Referência (opcional)</Label>
+                <Input
+                  placeholder="Ex: FAT-2024-001, Pedido #123…"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Notas (opcional)</Label>
+                <Input
+                  placeholder="Observações adicionais…"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+              <div className="pt-4 border-t space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Produtos no carrinho:</span>
+                  <span className="font-medium">{totalItems}</span>
+                </div>
+                <Button
+                  variant="destructive"
+                  className="w-full gap-2"
+                  onClick={handleSubmit}
+                  disabled={cart.length === 0 || submitting}
+                >
+                  <Check className="h-4 w-4" />
+                  {submitting ? 'A registar…' : 'Concluir e retirar do stock'}
+                </Button>
+                {cart.length > 0 && (
+                  <Button variant="outline" className="w-full" onClick={() => setCart([])} disabled={submitting}>
+                    Esvaziar carrinho
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-    for (const item of items) {
-      // Only check items in individual colis mode
-      if (item.isCompleteSet !== false || !item.colisQuantities) continue;
+          <RecentExitsPanel />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-      const product = products.find(p => p.id === item.product_id);
-      if (!product || product.total_colis <= 1) continue;
+// ---------------------------------------------------------------------------
+// Single cart item card
+// ---------------------------------------------------------------------------
+interface CartItemCardProps {
+  item: CartItem;
+  onChange: (patch: Partial<CartItem>) => void;
+  onRemove: () => void;
+}
 
-      const colisBeingRemoved: number[] = [];
-      const colisMissing: number[] = [];
-
-      for (let i = 1; i <= product.total_colis; i++) {
-        const qty = item.colisQuantities[i] || 0;
-        if (qty > 0) {
-          colisBeingRemoved.push(i);
-        } else {
-          colisMissing.push(i);
-        }
-      }
-
-      // If some colis are being removed but not all, warn
-      if (colisBeingRemoved.length > 0 && colisMissing.length > 0) {
-        warnings.push({
-          product_code: item.product_code,
-          product_name: item.product_name,
-          totalColis: product.total_colis,
-          colisBeingRemoved,
-          colisMissing,
-        });
-      }
-    }
-
-    return warnings;
-  };
-
-  // Proceed after incomplete set warning is acknowledged
-  const proceedAfterIncompleteCheck = async (items: MovementItem[]) => {
-    // Check for split colis that need location selection
-    const itemsNeedingLocationSelection = await checkForSplitColis(items);
-    if (itemsNeedingLocationSelection.length > 0) {
-      // Process first item that needs location selection
-      const firstItem = itemsNeedingLocationSelection[0];
-      setLocationSelectionItem(firstItem);
-      setShowLocationSelection(true);
-      return;
-    }
-
-    // All good, show picking report
-    showPickingReportWithItems(items);
-  };
-
-  // Check for products with colis split across multiple locations
-  const checkForSplitColis = async (items: MovementItem[]): Promise<Array<{
-    item: MovementItem;
-    colisData: ColisLocationData[];
-    totalColis: number;
-  }>> => {
-    const itemsNeedingSelection: Array<{
-      item: MovementItem;
-      colisData: ColisLocationData[];
-      totalColis: number;
-    }> = [];
-
-    for (const item of items) {
-      // Skip items that already have location selections
-      if (pendingLocationSelections.has(item.product_id)) continue;
-
-      const product = products.find(p => p.id === item.product_id);
-      const totalColis = product?.total_colis || 1;
-
-      // Fetch counts with locations
-      const { data: counts } = await supabase
+function CartItemCard({ item, onChange, onRemove }: CartItemCardProps) {
+  // Fetch available locations grouped by coli
+  const { data: locByColi = {}, isLoading } = useQuery({
+    queryKey: ['exit-locations', item.product_id],
+    queryFn: async (): Promise<LocationsByColi> => {
+      const { data: counts, error } = await supabase
         .from('counts')
         .select('id, colis_number, quantity, location, pallet_number')
         .eq('product_id', item.product_id)
         .gt('quantity', 0);
+      if (error) throw error;
 
-      if (!counts || counts.length === 0) continue;
-
-      // Group by colis_number
-      const colisCounts: Record<number, typeof counts> = {};
-      counts.forEach(c => {
-        if (!colisCounts[c.colis_number]) {
-          colisCounts[c.colis_number] = [];
-        }
-        colisCounts[c.colis_number].push(c);
-      });
-
-      // Check if any colis has multiple locations with stock
-      const dividedColisData: ColisLocationData[] = [];
-      
-      for (let i = 1; i <= totalColis; i++) {
-        const colisEntries = colisCounts[i] || [];
-        const entriesWithStock = colisEntries.filter(e => e.quantity > 0);
-        
-        if (entriesWithStock.length > 1) {
-          // This colis is divided
-          dividedColisData.push({
-            colisNumber: i,
-            entries: entriesWithStock.map(e => ({
-              countId: e.id,
-              quantity: e.quantity,
-              location: e.location,
-              pallet_number: e.pallet_number,
-            })),
+      // Fetch location -> level metadata
+      const codes = Array.from(new Set((counts || []).map(c => c.location).filter((x): x is string => !!x)));
+      const levelMap = new Map<string, { level_number: number | null; requires_forklift: boolean }>();
+      if (codes.length > 0) {
+        const { data: locs } = await supabase
+          .from('warehouse_locations')
+          .select('code, level:warehouse_levels(level_number, requires_forklift)')
+          .in('code', codes);
+        (locs || []).forEach(l => {
+          const lvl = (l as { level: { level_number: number | null; requires_forklift: boolean } | null }).level;
+          levelMap.set(l.code, {
+            level_number: lvl?.level_number ?? null,
+            requires_forklift: lvl?.requires_forklift ?? false,
           });
-        }
-      }
-
-      if (dividedColisData.length > 0) {
-        itemsNeedingSelection.push({
-          item,
-          colisData: dividedColisData,
-          totalColis,
         });
       }
-    }
 
-    return itemsNeedingSelection;
-  };
-
-  // Handle location selection confirmation
-  const handleLocationSelectionConfirm = async (selections: LocationSelection[]) => {
-    if (!locationSelectionItem) return;
-
-    // Store selections for this product
-    setPendingLocationSelections(prev => {
-      const newMap = new Map(prev);
-      newMap.set(locationSelectionItem.item.product_id, selections);
-      return newMap;
-    });
-
-    setShowLocationSelection(false);
-    setLocationSelectionItem(null);
-
-    // Check if there are more items needing selection
-    const remainingItems = await checkForSplitColis(allItems);
-    if (remainingItems.length > 0) {
-      const nextItem = remainingItems[0];
-      setLocationSelectionItem(nextItem);
-      setShowLocationSelection(true);
-    } else {
-      // All selections done, show picking report
-      showPickingReportWithItems(allItems);
-    }
-  };
-  
-  // Show picking report with prepared items
-  const showPickingReportWithItems = (items: MovementItem[]) => {
-    setItemsForPicking(items);
-    setShowPickingReport(true);
-  };
-
-  // Handle adjusting quantities to available stock
-  const handleAdjustQuantities = () => {
-    // For cart items, update to available stock
-    setCart(prev => prev.map(item => {
-      const available = stockMap[item.product_id] || 0;
-      if (item.quantity > available) {
-        return { ...item, quantity: Math.max(1, available) };
-      }
-      return item;
-    }).filter(item => {
-      // Remove items with 0 available stock
-      const available = stockMap[item.product_id] || 0;
-      return available > 0;
-    }));
-
-    // For parsed items, we just filter them
-    setParsedItems(prev => prev.map(item => {
-      if (!item.valid || !item.product_id) return item;
-      const available = stockMap[item.product_id] || 0;
-      if (item.quantity > available) {
-        return { ...item, quantity: Math.max(1, available) };
-      }
-      return item;
-    }).filter(item => {
-      if (!item.valid || !item.product_id) return true;
-      const available = stockMap[item.product_id] || 0;
-      return available > 0;
-    }));
-
-    setShowValidationDialog(false);
-    toast.success('Quantidades ajustadas para o stock disponível');
-  };
-
-  // Handle confirming only items with available stock
-  const handleConfirmPartial = () => {
-    // Get only items that have stock
-    const validItems = allItems.filter(item => {
-      const available = stockMap[item.product_id] || 0;
-      return item.quantity <= available;
-    });
-
-    if (validItems.length === 0) {
-      toast.error('Nenhum item tem stock suficiente');
-      setShowValidationDialog(false);
-      return;
-    }
-
-    setShowValidationDialog(false);
-    showPickingReportWithItems(validItems);
-  };
-
-  // Final confirmation after picking report
-  // Final confirmation after picking report
-  const handleFinalConfirm = async () => {
-    if (detailedPickingItems.length === 0) return;
-
-    // Create picking session with location details
-    // NOTA: O picking decrementa os counts directamente (inventário físico)
-    // O trigger sync_stock_on_picking NÃO subtrai picking da fórmula
-    // Fórmula: current_stock = MIN(counts) APENAS
-    const pickingSessionItems = detailedPickingItems.flatMap(item => {
-      // Get the first coli with location data for the session record
-      const firstColi = item.colisDetails.find(c => c.location) || item.colisDetails[0];
-      
-      return {
-        product_id: item.product_id,
-        product_code: item.product_code,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        location: firstColi?.location || undefined,
-        pallet_number: firstColi?.pallet_number || undefined,
-        requires_forklift: item.hasForkliftRequired,
-        level_name: firstColi?.level_name || undefined,
-        aisle_name: firstColi?.aisle_name || undefined,
-      };
-    });
-
-    // Criar sessão de picking (registo para auditoria)
-    await createSession.mutateAsync({
-      reference: reference || undefined,
-      reason: reason || undefined,
-      notes: notes || undefined,
-      items: pickingSessionItems,
-    });
-
-    // Decrementar o stock físico via função atómica da BD
-    // Isto garante que TODOS os decrementos são aplicados de forma fiável
-    for (const item of detailedPickingItems) {
-      const product = products.find(p => p.id === item.product_id);
-      const totalColis = product?.total_colis || 1;
-
-      const cartItem = allItems.find(ci => ci.product_id === item.product_id);
-      const isCompleteSet = cartItem?.isCompleteSet !== false;
-
-      // Remover order number se aplicável
-      if (cartItem?.orderNumber) {
-        const { data: orderEntry } = await supabase
-          .from('stock_order_numbers')
-          .select('id')
-          .eq('product_id', item.product_id)
-          .eq('order_number', cartItem.orderNumber)
-          .maybeSingle();
-
-        if (orderEntry) {
-          await removeOrderNumberAfterExit(orderEntry.id);
-        }
-      }
-
-      // Preparar selecções de localização
-      const locationSelections = pendingLocationSelections.get(item.product_id);
-      const locationSelectionsJson = locationSelections 
-        ? locationSelections.map(s => ({
-            colisNumber: s.colisNumber,
-            countId: s.countId,
-            quantityToDeduct: s.quantityToDeduct,
-          }))
-        : [];
-
-      // Preparar quantidades por coli (modo individual)
-      const colisQuantitiesObj = !isCompleteSet && cartItem?.colisQuantities
-        ? cartItem.colisQuantities
-        : {};
-
-      // Chamar função atómica da BD
-      const { error: decrError } = await supabase.rpc('decrement_counts_for_picking', {
-        p_product_id: item.product_id,
-        p_total_colis: totalColis,
-        p_is_complete_set: isCompleteSet,
-        p_set_quantity: isCompleteSet ? item.quantity : 0,
-        p_colis_quantities: colisQuantitiesObj,
-        p_location_selections: locationSelectionsJson,
+      const grouped: LocationsByColi = {};
+      (counts || []).forEach(c => {
+        const meta = c.location ? levelMap.get(c.location) : undefined;
+        const row: CountLocationRow = {
+          id: c.id,
+          quantity: c.quantity,
+          location: c.location,
+          pallet_number: c.pallet_number,
+          level_number: meta?.level_number ?? null,
+          requires_forklift: meta?.requires_forklift ?? false,
+        };
+        if (!grouped[c.colis_number]) grouped[c.colis_number] = [];
+        grouped[c.colis_number].push(row);
       });
 
-      if (decrError) {
-        console.error('Erro ao decrementar stock:', decrError);
-        toast.error(`Erro ao decrementar stock de ${item.product_name}`);
-      }
+      // Sort each coli: requires_forklift=false first, then level_number asc, then qty desc
+      Object.values(grouped).forEach(arr => {
+        arr.sort((a, b) => {
+          if (a.requires_forklift !== b.requires_forklift) return a.requires_forklift ? 1 : -1;
+          const an = a.level_number ?? 9999;
+          const bn = b.level_number ?? 9999;
+          if (an !== bn) return an - bn;
+          return b.quantity - a.quantity;
+        });
+      });
+      return grouped;
+    },
+  });
+
+  // Auto-select sugested locations when quantities change
+  useEffect(() => {
+    const required: Record<number, number> = {};
+    if (item.mode === 'set') {
+      for (let i = 1; i <= item.total_colis; i++) required[i] = item.setQuantity;
+    } else {
+      for (let i = 1; i <= item.total_colis; i++) required[i] = item.colisQuantities[i] || 0;
     }
+    const newSelections: Record<number, Record<string, number>> = {};
+    for (let i = 1; i <= item.total_colis; i++) {
+      const req = required[i];
+      if (req <= 0) { newSelections[i] = {}; continue; }
+      const candidates = locByColi[i] || [];
+      const existing = item.selections[i] || {};
+      // If user has manual selections summing >= req, keep them
+      const existingSum = Object.values(existing).reduce((s, n) => s + n, 0);
+      if (existingSum > 0 && existing && Object.keys(existing).some(id => candidates.some(c => c.id === id))) {
+        newSelections[i] = existing;
+        continue;
+      }
+      // Auto-fill greedily from top of sorted list
+      let remaining = req;
+      const sel: Record<string, number> = {};
+      for (const c of candidates) {
+        if (remaining <= 0) break;
+        const take = Math.min(c.quantity, remaining);
+        sel[c.id] = take;
+        remaining -= take;
+      }
+      newSelections[i] = sel;
+    }
+    // Only update if changed
+    const same = JSON.stringify(newSelections) === JSON.stringify(item.selections);
+    if (!same) onChange({ selections: newSelections });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.mode, item.setQuantity, JSON.stringify(item.colisQuantities), JSON.stringify(locByColi)]);
 
-    // Invalidar queries para atualizar UI
-    queryClient.invalidateQueries({ queryKey: ['products'] });
-    queryClient.invalidateQueries({ queryKey: ['counts'] });
+  const totalAvailableSets = useMemo(() => {
+    if (item.total_colis === 1) {
+      return (locByColi[1] || []).reduce((s, r) => s + r.quantity, 0);
+    }
+    let min = Infinity;
+    for (let i = 1; i <= item.total_colis; i++) {
+      const sum = (locByColi[i] || []).reduce((s, r) => s + r.quantity, 0);
+      if (sum < min) min = sum;
+    }
+    return min === Infinity ? 0 : min;
+  }, [locByColi, item.total_colis]);
 
-    toast.success(`${detailedPickingItems.length} saídas registadas com sucesso.`);
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base truncate">{item.product_name}</CardTitle>
+            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+              <span className="font-mono">{item.product_code}</span>
+              <span>·</span>
+              <span>Disponível: <span className="font-medium text-foreground">{totalAvailableSets} {item.mode === 'set' ? 'sets' : 'un. (mínimo por coli)'}</span></span>
+              <span>·</span>
+              <span>{item.total_colis} coli{item.total_colis > 1 ? 's' : ''}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={item.mode === 'set' ? 'default' : 'secondary'}>
+              {item.mode === 'set' ? <><Layers className="h-3 w-3 mr-1" />Set completo</> : <><Package className="h-3 w-3 mr-1" />Colis avulso</>}
+            </Badge>
+            <Button size="icon" variant="ghost" onClick={onRemove} className="h-8 w-8">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* Mode toggle + quantity */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {item.mode === 'set' ? (
+            <>
+              <Label className="text-sm">Sets:</Label>
+              <NumericInput
+                min={1}
+                value={item.setQuantity}
+                onChange={(v) => onChange({ setQuantity: v })}
+                className="w-24 h-9 text-center"
+              />
+              {item.total_colis > 1 && (
+                <Button variant="outline" size="sm" onClick={() => onChange({ mode: 'individual' })}>
+                  <Package className="h-3.5 w-3.5 mr-1" /> Tirar colis avulso
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <Label className="text-sm">Por coli:</Label>
+              <div className="flex flex-wrap gap-2">
+                {Array.from({ length: item.total_colis }, (_, i) => i + 1).map(n => (
+                  <div key={n} className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Coli {n}:</span>
+                    <NumericInput
+                      min={0}
+                      value={item.colisQuantities[n] || 0}
+                      onChange={(v) => onChange({
+                        colisQuantities: { ...item.colisQuantities, [n]: v },
+                      })}
+                      className="w-16 h-8 text-center text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => onChange({ mode: 'set' })}>
+                <Layers className="h-3.5 w-3.5 mr-1" /> Voltar a set completo
+              </Button>
+            </>
+          )}
+        </div>
 
-    // Reset form
-    setParsedItems([]);
-    setCart([]);
-    setReason('');
-    setReference('');
-    setNotes('');
-    setShowPickingReport(false);
-    setItemsForPicking([]);
-    // Clear location selections
-    setPendingLocationSelections(new Map());
+        {/* Location selection per coli */}
+        <div className="space-y-2 pt-2 border-t">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            Onde retirar (por coli)
+          </div>
+          {isLoading ? (
+            <p className="text-xs text-muted-foreground">A carregar localizações…</p>
+          ) : (
+            Array.from({ length: item.total_colis }, (_, i) => i + 1).map(coliNum => {
+              const required = item.mode === 'set' ? item.setQuantity : (item.colisQuantities[coliNum] || 0);
+              if (required <= 0) return null;
+              const candidates = locByColi[coliNum] || [];
+              const selected = item.selections[coliNum] || {};
+              const totalSelected = Object.values(selected).reduce((s, n) => s + n, 0);
+              const ok = totalSelected >= required;
+
+              return (
+                <ColiLocationBlock
+                  key={coliNum}
+                  coliNumber={coliNum}
+                  required={required}
+                  totalSelected={totalSelected}
+                  ok={ok}
+                  candidates={candidates}
+                  selected={selected}
+                  onSelectionChange={(newSel) => onChange({
+                    selections: { ...item.selections, [coliNum]: newSel },
+                  })}
+                />
+              );
+            })
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Coli location picker — shows sorted candidates with suggested top one
+// ---------------------------------------------------------------------------
+interface ColiLocationBlockProps {
+  coliNumber: number;
+  required: number;
+  totalSelected: number;
+  ok: boolean;
+  candidates: CountLocationRow[];
+  selected: Record<string, number>;
+  onSelectionChange: (sel: Record<string, number>) => void;
+}
+
+function ColiLocationBlock({ coliNumber, required, totalSelected, ok, candidates, selected, onSelectionChange }: ColiLocationBlockProps) {
+  if (candidates.length === 0) {
+    return (
+      <div className="p-3 rounded-md border border-destructive/40 bg-destructive/5 text-sm">
+        <span className="font-medium">Coli {coliNumber}:</span> sem stock disponível.
+      </div>
+    );
+  }
+
+  const toggle = (c: CountLocationRow) => {
+    const existing = selected[c.id];
+    if (existing && existing > 0) {
+      const copy = { ...selected };
+      delete copy[c.id];
+      onSelectionChange(copy);
+    } else {
+      const alreadySelected = totalSelected;
+      const remaining = Math.max(0, required - alreadySelected);
+      const take = Math.min(c.quantity, remaining || c.quantity);
+      onSelectionChange({ ...selected, [c.id]: take });
+    }
   };
 
-  const handleClearAll = () => {
-    setParsedItems([]);
-    setCart([]);
+  const updateQty = (id: string, qty: number) => {
+    const cand = candidates.find(c => c.id === id);
+    if (!cand) return;
+    const clamped = Math.max(0, Math.min(qty, cand.quantity));
+    const copy = { ...selected };
+    if (clamped === 0) delete copy[id];
+    else copy[id] = clamped;
+    onSelectionChange(copy);
   };
 
   return (
-    <>
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="saidas" className="flex items-center gap-2">
-            <TrendingDown className="h-4 w-4" />
-            Saídas
-          </TabsTrigger>
-          <TabsTrigger value="historico" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            Histórico de Picking
-          </TabsTrigger>
-          <TabsTrigger value="erp-exits" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />
-            Saídas do ERP
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="saidas" className="space-y-6">
-          {/* Header */}
-          <div>
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-red-600" />
-              Saídas de Stock
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Registe saídas de produtos do inventário
-            </p>
-          </div>
-
-          {/* Main Content - Stacked Layout for better product visibility */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Left/Main Column - Manual Selection (takes 2 cols on xl) */}
-            <div className="xl:col-span-2 space-y-4">
-              <ManualStockSection
-                cart={cart}
-                onAddToCart={handleAddToCart}
-                onUpdateQuantity={handleUpdateQuantity}
-                onRemoveFromCart={handleRemoveFromCart}
-                movementType="saida"
-              />
-
-              {/* Collapsible Upload Section */}
-              <details className="group">
-                <summary className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors py-2">
-                  <Upload className="h-4 w-4" />
-                  <span>Importar de ficheiro CSV/Excel</span>
-                  <span className="text-xs">(clique para expandir)</span>
-                </summary>
-                <div className="mt-2 space-y-4">
-                  <StockUploadSection
-                    onFileParsed={setParsedItems}
-                    parseFile={parseStockFile}
-                    isProcessing={isProcessing}
-                    movementType="saida"
-                  />
-                  {parsedItems.length > 0 && (
-                    <ParsedItemsPreview
-                      items={parsedItems}
-                      onClear={() => setParsedItems([])}
-                    />
+    <div className={cn(
+      'rounded-lg border-2 overflow-hidden',
+      ok ? 'border-green-300' : 'border-amber-300'
+    )}>
+      <div className={cn(
+        'px-3 py-2 flex items-center justify-between text-sm',
+        ok ? 'bg-green-50' : 'bg-amber-50'
+      )}>
+        <span className="font-medium">Coli {coliNumber}</span>
+        <Badge className={ok ? 'bg-green-600' : 'bg-amber-500'}>
+          {totalSelected}/{required}
+        </Badge>
+      </div>
+      <div className="p-2 space-y-1.5">
+        {candidates.map((c, idx) => {
+          const isSuggested = idx === 0;
+          const isSelected = (selected[c.id] || 0) > 0;
+          return (
+            <div
+              key={c.id}
+              className={cn(
+                'p-2 rounded-md border cursor-pointer transition-colors flex items-center gap-3',
+                isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
+              )}
+              onClick={() => toggle(c)}
+            >
+              <MapPin className={cn('h-4 w-4', c.location ? 'text-blue-600' : 'text-muted-foreground')} />
+              <div className="flex-1 min-w-0 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium truncate">{c.location || 'Sem localização'}</span>
+                  {isSuggested && (
+                    <Badge variant="outline" className="text-[10px] gap-1 border-yellow-400 text-yellow-700">
+                      <Star className="h-2.5 w-2.5 fill-yellow-400" />
+                      {c.requires_forklift ? 'recomendado' : 'nível baixo'}
+                    </Badge>
                   )}
                 </div>
-              </details>
-            </div>
-
-            {/* Right Column - Confirmation */}
-            <div className="space-y-4">
-              <Card>
-                <CardContent className="pt-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label>Motivo</Label>
-                    <Select value={reason} onValueChange={setReason}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um motivo..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {EXIT_REASONS.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {r}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Referência (opcional)</Label>
-                    <Input
-                      placeholder="Ex: FAT-2024-001, Pedido #123..."
-                      value={reference}
-                      onChange={(e) => setReference(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Notas (opcional)</Label>
-                    <Input
-                      placeholder="Observações adicionais..."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="pt-4 border-t space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total de itens:</span>
-                      <span className="font-medium">{allItems.length} produtos</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total de unidades:</span>
-                      <span className="font-medium">
-                        {allItems.reduce((sum, i) => sum + i.quantity, 0)} un.
-                      </span>
-                    </div>
-
-                    {hasStockErrors && (
-                      <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-sm">
-                        <AlertTriangle className="h-4 w-4 shrink-0" />
-                        <span>{stockErrors.length} produto(s) com stock insuficiente</span>
-                      </div>
-                    )}
-
-                    {colisValidationMessage && (
-                      <div className="flex items-start gap-2 p-2 rounded-md bg-orange-100 text-orange-800 text-sm">
-                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-medium">Stock por colis insuficiente</p>
-                          <p className="text-xs mt-1">{colisValidationMessage}</p>
-                          <p className="text-xs mt-1 text-orange-600">
-                            Sugestão: Ajuste a quantidade ou mude para modo "Colis Individual".
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={handleClearAll}
-                        disabled={allItems.length === 0}
-                      >
-                        Limpar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        className="flex-1 gap-2"
-                        onClick={handleValidateAndConfirm}
-                        disabled={allItems.length === 0 || createSession.isPending}
-                      >
-                        <ClipboardList className="h-4 w-4" />
-                        {createSession.isPending ? 'A registar...' : 'Ver Picking'}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* History */}
-          <StockHistoryTable
-            movements={movements}
-            isLoading={isLoading}
-            onDelete={(m) => deleteMovement.mutate(m)}
-            movementType="saida"
-          />
-        </TabsContent>
-
-        <TabsContent value="historico">
-          <PickingHistoryView />
-        </TabsContent>
-
-        <TabsContent value="erp-exits">
-          <ERPExitsView onSendToCart={(items) => {
-            items.forEach(item => handleAddToCart(item));
-            setActiveTab('saidas');
-          }} />
-        </TabsContent>
-      </Tabs>
-
-      {/* Validation Dialog */}
-      <StockValidationDialog
-        open={showValidationDialog}
-        onOpenChange={setShowValidationDialog}
-        errors={validationErrors}
-        onAdjustQuantities={handleAdjustQuantities}
-        onConfirmPartial={handleConfirmPartial}
-      />
-
-      {/* Picking Report Dialog */}
-      <PickingReportDialog
-        open={showPickingReport}
-        onOpenChange={(open) => {
-          setShowPickingReport(open);
-          if (!open) setItemsForPicking([]);
-        }}
-        items={detailedPickingItems}
-        reference={reference}
-        reason={reason}
-        notes={notes}
-        onConfirm={handleFinalConfirm}
-        isLoading={createSession.isPending || isLoadingPickingData}
-      />
-
-      {/* Location Selection Dialog for split colis */}
-      {locationSelectionItem && (
-        <LocationSelectionDialog
-          open={showLocationSelection}
-          onOpenChange={(open) => {
-            setShowLocationSelection(open);
-            if (!open) setLocationSelectionItem(null);
-          }}
-          productName={locationSelectionItem.item.product_name}
-          productCode={locationSelectionItem.item.product_code}
-          quantitySets={locationSelectionItem.item.quantity}
-          totalColis={locationSelectionItem.totalColis}
-          colisData={locationSelectionItem.colisData}
-          onConfirm={handleLocationSelectionConfirm}
-        />
-      )}
-
-      {/* Incomplete Set Warning Dialog */}
-      <AlertDialog open={showIncompleteSetWarning} onOpenChange={setShowIncompleteSetWarning}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="h-5 w-5" />
-              Saída Parcial de Produto
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>Os seguintes produtos não terão todos os colis retirados, ficando com partes soltas no armazém:</p>
-                {incompleteSetWarnings.map((w, idx) => (
-                  <div key={idx} className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-1">
-                    <p className="font-medium text-sm text-foreground">{w.product_code}</p>
-                    <p className="text-xs text-muted-foreground">{w.product_name}</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {Array.from({ length: w.totalColis }, (_, i) => i + 1).map(coli => (
-                        <Badge
-                          key={coli}
-                          variant={w.colisBeingRemoved.includes(coli) ? "destructive" : "secondary"}
-                          className="text-xs"
-                        >
-                          Coli {coli}: {w.colisBeingRemoved.includes(coli) ? 'Sai' : 'Fica'}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                <p className="text-sm font-medium">Deseja continuar com a saída parcial?</p>
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  {c.pallet_number ? (
+                    <span className="flex items-center gap-1"><Box className="h-3 w-3" />{c.pallet_number}</span>
+                  ) : <span className="italic">sem palete</span>}
+                  {c.level_number !== null && (
+                    <span>· nível {c.level_number}{c.requires_forklift ? ' (empilhador)' : ''}</span>
+                  )}
+                  <span>· {c.quantity} disponível</span>
+                </div>
               </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setShowIncompleteSetWarning(false);
-              setPendingItemsAfterWarning([]);
-            }}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                setShowIncompleteSetWarning(false);
-                await proceedAfterIncompleteCheck(pendingItemsAfterWarning);
-                setPendingItemsAfterWarning([]);
-              }}
-              className="bg-amber-600 hover:bg-amber-700"
-            >
-              Sim, continuar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+              {isSelected && (
+                <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
+                  <Label className="text-xs text-muted-foreground">Retirar:</Label>
+                  <NumericInput
+                    min={0}
+                    value={selected[c.id] || 0}
+                    onChange={(v) => updateQty(c.id, v)}
+                    className="w-16 h-8 text-center text-sm"
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {!ok && (
+        <div className="px-3 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+          <AlertTriangle className="h-3 w-3" />
+          Faltam {required - totalSelected} un. — saída será parcial.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Recent exits panel
+// ---------------------------------------------------------------------------
+interface UnifiedRow {
+  id: string;
+  product_id: string;
+  movement_type: string;
+  quantity: number;
+  reason: string | null;
+  reference: string | null;
+  created_at: string;
+  origem: string;
+}
+
+function RecentExitsPanel() {
+  const { products } = useProducts();
+  const productMap = useMemo(() => {
+    const m = new Map<string, Product>();
+    products.forEach(p => m.set(p.id, p));
+    return m;
+  }, [products]);
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ['recent-exits'],
+    queryFn: async (): Promise<UnifiedRow[]> => {
+      const { data, error } = await (supabase as unknown as {
+        from: (t: string) => {
+          select: (q: string) => {
+            eq: (col: string, v: string) => {
+              order: (col: string, opts: { ascending: boolean }) => {
+                limit: (n: number) => Promise<{ data: UnifiedRow[] | null; error: Error | null }>;
+              };
+            };
+          };
+        };
+      })
+        .from('stock_movements_unified')
+        .select('id, product_id, movement_type, quantity, reason, reference, created_at, origem')
+        .eq('movement_type', 'saida')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data || [];
+    },
+    refetchInterval: 30_000,
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Saídas recentes</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">A carregar…</p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem saídas ainda.</p>
+        ) : (
+          <ScrollArea className="max-h-[360px]">
+            <ul className="space-y-2 pr-3">
+              {rows.map(r => {
+                const p = productMap.get(r.product_id);
+                return (
+                  <li key={r.id} className="text-sm border-b last:border-0 pb-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium truncate">{p?.name ?? 'Produto desconhecido'}</span>
+                      <Badge variant="secondary" className="text-xs">−{r.quantity}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="font-mono">{p?.code ?? r.product_id.slice(0, 8)}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={cn('text-[10px] px-1 py-0', r.origem === 'arquivo' && 'bg-muted')}>
+                          {r.origem}
+                        </Badge>
+                        <span>
+                          {formatDistanceToNow(new Date(r.created_at), { addSuffix: true, locale: pt })}
+                        </span>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </ScrollArea>
+        )}
+      </CardContent>
+    </Card>
   );
 }
