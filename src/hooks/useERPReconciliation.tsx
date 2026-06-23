@@ -309,9 +309,7 @@ export function useERPReconciliation() {
         .eq('code', item.possibleMatch.code);
 
       if (error) {
-        toast({ title: 'Erro', description: error.message.includes('duplicate') 
-          ? 'Já existe um produto com este código no sistema local' 
-          : error.message, variant: 'destructive' });
+        toast({ title: 'Erro', description: mapDatabaseError(error, 'Já existe um produto com este código no sistema local'), variant: 'destructive' });
         return false;
       }
 
@@ -324,9 +322,7 @@ export function useERPReconciliation() {
         .eq('code', item.productCode);
 
       if (error) {
-        toast({ title: 'Erro', description: error.message.includes('duplicate') 
-          ? 'Já existe um produto com este código no sistema local' 
-          : error.message, variant: 'destructive' });
+        toast({ title: 'Erro', description: mapDatabaseError(error, 'Já existe um produto com este código no sistema local'), variant: 'destructive' });
         return false;
       }
 
