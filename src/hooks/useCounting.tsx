@@ -4,6 +4,7 @@ import { CountingSession, Count, Product, ProductWithCounts, ColisDetail, StockD
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 export function useCounting(sessionId: string | null) {
   const { toast } = useToast();

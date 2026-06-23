@@ -11,6 +11,7 @@ import {
   WarehouseAisle
 } from './useWarehouseConfig';
 import { toast } from 'sonner';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 export interface ProductInLocation {
   countId: string; // ID of the specific count record

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Product } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 export function useProducts() {
   const { toast } = useToast();

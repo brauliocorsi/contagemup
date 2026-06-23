@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 export interface ERPProduct {
   id: string;
