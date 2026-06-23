@@ -55,7 +55,7 @@ export function useERPReconciliation() {
     });
 
     if (error) {
-      throw new Error(`Erro ao buscar produtos do ERP: ${error.message}`);
+      throw new Error(`Erro ao buscar produtos do ERP: ${mapDatabaseError(error)}`);
     }
 
     const products = data?.data || [];
@@ -247,7 +247,7 @@ export function useERPReconciliation() {
         body: { search: searchQuery.trim() },
       });
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(mapDatabaseError(error));
 
       const products = data?.data || [];
       if (products.length === 0) {
@@ -364,7 +364,7 @@ export function useERPReconciliation() {
     const { error } = await supabase.from('products').insert(productsToInsert);
 
     if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro', description: mapDatabaseError(error), variant: 'destructive' });
       return;
     }
 

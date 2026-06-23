@@ -132,7 +132,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
     onError: (error) => {
       toast({
         title: 'Erro ao registar movimento',
-        description: error.message,
+        description: mapDatabaseError(error),
         variant: 'destructive',
       });
     },
@@ -238,7 +238,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
     onError: (error) => {
       toast({
         title: 'Erro ao registar movimentos',
-        description: error.message,
+        description: mapDatabaseError(error),
         variant: 'destructive',
       });
     },
@@ -386,7 +386,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
     onError: (error) => {
       toast({
         title: 'Erro ao anular movimento',
-        description: error.message,
+        description: mapDatabaseError(error),
         variant: 'destructive',
       });
     },

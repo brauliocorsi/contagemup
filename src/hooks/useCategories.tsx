@@ -100,7 +100,7 @@ export function useCategories() {
       toast.success('Categoria criada com sucesso');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Erro ao criar categoria');
+      toast.error(mapDatabaseError(error, 'Erro ao criar categoria'));
     }
   });
 
@@ -149,7 +149,7 @@ export function useCategories() {
       toast.success('Categoria atualizada com sucesso');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Erro ao atualizar categoria');
+      toast.error(mapDatabaseError(error, 'Erro ao atualizar categoria'));
     }
   });
 
@@ -173,7 +173,7 @@ export function useCategories() {
       toast.success('Categoria excluída com sucesso');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Erro ao excluir categoria');
+      toast.error(mapDatabaseError(error, 'Erro ao excluir categoria'));
     }
   });
 

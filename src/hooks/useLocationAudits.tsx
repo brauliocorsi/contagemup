@@ -163,7 +163,7 @@ export function useLocationAudits() {
     onError: (error: Error) => {
       toast({
         title: 'Erro',
-        description: error.message || 'Não foi possível criar a conferência',
+        description: mapDatabaseError(error, 'Não foi possível criar a conferência'),
         variant: 'destructive',
       });
     },

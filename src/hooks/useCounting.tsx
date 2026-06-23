@@ -748,7 +748,7 @@ export function useCounting(sessionId: string | null) {
     } catch (error: any) {
       toast({
         title: 'Erro',
-        description: 'Não foi possível dividir o stock: ' + error.message,
+        description: 'Não foi possível dividir o stock: ' + mapDatabaseError(error),
         variant: 'destructive'
       });
       return false;
@@ -810,7 +810,7 @@ export function useCounting(sessionId: string | null) {
     } catch (error: any) {
       toast({
         title: 'Erro',
-        description: 'Não foi possível unificar o stock: ' + error.message,
+        description: 'Não foi possível unificar o stock: ' + mapDatabaseError(error),
         variant: 'destructive'
       });
       return false;

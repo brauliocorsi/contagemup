@@ -81,7 +81,7 @@ export function useWarehouseAisles() {
       toast.success('Rua criada com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao criar rua: ' + error.message);
+      toast.error('Erro ao criar rua: ' + mapDatabaseError(error));
     },
   });
 
@@ -102,7 +102,7 @@ export function useWarehouseAisles() {
       toast.success('Rua atualizada com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao atualizar rua: ' + error.message);
+      toast.error('Erro ao atualizar rua: ' + mapDatabaseError(error));
     },
   });
 
@@ -120,7 +120,7 @@ export function useWarehouseAisles() {
       toast.success('Rua removida com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao remover rua: ' + error.message);
+      toast.error('Erro ao remover rua: ' + mapDatabaseError(error));
     },
   });
 
@@ -159,7 +159,7 @@ export function useWarehouseLevels() {
       toast.success('Nível criado com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao criar nível: ' + error.message);
+      toast.error('Erro ao criar nível: ' + mapDatabaseError(error));
     },
   });
 
@@ -180,7 +180,7 @@ export function useWarehouseLevels() {
       toast.success('Nível atualizado com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao atualizar nível: ' + error.message);
+      toast.error('Erro ao atualizar nível: ' + mapDatabaseError(error));
     },
   });
 
@@ -198,7 +198,7 @@ export function useWarehouseLevels() {
       toast.success('Nível removido com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao remover nível: ' + error.message);
+      toast.error('Erro ao remover nível: ' + mapDatabaseError(error));
     },
   });
 
@@ -242,7 +242,7 @@ export function useWarehouseLocations() {
       toast.success('Localização criada com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao criar localização: ' + error.message);
+      toast.error('Erro ao criar localização: ' + mapDatabaseError(error));
     },
   });
 
@@ -264,7 +264,7 @@ export function useWarehouseLocations() {
       toast.success('Localização atualizada com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao atualizar localização: ' + error.message);
+      toast.error('Erro ao atualizar localização: ' + mapDatabaseError(error));
     },
   });
 
@@ -282,7 +282,7 @@ export function useWarehouseLocations() {
       toast.success('Localização removida com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao remover localização: ' + error.message);
+      toast.error('Erro ao remover localização: ' + mapDatabaseError(error));
     },
   });
 
@@ -329,7 +329,7 @@ export function useWarehousePallets() {
       toast.success('Palete criado com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao criar palete: ' + error.message);
+      toast.error('Erro ao criar palete: ' + mapDatabaseError(error));
     },
   });
 
@@ -351,7 +351,7 @@ export function useWarehousePallets() {
       toast.success('Palete atualizado com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao atualizar palete: ' + error.message);
+      toast.error('Erro ao atualizar palete: ' + mapDatabaseError(error));
     },
   });
 
@@ -369,7 +369,7 @@ export function useWarehousePallets() {
       toast.success('Palete removido com sucesso');
     },
     onError: (error) => {
-      toast.error('Erro ao remover palete: ' + error.message);
+      toast.error('Erro ao remover palete: ' + mapDatabaseError(error));
     },
   });
 

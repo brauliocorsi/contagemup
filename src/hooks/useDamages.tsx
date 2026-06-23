@@ -119,7 +119,7 @@ export function useDamages() {
     onError: (error: Error) => {
       toast({
         title: 'Erro',
-        description: error.message || 'Não foi possível registar a avaria',
+        description: mapDatabaseError(error, 'Não foi possível registar a avaria'),
         variant: 'destructive'
       });
     }
@@ -175,7 +175,7 @@ export function useDamages() {
     onError: (error: Error) => {
       toast({
         title: 'Erro',
-        description: error.message || 'Não foi possível resolver a avaria',
+        description: mapDatabaseError(error, 'Não foi possível resolver a avaria'),
         variant: 'destructive'
       });
     }
@@ -228,7 +228,7 @@ export function useDamages() {
     onError: (error: Error) => {
       toast({
         title: 'Erro',
-        description: error.message || 'Não foi possível atualizar a avaria',
+        description: mapDatabaseError(error, 'Não foi possível atualizar a avaria'),
         variant: 'destructive'
       });
     }
@@ -277,7 +277,7 @@ export function useDamages() {
     onError: (error: Error) => {
       toast({
         title: 'Erro',
-        description: error.message || 'Não foi possível eliminar a avaria',
+        description: mapDatabaseError(error, 'Não foi possível eliminar a avaria'),
         variant: 'destructive'
       });
     }

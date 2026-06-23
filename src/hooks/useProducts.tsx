@@ -83,9 +83,7 @@ export function useProducts() {
     if (error) {
       toast({
         title: 'Erro',
-        description: error.message.includes('duplicate') 
-          ? 'Já existe um produto com este código' 
-          : 'Não foi possível criar o produto',
+        description: mapDatabaseError(error, 'Não foi possível criar o produto'),
         variant: 'destructive'
       });
       return null;

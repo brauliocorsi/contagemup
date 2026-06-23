@@ -209,7 +209,7 @@ export function useWarehouseMap(sessionId?: string) {
       queryClient.invalidateQueries({ queryKey: ['warehouse-map-counts'] });
       toast.success(`Produto movido para ${toLocationCode}`);
     } catch (error: any) {
-      toast.error('Erro ao mover produto: ' + error.message);
+      toast.error('Erro ao mover produto: ' + mapDatabaseError(error));
     }
   };
 
@@ -229,7 +229,7 @@ export function useWarehouseMap(sessionId?: string) {
       queryClient.invalidateQueries({ queryKey: ['warehouse-map-counts'] });
       toast.success(`Stock movido para ${toLocationCode}`);
     } catch (error: any) {
-      toast.error('Erro ao mover stock: ' + error.message);
+      toast.error('Erro ao mover stock: ' + mapDatabaseError(error));
     }
   };
 
