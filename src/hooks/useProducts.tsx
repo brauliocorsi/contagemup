@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Product } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 export function useProducts() {
   const { toast } = useToast();
@@ -82,9 +83,7 @@ export function useProducts() {
     if (error) {
       toast({
         title: 'Erro',
-        description: error.message.includes('duplicate') 
-          ? 'Já existe um produto com este código' 
-          : 'Não foi possível criar o produto',
+        description: mapDatabaseError(error, 'Não foi possível criar o produto'),
         variant: 'destructive'
       });
       return null;

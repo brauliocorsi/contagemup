@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 export interface StockMovement {
   id: string;
@@ -131,7 +132,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
     onError: (error) => {
       toast({
         title: 'Erro ao registar movimento',
-        description: error.message,
+        description: mapDatabaseError(error),
         variant: 'destructive',
       });
     },
@@ -237,7 +238,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
     onError: (error) => {
       toast({
         title: 'Erro ao registar movimentos',
-        description: error.message,
+        description: mapDatabaseError(error),
         variant: 'destructive',
       });
     },
@@ -385,7 +386,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
     onError: (error) => {
       toast({
         title: 'Erro ao anular movimento',
-        description: error.message,
+        description: mapDatabaseError(error),
         variant: 'destructive',
       });
     },

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 export interface LocationAudit {
   id: string;
@@ -162,7 +163,7 @@ export function useLocationAudits() {
     onError: (error: Error) => {
       toast({
         title: 'Erro',
-        description: error.message || 'Não foi possível criar a conferência',
+        description: mapDatabaseError(error, 'Não foi possível criar a conferência'),
         variant: 'destructive',
       });
     },

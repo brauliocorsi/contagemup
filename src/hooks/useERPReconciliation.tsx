@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 export interface ERPProduct {
   id: string;
@@ -54,7 +55,7 @@ export function useERPReconciliation() {
     });
 
     if (error) {
-      throw new Error(`Erro ao buscar produtos do ERP: ${error.message}`);
+      throw new Error(`Erro ao buscar produtos do ERP: ${mapDatabaseError(error)}`);
     }
 
     const products = data?.data || [];
@@ -246,7 +247,7 @@ export function useERPReconciliation() {
         body: { search: searchQuery.trim() },
       });
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(mapDatabaseError(error));
 
       const products = data?.data || [];
       if (products.length === 0) {
@@ -308,9 +309,7 @@ export function useERPReconciliation() {
         .eq('code', item.possibleMatch.code);
 
       if (error) {
-        toast({ title: 'Erro', description: error.message.includes('duplicate') 
-          ? 'Já existe um produto com este código no sistema local' 
-          : error.message, variant: 'destructive' });
+        toast({ title: 'Erro', description: mapDatabaseError(error, 'Já existe um produto com este código no sistema local'), variant: 'destructive' });
         return false;
       }
 
@@ -323,9 +322,7 @@ export function useERPReconciliation() {
         .eq('code', item.productCode);
 
       if (error) {
-        toast({ title: 'Erro', description: error.message.includes('duplicate') 
-          ? 'Já existe um produto com este código no sistema local' 
-          : error.message, variant: 'destructive' });
+        toast({ title: 'Erro', description: mapDatabaseError(error, 'Já existe um produto com este código no sistema local'), variant: 'destructive' });
         return false;
       }
 
@@ -363,7 +360,7 @@ export function useERPReconciliation() {
     const { error } = await supabase.from('products').insert(productsToInsert);
 
     if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro', description: mapDatabaseError(error), variant: 'destructive' });
       return;
     }
 
