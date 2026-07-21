@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { TrendingUp, Search, Package, Layers, Plus, AlertTriangle, MapPin, ClipboardList, X, Check } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/command';
 import { LocationSelect } from '@/components/counting/LocationSelect';
 import { PalletSelect } from '@/components/counting/PalletSelect';
+import { PurchaseEntryView } from '@/components/stock/PurchaseEntryView';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
@@ -244,11 +246,26 @@ export function StockEntriesView() {
           Entradas de Stock
         </h2>
         <p className="text-sm text-muted-foreground">
-          Registe a entrada de produtos por coli, com localização independente.
+          Registe a entrada de produtos por coli ou importe diretamente de uma compra do Gestão Click.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <Tabs defaultValue="manual" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="manual" className="gap-2">
+            <Pencil className="h-4 w-4" /> Entrada manual
+          </TabsTrigger>
+          <TabsTrigger value="compra" className="gap-2">
+            <ShoppingCart className="h-4 w-4" /> Por compra (Gestão Click)
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="compra" className="mt-0">
+          <PurchaseEntryView />
+        </TabsContent>
+
+        <TabsContent value="manual" className="mt-0">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Main column */}
         <div className="xl:col-span-2 space-y-4">
           {/* Product picker */}
@@ -531,7 +548,9 @@ export function StockEntriesView() {
 
           <RecentEntriesPanel />
         </div>
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

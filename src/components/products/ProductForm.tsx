@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NumericInput } from '@/components/ui/numeric-input';
@@ -11,20 +11,49 @@ import { useCategories } from '@/hooks/useCategories';
 
 interface ProductFormProps {
   onSubmit: (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null; min_stock?: number }) => Promise<boolean>;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  initialCode?: string;
+  initialName?: string;
+  lockCode?: boolean;
+  hideTrigger?: boolean;
+  onCreated?: () => void;
 }
 
-export function ProductForm({ onSubmit }: ProductFormProps) {
+export function ProductForm({
+  onSubmit,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  initialCode,
+  initialName,
+  lockCode,
+  hideTrigger,
+  onCreated,
+}: ProductFormProps) {
   const { categories, loading: categoriesLoading } = useCategories();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (v: boolean) => {
+    if (controlledOnOpenChange) controlledOnOpenChange(v);
+    else setInternalOpen(v);
+  };
   const [isLoading, setIsLoading] = useState(false);
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
+  const [code, setCode] = useState(initialCode ?? '');
+  const [name, setName] = useState(initialName ?? '');
   const [category, setCategory] = useState('Geral');
   const [totalColis, setTotalColis] = useState(1);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [palletNumber, setPalletNumber] = useState('');
   const [minStock, setMinStock] = useState(5);
+
+  // Sync initial values when dialog opens (e.g. pre-fill from external caller)
+  useEffect(() => {
+    if (open) {
+      if (initialCode !== undefined) setCode(initialCode);
+      if (initialName !== undefined) setName(initialName);
+    }
+  }, [open, initialCode, initialName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +80,7 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
       setPalletNumber('');
       setMinStock(5);
       setOpen(false);
+      onCreated?.();
     }
     
     setIsLoading(false);
@@ -58,12 +88,14 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Produto
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Produto
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
@@ -81,6 +113,8 @@ export function ProductForm({ onSubmit }: ProductFormProps) {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 required
+                readOnly={lockCode}
+                disabled={lockCode}
               />
             </div>
             <div className="space-y-2">
