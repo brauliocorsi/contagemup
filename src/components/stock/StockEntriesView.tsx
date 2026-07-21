@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { TrendingUp, Search, Package, Layers, Plus, AlertTriangle, MapPin, ClipboardList, X, Check } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/command';
 import { LocationSelect } from '@/components/counting/LocationSelect';
 import { PalletSelect } from '@/components/counting/PalletSelect';
+import { PurchaseEntryView } from '@/components/stock/PurchaseEntryView';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
