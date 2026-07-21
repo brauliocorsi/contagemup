@@ -15,6 +15,7 @@ import { useCountingExport } from './hooks/useCountingExport';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { StockDistribution, ProductWithCounts } from '@/types/stock';
+import { PageContainer } from '@/components/layout/PageContainer';
 
 const STORAGE_KEY = 'counting_selected_session';
 
