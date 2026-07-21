@@ -87,9 +87,9 @@ export function ReconciliationView() {
 
     if (isExcel) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const data = e.target?.result as ArrayBuffer;
-        const result = parseXLSX(data);
+        const result = await parseXLSX(data);
         applyParseResult(result);
       };
       reader.readAsArrayBuffer(file);

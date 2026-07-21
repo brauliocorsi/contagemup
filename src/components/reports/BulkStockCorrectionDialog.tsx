@@ -17,8 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { AlertTriangle, Upload, TrendingUp, TrendingDown, FileSpreadsheet, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface CorrectionItem {
   productId: string;
   code: string;
@@ -126,6 +125,7 @@ export function BulkStockCorrectionDialog({
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const XLSX = await loadXLSX();
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -202,7 +202,8 @@ export function BulkStockCorrectionDialog({
     }
   };
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
+      const XLSX = await loadXLSX();
     const template = [
       { Codigo: 'PROD001', Stock: 100 },
       { Codigo: 'PROD002', Stock: 50 },

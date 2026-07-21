@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
+import { loadXLSX } from '@/lib/lazyXlsx';
 import { mapDatabaseError } from '@/lib/errorMessages';
 
 export interface StockMovement {
@@ -261,6 +261,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
 
   // Parse CSV/Excel file
   const parseStockFile = async (file: File): Promise<ParsedCSVItem[]> => {
+      const XLSX = await loadXLSX();
     setIsProcessing(true);
     
     try {

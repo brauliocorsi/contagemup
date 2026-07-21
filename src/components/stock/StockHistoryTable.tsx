@@ -18,8 +18,7 @@ import {
 import { DateRangeFilter, filterByDateRange } from '@/components/ui/date-range-filter';
 import { StockMovement } from '@/hooks/useStockMovements';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface StockHistoryTableProps {
   movements: StockMovement[];
   isLoading: boolean;
@@ -82,7 +81,8 @@ export function StockHistoryTable({
     toast.success(`${filteredMovements.length} movimentos exportados`);
   }, [filteredMovements, movementType, dateFrom, dateTo]);
 
-  const exportExcel = useCallback(() => {
+  const exportExcel = useCallback(async () => {
+      const XLSX = await loadXLSX();
     if (filteredMovements.length === 0) return;
     const headers = ['Data', 'Hora', 'Código', 'Produto', 'Quantidade', 'Motivo', 'Referência', 'Notas'];
     const rows = filteredMovements.map(m => {

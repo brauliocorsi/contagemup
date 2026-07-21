@@ -4,8 +4,7 @@ import { Reconciliation, ReconciliationItem, CSVImportRow, CSVParseResult, CSVVa
 import { ProductWithCounts } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 // Column aliases for auto-detection
 const COLUMN_ALIASES = {
   code: ['codigo', 'code', 'código', 'cod', 'sku', 'ref', 'referencia', 'referência', 'product_code', 'productcode'],
@@ -150,7 +149,8 @@ export function useReconciliation() {
   // Security: File limits
   const MAX_ROWS = 10000;
 
-  const parseXLSX = (data: ArrayBuffer): FileParseResult => {
+  const parseXLSX = async (data: ArrayBuffer): Promise<FileParseResult> => {
+      const XLSX = await loadXLSX();
     const result: FileParseResult = {
       rows: [],
       errors: [],

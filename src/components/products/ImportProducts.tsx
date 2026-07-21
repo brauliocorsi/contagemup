@@ -5,8 +5,7 @@ import { Upload, FileSpreadsheet, Loader2, Download, Plus, CheckCircle2, XCircle
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface ImportProductsProps {
   onImport: (products: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>) => Promise<boolean>;
   existingCategories: string[];
@@ -197,7 +196,8 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
     return { data, mapping, columns };
   };
 
-  const parseXLSX = (data: ArrayBuffer): { data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] } => {
+  const parseXLSX = async (data: ArrayBuffer): Promise<{ data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] }> => {
+      const XLSX = await loadXLSX();
     const workbook = XLSX.read(data, { type: 'array' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
@@ -268,10 +268,10 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
 
     if (isExcel) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const arrayBuffer = event.target?.result as ArrayBuffer;
-          const { data, mapping, columns } = parseXLSX(arrayBuffer);
+          const { data, mapping, columns } = await parseXLSX(arrayBuffer);
           
           // Security: Row limit validation
           if (data.length > MAX_ROWS) {

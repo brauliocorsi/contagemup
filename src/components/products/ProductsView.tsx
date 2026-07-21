@@ -30,8 +30,7 @@ import { Product } from '@/types/stock';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   checkbox: 48,
   code: 120,
@@ -234,7 +233,8 @@ export function ProductsView() {
   }, [products, productIdsWithOrders]);
 
   // Export helpers
-  const exportToExcel = useCallback((data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
+  const exportToExcel = useCallback(async (data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
+      const XLSX = await loadXLSX();
     const worksheet = XLSX.utils.aoa_to_sheet(data);
     const colWidths = data[0].map((_, colIndex) => {
       const maxLength = Math.max(...data.map(row => String(row[colIndex] || '').length));

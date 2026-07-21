@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DamagesTable } from './DamagesTable';
 import { DateRangeFilter, filterByDateRange } from '@/components/ui/date-range-filter';
 import { AlertOctagon, Package, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { loadXLSX } from '@/lib/lazyXlsx';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
@@ -61,7 +61,8 @@ export function DamagesView() {
   }, [filteredDamages]);
 
   // Export to Excel
-  const exportToExcel = useCallback(() => {
+  const exportToExcel = useCallback(async () => {
+      const XLSX = await loadXLSX();
     const damagesToExport = filteredDamages;
     
     if (damagesToExport.length === 0) return;

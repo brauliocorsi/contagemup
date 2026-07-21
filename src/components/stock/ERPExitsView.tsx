@@ -17,8 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface SaleExitItem {
   productCode: string;
   productName: string;
@@ -235,7 +234,8 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
     toast({ title: 'Enviado para carrinho', description: `${items.length} produto(s) adicionado(s) ao carrinho de saída.` });
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
+      const XLSX = await loadXLSX();
     const salesData = salesExits.flatMap(sale =>
       sale.items
         .filter(item => !removedProducts.has(item.productCode.toLowerCase()))

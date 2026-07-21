@@ -24,7 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import * as XLSX from 'xlsx';
+import { loadXLSX } from '@/lib/lazyXlsx';
 import { BulkStockCorrectionDialog } from './BulkStockCorrectionDialog';
 
 interface IntegrityCheck {
@@ -203,7 +203,8 @@ export function StockIntegrityReport() {
 
   // syncCountsMutation removed in stock refactor Phase 1 (RPC sync_counts_with_current_stock dropped).
 
-  const handleExport = () => {
+  const handleExport = async () => {
+      const XLSX = await loadXLSX();
     if (!integrityData) return;
 
     const exportData = integrityData.checks
@@ -226,7 +227,8 @@ export function StockIntegrityReport() {
     toast.success('Relatório exportado!');
   };
 
-  const handleExportImbalances = () => {
+  const handleExportImbalances = async () => {
+      const XLSX = await loadXLSX();
     if (!integrityData?.imbalances) return;
 
     const exportData = integrityData.imbalances.flatMap(item => 

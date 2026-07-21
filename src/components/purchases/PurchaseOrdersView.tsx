@@ -13,8 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/hooks/useProducts';
 import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface SoldItem {
   productCode: string;
   productName: string;
@@ -292,7 +291,8 @@ export function PurchaseOrdersView() {
     setDateTo(d);
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
+      const XLSX = await loadXLSX();
     // Sheet 1: Resumo por produto
     const resumo = displayItems.map(p => ({
       'Código': p.productCode,

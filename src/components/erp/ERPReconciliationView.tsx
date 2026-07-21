@@ -12,8 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   match: { label: 'OK', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle2 },
   surplus: { label: 'Excesso Local', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: ArrowUp },
@@ -113,7 +112,8 @@ export function ERPReconciliationView() {
 
   const canExport = comparisonItems.length > 0 && salesLoaded && !salesLoading && !loading && syncValidation?.isValid === true;
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
+      const XLSX = await loadXLSX();
     if (!canExport) return;
 
     // Always export ALL products (comparisonItems), not just filtered

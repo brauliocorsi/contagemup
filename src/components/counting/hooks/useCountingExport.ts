@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+import { loadXLSX } from '@/lib/lazyXlsx';
 import { ProductWithCounts } from './useCountingFilters';
 
 interface ExportFilters {
@@ -57,7 +57,8 @@ export function useCountingExport(
   }, []);
 
   // Helper function to export to Excel
-  const exportToExcel = useCallback((data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
+  const exportToExcel = useCallback(async (data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
+      const XLSX = await loadXLSX();
     const worksheet = XLSX.utils.aoa_to_sheet(data);
     const colWidths = data[0].map((_, colIndex) => {
       const maxLength = Math.max(...data.map(row => String(row[colIndex] || '').length));

@@ -36,8 +36,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocationAudits, LocationAudit } from '@/hooks/useLocationAudits';
 import { AuditResultsDialog } from '@/components/audit/AuditResultsDialog';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface AuditReportsViewProps {
   onStartAudit?: (auditId: string) => void;
 }
@@ -78,7 +77,8 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
   }, [audits]);
 
   // Export all audits summary
-  const exportSummary = () => {
+  const exportSummary = async () => {
+      const XLSX = await loadXLSX();
     const data = audits.map(a => ({
       'Nome': a.name,
       'Status': getStatusConfig(a.status).label,

@@ -33,8 +33,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useDamages } from '@/hooks/useDamages';
 import { useCounting } from '@/hooks/useCounting';
 import { useActiveSession } from '@/hooks/useActiveSession';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 export function StockStatusReport() {
   const { products, loading: productsLoading } = useProducts();
   const { categories, loading: categoriesLoading } = useCategories();
@@ -107,7 +106,8 @@ export function StockStatusReport() {
   };
 
   // Export all data
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
+      const XLSX = await loadXLSX();
     const workbook = XLSX.utils.book_new();
 
     // Complete products sheet

@@ -26,8 +26,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { AuditWithItems } from '@/hooks/useLocationAudits';
 import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface AuditResultsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,7 +55,8 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
   }, [audit.items]);
 
   // Export to Excel
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
+      const XLSX = await loadXLSX();
     const data = audit.items.map(item => ({
       'Localização': item.location,
       'Palete': item.pallet_number || '-',
