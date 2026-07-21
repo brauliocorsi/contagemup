@@ -207,9 +207,14 @@ Deno.serve(async (req) => {
           const totalRegistros = Number(j?.meta?.total_registros ?? arr.length);
           console.log(`[compra-detail] filter ${paramName}=${numero} -> ${arr.length} rows (total=${totalRegistros})`);
           if (arr.length === 1 && totalRegistros === 1) {
-            foundCompra = arr[0];
-            const c = arr[0] as Record<string, unknown>;
-            console.log(`[compra-detail] single hit fields: id=${c.id} codigo=${c.codigo} numero=${c.numero} numero_documento=${c.numero_documento}`);
+            const raw = arr[0] as Record<string, unknown>;
+            console.log(`[compra-detail] raw single row keys: ${Object.keys(raw).join(',')}`);
+            // GestãoClick sometimes wraps the resource: { compra: {...} }
+            const unwrapped = (raw && typeof raw === 'object' && 'compra' in raw && typeof (raw as { compra: unknown }).compra === 'object')
+              ? (raw as { compra: Record<string, unknown> }).compra
+              : raw;
+            foundCompra = unwrapped;
+            console.log(`[compra-detail] unwrapped id=${unwrapped.id} codigo=${unwrapped.codigo} numero=${unwrapped.numero}`);
             break;
           }
           for (const c of arr) {
