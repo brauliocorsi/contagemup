@@ -1,7 +1,8 @@
 import { useState, Suspense, lazy } from 'react';
 import { APP_VERSION, APP_BUILD_DATE } from '@/version';
 import { Header } from '@/components/layout/Header';
-import { Navigation } from '@/components/layout/Navigation';
+import { AppSidebar } from '@/components/layout/AppSidebar';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AuditExecutionView } from '@/components/audit/AuditExecutionView';
 import { DashboardHome } from '@/components/dashboard/DashboardHome';
