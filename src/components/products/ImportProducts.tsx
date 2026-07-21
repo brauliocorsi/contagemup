@@ -196,7 +196,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
     return { data, mapping, columns };
   };
 
-  const parseXLSX = async (data: ArrayBuffer): { data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] } => {
+  const parseXLSX = async (data: ArrayBuffer): Promise<{ data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] }> => {
       const XLSX = await loadXLSX();
     const workbook = XLSX.read(data, { type: 'array' });
     const firstSheetName = workbook.SheetNames[0];
