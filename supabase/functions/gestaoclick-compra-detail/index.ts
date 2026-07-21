@@ -173,41 +173,53 @@ Deno.serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     let foundCompra: any = null;
 
-    // 1) Fast path: ?codigo=<numero>
-    try {
-      const fastUrl = new URL(baseListUrl);
-      fastUrl.searchParams.set('codigo', numero);
-      const res = await fetchWithRetry(fastUrl.toString(), { method: 'GET', headers: apiHeaders });
-      if (res.ok) {
-        const j = await res.json();
-        const arr = (j?.data || []) as unknown[];
-        for (const c of arr) {
-          if (
-            numeroMatches(numero, (c as { codigo?: unknown }).codigo) ||
-            numeroMatches(numero, (c as { numero?: unknown }).numero) ||
-            numeroMatches(numero, (c as { id?: unknown }).id)
-          ) {
-            foundCompra = c;
-            break;
-          }
+    const matchesNumero = (c: unknown) =>
+      numeroMatches(numero, (c as { codigo?: unknown }).codigo) ||
+      numeroMatches(numero, (c as { numero?: unknown }).numero) ||
+      numeroMatches(numero, (c as { numero_documento?: unknown }).numero_documento) ||
+      numeroMatches(numero, (c as { id?: unknown }).id);
+
+    // 0) If numero is purely numeric, try direct fetch by ID.
+    if (/^\d+$/.test(numero)) {
+      try {
+        const r = await fetchWithRetry(`${baseListUrl}/${numero}`, { method: 'GET', headers: apiHeaders });
+        if (r.ok) {
+          const j = await r.json();
+          const d = j?.data ?? j;
+          if (d && (d.id || d.codigo || d.numero)) foundCompra = d;
+        } else {
+          await r.text();
         }
+      } catch (_e) { /* ignore */ }
+    }
+
+    // 1) Fast path: try common filter params.
+    if (!foundCompra) {
+      for (const paramName of ['codigo', 'numero', 'numero_documento']) {
+        try {
+          const fastUrl = new URL(baseListUrl);
+          fastUrl.searchParams.set(paramName, numero);
+          const res = await fetchWithRetry(fastUrl.toString(), { method: 'GET', headers: apiHeaders });
+          if (!res.ok) { await res.text(); continue; }
+          const j = await res.json();
+          const arr = (j?.data || []) as unknown[];
+          console.log(`[compra-detail] filter ${paramName}=${numero} -> ${arr.length} rows`);
+          for (const c of arr) {
+            if (matchesNumero(c)) { foundCompra = c; break; }
+          }
+          if (foundCompra) break;
+        } catch (_e) { /* try next */ }
       }
-    } catch (_e) { /* fallthrough */ }
+    }
 
     // 2) Fallback: paginated scan (cap for safety)
     if (!foundCompra) {
       const first = await fetchPage(baseListUrl, 1, apiHeaders);
-      const totalPages = Math.min(Number(first.meta?.total_paginas ?? 1), 50);
+      const totalPages = Math.min(Number(first.meta?.total_paginas ?? 1), 100);
+      console.log(`[compra-detail] scanning ${totalPages} pages of /api/compras for "${numero}"`);
       const scan = (arr: unknown[]) => {
         for (const c of arr) {
-          if (
-            numeroMatches(numero, (c as { codigo?: unknown }).codigo) ||
-            numeroMatches(numero, (c as { numero?: unknown }).numero) ||
-            numeroMatches(numero, (c as { id?: unknown }).id)
-          ) {
-            foundCompra = c;
-            return true;
-          }
+          if (matchesNumero(c)) { foundCompra = c; return true; }
         }
         return false;
       };
@@ -225,6 +237,7 @@ Deno.serve(async (req) => {
     }
 
     if (!foundCompra) {
+      console.log(`[compra-detail] not found: ${numero}`);
       return new Response(JSON.stringify({ error: 'Compra não encontrada no Gestão Click' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
