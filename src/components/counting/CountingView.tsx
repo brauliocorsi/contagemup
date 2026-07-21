@@ -15,6 +15,7 @@ import { useCountingExport } from './hooks/useCountingExport';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { StockDistribution, ProductWithCounts } from '@/types/stock';
+import { PageContainer } from '@/components/layout/PageContainer';
 
 const STORAGE_KEY = 'counting_selected_session';
 
@@ -252,7 +253,8 @@ export function CountingView() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <PageContainer className="p-4">
+
       {/* Session header */}
       <CountingHeader
         currentSession={currentSession}
@@ -331,6 +333,6 @@ export function CountingView() {
         onMergeStock={handleMergeStock}
         onReportDamage={reportDamage}
       />
-    </div>
+    </PageContainer>
   );
 }
