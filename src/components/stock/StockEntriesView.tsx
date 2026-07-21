@@ -259,10 +259,17 @@ export function StockEntriesView() {
           <TabsTrigger value="compra" className="gap-2">
             <ShoppingCart className="h-4 w-4" /> Por compra (Gestão Click)
           </TabsTrigger>
+          <TabsTrigger value="historico" className="gap-2">
+            <History className="h-4 w-4" /> Histórico de compras
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="compra" className="mt-0">
           <PurchaseEntryView />
+        </TabsContent>
+
+        <TabsContent value="historico" className="mt-0">
+          <PurchaseEntryHistory />
         </TabsContent>
 
         <TabsContent value="manual" className="mt-0">
