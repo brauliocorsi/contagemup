@@ -149,7 +149,7 @@ export function useReconciliation() {
   // Security: File limits
   const MAX_ROWS = 10000;
 
-  const parseXLSX = async (data: ArrayBuffer): FileParseResult => {
+  const parseXLSX = async (data: ArrayBuffer): Promise<FileParseResult> => {
       const XLSX = await loadXLSX();
     const result: FileParseResult = {
       rows: [],
