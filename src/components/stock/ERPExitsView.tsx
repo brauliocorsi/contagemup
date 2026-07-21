@@ -18,6 +18,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { cn } from '@/lib/utils';
 import { loadXLSX } from '@/lib/lazyXlsx';
+import { mapDatabaseError } from '@/lib/errorMessages';
 interface SaleExitItem {
   productCode: string;
   productName: string;
