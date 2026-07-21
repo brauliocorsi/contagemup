@@ -50,28 +50,8 @@ export function useProducts() {
     refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
-  // Subscribe to realtime changes
-  useEffect(() => {
-    const channel = supabase
-      .channel('products-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'products',
-        },
-        (payload) => {
-          // Invalidate and refetch products on any change
-          queryClient.invalidateQueries({ queryKey: ['products'] });
-        }
-      )
-      .subscribe();
+  // Realtime invalidation handled by RealtimeSyncProvider.
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   const createProduct = async (product: Omit<Product, 'id' | 'created_at' | 'updated_at'> | { code: string; name: string; category: string; total_colis: number; description: string | null; location?: string | null; pallet_number?: string | null }) => {
     const { data, error } = await supabase
