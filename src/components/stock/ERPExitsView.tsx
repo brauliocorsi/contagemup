@@ -115,9 +115,8 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
         title: 'Pesquisa concluída',
         description: `${total} venda(s) encontrada(s) de ${format(dateFrom, 'dd/MM/yyyy')} a ${format(dateTo, 'dd/MM/yyyy')}.`,
       });
-    } catch (err: any) {
-      console.error('Error fetching scheduled exits:', err);
-      toast({ title: 'Erro', description: err.message || 'Erro ao buscar saídas agendadas', variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro', description: mapDatabaseError(err, 'Erro ao buscar saídas agendadas'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
