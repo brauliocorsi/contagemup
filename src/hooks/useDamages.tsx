@@ -53,28 +53,8 @@ export function useDamages() {
     refetchOnWindowFocus: true,
   });
 
-  // Subscribe to realtime changes
-  useEffect(() => {
-    const channel = supabase
-      .channel('damages-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'product_damages',
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['damages'] });
-          queryClient.invalidateQueries({ queryKey: ['products'] });
-        }
-      )
-      .subscribe();
+  // Realtime invalidation handled by RealtimeSyncProvider.
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   // Report new damage
   const reportDamageMutation = useMutation({
