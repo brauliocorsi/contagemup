@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { mapDatabaseError } from '@/lib/errorMessages';
+import { getProductWithCounts as computeProductWithCounts } from '@/lib/counting/getProductWithCounts';
 
 export function useCounting(sessionId: string | null) {
   const { toast } = useToast();
@@ -553,131 +554,11 @@ export function useCounting(sessionId: string | null) {
 
   // Memoized function to process a single product with counts
   // Now accepts optional categoryColisNames to calculate effective total colis
-  const getProductWithCounts = useCallback((
-    product: Product, 
-    categoryColisNames?: Record<string, string> | null
-  ): ProductWithCounts => {
-    const productCounts = counts.filter(c => c.product_id === product.id);
-    
-    // Calculate effective total colis: use max between product's total_colis and category's colis count
-    const categoryColisCount = categoryColisNames ? Object.keys(categoryColisNames).length : 0;
-    const effectiveTotalColis = Math.max(product.total_colis, categoryColisCount);
-    
-    // Build colis details with location/pallet per coli - now supporting multiple locations per coli
-    const colisDetails: ColisDetail[] = [];
-    const colisQuantities: Record<number, number> = {};
-    
-    for (let i = 1; i <= effectiveTotalColis; i++) {
-      // Get ALL counts for this colis number (may be multiple if split across locations)
-      const countsForColi = productCounts.filter(c => c.colis_number === i);
-      
-      // Build location entries for this coli
-      const locationEntries = countsForColi.map(count => ({
-        countId: count.id,
-        quantity: count.quantity,
-        location: count.location,
-        pallet_number: count.pallet_number
-      }));
-      
-      // Sum total quantity across all locations
-      const totalQuantity = locationEntries.reduce((sum, e) => sum + e.quantity, 0);
-      colisQuantities[i] = totalQuantity;
-      
-      // Primary location/pallet is from first entry with data
-      const primaryEntry = locationEntries.find(e => e.quantity > 0) || locationEntries[0];
-      
-      colisDetails.push({
-        colis_number: i,
-        quantity: totalQuantity,
-        location: primaryEntry?.location || null,
-        pallet_number: primaryEntry?.pallet_number || null,
-        locationEntries,
-        hasMultipleLocations: locationEntries.filter(e => e.quantity > 0).length > 1
-      });
-    }
-
-    // Get unique locations and pallets from all location entries
-    const allLocations = colisDetails.flatMap(c => 
-      c.locationEntries.map(e => e.location).filter((loc): loc is string => loc !== null && loc.trim() !== '')
-    );
-    const uniqueLocations = [...new Set(allLocations)].sort();
-
-    const allPallets = colisDetails.flatMap(c => 
-      c.locationEntries.map(e => e.pallet_number).filter((p): p is string => p !== null && p.trim() !== '')
-    );
-    const uniquePallets = [...new Set(allPallets)].sort();
-
-    // Fallback to product defaults if no session-specific data
-    const hasMultipleLocations = uniqueLocations.length > 1 || colisDetails.some(c => c.hasMultipleLocations);
-    const hasMultiplePallets = uniquePallets.length > 1;
-
-    // Primary location/pallet: from first coli with data, or product default
-    const location = uniqueLocations[0] || product.location || null;
-    const palletNumber = uniquePallets[0] || product.pallet_number || null;
-
-    // Calculate complete sets (minimum across all colis)
-    const quantities = Object.values(colisQuantities);
-    const completeSets = quantities.length > 0 ? Math.min(...quantities) : 0;
-    const maxQuantity = quantities.length > 0 ? Math.max(...quantities) : 0;
-
-    // Find incomplete colis and what's missing for next complete
-    const incompleteColis: { colis_number: number; quantity: number }[] = [];
-    const excessColis: { colis_number: number; excess: number }[] = [];
-    const missingForNextComplete: { colis_number: number; missing: number }[] = [];
-
-    // Check if there's a partial product being formed (some colis have more than completeSets)
-    const hasPartialProduct = maxQuantity > completeSets;
-
-    for (let i = 1; i <= effectiveTotalColis; i++) {
-      const qty = colisQuantities[i];
-      
-      // If this colis has less than max, it's incomplete for the partial product
-      if (qty < maxQuantity) {
-        incompleteColis.push({ colis_number: i, quantity: qty });
-        // Calculate how many are missing to match the max (complete another product)
-        missingForNextComplete.push({ colis_number: i, missing: maxQuantity - qty });
-      }
-      
-      // If this colis has more than the minimum, it's in excess
-      if (qty > completeSets && qty === maxQuantity) {
-        excessColis.push({ colis_number: i, excess: qty - completeSets });
-      }
-    }
-
-    // Determine status
-    let status: ProductWithCounts['status'] = 'not_counted';
-    const totalCounted = quantities.reduce((sum, q) => sum + q, 0);
-    
-    if (totalCounted === 0) {
-      status = 'not_counted';
-    } else if (hasPartialProduct) {
-      status = 'incomplete';
-    } else if (completeSets > 0) {
-      status = 'complete';
-    }
-
-    // Calculate total excess parts (parts that don't form complete sets)
-    const totalExcessParts = maxQuantity - completeSets;
-
-    return {
-      ...product,
-      counts: productCounts,
-      completeSets,
-      incompleteColis,
-      excessColis,
-      missingForNextComplete,
-      hasPartialProduct,
-      totalExcessParts,
-      location,
-      palletNumber,
-      status,
-      colisDetails,
-      uniqueLocations,
-      uniquePallets,
-      hasMultipleLocations,
-      hasMultiplePallets
-    };
-  }, [counts]);
+  const getProductWithCounts = useCallback(
+    (product: Product, categoryColisNames?: Record<string, string> | null): ProductWithCounts =>
+      computeProductWithCounts(product, counts, categoryColisNames),
+    [counts],
+  );
 
   const deleteOrphanCounts = async (productId: string, newTotalColis: number) => {
     if (!sessionId) return false;
