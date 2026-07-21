@@ -1,4 +1,5 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+// Realtime updates are handled centrally by RealtimeSyncProvider (see src/hooks/useRealtimeSync.tsx)
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -52,28 +53,8 @@ export function useDamages() {
     refetchOnWindowFocus: true,
   });
 
-  // Subscribe to realtime changes
-  useEffect(() => {
-    const channel = supabase
-      .channel('damages-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'product_damages',
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['damages'] });
-          queryClient.invalidateQueries({ queryKey: ['products'] });
-        }
-      )
-      .subscribe();
+  // Realtime invalidation handled by RealtimeSyncProvider.
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   // Report new damage
   const reportDamageMutation = useMutation({
