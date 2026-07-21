@@ -548,7 +548,9 @@ export function StockEntriesView() {
 
           <RecentEntriesPanel />
         </div>
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
