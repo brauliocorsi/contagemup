@@ -65,54 +65,63 @@ export default function Dashboard() {
     setActiveAuditId(null);
   };
 
-  // If executing an audit, show the execution view
+  // If executing an audit, show the execution view (full screen, no shell chrome distractions)
   if (activeAuditId) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header onNavigateToProducts={handleNavigateToProducts} activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="container py-4">
-          <AuditExecutionView
-            auditId={activeAuditId}
-            onComplete={handleAuditComplete}
-            onBack={handleAuditBack}
-          />
-        </main>
-      </div>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-background">
+          <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          <SidebarInset className="flex flex-col min-w-0">
+            <Header onNavigateToProducts={handleNavigateToProducts} activeTab={activeTab} onTabChange={setActiveTab} />
+            <main className="flex-1 px-4 md:px-6 lg:px-8 py-6">
+              <AuditExecutionView
+                auditId={activeAuditId}
+                onComplete={handleAuditComplete}
+                onBack={handleAuditBack}
+              />
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header onNavigateToProducts={handleNavigateToProducts} activeTab={activeTab} onTabChange={setActiveTab} />
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-      <main className="container py-4">
-        <Suspense fallback={<ViewLoader />}>
-          {activeTab === 'home' && <DashboardHome onNavigate={setActiveTab} />}
-          {activeTab === 'counting' && <CountingView />}
-          {activeTab === 'products' && <ProductsView />}
-          {activeTab === 'categories' && <CategoriesView />}
-          {activeTab === 'sessions' && <SessionsView />}
-          {activeTab === 'entries' && <StockEntriesView />}
-          {activeTab === 'exits' && <StockExitsView />}
-          {activeTab === 'alerts' && <StockAlertsView />}
-          {activeTab === 'damages' && <DamagesView />}
-          {activeTab === 'reconciliation' && <ReconciliationView />}
-          {activeTab === 'erp' && <ERPReconciliationView />}
-          {activeTab === 'purchases' && <PurchaseOrdersView />}
-          {activeTab === 'routes' && <RoutesView />}
-          {activeTab === 'pending-sales' && <PendingSalesView />}
-          {activeTab === 'cancellations' && <CancellationsView />}
-          {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
-          {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
-          {activeTab === 'recent' && <RecentProductsView />}
-          {activeTab === 'settings' && <SettingsView />}
-        </Suspense>
-      </main>
-      <footer className="border-t border-border-subtle py-3 text-center">
-        <p className="text-xs text-muted-foreground">
-          Versão {APP_VERSION} • {APP_BUILD_DATE}
-        </p>
-      </footer>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <SidebarInset className="flex flex-col min-w-0">
+          <Header onNavigateToProducts={handleNavigateToProducts} activeTab={activeTab} onTabChange={setActiveTab} />
+          <main className="flex-1 px-4 md:px-6 lg:px-8 py-6">
+            <Suspense fallback={<ViewLoader />}>
+              {activeTab === 'home' && <DashboardHome onNavigate={setActiveTab} />}
+              {activeTab === 'counting' && <CountingView />}
+              {activeTab === 'products' && <ProductsView />}
+              {activeTab === 'categories' && <CategoriesView />}
+              {activeTab === 'sessions' && <SessionsView />}
+              {activeTab === 'entries' && <StockEntriesView />}
+              {activeTab === 'exits' && <StockExitsView />}
+              {activeTab === 'alerts' && <StockAlertsView />}
+              {activeTab === 'damages' && <DamagesView />}
+              {activeTab === 'reconciliation' && <ReconciliationView />}
+              {activeTab === 'erp' && <ERPReconciliationView />}
+              {activeTab === 'purchases' && <PurchaseOrdersView />}
+              {activeTab === 'routes' && <RoutesView />}
+              {activeTab === 'pending-sales' && <PendingSalesView />}
+              {activeTab === 'cancellations' && <CancellationsView />}
+              {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
+              {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
+              {activeTab === 'recent' && <RecentProductsView />}
+              {activeTab === 'settings' && <SettingsView />}
+            </Suspense>
+          </main>
+          <footer className="border-t border-border-subtle py-3 text-center">
+            <p className="text-xs text-muted-foreground">
+              Versão {APP_VERSION} • {APP_BUILD_DATE}
+            </p>
+          </footer>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 }
