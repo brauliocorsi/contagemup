@@ -253,7 +253,8 @@ export function CountingView() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <PageContainer className="p-4">
+
       {/* Session header */}
       <CountingHeader
         currentSession={currentSession}
