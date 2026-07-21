@@ -30,8 +30,7 @@ import { Product } from '@/types/stock';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   checkbox: 48,
   code: 120,
@@ -235,15 +234,15 @@ export function ProductsView() {
 
   // Export helpers
   const exportToExcel = useCallback((data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
-    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const worksheet = (await loadXLSX()).utils.aoa_to_sheet(data);
     const colWidths = data[0].map((_, colIndex) => {
       const maxLength = Math.max(...data.map(row => String(row[colIndex] || '').length));
       return { wch: Math.min(Math.max(maxLength + 2, 10), 50) };
     });
     worksheet['!cols'] = colWidths;
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    XLSX.writeFile(workbook, filename);
+    const workbook = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(workbook, worksheet, sheetName);
+    (await loadXLSX()).writeFile(workbook, filename);
   }, []);
 
   const productHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Stock (Sets)', 'Avarias', 'Última Contagem', 'Sessão', 'Data Contagem'];

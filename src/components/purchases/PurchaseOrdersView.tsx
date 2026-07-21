@@ -13,8 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/hooks/useProducts';
 import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface SoldItem {
   productCode: string;
   productName: string;
@@ -328,16 +327,16 @@ export function PurchaseOrdersView() {
       'Vendas': p.vendas.map(v => `#${v.codigo} (${v.cliente} - ${v.quantidade}un)`).join(' | '),
     }));
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumo), 'Resumo');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalhes), 'Detalhes Vendas');
+    const wb = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(wb, (await loadXLSX()).utils.json_to_sheet(resumo), 'Resumo');
+    (await loadXLSX()).utils.book_append_sheet(wb, (await loadXLSX()).utils.json_to_sheet(detalhes), 'Detalhes Vendas');
     if (negativos.length > 0) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(negativos), 'Stock Negativo');
+      (await loadXLSX()).utils.book_append_sheet(wb, (await loadXLSX()).utils.json_to_sheet(negativos), 'Stock Negativo');
     }
     const fname = isSameDate
       ? `compras_${format(dateFrom, 'yyyy-MM-dd')}.xlsx`
       : `compras_${format(dateFrom, 'yyyy-MM-dd')}_a_${format(dateTo, 'yyyy-MM-dd')}.xlsx`;
-    XLSX.writeFile(wb, fname);
+    (await loadXLSX()).writeFile(wb, fname);
   };
 
   const isSameDate = format(dateFrom, 'yyyy-MM-dd') === format(dateTo, 'yyyy-MM-dd');

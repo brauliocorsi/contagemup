@@ -33,8 +33,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useDamages } from '@/hooks/useDamages';
 import { useCounting } from '@/hooks/useCounting';
 import { useActiveSession } from '@/hooks/useActiveSession';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 export function StockStatusReport() {
   const { products, loading: productsLoading } = useProducts();
   const { categories, loading: categoriesLoading } = useCategories();
@@ -108,7 +107,7 @@ export function StockStatusReport() {
 
   // Export all data
   const exportToExcel = () => {
-    const workbook = XLSX.utils.book_new();
+    const workbook = (await loadXLSX()).utils.book_new();
 
     // Complete products sheet
     const completeData = completeProducts.map(p => ({
@@ -120,8 +119,8 @@ export function StockStatusReport() {
       'Localizações': p.uniqueLocations.join(', ') || '-',
       'Paletes': p.uniquePallets.join(', ') || '-',
     }));
-    const completeSheet = XLSX.utils.json_to_sheet(completeData);
-    XLSX.utils.book_append_sheet(workbook, completeSheet, 'Completos');
+    const completeSheet = (await loadXLSX()).utils.json_to_sheet(completeData);
+    (await loadXLSX()).utils.book_append_sheet(workbook, completeSheet, 'Completos');
 
     // Incomplete products sheet
     const incompleteData = incompleteProducts.map(p => ({
@@ -133,8 +132,8 @@ export function StockStatusReport() {
       'Colis em Falta': formatMissingColis(p),
       'Excedentes': p.totalExcessParts || 0,
     }));
-    const incompleteSheet = XLSX.utils.json_to_sheet(incompleteData);
-    XLSX.utils.book_append_sheet(workbook, incompleteSheet, 'Incompletos');
+    const incompleteSheet = (await loadXLSX()).utils.json_to_sheet(incompleteData);
+    (await loadXLSX()).utils.book_append_sheet(workbook, incompleteSheet, 'Incompletos');
 
     // Damages sheet
     const damageData = activeDamages.map(d => ({
@@ -147,10 +146,10 @@ export function StockStatusReport() {
       'Localização': d.location || '-',
       'Coli': d.colis_number || '-',
     }));
-    const damageSheet = XLSX.utils.json_to_sheet(damageData);
-    XLSX.utils.book_append_sheet(workbook, damageSheet, 'Avarias');
+    const damageSheet = (await loadXLSX()).utils.json_to_sheet(damageData);
+    (await loadXLSX()).utils.book_append_sheet(workbook, damageSheet, 'Avarias');
 
-    XLSX.writeFile(workbook, `relatorio_stock_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    (await loadXLSX()).writeFile(workbook, `relatorio_stock_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
   const isLoading = productsLoading || categoriesLoading || damagesLoading;

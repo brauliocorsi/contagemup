@@ -26,8 +26,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { AuditWithItems } from '@/hooks/useLocationAudits';
 import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface AuditResultsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -69,10 +68,10 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
       'Status': item.difference === 0 ? 'OK' : item.difference && item.difference > 0 ? 'Excesso' : 'Falta',
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Resultados');
-    XLSX.writeFile(workbook, `conferencia_${audit.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    const worksheet = (await loadXLSX()).utils.json_to_sheet(data);
+    const workbook = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(workbook, worksheet, 'Resultados');
+    (await loadXLSX()).writeFile(workbook, `conferencia_${audit.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
   return (

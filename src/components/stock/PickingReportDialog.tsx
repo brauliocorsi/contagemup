@@ -33,9 +33,7 @@ import {
 } from '@/components/ui/collapsible';
 import { PickingItemDetailed, PickingPDFRow, ColisPickingDetail } from '@/types/picking';
 import { optimizeDetailedPickingRoute } from '@/hooks/useDetailedPickingData';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-
+import { loadPDF } from '@/lib/lazyPdf';
 interface PickingReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -117,7 +115,7 @@ export function PickingReportDialog({
   }, [items]);
 
   const handleExportPDF = () => {
-    const doc = new jsPDF();
+    const doc = new (await loadPDF()).jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     
     // Header
@@ -164,7 +162,7 @@ export function PickingReportDialog({
       doc.setTextColor(0);
       yPos += 4;
       
-      autoTable(doc, {
+      (await loadPDF()).autoTable(doc, {
         startY: yPos,
         head: [['☐', '#', 'Código', 'Produto', 'Coli', 'Nome Coli', 'Qtd', 'Local', 'Palete', 'Nível']],
         body: forkliftRows.map((row) => [
@@ -215,7 +213,7 @@ export function PickingReportDialog({
       doc.setTextColor(0);
       yPos += 4;
       
-      autoTable(doc, {
+      (await loadPDF()).autoTable(doc, {
         startY: yPos,
         head: [['☐', '#', 'Código', 'Produto', 'Coli', 'Nome Coli', 'Qtd', 'Local', 'Palete', 'Nível']],
         body: footRows.map((row) => [

@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DamagesTable } from './DamagesTable';
 import { DateRangeFilter, filterByDateRange } from '@/components/ui/date-range-filter';
 import { AlertOctagon, Package, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { loadXLSX } from '@/lib/lazyXlsx';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
@@ -92,7 +92,7 @@ export function DamagesView() {
       [`Resolvidas: ${damagesToExport.filter(d => d.status === 'resolved').length}`, '', '', '', '', '', '', '', '', '', '', '', '']
     ];
 
-    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const worksheet = (await loadXLSX()).utils.aoa_to_sheet(data);
     
     const colWidths = data[3].map((_, colIndex) => {
       const maxLength = Math.max(...data.slice(3).map(row => String(row[colIndex] || '').length));
@@ -100,9 +100,9 @@ export function DamagesView() {
     });
     worksheet['!cols'] = colWidths;
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Avarias');
-    XLSX.writeFile(workbook, `avarias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    const workbook = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(workbook, worksheet, 'Avarias');
+    (await loadXLSX()).writeFile(workbook, `avarias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   }, [filteredDamages]);
 
   if (loading) {

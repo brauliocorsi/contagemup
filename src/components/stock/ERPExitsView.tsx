@@ -17,8 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface SaleExitItem {
   productCode: string;
   productName: string;
@@ -249,10 +248,10 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
       'Código': p.productCode, 'Produto': p.productName,
       'Quantidade Total': p.totalQuantity, 'Nº Vendas': p.salesCount,
     }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(salesData), 'Por Venda');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(aggData), 'Resumo Produtos');
-    XLSX.writeFile(wb, `saidas_erp_${format(dateFrom, 'yyyy-MM-dd')}_${format(dateTo, 'yyyy-MM-dd')}.xlsx`);
+    const wb = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(wb, (await loadXLSX()).utils.json_to_sheet(salesData), 'Por Venda');
+    (await loadXLSX()).utils.book_append_sheet(wb, (await loadXLSX()).utils.json_to_sheet(aggData), 'Resumo Produtos');
+    (await loadXLSX()).writeFile(wb, `saidas_erp_${format(dateFrom, 'yyyy-MM-dd')}_${format(dateTo, 'yyyy-MM-dd')}.xlsx`);
   };
 
   return (

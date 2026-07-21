@@ -24,7 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import * as XLSX from 'xlsx';
+import { loadXLSX } from '@/lib/lazyXlsx';
 import { BulkStockCorrectionDialog } from './BulkStockCorrectionDialog';
 
 interface IntegrityCheck {
@@ -219,10 +219,10 @@ export function StockIntegrityReport() {
         'Avarias': c.damagedStock,
       }));
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Integridade');
-    XLSX.writeFile(wb, `integridade_stock_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`);
+    const ws = (await loadXLSX()).utils.json_to_sheet(exportData);
+    const wb = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(wb, ws, 'Integridade');
+    (await loadXLSX()).writeFile(wb, `integridade_stock_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`);
     toast.success('Relatório exportado!');
   };
 
@@ -241,10 +241,10 @@ export function StockIntegrityReport() {
       }))
     );
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Colis Incompletos');
-    XLSX.writeFile(wb, `colis_incompletos_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`);
+    const ws = (await loadXLSX()).utils.json_to_sheet(exportData);
+    const wb = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(wb, ws, 'Colis Incompletos');
+    (await loadXLSX()).writeFile(wb, `colis_incompletos_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`);
     toast.success('Relatório de colis incompletos exportado!');
   };
 

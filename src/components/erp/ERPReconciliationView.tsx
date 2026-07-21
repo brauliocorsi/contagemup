@@ -12,8 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   match: { label: 'OK', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle2 },
   surplus: { label: 'Excesso Local', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: ArrowUp },
@@ -174,7 +173,7 @@ export function ERPReconciliationView() {
       'Localização': '',
     } as any);
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = (await loadXLSX()).utils.json_to_sheet(data);
     
     // Auto-size columns
     const colWidths = Object.keys(data[0] || {}).map(key => ({
@@ -182,9 +181,9 @@ export function ERPReconciliationView() {
     }));
     ws['!cols'] = colWidths;
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Conciliação ERP');
-    XLSX.writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const wb = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(wb, ws, 'Conciliação ERP');
+    (await loadXLSX()).writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
 

@@ -36,8 +36,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocationAudits, LocationAudit } from '@/hooks/useLocationAudits';
 import { AuditResultsDialog } from '@/components/audit/AuditResultsDialog';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface AuditReportsViewProps {
   onStartAudit?: (auditId: string) => void;
 }
@@ -89,10 +88,10 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
       'Notas': a.notes || '',
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Conferências');
-    XLSX.writeFile(workbook, `conferencias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    const worksheet = (await loadXLSX()).utils.json_to_sheet(data);
+    const workbook = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(workbook, worksheet, 'Conferências');
+    (await loadXLSX()).writeFile(workbook, `conferencias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
   if (isLoading) {

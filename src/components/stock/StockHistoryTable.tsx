@@ -18,8 +18,7 @@ import {
 import { DateRangeFilter, filterByDateRange } from '@/components/ui/date-range-filter';
 import { StockMovement } from '@/hooks/useStockMovements';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface StockHistoryTableProps {
   movements: StockMovement[];
   isLoading: boolean;
@@ -110,11 +109,11 @@ export function StockHistoryTable({
       ['Total Movimentos', filteredMovements.length, '', '', '', '', '', ''],
       ['Total Unidades', totalUnits, '', '', '', '', '', ''],
     ];
-    const ws = XLSX.utils.aoa_to_sheet(data);
+    const ws = (await loadXLSX()).utils.aoa_to_sheet(data);
     ws['!cols'] = headers.map((_, i) => ({ wch: Math.min(Math.max(...data.map(r => String(r[i] || '').length) , 10) + 2, 40) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, typeLabel);
-    XLSX.writeFile(wb, `${movementType === 'entrada' ? 'entradas' : 'saidas'}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
+    const wb = (await loadXLSX()).utils.book_new();
+    (await loadXLSX()).utils.book_append_sheet(wb, ws, typeLabel);
+    (await loadXLSX()).writeFile(wb, `${movementType === 'entrada' ? 'entradas' : 'saidas'}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
     toast.success(`${filteredMovements.length} movimentos exportados para Excel`);
   }, [filteredMovements, movementType, typeLabel, dateFrom, dateTo]);
 

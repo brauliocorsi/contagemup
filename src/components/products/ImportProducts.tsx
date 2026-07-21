@@ -5,8 +5,7 @@ import { Upload, FileSpreadsheet, Loader2, Download, Plus, CheckCircle2, XCircle
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 interface ImportProductsProps {
   onImport: (products: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>) => Promise<boolean>;
   existingCategories: string[];
@@ -198,12 +197,12 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
   };
 
   const parseXLSX = (data: ArrayBuffer): { data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] } => {
-    const workbook = XLSX.read(data, { type: 'array' });
+    const workbook = (await loadXLSX()).read(data, { type: 'array' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     
     // Convert to JSON with header row
-    const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
+    const jsonData = (await loadXLSX()).utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
     
     // Get all column names from the file
     const columns = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];

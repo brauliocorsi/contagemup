@@ -4,8 +4,7 @@ import { Reconciliation, ReconciliationItem, CSVImportRow, CSVParseResult, CSVVa
 import { ProductWithCounts } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
-import * as XLSX from 'xlsx';
-
+import { loadXLSX } from '@/lib/lazyXlsx';
 // Column aliases for auto-detection
 const COLUMN_ALIASES = {
   code: ['codigo', 'code', 'código', 'cod', 'sku', 'ref', 'referencia', 'referência', 'product_code', 'productcode'],
@@ -161,11 +160,11 @@ export function useReconciliation() {
     };
 
     try {
-      const workbook = XLSX.read(data, { type: 'array' });
+      const workbook = (await loadXLSX()).read(data, { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       
-      const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
+      const jsonData = (await loadXLSX()).utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
       
       if (jsonData.length === 0) {
         result.headerError = 'O ficheiro está vazio ou não contém dados';

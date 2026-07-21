@@ -51,9 +51,7 @@ import { usePickingHistory, PickingSession, PickingItem } from '@/hooks/usePicki
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-
+import { loadPDF } from '@/lib/lazyPdf';
 export function PickingHistoryView() {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
@@ -154,7 +152,7 @@ export function PickingHistoryView() {
 
   // Export session to PDF
   const exportSessionToPDF = async (session: PickingSession, items: PickingItem[]) => {
-    const doc = new jsPDF();
+    const doc = new (await loadPDF()).jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const groups = groupItemsByForklift(items);
     
@@ -201,7 +199,7 @@ export function PickingHistoryView() {
       doc.setTextColor(0);
       yPos += 4;
       
-      autoTable(doc, {
+      (await loadPDF()).autoTable(doc, {
         startY: yPos,
         head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Palete', 'Nível']],
         body: groups.forkliftItems.map((item, idx) => [
@@ -245,7 +243,7 @@ export function PickingHistoryView() {
       doc.setTextColor(0);
       yPos += 4;
       
-      autoTable(doc, {
+      (await loadPDF()).autoTable(doc, {
         startY: yPos,
         head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Palete', 'Nível']],
         body: groups.floorItems.map((item, idx) => [
@@ -289,7 +287,7 @@ export function PickingHistoryView() {
       doc.setTextColor(0);
       yPos += 4;
       
-      autoTable(doc, {
+      (await loadPDF()).autoTable(doc, {
         startY: yPos,
         head: [['#', 'Código', 'Produto', 'Qtd']],
         body: groups.noLocationItems.map((item, idx) => [

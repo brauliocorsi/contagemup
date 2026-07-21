@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
+import { loadXLSX } from '@/lib/lazyXlsx';
 import { mapDatabaseError } from '@/lib/errorMessages';
 
 export interface StockMovement {
@@ -270,10 +270,10 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
       }
 
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
+      const workbook = (await loadXLSX()).read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
+      const rows = (await loadXLSX()).utils.sheet_to_json<Record<string, any>>(sheet);
 
       if (rows.length === 0) {
         throw new Error('Ficheiro vazio');
