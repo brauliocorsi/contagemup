@@ -198,8 +198,8 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
       setRegisterDialogOpen(false);
       setRegisterItem(null);
       fetchProducts();
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro', description: mapDatabaseError(err), variant: 'destructive' });
     } finally {
       setRegistering(false);
     }
