@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Plus, MapPin, Route, Settings, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 type View = 'list' | 'regions' | 'optimizer';
 
