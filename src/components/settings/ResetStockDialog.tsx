@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 interface ResetStockDialogProps {
   open: boolean;
