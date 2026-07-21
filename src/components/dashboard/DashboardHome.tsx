@@ -8,20 +8,22 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   TrendingUp, TrendingDown, AlertTriangle, Package,
-  ArrowRight, Clock, AlertOctagon, BarChart3
+  ArrowRight, Clock, AlertOctagon, BarChart3, LayoutDashboard
 } from 'lucide-react';
 import { format, subDays, startOfDay } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { StatCard } from '@/components/layout/StatCard';
 
 interface DashboardHomeProps {
   onNavigate: (tab: string) => void;
 }
 
 export function DashboardHome({ onNavigate }: DashboardHomeProps) {
-  const { products, loading: productsLoading } = useProducts();
+  const { products } = useProducts();
   const { alerts, outOfStockCount, lowStockCount, totalAlerts } = useStockAlerts();
 
-  // Recent stock movements (last 7 days)
   const { data: recentMovements = [] } = useQuery({
     queryKey: ['dashboard-recent-movements'],
     queryFn: async () => {
@@ -37,7 +39,6 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
     staleTime: 30000,
   });
 
-  // Movement stats (today and last 7 days)
   const { data: movementStats } = useQuery({
     queryKey: ['dashboard-movement-stats'],
     queryFn: async () => {
@@ -45,14 +46,8 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
       const weekAgo = subDays(new Date(), 7).toISOString();
 
       const [todayRes, weekRes] = await Promise.all([
-        supabase
-          .from('stock_movements')
-          .select('movement_type, quantity')
-          .gte('created_at', today),
-        supabase
-          .from('stock_movements')
-          .select('movement_type, quantity')
-          .gte('created_at', weekAgo),
+        supabase.from('stock_movements').select('movement_type, quantity').gte('created_at', today),
+        supabase.from('stock_movements').select('movement_type, quantity').gte('created_at', weekAgo),
       ]);
 
       const calcStats = (data: any[] | null) => {
@@ -66,15 +61,11 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
         };
       };
 
-      return {
-        today: calcStats(todayRes.data),
-        week: calcStats(weekRes.data),
-      };
+      return { today: calcStats(todayRes.data), week: calcStats(weekRes.data) };
     },
     staleTime: 30000,
   });
 
-  // Recent picking sessions
   const { data: recentPicking = [] } = useQuery({
     queryKey: ['dashboard-recent-picking'],
     queryFn: async () => {
@@ -95,89 +86,79 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
   const weekStats = movementStats?.week;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Visão geral do inventário</p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        icon={<LayoutDashboard className="h-5 w-5" />}
+        title="Dashboard"
+        description="Visão geral do inventário"
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onNavigate('products')}>
-          <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center justify-between mb-2">
-              <Package className="h-5 w-5 text-primary" />
-              <Badge variant="secondary" className="text-xs">{totalProducts}</Badge>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{totalStock}</p>
-            <p className="text-xs text-muted-foreground">Unidades em stock</p>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onNavigate('entries')}>
-          <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center justify-between mb-2">
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
-              <Badge className="bg-emerald-100 text-emerald-700 text-xs">{todayStats?.entriesCount || 0} hoje</Badge>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{weekStats?.entriesQty || 0}</p>
-            <p className="text-xs text-muted-foreground">Entradas (7 dias)</p>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onNavigate('exits')}>
-          <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center justify-between mb-2">
-              <TrendingDown className="h-5 w-5 text-orange-600" />
-              <Badge className="bg-orange-100 text-orange-700 text-xs">{todayStats?.exitsCount || 0} hoje</Badge>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{weekStats?.exitsQty || 0}</p>
-            <p className="text-xs text-muted-foreground">Saídas (7 dias)</p>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onNavigate('alerts')}>
-          <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center justify-between mb-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              <Badge variant="destructive" className="text-xs">{totalAlerts}</Badge>
-            </div>
-            <div className="flex gap-2 items-baseline">
-              <p className="text-2xl font-bold text-foreground">{outOfStockCount}</p>
-              <span className="text-xs text-muted-foreground">esgotados</span>
-            </div>
-            <p className="text-xs text-muted-foreground">{lowStockCount} com stock baixo</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Unidades em stock"
+          value={totalStock.toLocaleString('pt-PT')}
+          hint={`${totalProducts} produtos`}
+          icon={<Package className="h-5 w-5" />}
+          tone="primary"
+          onClick={() => onNavigate('products')}
+        />
+        <StatCard
+          label="Entradas (7 dias)"
+          value={weekStats?.entriesQty ?? 0}
+          badge={`${todayStats?.entriesCount ?? 0} hoje`}
+          icon={<TrendingUp className="h-5 w-5" />}
+          tone="success"
+          onClick={() => onNavigate('entries')}
+        />
+        <StatCard
+          label="Saídas (7 dias)"
+          value={weekStats?.exitsQty ?? 0}
+          badge={`${todayStats?.exitsCount ?? 0} hoje`}
+          icon={<TrendingDown className="h-5 w-5" />}
+          tone="warning"
+          onClick={() => onNavigate('exits')}
+        />
+        <StatCard
+          label="Alertas de stock"
+          value={outOfStockCount}
+          hint={`${lowStockCount} com stock baixo`}
+          badge={totalAlerts > 0 ? totalAlerts : undefined}
+          icon={<AlertTriangle className="h-5 w-5" />}
+          tone="danger"
+          onClick={() => onNavigate('alerts')}
+        />
       </div>
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent movements */}
-        <Card>
+        <Card className="border-border-subtle">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Clock className="h-4 w-4" />
+              <CardTitle className="font-heading text-base flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
                 Últimos Movimentos
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => onNavigate('entries')} className="text-xs">
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('entries')} className="text-xs h-7">
                 Ver todos <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-1">
             {recentMovements.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Sem movimentos recentes</p>
+              <p className="text-sm text-muted-foreground text-center py-6">Sem movimentos recentes</p>
             ) : (
               recentMovements.slice(0, 8).map((mov: any) => (
-                <div key={mov.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div key={mov.id} className="flex items-center justify-between py-2 border-b border-border-subtle last:border-0">
                   <div className="flex items-center gap-2 min-w-0">
                     {mov.movement_type === 'entrada' ? (
-                      <TrendingUp className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-success-soft text-success shrink-0">
+                        <TrendingUp className="h-3.5 w-3.5" />
+                      </div>
                     ) : (
-                      <TrendingDown className="h-4 w-4 text-orange-600 shrink-0" />
+                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-warning-soft text-warning shrink-0">
+                        <TrendingDown className="h-3.5 w-3.5" />
+                      </div>
                     )}
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">
@@ -189,48 +170,54 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
                       </p>
                     </div>
                   </div>
-                  <Badge
-                    className={mov.movement_type === 'entrada'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-orange-100 text-orange-700'
+                  <span
+                    className={
+                      'text-sm font-semibold tabular-nums ' +
+                      (mov.movement_type === 'entrada' ? 'text-success' : 'text-warning')
                     }
                   >
-                    {mov.movement_type === 'entrada' ? '+' : '-'}{mov.quantity}
-                  </Badge>
+                    {mov.movement_type === 'entrada' ? '+' : '−'}{mov.quantity}
+                  </span>
                 </div>
               ))
             )}
           </CardContent>
         </Card>
 
-        {/* Stock Alerts */}
-        <Card>
+        <Card className="border-border-subtle">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <AlertOctagon className="h-4 w-4" />
+              <CardTitle className="font-heading text-base flex items-center gap-2">
+                <AlertOctagon className="h-4 w-4 text-muted-foreground" />
                 Alertas de Stock
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => onNavigate('alerts')} className="text-xs">
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('alerts')} className="text-xs h-7">
                 Ver todos <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-1">
             {alerts.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Sem alertas activos ✓</p>
+              <p className="text-sm text-muted-foreground text-center py-6">Sem alertas activos ✓</p>
             ) : (
               alerts.slice(0, 8).map((alert) => (
-                <div key={alert.product.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div key={alert.product.id} className="flex items-center justify-between py-2 border-b border-border-subtle last:border-0">
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{alert.product.name}</p>
                     <p className="text-xs text-muted-foreground">{alert.product.code}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-mono">
+                    <span className="text-sm tabular-nums text-muted-foreground">
                       {alert.product.current_stock}/{alert.product.min_stock}
                     </span>
-                    <Badge variant={alert.type === 'out_of_stock' ? 'destructive' : 'outline'} className="text-xs">
+                    <Badge
+                      variant="outline"
+                      className={
+                        alert.type === 'out_of_stock'
+                          ? 'bg-danger-soft text-danger border-danger/20'
+                          : 'bg-warning-soft text-warning border-warning/20'
+                      }
+                    >
                       {alert.type === 'out_of_stock' ? 'Esgotado' : 'Baixo'}
                     </Badge>
                   </div>
@@ -241,28 +228,27 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
         </Card>
       </div>
 
-      {/* Recent Picking */}
       {recentPicking.length > 0 && (
-        <Card>
+        <Card className="border-border-subtle">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Últimas Sessões de Picking
-              </CardTitle>
-            </div>
+            <CardTitle className="font-heading text-base flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              Últimas Sessões de Picking
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {recentPicking.slice(0, 6).map((session: any) => {
                 const totalQty = (session.picking_items || []).reduce((s: number, i: any) => s + i.quantity, 0);
                 return (
-                  <div key={session.id} className="p-3 rounded-lg border border-border bg-card">
+                  <div key={session.id} className="p-3 rounded-lg border border-border-subtle bg-surface-muted/40 hover:bg-surface-muted transition-colors">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-muted-foreground">
                         {format(new Date(session.created_at), "dd/MM HH:mm", { locale: pt })}
                       </span>
-                      <Badge variant="secondary" className="text-xs">{totalQty} un.</Badge>
+                      <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20 tabular-nums">
+                        {totalQty} un.
+                      </Badge>
                     </div>
                     {session.reference && (
                       <p className="text-sm font-medium truncate">{session.reference}</p>
@@ -277,6 +263,6 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
           </CardContent>
         </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }
