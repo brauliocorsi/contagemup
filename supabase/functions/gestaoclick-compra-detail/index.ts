@@ -274,7 +274,11 @@ Deno.serve(async (req) => {
         });
         if (detRes.ok) {
           const j = await detRes.json();
-          detail = j?.data ?? j ?? foundCompra;
+          const raw = j?.data ?? j ?? foundCompra;
+          detail = unwrapCompra(Array.isArray(raw) ? raw[0] : raw);
+          console.log(`[compra-detail] detail keys: ${Object.keys(detail || {}).join(',')}`);
+        } else {
+          await detRes.text();
         }
       } catch (_e) { /* keep list-level data */ }
     }
