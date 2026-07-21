@@ -162,6 +162,6 @@ export function RoutesView() {
         onOpenChange={setBuilderOpen}
         onCreateRoute={handleCreateRegionalRoute}
       />
-    </div>
+    </PageContainer>
   );
 }
