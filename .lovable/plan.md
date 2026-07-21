@@ -1,78 +1,88 @@
-# Refactor UI/UX — UP Contagem
+# Refactor UX/UI — UP Contagem
 
-**Regra dourada:** só código de apresentação. Zero mudanças em hooks de dados, RPCs, RLS, edge functions ou lógica de negócio. Funcionalidades ficam idênticas.
+Direção: **Ocean Deep** + **Urbanist/Epilogue** + **Sidebar layout**. Foco em clareza e hierarquia. Zero mudanças de funcionalidade — só apresentação.
 
-## Direção visual
+## Etapa 1 — Design system (tokens)
 
-- **Paleta Cloud White:** `#fafbfc` bg, `#e8ecf1` superfície, `#94a3b8` muted, `#3b82f6` primary. Sensação SaaS arejado, claro, com foco no dado.
-- **Tipografia:** Space Grotesk (headings, números) + DM Sans (body/UI). Números tabulares (`font-variant-numeric: tabular-nums`) em tabelas de stock.
-- **Densidade 3:** intermédia — respiração confortável mas sem ecrãs vazios. Row-height tabela ~44px, cards com padding 20px.
-- **Border-radius:** 10px componentes, 14px cards, 8px inputs.
-- **Sombras:** planas, uma única shadow-elegant subtil para elevação (evitar drop shadows pesadas).
-- **Estado ativo/hover:** superfícies com tint de primary a baixa opacidade em vez de bordas fortes.
+Substituir tokens em `src/index.css` e `tailwind.config.ts`:
 
-## Etapas
+- **Cores (light)**: background `#f7fafb`, surface `#ffffff`, primary `#1a4a6e` (navy médio), primary-glow `#2d8a9e` (teal), accent `#5cbdb9` (mint), foreground `#0c2340` (navy profundo). Sidebar em navy profundo (`#0c2340`) com foreground claro.
+- **Cores (dark)**: background `#0c2340`, surface `#12314f`, primary `#5cbdb9`, foreground `#e8f4f5`.
+- **Tipografia**: swap Google Fonts para `Urbanist` (heading, 500-700) + `Epilogue` (body, 400-600). Atualizar `--font-heading` e `--font-sans`.
+- **Radius**: `0.75rem` (mais suave, moderno).
+- **Sombras**: refinar `--shadow-sm/md/lg` com tint navy em vez de neutro.
+- **Semantic states**: manter success/warning/danger/info, ajustar hues para harmonizar com teal.
 
-### 1. Design system (base de tudo)
-- `src/index.css`: reescrever tokens HSL para Cloud White (light + dark coerente). Adicionar tokens semânticos: `--surface`, `--surface-elevated`, `--border-subtle`, `--success`, `--warning`, `--danger`, `--info`, gradients e shadow-elegant.
-- `tailwind.config.ts`: registar fontes (`font-heading`, `font-sans`), estender `fontFamily`, `boxShadow`, `borderRadius`, cores semânticas novas.
-- `index.html`: injetar Google Fonts (Space Grotesk 500/600/700 + DM Sans 400/500/600).
-- Auditar componentes `src/components/ui/*` (shadcn) para garantir que usam apenas tokens — sem cores hardcoded.
+## Etapa 2 — App shell: migrar top-nav → sidebar
 
-### 2. Shell da app (layout + navegação)
-- `SidebarProvider` / sidebar principal: novo visual — logo compacto no topo, grupos com labels finos uppercase, item ativo com pill de primary/10 + texto primary, ícones lucide 18px, colapsável mantendo estado.
-- Header/topbar: breadcrumb esquerda, ações contextuais direita (sync ERP, notificações, user menu). Sticky com blur bg.
-- Container principal com `max-w` responsivo e padding consistente.
+Novo shell em `src/App.tsx` (ou wrapper `AppLayout`):
 
-### 3. Padrões repetidos (aplicados transversalmente)
-- **PageHeader** unificado: título Space Grotesk + subtítulo muted + slot de ações — usado em todas as views.
-- **StatCard** para KPIs (dashboard, relatórios): valor grande, label, delta/tendência, ícone.
-- **DataTable wrapper**: header sticky, zebra subtil, hover suave, densidade fixa, empty-state e loading skeleton.
-- **FilterBar**: campo search + selects + chips ativos + botão "limpar".
-- **Dialogs/Sheets**: header com título+descrição, footer sticky com ações à direita, spacing consistente.
-- **Toast/Sonner**: variantes success/warning/danger alinhadas aos novos tokens.
-- **Empty states** e **loading skeletons** consistentes.
+```
+┌─────────────────────────────────────────┐
+│ Sidebar │  Header (trigger + user + …)  │
+│  logo   ├───────────────────────────────┤
+│  nav    │                               │
+│  ...    │        <Outlet />             │
+│  user   │                               │
+└─────────┴───────────────────────────────┘
+```
 
-### 4. Vistas — pass visual (sem tocar em lógica)
-Aplicar os padrões acima em, por ordem:
-1. Dashboard / Index
-2. Contagens (`CountingView` e filhos)
-3. Entradas de Stock (`StockEntriesView`)
-4. Saídas de Stock (`StockExitsView` — cart)
-5. Produtos (lista + formulário)
-6. Avarias (`DamagesView` + tabela)
-7. ERP (Reconciliação, Saídas ERP, Cancelamentos, Compras)
-8. Rotas / Entregas
-9. Relatórios
-10. Definições / Utilizadores
+- Criar `src/components/layout/AppSidebar.tsx` com `Sidebar` (shadcn) colapsível `collapsible="icon"`.
+- Grupos: **Operação** (Dashboard, Contagem, Entradas, Saídas), **Catálogo** (Produtos, Avarias, Categorias), **Integração** (ERP, Rotas, Compras), **Análise** (Relatórios, Armazém), **Sistema** (Settings).
+- Item ativo destacado com `NavLink` + `useLocation`. Estado colapsado mostra só ícones.
+- `SidebarTrigger` fica no header (sempre visível).
+- `src/components/layout/Header.tsx`: reduzir para trigger + breadcrumb/título da página + busca global + user menu. Remover navegação horizontal.
+- **Remover** `src/components/layout/Navigation.tsx` (substituído pela sidebar).
+- Ajustar `src/pages/Dashboard.tsx` para renderizar dentro do novo shell.
 
-Para cada vista: PageHeader, FilterBar, DataTable/Cards, dialogs — mantendo props, handlers, queries e mutations exatamente como estão.
+Nota técnica: o projeto usa navegação por state (não react-router com rotas reais para cada vista). Vou preservar isso — a sidebar dispara o mesmo estado de vista atual, sem migração de routing.
 
-### 5. Micro-detalhes
-- Badges de estado (contagem ativa, stock negativo, avaria por resolver) com paleta semântica consistente.
-- Números com `tabular-nums`, valores negativos em `danger`, positivos em `success`.
-- Ícones lucide harmonizados por área (armazém, ERP, rotas, avarias).
-- Focus rings visíveis (acessibilidade) usando ring primary.
-- Transições curtas (150ms) em hover/active — nada de animações longas.
+## Etapa 3 — Primitivos compartilhados
 
-### 6. QA visual
-- Percorrer todas as rotas em desktop + tablet.
-- Verificar dark mode (mesmo que secundário) — tokens coerentes.
-- Confirmar que nenhum teste/handler quebrou: build + typecheck.
-- Screenshot antes/depois das vistas principais.
+- `PageHeader`: já existe; refinar com breadcrumb opcional e melhor tratamento de actions.
+- `StatCard`: unificar variantes (default/success/warning/danger/info) e adicionar sparkline opcional.
+- `FilterBar`: revisar densidade e alinhamento em todas as vistas que usam.
+- `EmptyState` (novo): componente reutilizável para listas vazias.
+- `SectionCard` (novo): wrapper card com header + descrição para agrupar conteúdo dentro de páginas.
+
+## Etapa 4 — Refactor por vista (só apresentação)
+
+Passar por cada vista aplicando: `PageHeader` consistente, tokens semânticos (zero `text-white`/`bg-black`/hex), spacing uniforme (`space-y-6`), tabelas com zebra sutil, badges harmonizados. Sem mudar hooks nem lógica.
+
+1. **Dashboard** (`DashboardHome.tsx`) — já iniciado, refinar KPIs e seções recentes.
+2. **Contagem** (`CountingView`, `CountingHeader`, `ProductCard`, `CountingFilters`, `CountingSummary`) — reduzir ruído, hierarquizar contadores.
+3. **Entradas** (`StockEntriesView`) — polir carrinho de coli + painel recentes.
+4. **Saídas** (`StockExitsView`) — polir carrinho + badges de recomendação.
+5. **Produtos** (`ProductsView`, `RecentProductsView`, dialogs) — tabela mais leia, ações agrupadas.
+6. **Avarias** (`DamagesView`, `DamagesTable`, dialogs) — status com cores semânticas coerentes.
+7. **Categorias** (`CategoriesView`).
+8. **ERP** (`ERPReconciliationView`, `ERPExitsView`, `PendingSalesView`, `CancellationsView`).
+9. **Rotas** (`RoutesView`, `RoutesList`, `RouteDetail`, `RouteMap`, dialogs) — mapa mantém libs; só chrome à volta.
+10. **Compras** (`PurchaseOrdersView`).
+11. **Relatórios** (`ReportsView` e sub-relatórios) — cards de gráficos consistentes.
+12. **Armazém** (`WarehouseMapView`, `InteractiveWarehouseMap`, configs) — legends e controls polidos.
+13. **Sessões** (`SessionsView`).
+14. **Settings** (`SettingsView`, `ProfileSettings`, `ResetStockDialog`).
+15. **Login** (`LoginForm`) — hero split com paleta Ocean Deep.
+
+## Etapa 5 — Detalhes finais
+
+- Toasts (sonner): tema navy/teal, ícones consistentes.
+- Dialogs/Sheets: header padronizado, footers alinhados.
+- Estados de loading: skeletons em vez de spinners onde faz sentido.
+- Focus rings: teal `--ring` com boa visibilidade.
+- Dark mode: garantir contraste em todas as vistas.
 
 ## Detalhes técnicos
 
-- Nenhuma edição em: `src/hooks/*` (exceto se puramente cosmético), `src/integrations/supabase/*`, `supabase/functions/*`, `supabase/migrations/*`, `src/lib/errorMessages.ts`, `useRealtimeSync`.
-- Novos componentes de UI vão para `src/components/ui/` (primitivos) e `src/components/layout/` (PageHeader, FilterBar, StatCard).
-- Zero classes de cor hardcoded (`text-white`, `bg-black`, `bg-[#...]`) — sempre tokens semânticos.
-- Fontes carregadas via `<link>` em `index.html` para evitar FOUT.
+- Nenhuma mudança em hooks (`useProducts`, `useCounting`, etc.), RPCs, RLS, edge functions ou tipos.
+- Nenhuma alteração de rotas/navegação lógica — só a apresentação da navegação muda (top → sidebar).
+- `RealtimeSyncProvider` e providers permanecem intactos.
+- Preservar acessibilidade: aria-labels em botões-ícone, contraste AA.
+- Verificação: build + Playwright screenshots por vista após aplicar.
 
-## Fora do escopo
+## Ordem de execução
 
-- Alterar comportamento de qualquer feature (contagens, RPCs, ERP, realtime).
-- Adicionar novas páginas ou remover existentes.
-- Alterar rotas, permissões ou schema.
-- Mexer em testes de lógica.
+Etapa 1 → 2 → 3 → 4 (por blocos de 3-4 vistas com verificação visual entre blocos) → 5.
 
-Confirma para começar pela **Etapa 1 (design system + fontes)** — depois avanço vista a vista.
+Confirma para começar pela Etapa 1 (design tokens + fontes) e Etapa 2 (sidebar shell), que são a base de tudo o resto.
