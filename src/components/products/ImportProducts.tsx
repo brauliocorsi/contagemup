@@ -268,10 +268,10 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
 
     if (isExcel) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const arrayBuffer = event.target?.result as ArrayBuffer;
-          const { data, mapping, columns } = parseXLSX(arrayBuffer);
+          const { data, mapping, columns } = await parseXLSX(arrayBuffer);
           
           // Security: Row limit validation
           if (data.length > MAX_ROWS) {
