@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil } from 'lucide-react';
+import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import {
 import { LocationSelect } from '@/components/counting/LocationSelect';
 import { PalletSelect } from '@/components/counting/PalletSelect';
 import { PurchaseEntryView } from '@/components/stock/PurchaseEntryView';
+import { PurchaseEntryHistory } from '@/components/stock/PurchaseEntryHistory';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
@@ -258,10 +259,17 @@ export function StockEntriesView() {
           <TabsTrigger value="compra" className="gap-2">
             <ShoppingCart className="h-4 w-4" /> Por compra (Gestão Click)
           </TabsTrigger>
+          <TabsTrigger value="historico" className="gap-2">
+            <History className="h-4 w-4" /> Histórico de compras
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="compra" className="mt-0">
           <PurchaseEntryView />
+        </TabsContent>
+
+        <TabsContent value="historico" className="mt-0">
+          <PurchaseEntryHistory />
         </TabsContent>
 
         <TabsContent value="manual" className="mt-0">
