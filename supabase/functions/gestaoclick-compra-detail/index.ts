@@ -51,6 +51,16 @@ function numeroMatches(input: string, candidate: unknown): boolean {
   return stripLeadingZeros(a) === stripLeadingZeros(b);
 }
 
+// GestãoClick often wraps rows: { Compra: {...} } / { compra: {...} }.
+// deno-lint-ignore no-explicit-any
+function unwrapCompra(row: any): any {
+  if (!row || typeof row !== 'object') return row;
+  for (const key of ['Compra', 'compra']) {
+    if (key in row && row[key] && typeof row[key] === 'object') return row[key];
+  }
+  return row;
+}
+
 // deno-lint-ignore no-explicit-any
 function extractProductReferences(item: any): { productCode: string; productId: string; variationId: string } {
   const product = item?.produto || {};
