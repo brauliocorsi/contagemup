@@ -11,7 +11,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, icon, actions, className }: PageHeaderProps) {
   return (
-    <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6', className)}>
+    <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-4 mb-6 border-b border-border-subtle', className)}>
       <div className="flex items-start gap-3 min-w-0">
         {icon && (
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
