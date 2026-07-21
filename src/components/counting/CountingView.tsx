@@ -333,6 +333,6 @@ export function CountingView() {
         onMergeStock={handleMergeStock}
         onReportDamage={reportDamage}
       />
-    </div>
+    </PageContainer>
   );
 }
