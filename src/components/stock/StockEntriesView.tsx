@@ -246,11 +246,26 @@ export function StockEntriesView() {
           Entradas de Stock
         </h2>
         <p className="text-sm text-muted-foreground">
-          Registe a entrada de produtos por coli, com localização independente.
+          Registe a entrada de produtos por coli ou importe diretamente de uma compra do Gestão Click.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <Tabs defaultValue="manual" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="manual" className="gap-2">
+            <Pencil className="h-4 w-4" /> Entrada manual
+          </TabsTrigger>
+          <TabsTrigger value="compra" className="gap-2">
+            <ShoppingCart className="h-4 w-4" /> Por compra (Gestão Click)
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="compra" className="mt-0">
+          <PurchaseEntryView />
+        </TabsContent>
+
+        <TabsContent value="manual" className="mt-0">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Main column */}
         <div className="xl:col-span-2 space-y-4">
           {/* Product picker */}
