@@ -113,6 +113,8 @@ export function ProductForm({
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 required
+                readOnly={lockCode}
+                disabled={lockCode}
               />
             </div>
             <div className="space-y-2">
