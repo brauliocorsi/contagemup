@@ -42,16 +42,21 @@ export function Header({ onNavigateToProducts, activeTab, onTabChange }: HeaderP
   const activeErpLabel = erpItems.find(item => item.id === activeTab)?.label || 'ERP & Operações';
 
   return (
-    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Package className="h-6 w-6 text-primary" />
-            <span className="font-semibold text-lg hidden sm:inline">Conferências UP Móveis</span>
+    <header className="sticky top-0 z-40 border-b border-border-subtle bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
+      <div className="container flex h-16 items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground shadow-elegant">
+              <Package className="h-5 w-5" />
+            </div>
+            <div className="hidden sm:flex flex-col leading-tight">
+              <span className="font-heading font-semibold text-[15px] tracking-tight">UP Móveis</span>
+              <span className="text-[11px] text-muted-foreground -mt-0.5">Contagem &amp; Stock</span>
+            </div>
           </div>
-          
+
           {activeSession && (
-            <div className="flex items-center gap-2 pl-3 border-l">
+            <div className="flex items-center gap-2 pl-3 border-l border-border-subtle">
               <ClipboardList className="h-4 w-4 text-muted-foreground" />
               <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-medium">
                 {activeSession.name}
@@ -148,7 +153,7 @@ export function Header({ onNavigateToProducts, activeTab, onTabChange }: HeaderP
                 )}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={signOut} className="text-destructive">
+              <DropdownMenuItem onClick={signOut} className="text-danger focus:text-danger">
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
               </DropdownMenuItem>

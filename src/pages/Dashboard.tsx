@@ -107,7 +107,7 @@ export default function Dashboard() {
           {activeTab === 'settings' && <SettingsView />}
         </Suspense>
       </main>
-      <footer className="border-t bg-muted/30 py-2 text-center">
+      <footer className="border-t border-border-subtle py-3 text-center">
         <p className="text-xs text-muted-foreground">
           Versão {APP_VERSION} • {APP_BUILD_DATE}
         </p>

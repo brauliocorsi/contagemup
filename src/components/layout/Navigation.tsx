@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { 
   Package, ClipboardList, History, BarChart3, Tags,
   TrendingUp, TrendingDown, Warehouse, AlertTriangle, AlertOctagon,
@@ -62,52 +61,42 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
     return active?.label || 'Gestão';
   };
 
-  return (
-    <nav className="border-b bg-background">
-      <div className="container">
-        <div className="flex gap-1 flex-wrap py-2">
-          {/* Contagem - sempre visível */}
-          {mainTabs.map((tab) => (
-            <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => onTabChange(tab.id)}
-              className={cn(
-                'flex items-center gap-2 whitespace-nowrap',
-                activeTab === tab.id && 'shadow-sm'
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </Button>
-          ))}
+  const navBtnBase = 'flex items-center gap-2 whitespace-nowrap h-9 px-3 rounded-md text-sm font-medium transition-colors';
+  const activeCls = 'bg-primary/10 text-primary hover:bg-primary/15';
+  const idleCls = 'text-muted-foreground hover:text-foreground hover:bg-muted/60';
 
-          {/* Grupo Gestão */}
+  return (
+    <nav className="sticky top-16 z-30 border-b border-border-subtle bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
+      <div className="container">
+        <div className="flex gap-1 flex-wrap py-2 overflow-x-auto">
+          {mainTabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange(tab.id)}
+                className={cn(navBtnBase, isActive ? activeCls : idleCls)}
+              >
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant={isManagementActive ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'flex items-center gap-2 whitespace-nowrap',
-                  isManagementActive && 'shadow-sm'
-                )}
-              >
+              <button className={cn(navBtnBase, isManagementActive ? activeCls : idleCls)}>
                 <Package className="h-4 w-4" />
                 {isManagementActive ? getActiveManagementLabel() : 'Gestão'}
-                <ChevronDown className="h-3 w-3 opacity-50" />
-              </Button>
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="start" className="w-48">
               {managementItems.map((item) => (
                 <DropdownMenuItem
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
-                  className={cn(
-                    'flex items-center gap-2 cursor-pointer',
-                    activeTab === item.id && 'bg-accent'
-                  )}
+                  className={cn('gap-2 cursor-pointer', activeTab === item.id && 'bg-primary/10 text-primary font-medium')}
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
@@ -116,31 +105,20 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Grupo Stock */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant={isStockActive ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'flex items-center gap-2 whitespace-nowrap',
-                  isStockActive && 'shadow-sm'
-                )}
-              >
+              <button className={cn(navBtnBase, isStockActive ? activeCls : idleCls)}>
                 <TrendingUp className="h-4 w-4" />
                 {isStockActive ? getActiveStockLabel() : 'Stock'}
-                <ChevronDown className="h-3 w-3 opacity-50" />
-              </Button>
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="start" className="w-48">
               {stockItems.map((item) => (
                 <DropdownMenuItem
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
-                  className={cn(
-                    'flex items-center gap-2 cursor-pointer',
-                    activeTab === item.id && 'bg-accent'
-                  )}
+                  className={cn('gap-2 cursor-pointer', activeTab === item.id && 'bg-primary/10 text-primary font-medium')}
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
@@ -149,22 +127,19 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Items finais */}
-          {endTabs.map((tab) => (
-            <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => onTabChange(tab.id)}
-              className={cn(
-                'flex items-center gap-2 whitespace-nowrap',
-                activeTab === tab.id && 'shadow-sm'
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </Button>
-          ))}
+          {endTabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange(tab.id)}
+                className={cn(navBtnBase, isActive ? activeCls : idleCls)}
+              >
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </nav>
