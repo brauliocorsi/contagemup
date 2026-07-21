@@ -11,14 +11,35 @@ import { useCategories } from '@/hooks/useCategories';
 
 interface ProductFormProps {
   onSubmit: (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null; min_stock?: number }) => Promise<boolean>;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  initialCode?: string;
+  initialName?: string;
+  lockCode?: boolean;
+  hideTrigger?: boolean;
+  onCreated?: () => void;
 }
 
-export function ProductForm({ onSubmit }: ProductFormProps) {
+export function ProductForm({
+  onSubmit,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  initialCode,
+  initialName,
+  lockCode,
+  hideTrigger,
+  onCreated,
+}: ProductFormProps) {
   const { categories, loading: categoriesLoading } = useCategories();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (v: boolean) => {
+    if (controlledOnOpenChange) controlledOnOpenChange(v);
+    else setInternalOpen(v);
+  };
   const [isLoading, setIsLoading] = useState(false);
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
+  const [code, setCode] = useState(initialCode ?? '');
+  const [name, setName] = useState(initialName ?? '');
   const [category, setCategory] = useState('Geral');
   const [totalColis, setTotalColis] = useState(1);
   const [description, setDescription] = useState('');
