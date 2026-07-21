@@ -47,6 +47,14 @@ export function ProductForm({
   const [palletNumber, setPalletNumber] = useState('');
   const [minStock, setMinStock] = useState(5);
 
+  // Sync initial values when dialog opens (e.g. pre-fill from external caller)
+  useEffect(() => {
+    if (open) {
+      if (initialCode !== undefined) setCode(initialCode);
+      if (initialName !== undefined) setName(initialName);
+    }
+  }, [open, initialCode, initialName]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -72,6 +80,7 @@ export function ProductForm({
       setPalletNumber('');
       setMinStock(5);
       setOpen(false);
+      onCreated?.();
     }
     
     setIsLoading(false);
@@ -79,12 +88,14 @@ export function ProductForm({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Produto
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Produto
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
