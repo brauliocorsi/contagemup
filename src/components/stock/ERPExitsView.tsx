@@ -217,8 +217,8 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
       if (error) throw error;
       toast({ title: 'Produtos cadastrados', description: `${toInsert.length} produto(s) adicionado(s).` });
       fetchProducts();
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro', description: mapDatabaseError(err), variant: 'destructive' });
     } finally {
       setRegistering(false);
     }
