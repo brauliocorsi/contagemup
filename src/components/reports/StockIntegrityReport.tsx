@@ -203,7 +203,8 @@ export function StockIntegrityReport() {
 
   // syncCountsMutation removed in stock refactor Phase 1 (RPC sync_counts_with_current_stock dropped).
 
-  const handleExport = () => {
+  const handleExport = async () => {
+      const XLSX = await loadXLSX();
     if (!integrityData) return;
 
     const exportData = integrityData.checks
@@ -219,14 +220,15 @@ export function StockIntegrityReport() {
         'Avarias': c.damagedStock,
       }));
 
-    const ws = (await loadXLSX()).utils.json_to_sheet(exportData);
-    const wb = (await loadXLSX()).utils.book_new();
-    (await loadXLSX()).utils.book_append_sheet(wb, ws, 'Integridade');
-    (await loadXLSX()).writeFile(wb, `integridade_stock_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`);
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Integridade');
+    XLSX.writeFile(wb, `integridade_stock_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`);
     toast.success('Relatório exportado!');
   };
 
-  const handleExportImbalances = () => {
+  const handleExportImbalances = async () => {
+      const XLSX = await loadXLSX();
     if (!integrityData?.imbalances) return;
 
     const exportData = integrityData.imbalances.flatMap(item => 
@@ -241,10 +243,10 @@ export function StockIntegrityReport() {
       }))
     );
 
-    const ws = (await loadXLSX()).utils.json_to_sheet(exportData);
-    const wb = (await loadXLSX()).utils.book_new();
-    (await loadXLSX()).utils.book_append_sheet(wb, ws, 'Colis Incompletos');
-    (await loadXLSX()).writeFile(wb, `colis_incompletos_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`);
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Colis Incompletos');
+    XLSX.writeFile(wb, `colis_incompletos_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`);
     toast.success('Relatório de colis incompletos exportado!');
   };
 

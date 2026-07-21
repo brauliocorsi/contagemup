@@ -81,7 +81,8 @@ export function StockHistoryTable({
     toast.success(`${filteredMovements.length} movimentos exportados`);
   }, [filteredMovements, movementType, dateFrom, dateTo]);
 
-  const exportExcel = useCallback(() => {
+  const exportExcel = useCallback(async () => {
+      const XLSX = await loadXLSX();
     if (filteredMovements.length === 0) return;
     const headers = ['Data', 'Hora', 'Código', 'Produto', 'Quantidade', 'Motivo', 'Referência', 'Notas'];
     const rows = filteredMovements.map(m => {
@@ -109,11 +110,11 @@ export function StockHistoryTable({
       ['Total Movimentos', filteredMovements.length, '', '', '', '', '', ''],
       ['Total Unidades', totalUnits, '', '', '', '', '', ''],
     ];
-    const ws = (await loadXLSX()).utils.aoa_to_sheet(data);
+    const ws = XLSX.utils.aoa_to_sheet(data);
     ws['!cols'] = headers.map((_, i) => ({ wch: Math.min(Math.max(...data.map(r => String(r[i] || '').length) , 10) + 2, 40) }));
-    const wb = (await loadXLSX()).utils.book_new();
-    (await loadXLSX()).utils.book_append_sheet(wb, ws, typeLabel);
-    (await loadXLSX()).writeFile(wb, `${movementType === 'entrada' ? 'entradas' : 'saidas'}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, typeLabel);
+    XLSX.writeFile(wb, `${movementType === 'entrada' ? 'entradas' : 'saidas'}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
     toast.success(`${filteredMovements.length} movimentos exportados para Excel`);
   }, [filteredMovements, movementType, typeLabel, dateFrom, dateTo]);
 

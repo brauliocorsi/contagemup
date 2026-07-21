@@ -152,7 +152,8 @@ export function PickingHistoryView() {
 
   // Export session to PDF
   const exportSessionToPDF = async (session: PickingSession, items: PickingItem[]) => {
-    const doc = new (await loadPDF()).jsPDF();
+      const __PDF = await loadPDF(); const __PDFjsPDF = __PDF.jsPDF; const __PDFautoTable = __PDF.autoTable;
+    const doc = new __PDFjsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const groups = groupItemsByForklift(items);
     
@@ -199,7 +200,7 @@ export function PickingHistoryView() {
       doc.setTextColor(0);
       yPos += 4;
       
-      (await loadPDF()).autoTable(doc, {
+      __PDFautoTable(doc, {
         startY: yPos,
         head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Palete', 'Nível']],
         body: groups.forkliftItems.map((item, idx) => [
@@ -243,7 +244,7 @@ export function PickingHistoryView() {
       doc.setTextColor(0);
       yPos += 4;
       
-      (await loadPDF()).autoTable(doc, {
+      __PDFautoTable(doc, {
         startY: yPos,
         head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Palete', 'Nível']],
         body: groups.floorItems.map((item, idx) => [
@@ -287,7 +288,7 @@ export function PickingHistoryView() {
       doc.setTextColor(0);
       yPos += 4;
       
-      (await loadPDF()).autoTable(doc, {
+      __PDFautoTable(doc, {
         startY: yPos,
         head: [['#', 'Código', 'Produto', 'Qtd']],
         body: groups.noLocationItems.map((item, idx) => [

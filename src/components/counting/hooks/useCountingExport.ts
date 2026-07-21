@@ -57,16 +57,17 @@ export function useCountingExport(
   }, []);
 
   // Helper function to export to Excel
-  const exportToExcel = useCallback((data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
-    const worksheet = (await loadXLSX()).utils.aoa_to_sheet(data);
+  const exportToExcel = useCallback(async (data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
+      const XLSX = await loadXLSX();
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
     const colWidths = data[0].map((_, colIndex) => {
       const maxLength = Math.max(...data.map(row => String(row[colIndex] || '').length));
       return { wch: Math.min(Math.max(maxLength + 2, 10), 50) };
     });
     worksheet['!cols'] = colWidths;
-    const workbook = (await loadXLSX()).utils.book_new();
-    (await loadXLSX()).utils.book_append_sheet(workbook, worksheet, sheetName);
-    (await loadXLSX()).writeFile(workbook, filename);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, filename);
   }, []);
 
   // Shared headers

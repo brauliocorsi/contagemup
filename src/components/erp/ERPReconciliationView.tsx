@@ -112,7 +112,8 @@ export function ERPReconciliationView() {
 
   const canExport = comparisonItems.length > 0 && salesLoaded && !salesLoading && !loading && syncValidation?.isValid === true;
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
+      const XLSX = await loadXLSX();
     if (!canExport) return;
 
     // Always export ALL products (comparisonItems), not just filtered
@@ -173,7 +174,7 @@ export function ERPReconciliationView() {
       'Localização': '',
     } as any);
 
-    const ws = (await loadXLSX()).utils.json_to_sheet(data);
+    const ws = XLSX.utils.json_to_sheet(data);
     
     // Auto-size columns
     const colWidths = Object.keys(data[0] || {}).map(key => ({
@@ -181,9 +182,9 @@ export function ERPReconciliationView() {
     }));
     ws['!cols'] = colWidths;
 
-    const wb = (await loadXLSX()).utils.book_new();
-    (await loadXLSX()).utils.book_append_sheet(wb, ws, 'Conciliação ERP');
-    (await loadXLSX()).writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Conciliação ERP');
+    XLSX.writeFile(wb, `conciliacao_erp_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
 

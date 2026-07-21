@@ -77,7 +77,8 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
   }, [audits]);
 
   // Export all audits summary
-  const exportSummary = () => {
+  const exportSummary = async () => {
+      const XLSX = await loadXLSX();
     const data = audits.map(a => ({
       'Nome': a.name,
       'Status': getStatusConfig(a.status).label,
@@ -88,10 +89,10 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
       'Notas': a.notes || '',
     }));
 
-    const worksheet = (await loadXLSX()).utils.json_to_sheet(data);
-    const workbook = (await loadXLSX()).utils.book_new();
-    (await loadXLSX()).utils.book_append_sheet(workbook, worksheet, 'Conferências');
-    (await loadXLSX()).writeFile(workbook, `conferencias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Conferências');
+    XLSX.writeFile(workbook, `conferencias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
   if (isLoading) {

@@ -61,7 +61,8 @@ export function DamagesView() {
   }, [filteredDamages]);
 
   // Export to Excel
-  const exportToExcel = useCallback(() => {
+  const exportToExcel = useCallback(async () => {
+      const XLSX = await loadXLSX();
     const damagesToExport = filteredDamages;
     
     if (damagesToExport.length === 0) return;
@@ -92,7 +93,7 @@ export function DamagesView() {
       [`Resolvidas: ${damagesToExport.filter(d => d.status === 'resolved').length}`, '', '', '', '', '', '', '', '', '', '', '', '']
     ];
 
-    const worksheet = (await loadXLSX()).utils.aoa_to_sheet(data);
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
     
     const colWidths = data[3].map((_, colIndex) => {
       const maxLength = Math.max(...data.slice(3).map(row => String(row[colIndex] || '').length));
@@ -100,9 +101,9 @@ export function DamagesView() {
     });
     worksheet['!cols'] = colWidths;
 
-    const workbook = (await loadXLSX()).utils.book_new();
-    (await loadXLSX()).utils.book_append_sheet(workbook, worksheet, 'Avarias');
-    (await loadXLSX()).writeFile(workbook, `avarias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Avarias');
+    XLSX.writeFile(workbook, `avarias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   }, [filteredDamages]);
 
   if (loading) {

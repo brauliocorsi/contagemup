@@ -196,13 +196,14 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
     return { data, mapping, columns };
   };
 
-  const parseXLSX = (data: ArrayBuffer): { data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] } => {
-    const workbook = (await loadXLSX()).read(data, { type: 'array' });
+  const parseXLSX = async (data: ArrayBuffer): { data: Record<string, unknown>[]; mapping: ColumnMapping; columns: string[] } => {
+      const XLSX = await loadXLSX();
+    const workbook = XLSX.read(data, { type: 'array' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     
     // Convert to JSON with header row
-    const jsonData = (await loadXLSX()).utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
+    const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
     
     // Get all column names from the file
     const columns = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];

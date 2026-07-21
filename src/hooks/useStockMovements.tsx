@@ -261,6 +261,7 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
 
   // Parse CSV/Excel file
   const parseStockFile = async (file: File): Promise<ParsedCSVItem[]> => {
+      const XLSX = await loadXLSX();
     setIsProcessing(true);
     
     try {
@@ -270,10 +271,10 @@ export function useStockMovements(movementType?: 'entrada' | 'saida') {
       }
 
       const data = await file.arrayBuffer();
-      const workbook = (await loadXLSX()).read(data, { type: 'array' });
+      const workbook = XLSX.read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-      const rows = (await loadXLSX()).utils.sheet_to_json<Record<string, any>>(sheet);
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
 
       if (rows.length === 0) {
         throw new Error('Ficheiro vazio');

@@ -125,14 +125,15 @@ export function BulkStockCorrectionDialog({
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const XLSX = await loadXLSX();
     const file = event.target.files?.[0];
     if (!file) return;
 
     try {
       const data = await file.arrayBuffer();
-      const workbook = (await loadXLSX()).read(data);
+      const workbook = XLSX.read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = (await loadXLSX()).utils.sheet_to_json(worksheet) as Record<string, unknown>[];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
 
       // Fetch all products to match codes
       const { data: products, error } = await supabase
@@ -201,15 +202,16 @@ export function BulkStockCorrectionDialog({
     }
   };
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
+      const XLSX = await loadXLSX();
     const template = [
       { Codigo: 'PROD001', Stock: 100 },
       { Codigo: 'PROD002', Stock: 50 },
     ];
-    const ws = (await loadXLSX()).utils.json_to_sheet(template);
-    const wb = (await loadXLSX()).utils.book_new();
-    (await loadXLSX()).utils.book_append_sheet(wb, ws, 'Template');
-    (await loadXLSX()).writeFile(wb, 'template_correcao_stock.xlsx');
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, 'template_correcao_stock.xlsx');
   };
 
   const correctionMutation = useMutation({
