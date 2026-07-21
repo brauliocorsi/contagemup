@@ -112,31 +112,32 @@ export function RoutesView() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">Agendamento de Rotas</h1>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setView('optimizer')}>
-            <Calendar className="h-4 w-4 mr-1" />
-            Vista Semanal
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setView('regions')}>
-            <Settings className="h-4 w-4 mr-1" />
-            Regiões
-          </Button>
-          <Button variant="outline" onClick={() => setBuilderOpen(true)}>
-            <Route className="h-4 w-4 mr-1" />
-            Rota Regional
-          </Button>
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Nova Rota
-          </Button>
-        </div>
-      </div>
+    <PageContainer>
+      <PageHeader
+        icon={<MapPin className="h-5 w-5" />}
+        title="Agendamento de Rotas"
+        description="Planeamento, otimização e execução de entregas"
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setView('optimizer')}>
+              <Calendar className="h-4 w-4 mr-1" />
+              Vista Semanal
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setView('regions')}>
+              <Settings className="h-4 w-4 mr-1" />
+              Regiões
+            </Button>
+            <Button variant="outline" onClick={() => setBuilderOpen(true)}>
+              <Route className="h-4 w-4 mr-1" />
+              Rota Regional
+            </Button>
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Nova Rota
+            </Button>
+          </>
+        }
+      />
 
       <RoutesList
         routes={routes}
@@ -145,6 +146,7 @@ export function RoutesView() {
         onDelete={(id) => deleteRoute.mutate(id)}
         regions={regions}
       />
+
 
       <CreateRouteDialog
         open={createDialogOpen}
