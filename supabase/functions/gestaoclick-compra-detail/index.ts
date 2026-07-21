@@ -51,6 +51,16 @@ function numeroMatches(input: string, candidate: unknown): boolean {
   return stripLeadingZeros(a) === stripLeadingZeros(b);
 }
 
+// GestãoClick often wraps rows: { Compra: {...} } / { compra: {...} }.
+// deno-lint-ignore no-explicit-any
+function unwrapCompra(row: any): any {
+  if (!row || typeof row !== 'object') return row;
+  for (const key of ['Compra', 'compra']) {
+    if (key in row && row[key] && typeof row[key] === 'object') return row[key];
+  }
+  return row;
+}
+
 // deno-lint-ignore no-explicit-any
 function extractProductReferences(item: any): { productCode: string; productId: string; variationId: string } {
   const product = item?.produto || {};
@@ -185,7 +195,8 @@ Deno.serve(async (req) => {
         const r = await fetchWithRetry(`${baseListUrl}/${numero}`, { method: 'GET', headers: apiHeaders });
         if (r.ok) {
           const j = await r.json();
-          const d = j?.data ?? j;
+          const raw = j?.data ?? j;
+          const d = unwrapCompra(Array.isArray(raw) ? raw[0] : raw);
           if (d && (d.id || d.codigo || d.numero)) foundCompra = d;
         } else {
           await r.text();
@@ -193,7 +204,8 @@ Deno.serve(async (req) => {
       } catch (_e) { /* ignore */ }
     }
 
-    // 1) Fast path: try common filter params.
+    // 1) Fast path: try common filter params. If the API returns exactly 1 row
+    //    for a filter it recognizes, trust it (the filter already scoped it).
     if (!foundCompra) {
       for (const paramName of ['codigo', 'numero', 'numero_documento']) {
         try {
@@ -203,9 +215,16 @@ Deno.serve(async (req) => {
           if (!res.ok) { await res.text(); continue; }
           const j = await res.json();
           const arr = (j?.data || []) as unknown[];
-          console.log(`[compra-detail] filter ${paramName}=${numero} -> ${arr.length} rows`);
+          const totalRegistros = Number(j?.meta?.total_registros ?? arr.length);
+          console.log(`[compra-detail] filter ${paramName}=${numero} -> ${arr.length} rows (total=${totalRegistros})`);
+          if (arr.length === 1 && totalRegistros === 1) {
+            foundCompra = unwrapCompra(arr[0]);
+            console.log(`[compra-detail] single-hit id=${foundCompra?.id} codigo=${foundCompra?.codigo}`);
+            break;
+          }
           for (const c of arr) {
-            if (matchesNumero(c)) { foundCompra = c; break; }
+            const u = unwrapCompra(c);
+            if (matchesNumero(u)) { foundCompra = u; break; }
           }
           if (foundCompra) break;
         } catch (_e) { /* try next */ }
@@ -219,7 +238,8 @@ Deno.serve(async (req) => {
       console.log(`[compra-detail] scanning ${totalPages} pages of /api/compras for "${numero}"`);
       const scan = (arr: unknown[]) => {
         for (const c of arr) {
-          if (matchesNumero(c)) { foundCompra = c; return true; }
+          const u = unwrapCompra(c);
+          if (matchesNumero(u)) { foundCompra = u; return true; }
         }
         return false;
       };
@@ -254,7 +274,11 @@ Deno.serve(async (req) => {
         });
         if (detRes.ok) {
           const j = await detRes.json();
-          detail = j?.data ?? j ?? foundCompra;
+          const raw = j?.data ?? j ?? foundCompra;
+          detail = unwrapCompra(Array.isArray(raw) ? raw[0] : raw);
+          console.log(`[compra-detail] detail keys: ${Object.keys(detail || {}).join(',')}`);
+        } else {
+          await detRes.text();
         }
       } catch (_e) { /* keep list-level data */ }
     }
