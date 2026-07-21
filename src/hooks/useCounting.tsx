@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { mapDatabaseError } from '@/lib/errorMessages';
+import { getProductWithCounts as computeProductWithCounts } from '@/lib/counting/getProductWithCounts';
 
 export function useCounting(sessionId: string | null) {
   const { toast } = useToast();
