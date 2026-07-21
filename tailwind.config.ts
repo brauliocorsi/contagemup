@@ -126,9 +126,9 @@ export default {
         "gradient-surface": "var(--gradient-surface)",
       },
       fontFamily: {
-        heading: ["Space Grotesk", "ui-sans-serif", "system-ui", "sans-serif"],
+        heading: ["Urbanist", "ui-sans-serif", "system-ui", "sans-serif"],
         sans: [
-          "DM Sans",
+          "Epilogue",
           "ui-sans-serif",
           "system-ui",
           "-apple-system",
