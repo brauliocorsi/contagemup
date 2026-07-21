@@ -193,7 +193,8 @@ Deno.serve(async (req) => {
       } catch (_e) { /* ignore */ }
     }
 
-    // 1) Fast path: try common filter params.
+    // 1) Fast path: try common filter params. If the API returns exactly 1 row
+    //    for a filter it recognizes, trust it (the filter already scoped it).
     if (!foundCompra) {
       for (const paramName of ['codigo', 'numero', 'numero_documento']) {
         try {
@@ -203,7 +204,14 @@ Deno.serve(async (req) => {
           if (!res.ok) { await res.text(); continue; }
           const j = await res.json();
           const arr = (j?.data || []) as unknown[];
-          console.log(`[compra-detail] filter ${paramName}=${numero} -> ${arr.length} rows`);
+          const totalRegistros = Number(j?.meta?.total_registros ?? arr.length);
+          console.log(`[compra-detail] filter ${paramName}=${numero} -> ${arr.length} rows (total=${totalRegistros})`);
+          if (arr.length === 1 && totalRegistros === 1) {
+            foundCompra = arr[0];
+            const c = arr[0] as Record<string, unknown>;
+            console.log(`[compra-detail] single hit fields: id=${c.id} codigo=${c.codigo} numero=${c.numero} numero_documento=${c.numero_documento}`);
+            break;
+          }
           for (const c of arr) {
             if (matchesNumero(c)) { foundCompra = c; break; }
           }
