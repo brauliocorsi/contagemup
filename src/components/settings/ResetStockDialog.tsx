@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { mapDatabaseError } from '@/lib/errorMessages';
 
 interface ResetStockDialogProps {
   open: boolean;
@@ -35,60 +36,27 @@ export function ResetStockDialog({ open, onOpenChange }: ResetStockDialogProps) 
     if (!isConfirmed) return;
 
     setIsResetting(true);
+    setProgress('A executar reset transacional...');
 
     try {
-      // Passo 1: Apagar tabelas dependentes
-      setProgress('A apagar itens de picking...');
-      await supabase.from('picking_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      const { data, error } = await supabase.rpc('admin_reset_stock_data');
 
-      setProgress('A apagar logs de contagem...');
-      await supabase.from('count_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error) {
+        const isPermission =
+          error.code === '42501' ||
+          /insufficient_privilege|apenas administradores/i.test(error.message || '');
+        if (isPermission) {
+          toast({
+            title: 'Sem permissão',
+            description: 'Apenas administradores podem executar esta operação.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        throw error;
+      }
 
-      setProgress('A apagar itens de reconciliação...');
-      await supabase.from('reconciliation_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      setProgress('A apagar itens de auditoria...');
-      await supabase.from('location_audit_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Passo 2: Apagar tabelas principais
-      setProgress('A apagar contagens...');
-      await supabase.from('counts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      setProgress('A apagar movimentos de stock...');
-      await supabase.from('stock_movements').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      setProgress('A apagar sessões de picking...');
-      await supabase.from('picking_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      setProgress('A apagar sessões de contagem...');
-      await supabase.from('counting_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      setProgress('A apagar reconciliações...');
-      await supabase.from('reconciliations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      setProgress('A apagar auditorias...');
-      await supabase.from('location_audits').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      setProgress('A apagar histórico de alterações...');
-      await supabase.from('product_changes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      setProgress('A apagar relatórios de danos...');
-      await supabase.from('product_damages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Passo 3: Zerar stock nos produtos
-      setProgress('A zerar stock dos produtos...');
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({ 
-          current_stock: 0, 
-          damaged_stock: 0,
-          updated_at: new Date().toISOString()
-        })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (updateError) throw updateError;
-
-      // Invalidar todas as queries relevantes
+      // Invalidar queries relevantes
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['counts'] });
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
@@ -99,18 +67,33 @@ export function ResetStockDialog({ open, onOpenChange }: ResetStockDialogProps) 
       queryClient.invalidateQueries({ queryKey: ['product-damages'] });
       queryClient.invalidateQueries({ queryKey: ['last-counts'] });
 
+      const counts = (data ?? {}) as Record<string, number>;
+      const summary = [
+        ['Contagens', counts.counts],
+        ['Movimentos', counts.stock_movements],
+        ['Sessões contagem', counts.counting_sessions],
+        ['Sessões picking', counts.picking_sessions],
+        ['Reconciliações', counts.reconciliations],
+        ['Auditorias', counts.location_audits],
+        ['Danos', counts.product_damages],
+        ['Histórico', counts.product_changes],
+      ]
+        .filter(([, n]) => typeof n === 'number' && n > 0)
+        .map(([label, n]) => `${label}: ${n}`)
+        .join(' • ');
+
       toast({
         title: 'Reset concluído',
-        description: 'Todos os dados de stock foram zerados. O sistema está pronto para nova contagem.',
+        description: summary || 'Nenhum dado a apagar. Sistema pronto para nova contagem.',
       });
 
       setConfirmText('');
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro no reset:', error);
       toast({
         title: 'Erro no reset',
-        description: error.message || 'Ocorreu um erro ao fazer reset dos dados',
+        description: mapDatabaseError(error, 'Ocorreu um erro ao fazer reset dos dados'),
         variant: 'destructive',
       });
     } finally {

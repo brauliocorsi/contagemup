@@ -1189,6 +1189,7 @@ export type Database = {
       }
     }
     Functions: {
+      admin_reset_stock_data: { Args: never; Returns: Json }
       commit_exit_cart: {
         Args: {
           p_items: Json
@@ -1209,6 +1210,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
       recalculate_all_stock: { Args: never; Returns: undefined }
       register_damage: {
         Args: {
