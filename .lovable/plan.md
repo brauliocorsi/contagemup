@@ -1,88 +1,47 @@
-# Refactor UX/UI — UP Contagem
 
-Direção: **Ocean Deep** + **Urbanist/Epilogue** + **Sidebar layout**. Foco em clareza e hierarquia. Zero mudanças de funcionalidade — só apresentação.
+## Problema
 
-## Etapa 1 — Design system (tokens)
+O projeto usa `vite-plugin-pwa` com `registerType: "autoUpdate"` e um service worker que faz cache de `**/*.{js,css,html,ico,png,svg}`. Assim que o utilizador abriu a app uma vez, o SW serve os assets antigos do cache até que:
+1. Todas as abas da app sejam fechadas, ou
+2. O novo SW consiga tomar controlo (o `autoUpdate` só ativa após reload completo sem abas abertas).
 
-Substituir tokens em `src/index.css` e `tailwind.config.ts`:
+Por isso, mesmo com F5, a UI antiga continua a aparecer — é o service worker, não o servidor.
 
-- **Cores (light)**: background `#f7fafb`, surface `#ffffff`, primary `#1a4a6e` (navy médio), primary-glow `#2d8a9e` (teal), accent `#5cbdb9` (mint), foreground `#0c2340` (navy profundo). Sidebar em navy profundo (`#0c2340`) com foreground claro.
-- **Cores (dark)**: background `#0c2340`, surface `#12314f`, primary `#5cbdb9`, foreground `#e8f4f5`.
-- **Tipografia**: swap Google Fonts para `Urbanist` (heading, 500-700) + `Epilogue` (body, 400-600). Atualizar `--font-heading` e `--font-sans`.
-- **Radius**: `0.75rem` (mais suave, moderno).
-- **Sombras**: refinar `--shadow-sm/md/lg` com tint navy em vez de neutro.
-- **Semantic states**: manter success/warning/danger/info, ajustar hues para harmonizar com teal.
+Além disso, o `index.html` ainda tem as fontes antigas (`Space Grotesk` + `DM Sans`) em vez de `Urbanist` + `Epilogue` do redesign Ocean Deep, o que também contribui para a sensação de "não mudou nada".
 
-## Etapa 2 — App shell: migrar top-nav → sidebar
+## Correção proposta
 
-Novo shell em `src/App.tsx` (ou wrapper `AppLayout`):
+### 1. Forçar o service worker a assumir controlo imediato
+Em `vite.config.ts`, no bloco `VitePWA`:
+- Adicionar `workbox.skipWaiting: true` e `workbox.clientsClaim: true` para que a nova versão substitua a antiga sem esperar o fecho das abas.
+- Adicionar `workbox.cleanupOutdatedCaches: true` para eliminar caches de builds anteriores.
 
-```
-┌─────────────────────────────────────────┐
-│ Sidebar │  Header (trigger + user + …)  │
-│  logo   ├───────────────────────────────┤
-│  nav    │                               │
-│  ...    │        <Outlet />             │
-│  user   │                               │
-└─────────┴───────────────────────────────┘
-```
+### 2. Registar handler de update no cliente
+Criar `src/lib/pwa-update.ts` que usa `registerSW` do `virtual:pwa-register` para:
+- Detetar quando um novo SW está disponível.
+- Fazer `window.location.reload()` automático (ou mostrar um toast "Nova versão disponível — a atualizar…" com auto-reload após 1s).
 
-- Criar `src/components/layout/AppSidebar.tsx` com `Sidebar` (shadcn) colapsível `collapsible="icon"`.
-- Grupos: **Operação** (Dashboard, Contagem, Entradas, Saídas), **Catálogo** (Produtos, Avarias, Categorias), **Integração** (ERP, Rotas, Compras), **Análise** (Relatórios, Armazém), **Sistema** (Settings).
-- Item ativo destacado com `NavLink` + `useLocation`. Estado colapsado mostra só ícones.
-- `SidebarTrigger` fica no header (sempre visível).
-- `src/components/layout/Header.tsx`: reduzir para trigger + breadcrumb/título da página + busca global + user menu. Remover navegação horizontal.
-- **Remover** `src/components/layout/Navigation.tsx` (substituído pela sidebar).
-- Ajustar `src/pages/Dashboard.tsx` para renderizar dentro do novo shell.
+Importar esse ficheiro uma vez em `src/main.tsx`.
 
-Nota técnica: o projeto usa navegação por state (não react-router com rotas reais para cada vista). Vou preservar isso — a sidebar dispara o mesmo estado de vista atual, sem migração de routing.
+### 3. Alinhar as fontes do `index.html` com o novo design system
+Substituir o `<link>` do Google Fonts em `index.html`:
+- Remover `Space Grotesk` + `DM Sans`.
+- Carregar `Urbanist` (400,500,600,700) + `Epilogue` (400,500,600,700), que é o que o `tailwind.config.ts` e o `index.css` já esperam.
 
-## Etapa 3 — Primitivos compartilhados
+### 4. Instruções ao utilizador (uma única vez)
+Após esta build ser publicada, o utilizador precisa de:
+- Fechar **todas** as abas da app aberta e reabrir, **ou**
+- Fazer hard-reload (Ctrl+Shift+R / Cmd+Shift+R) uma vez.
 
-- `PageHeader`: já existe; refinar com breadcrumb opcional e melhor tratamento de actions.
-- `StatCard`: unificar variantes (default/success/warning/danger/info) e adicionar sparkline opcional.
-- `FilterBar`: revisar densidade e alinhamento em todas as vistas que usam.
-- `EmptyState` (novo): componente reutilizável para listas vazias.
-- `SectionCard` (novo): wrapper card com header + descrição para agrupar conteúdo dentro de páginas.
-
-## Etapa 4 — Refactor por vista (só apresentação)
-
-Passar por cada vista aplicando: `PageHeader` consistente, tokens semânticos (zero `text-white`/`bg-black`/hex), spacing uniforme (`space-y-6`), tabelas com zebra sutil, badges harmonizados. Sem mudar hooks nem lógica.
-
-1. **Dashboard** (`DashboardHome.tsx`) — já iniciado, refinar KPIs e seções recentes.
-2. **Contagem** (`CountingView`, `CountingHeader`, `ProductCard`, `CountingFilters`, `CountingSummary`) — reduzir ruído, hierarquizar contadores.
-3. **Entradas** (`StockEntriesView`) — polir carrinho de coli + painel recentes.
-4. **Saídas** (`StockExitsView`) — polir carrinho + badges de recomendação.
-5. **Produtos** (`ProductsView`, `RecentProductsView`, dialogs) — tabela mais leia, ações agrupadas.
-6. **Avarias** (`DamagesView`, `DamagesTable`, dialogs) — status com cores semânticas coerentes.
-7. **Categorias** (`CategoriesView`).
-8. **ERP** (`ERPReconciliationView`, `ERPExitsView`, `PendingSalesView`, `CancellationsView`).
-9. **Rotas** (`RoutesView`, `RoutesList`, `RouteDetail`, `RouteMap`, dialogs) — mapa mantém libs; só chrome à volta.
-10. **Compras** (`PurchaseOrdersView`).
-11. **Relatórios** (`ReportsView` e sub-relatórios) — cards de gráficos consistentes.
-12. **Armazém** (`WarehouseMapView`, `InteractiveWarehouseMap`, configs) — legends e controls polidos.
-13. **Sessões** (`SessionsView`).
-14. **Settings** (`SettingsView`, `ProfileSettings`, `ResetStockDialog`).
-15. **Login** (`LoginForm`) — hero split com paleta Ocean Deep.
-
-## Etapa 5 — Detalhes finais
-
-- Toasts (sonner): tema navy/teal, ícones consistentes.
-- Dialogs/Sheets: header padronizado, footers alinhados.
-- Estados de loading: skeletons em vez de spinners onde faz sentido.
-- Focus rings: teal `--ring` com boa visibilidade.
-- Dark mode: garantir contraste em todas as vistas.
+A partir daí, o `skipWaiting + clientsClaim` garante que todas as futuras atualizações são aplicadas automaticamente no próximo reload normal.
 
 ## Detalhes técnicos
 
-- Nenhuma mudança em hooks (`useProducts`, `useCounting`, etc.), RPCs, RLS, edge functions ou tipos.
-- Nenhuma alteração de rotas/navegação lógica — só a apresentação da navegação muda (top → sidebar).
-- `RealtimeSyncProvider` e providers permanecem intactos.
-- Preservar acessibilidade: aria-labels em botões-ícone, contraste AA.
-- Verificação: build + Playwright screenshots por vista após aplicar.
+- `vite-plugin-pwa` já está instalado — não é preciso adicionar dependências.
+- O import `virtual:pwa-register` é fornecido pelo próprio plugin (types já vêm com `vite-plugin-pwa/client`).
+- Nenhuma lógica de negócio é tocada; só shell/PWA.
 
-## Ordem de execução
+## Fora do âmbito
 
-Etapa 1 → 2 → 3 → 4 (por blocos de 3-4 vistas com verificação visual entre blocos) → 5.
-
-Confirma para começar pela Etapa 1 (design tokens + fontes) e Etapa 2 (sidebar shell), que são a base de tudo o resto.
+- Não vou desativar o PWA nem remover o service worker.
+- Não vou tocar em hooks, RPCs ou views funcionais.
