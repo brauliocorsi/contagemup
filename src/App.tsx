@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
+import { RealtimeSyncProvider } from "@/hooks/useRealtimeSync";
 import Index from "./pages/Index";
 import InstallApp from "./pages/InstallApp";
 import NotFound from "./pages/NotFound";
