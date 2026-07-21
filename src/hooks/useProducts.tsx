@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+// Realtime updates are handled centrally by RealtimeSyncProvider (see src/hooks/useRealtimeSync.tsx)
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Product } from '@/types/stock';
