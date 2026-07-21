@@ -195,7 +195,8 @@ Deno.serve(async (req) => {
         const r = await fetchWithRetry(`${baseListUrl}/${numero}`, { method: 'GET', headers: apiHeaders });
         if (r.ok) {
           const j = await r.json();
-          const d = j?.data ?? j;
+          const raw = j?.data ?? j;
+          const d = unwrapCompra(Array.isArray(raw) ? raw[0] : raw);
           if (d && (d.id || d.codigo || d.numero)) foundCompra = d;
         } else {
           await r.text();
@@ -217,18 +218,13 @@ Deno.serve(async (req) => {
           const totalRegistros = Number(j?.meta?.total_registros ?? arr.length);
           console.log(`[compra-detail] filter ${paramName}=${numero} -> ${arr.length} rows (total=${totalRegistros})`);
           if (arr.length === 1 && totalRegistros === 1) {
-            const raw = arr[0] as Record<string, unknown>;
-            console.log(`[compra-detail] raw single row keys: ${Object.keys(raw).join(',')}`);
-            // GestãoClick sometimes wraps the resource: { compra: {...} }
-            const unwrapped = (raw && typeof raw === 'object' && 'compra' in raw && typeof (raw as { compra: unknown }).compra === 'object')
-              ? (raw as { compra: Record<string, unknown> }).compra
-              : raw;
-            foundCompra = unwrapped;
-            console.log(`[compra-detail] unwrapped id=${unwrapped.id} codigo=${unwrapped.codigo} numero=${unwrapped.numero}`);
+            foundCompra = unwrapCompra(arr[0]);
+            console.log(`[compra-detail] single-hit id=${foundCompra?.id} codigo=${foundCompra?.codigo}`);
             break;
           }
           for (const c of arr) {
-            if (matchesNumero(c)) { foundCompra = c; break; }
+            const u = unwrapCompra(c);
+            if (matchesNumero(u)) { foundCompra = u; break; }
           }
           if (foundCompra) break;
         } catch (_e) { /* try next */ }
@@ -242,7 +238,8 @@ Deno.serve(async (req) => {
       console.log(`[compra-detail] scanning ${totalPages} pages of /api/compras for "${numero}"`);
       const scan = (arr: unknown[]) => {
         for (const c of arr) {
-          if (matchesNumero(c)) { foundCompra = c; return true; }
+          const u = unwrapCompra(c);
+          if (matchesNumero(u)) { foundCompra = u; return true; }
         }
         return false;
       };
