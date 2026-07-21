@@ -4,28 +4,16 @@ import { Reconciliation, ReconciliationItem, CSVImportRow, CSVParseResult, CSVVa
 import { ProductWithCounts } from '@/types/stock';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
-import { loadXLSX } from '@/lib/lazyXlsx';
-// Column aliases for auto-detection
-const COLUMN_ALIASES = {
-  code: ['codigo', 'code', 'código', 'cod', 'sku', 'ref', 'referencia', 'referência', 'product_code', 'productcode'],
-  name: ['nome', 'name', 'produto', 'product', 'description', 'descricao', 'descrição', 'designacao', 'designação'],
-  quantity: ['quantidade', 'quantity', 'qty', 'qtd', 'stock', 'qtde', 'quant', 'qnt', 'un', 'unidades']
-};
+import {
+  parseReconciliationCSV,
+  parseReconciliationXLSX,
+  reParseReconciliationWithMapping,
+  type ColumnMapping,
+  type FileParseResult,
+} from '@/lib/reconciliation/fileParser';
 
-export interface ColumnMapping {
-  code: string | null;
-  name: string | null;
-  quantity: string | null;
-}
-
-export interface FileParseResult {
-  rows: CSVImportRow[];
-  errors: CSVValidationError[];
-  headerError: string | null;
-  headers: string[];
-  detectedMapping: ColumnMapping;
-  rawData: Record<string, unknown>[];
-}
+// Re-export types kept for backward compatibility with existing importers
+export type { ColumnMapping, FileParseResult };
 
 export function useReconciliation() {
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
