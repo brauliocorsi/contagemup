@@ -47,7 +47,6 @@ const groups: { label: string; items: NavItem[] }[] = [
   {
     label: 'ERP & Operações',
     items: [
-      { id: 'reconciliation', label: 'Separação', icon: Scale },
       { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
       { id: 'purchases', label: 'Compras', icon: ShoppingBag },
       { id: 'pending-sales', label: 'Vendas Pendentes', icon: FileText },
