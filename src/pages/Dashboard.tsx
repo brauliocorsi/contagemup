@@ -103,7 +103,7 @@ export default function Dashboard() {
               {activeTab === 'exits' && <StockExitsView />}
               {activeTab === 'alerts' && <StockAlertsView />}
               {activeTab === 'damages' && <DamagesView />}
-              {activeTab === 'reconciliation' && <ReconciliationView />}
+              {activeTab === 'erp' && <ERPReconciliationView />}
               {activeTab === 'erp' && <ERPReconciliationView />}
               {activeTab === 'purchases' && <PurchaseOrdersView />}
               {activeTab === 'routes' && <RoutesView />}
