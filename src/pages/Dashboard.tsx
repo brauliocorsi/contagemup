@@ -13,7 +13,7 @@ const ProductsView = lazy(() => import('@/components/products/ProductsView').the
 const CategoriesView = lazy(() => import('@/components/categories/CategoriesView').then(m => ({ default: m.CategoriesView })));
 const SessionsView = lazy(() => import('@/components/sessions/SessionsView').then(m => ({ default: m.SessionsView })));
 const ReportsView = lazy(() => import('@/components/reports/ReportsView').then(m => ({ default: m.ReportsView })));
-const ReconciliationView = lazy(() => import('@/components/reconciliation/ReconciliationView').then(m => ({ default: m.ReconciliationView })));
+
 const StockEntriesView = lazy(() => import('@/components/stock/StockEntriesView').then(m => ({ default: m.StockEntriesView })));
 const StockExitsView = lazy(() => import('@/components/stock/StockExitsView').then(m => ({ default: m.StockExitsView })));
 const StockAlertsView = lazy(() => import('@/components/stock/StockAlertsView').then(m => ({ default: m.StockAlertsView })));
@@ -103,7 +103,7 @@ export default function Dashboard() {
               {activeTab === 'exits' && <StockExitsView />}
               {activeTab === 'alerts' && <StockAlertsView />}
               {activeTab === 'damages' && <DamagesView />}
-              {activeTab === 'reconciliation' && <ReconciliationView />}
+              {activeTab === 'erp' && <ERPReconciliationView />}
               {activeTab === 'erp' && <ERPReconciliationView />}
               {activeTab === 'purchases' && <PurchaseOrdersView />}
               {activeTab === 'routes' && <RoutesView />}
