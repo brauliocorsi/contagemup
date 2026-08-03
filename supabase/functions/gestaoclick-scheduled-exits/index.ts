@@ -149,10 +149,13 @@ Deno.serve(async (req) => {
 
     console.log('Included status IDs:', [...includedIds], 'Filter statuses:', filterStatuses);
 
-    // Step 2: Fetch all vendas and filter
+    // Step 2: Fetch vendas (filtered server-side por situação) e filtrar por data
+    const startedAt = Date.now();
+    const DEADLINE_MS = 100_000; // margem face ao idle timeout de 150s
+    const timeLeft = () => DEADLINE_MS - (Date.now() - startedAt);
+
     const matchingVendas: any[] = [];
-    const firstPage = await fetchPage('https://api.gestaoclick.com/api/vendas', 1, apiHeaders);
-    const totalPages = firstPage.meta.total_paginas || 1;
+    let truncated = false;
 
     const processVendas = (vendas: any[]) => {
       for (const venda of vendas) {
@@ -170,21 +173,37 @@ Deno.serve(async (req) => {
       }
     };
 
-    processVendas(firstPage.data);
+    const BATCH_SIZE = 10;
 
-    const BATCH_SIZE = 5;
-    for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
-      const pages = [];
-      for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
+    const scanVendasUrl = async (baseUrl: string) => {
+      const first = await fetchPage(baseUrl, 1, apiHeaders);
+      processVendas(first.data);
+      const totalPages = first.meta.total_paginas || 1;
 
-      const results = await Promise.all(
-        pages.map(p => fetchPage('https://api.gestaoclick.com/api/vendas', p, apiHeaders))
-      );
-      for (const result of results) processVendas(result.data);
+      for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH_SIZE) {
+        if (timeLeft() <= 0) { truncated = true; return; }
+        const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
+        const pages: number[] = [];
+        for (let p = batchStart; p <= batchEnd; p++) pages.push(p);
+        const results = await Promise.all(pages.map(p => fetchPage(baseUrl, p, apiHeaders)));
+        for (const result of results) processVendas(result.data);
+      }
+    };
 
-      if (batchEnd < totalPages) await new Promise(resolve => setTimeout(resolve, 200));
+    if (includedIds.size > 0) {
+      // Uma varredura por situação: reduz drasticamente o nº de páginas
+      for (const sid of includedIds) {
+        if (timeLeft() <= 0) { truncated = true; break; }
+        await scanVendasUrl(`https://api.gestaoclick.com/api/vendas?situacao_id=${encodeURIComponent(sid)}`);
+      }
+      // Fallback: se o filtro do servidor não devolveu nada, varre tudo
+      if (matchingVendas.length === 0 && !truncated) {
+        await scanVendasUrl('https://api.gestaoclick.com/api/vendas');
+      }
+    } else {
+      await scanVendasUrl('https://api.gestaoclick.com/api/vendas');
     }
+
 
     // Step 3: Resolve product codes if needed
     const requiredProductIds = new Set<string>();
