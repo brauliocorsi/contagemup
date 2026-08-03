@@ -305,6 +305,8 @@ Deno.serve(async (req) => {
       dateFrom,
       dateTo,
       allSituacoes, // Return all available statuses for the UI
+      truncated,
+
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
