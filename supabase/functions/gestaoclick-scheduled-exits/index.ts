@@ -246,13 +246,14 @@ Deno.serve(async (req) => {
       };
 
       consumeProducts(firstProductsPage.data);
-      for (let bs = 2; bs <= totalProductPages && (pendingProductIds.size > 0 || pendingVariationIds.size > 0); bs += 5) {
-        const be = Math.min(bs + 4, totalProductPages);
+      for (let bs = 2; bs <= totalProductPages && (pendingProductIds.size > 0 || pendingVariationIds.size > 0); bs += 10) {
+        if (timeLeft() <= 0) { truncated = true; break; }
+        const be = Math.min(bs + 9, totalProductPages);
         const pgs = []; for (let p = bs; p <= be; p++) pgs.push(p);
         const res = await Promise.all(pgs.map(p => fetchPage(productsBaseUrl, p, apiHeaders)));
         for (const r of res) consumeProducts(r.data);
-        if (be < totalProductPages) await new Promise(r => setTimeout(r, 150));
       }
+
     }
 
     // Step 4: Build exit items
