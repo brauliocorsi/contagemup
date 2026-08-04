@@ -308,6 +308,28 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
 
   const totalItems = cart.length;
 
+  const cartQtyMap = useMemo(() => {
+    const m = new Map<string, number>();
+    cart.forEach(i => m.set(i.product_id, i.mode === 'set'
+      ? i.setQuantity
+      : Object.values(i.colisQuantities).reduce((a, b) => a + (b || 0), 0)));
+    return m;
+  }, [cart]);
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    const term = search.trim().toLowerCase();
+    if (!term) return;
+    const exact = products.find(p => p.code.toLowerCase() === term);
+    const target = exact ?? (filteredProducts.length === 1 ? filteredProducts[0] : null);
+    if (target) {
+      e.preventDefault();
+      addProductToCart(target);
+      toast.success(`${target.name} adicionado`);
+      setSearch('');
+    }
+  }, [search, products, filteredProducts, addProductToCart]);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -316,6 +338,9 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-red-600" />
             Carrinho de saída
+            {totalItems > 0 && (
+              <Badge variant="secondary">{totalItems} produto{totalItems === 1 ? '' : 's'}</Badge>
+            )}
           </h2>
           <p className="text-sm text-muted-foreground">
             Rascunho — nada sai do stock até clicar em <span className="font-medium">"Concluir e retirar do stock"</span>.
@@ -329,51 +354,66 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
           {/* Product picker */}
           <Card>
             <CardContent className="pt-6">
-              <Label className="mb-2 block">Adicionar produto</Label>
+              <Label className="mb-2 block">Adicionar produtos (a pesquisa fica aberta)</Label>
               <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start gap-2">
                     <Search className="h-4 w-4" />
                     Procurar por código ou nome…
+                    {totalItems > 0 && (
+                      <Badge variant="secondary" className="ml-auto">{totalItems}</Badge>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="p-0 w-[min(640px,90vw)]" align="start">
                   <Command shouldFilter={false}>
                     <CommandInput
-                      placeholder="código ou nome…"
+                      placeholder="código ou nome… (Enter adiciona)"
                       value={search}
                       onValueChange={setSearch}
+                      onKeyDown={handleSearchKeyDown}
                     />
                     <CommandList>
                       <CommandEmpty>Sem resultados</CommandEmpty>
                       <CommandGroup>
-                        {filteredProducts.map(p => (
-                          <CommandItem
-                            key={p.id}
-                            value={p.id}
-                            onSelect={() => {
-                              addProductToCart(p);
-                              setPickerOpen(false);
-                              setSearch('');
-                            }}
-                          >
-                            <Package className="h-4 w-4 mr-2 text-muted-foreground" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{p.name}</div>
-                              <div className="text-xs text-muted-foreground font-mono">
-                                {p.code} · stock {p.current_stock ?? 0}
+                        {filteredProducts.map(p => {
+                          const inCart = cartQtyMap.get(p.id);
+                          return (
+                            <CommandItem
+                              key={p.id}
+                              value={p.id}
+                              onSelect={() => addProductToCart(p)}
+                            >
+                              <Package className="h-4 w-4 mr-2 text-muted-foreground" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">{p.name}</div>
+                                <div className="text-xs text-muted-foreground font-mono">
+                                  {p.code} · stock {p.current_stock ?? 0}
+                                </div>
                               </div>
-                            </div>
-                            <Plus className="h-4 w-4 ml-2" />
-                          </CommandItem>
-                        ))}
+                              {inCart !== undefined ? (
+                                <span className="ml-2 flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                                  <Check className="h-4 w-4" />
+                                  {inCart}
+                                </span>
+                              ) : (
+                                <Plus className="h-4 w-4 ml-2" />
+                              )}
+                            </CommandItem>
+                          );
+                        })}
                       </CommandGroup>
                     </CommandList>
                   </Command>
+                  <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
+                    <span>{totalItems} no carrinho</span>
+                    <Button size="sm" variant="ghost" onClick={() => setPickerOpen(false)}>Fechar</Button>
+                  </div>
                 </PopoverContent>
               </Popover>
             </CardContent>
           </Card>
+
 
           {/* Cart items */}
           {cart.length === 0 ? (
