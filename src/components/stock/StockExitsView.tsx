@@ -141,9 +141,11 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
 
   const addProductToCart = useCallback((p: Product) => {
     setCart(prev => {
-      if (prev.some(i => i.product_id === p.id)) {
-        toast.info(`${p.name} já está no carrinho`);
-        return prev;
+      const existing = prev.find(i => i.product_id === p.id);
+      if (existing) {
+        return prev.map(i => i.product_id === p.id
+          ? { ...i, setQuantity: i.mode === 'set' ? i.setQuantity + 1 : i.setQuantity }
+          : i);
       }
       const totalColis = effectiveColis(p);
       return [...prev, {
@@ -160,6 +162,7 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
       }];
     });
   }, [effectiveColis]);
+
 
   // Handle external (ERP) additions
   useEffect(() => {
