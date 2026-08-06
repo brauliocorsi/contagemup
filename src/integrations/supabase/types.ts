@@ -1211,6 +1211,16 @@ export type Database = {
         Returns: boolean
       }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
+      merge_colis_counts: {
+        Args: {
+          p_colis_number: number
+          p_location: string
+          p_pallet: string
+          p_product_id: string
+          p_session_id: string
+        }
+        Returns: number
+      }
       recalculate_all_stock: { Args: never; Returns: undefined }
       register_damage: {
         Args: {
@@ -1285,6 +1295,15 @@ export type Database = {
           p_resolution_type: string
         }
         Returns: Json
+      }
+      split_colis_counts: {
+        Args: {
+          p_colis_number: number
+          p_distributions: Json
+          p_product_id: string
+          p_session_id: string
+        }
+        Returns: number
       }
     }
     Enums: {
