@@ -583,47 +583,32 @@ export function useCounting(sessionId: string | null) {
     return true;
   };
 
-  // Split stock for a coli across multiple locations
+  // Split stock for a coli across multiple locations (atomic RPC — works for non-admins)
   const splitColisStock = async (productId: string, colisNumber: number, distributions: StockDistribution[]) => {
     if (!sessionId || !user) return false;
 
     try {
-      // Delete ALL counts for this coli (session + administrative)
-      // This prevents "ghost" records from causing quantity duplication
-      const { error: deleteError } = await supabase
-        .from('counts')
-        .delete()
-        .eq('product_id', productId)
-        .eq('colis_number', colisNumber)
-        .or(`session_id.eq.${sessionId},session_id.is.null`);
-
-      if (deleteError) throw deleteError;
-
-      // Insert new count records for each distribution (always with current session_id)
-      const newCounts = distributions
+      const payload = distributions
         .filter(d => d.quantity > 0)
         .map(d => ({
-          session_id: sessionId,
-          product_id: productId,
-          colis_number: colisNumber,
           quantity: d.quantity,
           location: d.location || null,
           pallet_number: d.pallet_number || null,
-          counted_by: user.id
         }));
 
-      if (newCounts.length > 0) {
-        const { error: insertError } = await supabase
-          .from('counts')
-          .insert(newCounts);
+      const { error } = await supabase.rpc('split_colis_counts', {
+        p_product_id: productId,
+        p_session_id: sessionId,
+        p_colis_number: colisNumber,
+        p_distributions: payload,
+      });
 
-        if (insertError) throw insertError;
-      }
+      if (error) throw error;
 
       invalidateCounts();
       toast({
         title: 'Stock dividido',
-        description: `Coli ${colisNumber} distribuído em ${distributions.length} localização${distributions.length > 1 ? 'es' : ''}`
+        description: `Coli ${colisNumber} distribuído em ${payload.length} localização${payload.length > 1 ? 'es' : ''}`
       });
       return true;
     } catch (error: any) {
@@ -636,56 +621,25 @@ export function useCounting(sessionId: string | null) {
     }
   };
 
-  // Merge all location entries for a coli into a single location
+  // Merge all location entries for a coli into a single location (atomic RPC — works for non-admins)
   const mergeColisStock = async (productId: string, colisNumber: number, targetLocation: string, targetPallet: string) => {
     if (!sessionId || !user) return false;
 
     try {
-      // Fetch fresh data from DB to get accurate totals (session + administrative)
-      const { data: freshCounts, error: fetchError } = await supabase
-        .from('counts')
-        .select('id, quantity, session_id')
-        .eq('product_id', productId)
-        .eq('colis_number', colisNumber)
-        .or(`session_id.eq.${sessionId},session_id.is.null`);
+      const { data, error } = await supabase.rpc('merge_colis_counts', {
+        p_product_id: productId,
+        p_session_id: sessionId,
+        p_colis_number: colisNumber,
+        p_location: targetLocation || '',
+        p_pallet: targetPallet || '',
+      });
 
-      if (fetchError) throw fetchError;
-      
-      // Sum total quantity from fresh data
-      const totalQuantity = (freshCounts || []).reduce((sum, c) => sum + (c.quantity || 0), 0);
-
-      // Delete ALL counts for this coli (session + administrative)
-      // This prevents "ghost" records from causing quantity duplication
-      const { error: deleteError } = await supabase
-        .from('counts')
-        .delete()
-        .eq('product_id', productId)
-        .eq('colis_number', colisNumber)
-        .or(`session_id.eq.${sessionId},session_id.is.null`);
-
-      if (deleteError) throw deleteError;
-
-      // Insert single merged count (always with current session_id)
-      if (totalQuantity > 0) {
-        const { error: insertError } = await supabase
-          .from('counts')
-          .insert({
-            session_id: sessionId,
-            product_id: productId,
-            colis_number: colisNumber,
-            quantity: totalQuantity,
-            location: targetLocation || null,
-            pallet_number: targetPallet || null,
-            counted_by: user.id
-          });
-
-        if (insertError) throw insertError;
-      }
+      if (error) throw error;
 
       invalidateCounts();
       toast({
         title: 'Stock unificado',
-        description: `${totalQuantity} unidades do Coli ${colisNumber} agora em ${targetLocation || 'localização única'}`
+        description: `${data ?? 0} unidades do Coli ${colisNumber} agora em ${targetLocation || 'localização única'}`
       });
       return true;
     } catch (error: any) {
@@ -697,6 +651,7 @@ export function useCounting(sessionId: string | null) {
       return false;
     }
   };
+
 
   // Increment count at a specific location
   const incrementCountAtLocation = async (productId: string, colisNumber: number, countId?: string) => {
