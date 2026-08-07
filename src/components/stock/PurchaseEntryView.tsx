@@ -67,6 +67,24 @@ export function PurchaseEntryView() {
     return m;
   }, [products]);
 
+  // Fallback: when the ERP item comes without a code, match by product name.
+  const productByName = useMemo(() => {
+    const m = new Map<string, Product>();
+    for (const p of products) {
+      const k = normalizeName(p.name);
+      if (k && !m.has(k)) m.set(k, p);
+    }
+    return m;
+  }, [products]);
+
+  const resolveProduct = useCallback((item: GcCompraItem): Product | undefined => {
+    if (item.codigo) {
+      const byCode = productByCode.get(normalizeCode(item.codigo));
+      if (byCode) return byCode;
+    }
+    return productByName.get(normalizeName(item.nome));
+  }, [productByCode, productByName]);
+
   const carregar = async () => {
     const n = numero.trim();
     if (!n) {
@@ -87,7 +105,8 @@ export function PurchaseEntryView() {
 
       setCompra(data.compra);
       const initialRows: RowState[] = (data.itens || []).map((it, idx) => {
-        const exists = it.codigo ? productByCode.has(normalizeCode(it.codigo)) : false;
+        const match = resolveProduct(it);
+
         return {
           key: `${it.codigo || 'sem-codigo'}-${idx}`,
           item: it,
