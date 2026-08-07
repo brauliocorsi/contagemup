@@ -106,14 +106,14 @@ export function PurchaseEntryView() {
       setCompra(data.compra);
       const initialRows: RowState[] = (data.itens || []).map((it, idx) => {
         const match = resolveProduct(it);
-
         return {
-          key: `${it.codigo || 'sem-codigo'}-${idx}`,
-          item: it,
+          key: `${it.codigo || normalizeName(it.nome) || 'sem-codigo'}-${idx}`,
+          item: { ...it, codigo: it.codigo || match?.code || '' },
           qtyEntry: Math.max(0, Math.min(9999, Math.round(it.quantidade || 0))),
-          selected: exists,
+          selected: !!match,
         };
       });
+
       setRows(initialRows);
 
       // Check duplicate — has this compra been entered before?
