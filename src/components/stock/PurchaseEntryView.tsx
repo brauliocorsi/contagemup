@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ShoppingCart, Search, Loader2, CheckCircle2, AlertCircle, Plus, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,14 @@ import type { GcCompraDetailResponse, GcCompraHeader, GcCompraItem } from '@/typ
 import type { Product } from '@/types/stock';
 
 const normalizeCode = (v: string) => v.trim().toLowerCase();
+const normalizeName = (v: string) =>
+  (v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
 
 interface RowState {
   key: string;
@@ -59,6 +67,24 @@ export function PurchaseEntryView() {
     return m;
   }, [products]);
 
+  // Fallback: when the ERP item comes without a code, match by product name.
+  const productByName = useMemo(() => {
+    const m = new Map<string, Product>();
+    for (const p of products) {
+      const k = normalizeName(p.name);
+      if (k && !m.has(k)) m.set(k, p);
+    }
+    return m;
+  }, [products]);
+
+  const resolveProduct = useCallback((item: GcCompraItem): Product | undefined => {
+    if (item.codigo) {
+      const byCode = productByCode.get(normalizeCode(item.codigo));
+      if (byCode) return byCode;
+    }
+    return productByName.get(normalizeName(item.nome));
+  }, [productByCode, productByName]);
+
   const carregar = async () => {
     const n = numero.trim();
     if (!n) {
@@ -79,14 +105,15 @@ export function PurchaseEntryView() {
 
       setCompra(data.compra);
       const initialRows: RowState[] = (data.itens || []).map((it, idx) => {
-        const exists = it.codigo ? productByCode.has(normalizeCode(it.codigo)) : false;
+        const match = resolveProduct(it);
         return {
-          key: `${it.codigo || 'sem-codigo'}-${idx}`,
-          item: it,
+          key: `${it.codigo || normalizeName(it.nome) || 'sem-codigo'}-${idx}`,
+          item: { ...it, codigo: it.codigo || match?.code || '' },
           qtyEntry: Math.max(0, Math.min(9999, Math.round(it.quantidade || 0))),
-          selected: exists,
+          selected: !!match,
         };
       });
+
       setRows(initialRows);
 
       // Check duplicate — has this compra been entered before?
@@ -111,17 +138,15 @@ export function PurchaseEntryView() {
   };
 
   const allRegisteredSelected = useMemo(() => {
-    const registeredRows = rows.filter(r => r.item.codigo && productByCode.has(normalizeCode(r.item.codigo)));
+    const registeredRows = rows.filter(r => !!resolveProduct(r.item));
     if (registeredRows.length === 0) return false;
     return registeredRows.every(r => r.selected);
-  }, [rows, productByCode]);
+  }, [rows, resolveProduct]);
 
   const toggleAll = (checked: boolean) => {
-    setRows(prev => prev.map(r => {
-      const exists = r.item.codigo && productByCode.has(normalizeCode(r.item.codigo));
-      return exists ? { ...r, selected: checked } : r;
-    }));
+    setRows(prev => prev.map(r => (resolveProduct(r.item) ? { ...r, selected: checked } : r)));
   };
+
 
   const openQuickRegister = (item: GcCompraItem) => {
     setQuickCode(item.codigo);
@@ -129,7 +154,7 @@ export function PurchaseEntryView() {
     setQuickOpen(true);
   };
 
-  const selectedRows = rows.filter(r => r.selected && r.item.codigo && productByCode.has(normalizeCode(r.item.codigo)) && r.qtyEntry > 0);
+  const selectedRows = rows.filter(r => r.selected && !!resolveProduct(r.item) && r.qtyEntry > 0);
 
   const iniciarEntrada = () => {
     if (!compra) return;
@@ -157,7 +182,7 @@ export function PurchaseEntryView() {
 
     for (let i = 0; i < selectedRows.length; i++) {
       const r = selectedRows[i];
-      const product = productByCode.get(normalizeCode(r.item.codigo));
+      const product = resolveProduct(r.item);
       if (!product) {
         failed.push({ code: r.item.codigo, name: r.item.nome, reason: 'Produto local não encontrado' });
         setProgress({ done: i + 1, total: selectedRows.length });
@@ -211,7 +236,7 @@ export function PurchaseEntryView() {
     if (ok > 0) setDuplicateWarning(true);
   };
 
-  const registeredCount = rows.filter(r => r.item.codigo && productByCode.has(normalizeCode(r.item.codigo))).length;
+  const registeredCount = rows.filter(r => !!resolveProduct(r.item)).length;
   const missingCount = rows.length - registeredCount;
 
   return (
@@ -285,7 +310,7 @@ export function PurchaseEntryView() {
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
                 {rows.map(r => {
-                  const exists = r.item.codigo && productByCode.has(normalizeCode(r.item.codigo));
+                  const exists = !!resolveProduct(r.item);
                   return (
                     <div key={r.key} className="border rounded-lg p-3 space-y-2">
                       <div className="flex items-center justify-between gap-2">
@@ -355,7 +380,7 @@ export function PurchaseEntryView() {
                     </TableHeader>
                     <TableBody>
                       {rows.map(r => {
-                        const exists = r.item.codigo && productByCode.has(normalizeCode(r.item.codigo));
+                        const exists = !!resolveProduct(r.item);
                         return (
                           <TableRow key={r.key}>
                             <TableCell>
@@ -472,17 +497,20 @@ export function PurchaseEntryView() {
         onOpenChange={setQuickOpen}
         initialCode={quickCode}
         initialName={quickName}
-        lockCode
+        lockCode={!!quickCode}
         hideTrigger
         onCreated={() => {
           // Force reselect the row now that product exists (products list will refresh via react-query)
           setTimeout(() => {
             setRows(prev => prev.map(r => {
-              if (r.item.codigo === quickCode) return { ...r, selected: true };
+              const sameCode = !!quickCode && r.item.codigo === quickCode;
+              const sameName = normalizeName(r.item.nome) === normalizeName(quickName);
+              if (sameCode || sameName) return { ...r, selected: true };
               return r;
             }));
           }, 50);
         }}
+
       />
     </div>
   );

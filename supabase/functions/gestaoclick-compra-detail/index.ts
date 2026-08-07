@@ -120,6 +120,15 @@ function extractCompraHeader(compra: any) {
   };
 }
 
+function normalizeName(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 interface NormalizedItem {
   codigo: string;
   nome: string;
@@ -128,6 +137,7 @@ interface NormalizedItem {
   produto_id_gc: string;
   variacao_id_gc: string;
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -291,71 +301,105 @@ Deno.serve(async (req) => {
       (detail?.items as unknown[]) ||
       [];
 
+    // deno-lint-ignore no-explicit-any
+    const itemName = (it: any): string =>
+      it?.nome ||
+      it?.produto_nome ||
+      it?.produto?.nome ||
+      it?.produto?.nome_produto ||
+      it?.descricao ||
+      it?.produto?.descricao ||
+      '';
+
     // Collect refs needing product lookup
     const requiredProductIds = new Set<string>();
     const requiredVariationIds = new Set<string>();
+    const requiredNames = new Set<string>();
     for (const it of rawItems) {
       const refs = extractProductReferences(it);
       if (!refs.productCode) {
         if (refs.productId) requiredProductIds.add(refs.productId);
         if (refs.variationId) requiredVariationIds.add(refs.variationId);
+        const n = normalizeName(itemName(it));
+        if (n) requiredNames.add(n);
+        console.log(`[compra-detail] item sem código direto: keys=${Object.keys((it as Record<string, unknown>) || {}).join(',')} nome="${itemName(it)}"`);
       }
     }
 
     const productCodeByProductId: Record<string, string> = {};
     const productCodeByVariationId: Record<string, string> = {};
+    const productCodeByName: Record<string, string> = {};
 
-    if (requiredProductIds.size > 0 || requiredVariationIds.size > 0) {
-      const productsBaseUrl = 'https://api.gestaoclick.com/api/produtos?ativo=1';
-      const firstProductsPage = await fetchPage(productsBaseUrl, 1, apiHeaders);
-      const totalProductPages = Math.min(Number(firstProductsPage.meta?.total_paginas ?? 1), 30);
+    if (requiredProductIds.size > 0 || requiredVariationIds.size > 0 || requiredNames.size > 0) {
       const pendingProductIds = new Set(requiredProductIds);
       const pendingVariationIds = new Set(requiredVariationIds);
+      const pendingNames = new Set(requiredNames);
+
+      const stillPending = () =>
+        pendingProductIds.size > 0 || pendingVariationIds.size > 0 || pendingNames.size > 0;
 
       // deno-lint-ignore no-explicit-any
       const consumeProducts = (products: any[]) => {
         for (const product of products) {
-          const pid = normalizeIdentifier(product?.id);
-          const code = normalizeCode(product?.codigo_interno || product?.codigo);
+          // GestãoClick may wrap rows as { Produto: {...} }
+          const p = product?.Produto || product?.produto || product;
+          const pid = normalizeIdentifier(p?.id);
+          const code = normalizeCode(p?.codigo_interno || p?.codigo);
           if (pid && code) { productCodeByProductId[pid] = code; pendingProductIds.delete(pid); }
-          const variacoes = Array.isArray(product?.variacoes) ? product.variacoes : [];
+          const pname = normalizeName(p?.nome || p?.descricao);
+          if (pname && code && !productCodeByName[pname]) {
+            productCodeByName[pname] = code;
+            pendingNames.delete(pname);
+          }
+          const variacoes = Array.isArray(p?.variacoes) ? p.variacoes : [];
           for (const vw of variacoes) {
             const v = vw?.variacao || vw || {};
             const vid = normalizeIdentifier(v?.id || v?.variacao_id);
             const vc = normalizeCode(v?.codigo || v?.codigo_interno || code);
             if (vid && vc) { productCodeByVariationId[vid] = vc; pendingVariationIds.delete(vid); }
+            const vname = normalizeName(v?.nome || v?.descricao);
+            if (vname && vc && !productCodeByName[vname]) {
+              productCodeByName[vname] = vc;
+              pendingNames.delete(vname);
+            }
           }
         }
       };
 
-      consumeProducts(firstProductsPage.data);
-      for (let bs = 2; bs <= totalProductPages && (pendingProductIds.size > 0 || pendingVariationIds.size > 0); bs += 5) {
-        const be = Math.min(bs + 4, totalProductPages);
-        const pgs: number[] = [];
-        for (let p = bs; p <= be; p++) pgs.push(p);
-        const res = await Promise.all(pgs.map(p => fetchPage(productsBaseUrl, p, apiHeaders)));
-        for (const r of res) consumeProducts(r.data);
-        if (be < totalProductPages) await new Promise(r => setTimeout(r, 150));
+      // Scan active products first, then all products (inactive included) if anything is still missing.
+      for (const productsBaseUrl of [
+        'https://api.gestaoclick.com/api/produtos?ativo=1',
+        'https://api.gestaoclick.com/api/produtos',
+      ]) {
+        if (!stillPending()) break;
+        const firstProductsPage = await fetchPage(productsBaseUrl, 1, apiHeaders);
+        const totalProductPages = Math.min(Number(firstProductsPage.meta?.total_paginas ?? 1), 30);
+        consumeProducts(firstProductsPage.data);
+        for (let bs = 2; bs <= totalProductPages && stillPending(); bs += 5) {
+          const be = Math.min(bs + 4, totalProductPages);
+          const pgs: number[] = [];
+          for (let p = bs; p <= be; p++) pgs.push(p);
+          const res = await Promise.all(pgs.map(p => fetchPage(productsBaseUrl, p, apiHeaders)));
+          for (const r of res) consumeProducts(r.data);
+          if (be < totalProductPages) await new Promise(r => setTimeout(r, 150));
+        }
       }
     }
 
     const itens: NormalizedItem[] = rawItems.map((it) => {
       const refs = extractProductReferences(it);
+      // deno-lint-ignore no-explicit-any
+      const anyIt = it as any;
+      const nome = itemName(anyIt);
       const codigo =
         refs.productCode ||
         (refs.variationId ? productCodeByVariationId[refs.variationId] : '') ||
         (refs.productId ? productCodeByProductId[refs.productId] : '') ||
+        productCodeByName[normalizeName(nome)] ||
         '';
-      // deno-lint-ignore no-explicit-any
-      const anyIt = it as any;
-      const nome =
-        anyIt?.nome ||
-        anyIt?.produto_nome ||
-        anyIt?.produto?.nome ||
-        anyIt?.produto?.nome_produto ||
-        anyIt?.descricao ||
-        anyIt?.produto?.descricao ||
-        '';
+      if (!codigo) {
+        console.warn(`[compra-detail] código não resolvido para item "${nome}" (produto_id=${refs.productId} variacao_id=${refs.variationId})`);
+      }
       const quantidade = Number(anyIt?.quantidade ?? anyIt?.produto?.quantidade ?? 0) || 0;
       const valorUnit = Number(
         anyIt?.valor_unitario ??
@@ -373,6 +417,7 @@ Deno.serve(async (req) => {
         variacao_id_gc: refs.variationId,
       };
     });
+
 
     return new Response(JSON.stringify({ compra: header, itens }), {
       status: 200,
