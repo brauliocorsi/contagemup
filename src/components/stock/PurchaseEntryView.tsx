@@ -25,6 +25,14 @@ import type { GcCompraDetailResponse, GcCompraHeader, GcCompraItem } from '@/typ
 import type { Product } from '@/types/stock';
 
 const normalizeCode = (v: string) => v.trim().toLowerCase();
+const normalizeName = (v: string) =>
+  (v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
 
 interface RowState {
   key: string;
