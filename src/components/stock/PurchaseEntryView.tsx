@@ -497,17 +497,20 @@ export function PurchaseEntryView() {
         onOpenChange={setQuickOpen}
         initialCode={quickCode}
         initialName={quickName}
-        lockCode
+        lockCode={!!quickCode}
         hideTrigger
         onCreated={() => {
           // Force reselect the row now that product exists (products list will refresh via react-query)
           setTimeout(() => {
             setRows(prev => prev.map(r => {
-              if (r.item.codigo === quickCode) return { ...r, selected: true };
+              const sameCode = !!quickCode && r.item.codigo === quickCode;
+              const sameName = normalizeName(r.item.nome) === normalizeName(quickName);
+              if (sameCode || sameName) return { ...r, selected: true };
               return r;
             }));
           }, 50);
         }}
+
       />
     </div>
   );
