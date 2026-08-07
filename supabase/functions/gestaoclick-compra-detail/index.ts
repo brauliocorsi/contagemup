@@ -120,6 +120,15 @@ function extractCompraHeader(compra: any) {
   };
 }
 
+function normalizeName(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 interface NormalizedItem {
   codigo: string;
   nome: string;
@@ -128,6 +137,7 @@ interface NormalizedItem {
   produto_id_gc: string;
   variacao_id_gc: string;
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
