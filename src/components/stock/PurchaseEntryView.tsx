@@ -154,7 +154,7 @@ export function PurchaseEntryView() {
     setQuickOpen(true);
   };
 
-  const selectedRows = rows.filter(r => r.selected && r.item.codigo && productByCode.has(normalizeCode(r.item.codigo)) && r.qtyEntry > 0);
+  const selectedRows = rows.filter(r => r.selected && !!resolveProduct(r.item) && r.qtyEntry > 0);
 
   const iniciarEntrada = () => {
     if (!compra) return;
