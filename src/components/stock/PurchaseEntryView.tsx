@@ -236,7 +236,7 @@ export function PurchaseEntryView() {
     if (ok > 0) setDuplicateWarning(true);
   };
 
-  const registeredCount = rows.filter(r => r.item.codigo && productByCode.has(normalizeCode(r.item.codigo))).length;
+  const registeredCount = rows.filter(r => !!resolveProduct(r.item)).length;
   const missingCount = rows.length - registeredCount;
 
   return (
@@ -310,7 +310,7 @@ export function PurchaseEntryView() {
               {/* Mobile cards */}
               <div className="md:hidden space-y-3">
                 {rows.map(r => {
-                  const exists = r.item.codigo && productByCode.has(normalizeCode(r.item.codigo));
+                  const exists = !!resolveProduct(r.item);
                   return (
                     <div key={r.key} className="border rounded-lg p-3 space-y-2">
                       <div className="flex items-center justify-between gap-2">
@@ -380,7 +380,7 @@ export function PurchaseEntryView() {
                     </TableHeader>
                     <TableBody>
                       {rows.map(r => {
-                        const exists = r.item.codigo && productByCode.has(normalizeCode(r.item.codigo));
+                        const exists = !!resolveProduct(r.item);
                         return (
                           <TableRow key={r.key}>
                             <TableCell>
