@@ -182,7 +182,7 @@ export function PurchaseEntryView() {
 
     for (let i = 0; i < selectedRows.length; i++) {
       const r = selectedRows[i];
-      const product = productByCode.get(normalizeCode(r.item.codigo));
+      const product = resolveProduct(r.item);
       if (!product) {
         failed.push({ code: r.item.codigo, name: r.item.nome, reason: 'Produto local não encontrado' });
         setProgress({ done: i + 1, total: selectedRows.length });
