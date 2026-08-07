@@ -138,17 +138,15 @@ export function PurchaseEntryView() {
   };
 
   const allRegisteredSelected = useMemo(() => {
-    const registeredRows = rows.filter(r => r.item.codigo && productByCode.has(normalizeCode(r.item.codigo)));
+    const registeredRows = rows.filter(r => !!resolveProduct(r.item));
     if (registeredRows.length === 0) return false;
     return registeredRows.every(r => r.selected);
-  }, [rows, productByCode]);
+  }, [rows, resolveProduct]);
 
   const toggleAll = (checked: boolean) => {
-    setRows(prev => prev.map(r => {
-      const exists = r.item.codigo && productByCode.has(normalizeCode(r.item.codigo));
-      return exists ? { ...r, selected: checked } : r;
-    }));
+    setRows(prev => prev.map(r => (resolveProduct(r.item) ? { ...r, selected: checked } : r)));
   };
+
 
   const openQuickRegister = (item: GcCompraItem) => {
     setQuickCode(item.codigo);
