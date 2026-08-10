@@ -621,6 +621,8 @@ export function StockEntriesView() {
                     : cart.length > 0
                       ? `Confirmar ${cart.length + (selected && !allZero ? 1 : 0)} entrada(s) — ${cartUnits + (selected && !allZero ? totalUnits : 0)} un.`
                       : 'Confirmar entrada'}
+                </Button>
+
 
               </div>
             </CardContent>
