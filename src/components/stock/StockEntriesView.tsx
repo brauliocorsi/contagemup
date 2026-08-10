@@ -719,6 +719,41 @@ export function StockEntriesView() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!missingWarning} onOpenChange={(o) => !o && setMissingWarning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Entrada sem localização
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Estes colis vão entrar sem localização nem palete e não aparecerão nas vistas de armazém:
+                </p>
+                <ul className="text-xs list-disc pl-5 max-h-40 overflow-auto">
+                  {missingWarning?.missing.map(m => <li key={m}>{m}</li>)}
+                </ul>
+                <p>Pode corrigir depois no separador "Sem localização".</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Voltar e indicar local</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (missingWarning) void runSubmit(missingWarning.items);
+              }}
+              disabled={submitting}
+            >
+              {submitting ? 'A registar…' : 'Registar mesmo assim'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
