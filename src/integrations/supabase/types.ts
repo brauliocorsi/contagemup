@@ -1210,6 +1210,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      dedupe_counts_same_place: { Args: never; Returns: number }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
       merge_colis_counts: {
         Args: {
