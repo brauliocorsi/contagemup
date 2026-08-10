@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil, History } from 'lucide-react';
+import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil, History, ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -83,6 +83,7 @@ export function StockEntriesView() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [missingWarning, setMissingWarning] = useState<{ items: CartItem[]; missing: string[] } | null>(null);
 
   // ------- Derived ----------------------------------------------------------
@@ -477,11 +478,70 @@ export function StockEntriesView() {
 
           {/* Entry form */}
           {selected && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Quantidade e localização por coli</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <Card className="overflow-hidden">
+              {/* Compact quick line */}
+              <div className="flex items-center gap-3 p-3">
+                <button
+                  type="button"
+                  className="flex-1 min-w-0 text-left"
+                  onClick={() => setDetailsOpen(v => !v)}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {detailsOpen
+                      ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                    <span className="text-sm font-medium truncate">{selected.name}</span>
+                    <Badge variant={mode === 'set' ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
+                      {mode === 'set' ? 'Set' : 'Avulso'}
+                    </Badge>
+                  </div>
+                  <div className="pl-6 text-xs text-muted-foreground flex flex-wrap gap-x-2">
+                    <span className="font-mono">{selected.code}</span>
+                    <span>· {effectiveTotalColis} coli{effectiveTotalColis > 1 ? 's' : ''}</span>
+                    <span>· {totalUnits} un.</span>
+                    {rows.some(r => r.location) && (
+                      <span className="truncate">
+                        · {Array.from(new Set(rows.filter(r => r.quantity > 0 && r.location).map(r => r.location))).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {mode === 'set' ? (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button size="icon" variant="outline" className="h-8 w-8"
+                      onClick={() => setSetQuantity(q => Math.max(1, q - 1))}>
+                      <Minus className="h-3.5 w-3.5" />
+                    </Button>
+                    <NumericInput
+                      min={1}
+                      value={setQuantity}
+                      onChange={setSetQuantity}
+                      className="w-16 h-8 text-center"
+                    />
+                    <Button size="icon" variant="outline" className="h-8 w-8"
+                      onClick={() => setSetQuantity(q => q + 1)}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Badge variant="secondary" className="shrink-0">{totalUnits} un.</Badge>
+                )}
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 gap-1"
+                  onClick={addToCart}
+                  disabled={allZero || submitting}
+                >
+                  <ShoppingCart className="h-3.5 w-3.5" />
+                  Adicionar
+                </Button>
+              </div>
+
+              {detailsOpen && (
+              <CardContent className="space-y-4 border-t pt-4">
                 {/* Mode toggle */}
                 <div className="flex gap-2">
                   <Button
@@ -586,8 +646,10 @@ export function StockEntriesView() {
                   </div>
                 )}
               </CardContent>
+              )}
             </Card>
           )}
+
         </div>
 
         {/* Sidebar — meta + actions + recent */}
