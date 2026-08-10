@@ -19,6 +19,13 @@ import { LocationSelect } from '@/components/counting/LocationSelect';
 import { PalletSelect } from '@/components/counting/PalletSelect';
 import { PurchaseEntryView } from '@/components/stock/PurchaseEntryView';
 import { PurchaseEntryHistory } from '@/components/stock/PurchaseEntryHistory';
+import { RecentMovementsPanel } from '@/components/stock/RecentMovementsPanel';
+import { UnlocatedStockPanel } from '@/components/stock/UnlocatedStockPanel';
+import { MovementHistoryView } from '@/components/stock/MovementHistoryView';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
@@ -76,6 +83,7 @@ export function StockEntriesView() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [missingWarning, setMissingWarning] = useState<{ items: CartItem[]; missing: string[] } | null>(null);
 
   // ------- Derived ----------------------------------------------------------
   const categoryColisCount = useMemo(() => {
@@ -239,13 +247,12 @@ export function StockEntriesView() {
   };
 
   // ------- Submit -----------------------------------------------------------
-  const handleSubmit = async () => {
-    // Include the item currently being edited, if valid
+  const buildPending = (): CartItem[] | null => {
     const pending: CartItem[] = [...cart];
     if (selected && !allZero) {
       if (requiresOrderNumber && !orderNumber.trim()) {
         toast.error('Número de encomenda obrigatório para esta categoria');
-        return;
+        return null;
       }
       pending.push({
         key: 'current',
@@ -255,12 +262,32 @@ export function StockEntriesView() {
         orderNumber: requiresOrderNumber ? orderNumber.trim() : null,
       });
     }
-
     if (pending.length === 0) {
       toast.error('Carrinho vazio');
+      return null;
+    }
+    return pending;
+  };
+
+  const missingPlace = (items: CartItem[]) =>
+    items.flatMap(i =>
+      i.rows
+        .filter(r => !r.location && !r.pallet_number)
+        .map(r => `${i.product.code} · Coli ${r.colis_number} (${r.quantity} un.)`)
+    );
+
+  const handleSubmit = () => {
+    const pending = buildPending();
+    if (!pending) return;
+    const missing = missingPlace(pending);
+    if (missing.length > 0) {
+      setMissingWarning({ items: pending, missing });
       return;
     }
+    void runSubmit(pending);
+  };
 
+  const runSubmit = async (pending: CartItem[]) => {
     setSubmitting(true);
     const failed: string[] = [];
     let okItems = 0;
@@ -287,14 +314,17 @@ export function StockEntriesView() {
 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['counts'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['unlocated-counts'] });
 
       if (failed.length === 0) resetForm();
       else clearProductForm();
     } finally {
       setSubmitting(false);
+      setMissingWarning(null);
     }
   };
+
 
 
 
@@ -321,11 +351,26 @@ export function StockEntriesView() {
           <TabsTrigger value="historico" className="gap-2">
             <History className="h-4 w-4" /> Histórico de compras
           </TabsTrigger>
+          <TabsTrigger value="sem-local" className="gap-2">
+            <AlertTriangle className="h-4 w-4" /> Sem localização
+          </TabsTrigger>
+          <TabsTrigger value="movimentos" className="gap-2">
+            <ClipboardList className="h-4 w-4" /> Movimentos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="compra" className="mt-0">
           <PurchaseEntryView />
         </TabsContent>
+
+        <TabsContent value="sem-local" className="mt-0">
+          <UnlocatedStockPanel />
+        </TabsContent>
+
+        <TabsContent value="movimentos" className="mt-0">
+          <MovementHistoryView />
+        </TabsContent>
+
 
         <TabsContent value="historico" className="mt-0">
           <PurchaseEntryHistory />
@@ -668,118 +713,47 @@ export function StockEntriesView() {
             </Card>
           )}
 
-          <RecentEntriesPanel />
+          <RecentMovementsPanel type="entrada" />
 
         </div>
           </div>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!missingWarning} onOpenChange={(o) => !o && setMissingWarning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Entrada sem localização
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Estes colis vão entrar sem localização nem palete e não aparecerão nas vistas de armazém:
+                </p>
+                <ul className="text-xs list-disc pl-5 max-h-40 overflow-auto">
+                  {missingWarning?.missing.map(m => <li key={m}>{m}</li>)}
+                </ul>
+                <p>Pode corrigir depois no separador "Sem localização".</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Voltar e indicar local</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (missingWarning) void runSubmit(missingWarning.items);
+              }}
+              disabled={submitting}
+            >
+              {submitting ? 'A registar…' : 'Registar mesmo assim'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Recent entries panel — reads from stock_movements_unified
-// ---------------------------------------------------------------------------
-
-interface UnifiedRow {
-  id: string;
-  product_id: string;
-  movement_type: string;
-  quantity: number;
-  reason: string | null;
-  reference: string | null;
-  created_at: string;
-  origem: string;
-}
-
-function RecentEntriesPanel() {
-  const { products } = useProducts();
-  const productMap = useMemo(() => {
-    const m = new Map<string, Product>();
-    products.forEach(p => m.set(p.id, p));
-    return m;
-  }, [products]);
-
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ['recent-entries'],
-    queryFn: async (): Promise<UnifiedRow[]> => {
-      // The view exists in DB; types may lag, so cast through a typed `from`.
-      const { data, error } = await (supabase as unknown as {
-        from: (t: string) => {
-          select: (q: string) => {
-            eq: (col: string, v: string) => {
-              order: (col: string, opts: { ascending: boolean }) => {
-                limit: (n: number) => Promise<{ data: UnifiedRow[] | null; error: Error | null }>;
-              };
-            };
-          };
-        };
-      })
-        .from('stock_movements_unified')
-        .select('id, product_id, movement_type, quantity, reason, reference, created_at, origem')
-        .eq('movement_type', 'entrada')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      return data || [];
-    },
-    refetchInterval: 30_000,
-  });
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Entradas recentes</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">A carregar…</p>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sem entradas ainda.</p>
-        ) : (
-          <ScrollArea className="max-h-[360px]">
-            <ul className="space-y-2 pr-3">
-              {rows.map(r => {
-                const p = productMap.get(r.product_id);
-                return (
-                  <li key={r.id} className="text-sm border-b last:border-0 pb-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium truncate">
-                        {p?.name ?? 'Produto desconhecido'}
-                      </span>
-                      <Badge variant="secondary" className="text-xs">
-                        +{r.quantity}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="font-mono">{p?.code ?? r.product_id.slice(0, 8)}</span>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'text-[10px] px-1 py-0',
-                            r.origem === 'arquivo' && 'bg-muted'
-                          )}
-                        >
-                          {r.origem}
-                        </Badge>
-                        <span>
-                          {formatDistanceToNow(new Date(r.created_at), {
-                            addSuffix: true,
-                            locale: pt,
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </ScrollArea>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
