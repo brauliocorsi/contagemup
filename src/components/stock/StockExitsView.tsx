@@ -25,6 +25,7 @@ import { pt } from 'date-fns/locale';
 import type { Product } from '@/types/stock';
 import { PickingHistoryView } from './PickingHistoryView';
 import { ERPExitsView, ERPExitCartItem } from './ERPExitsView';
+import { RecentMovementsPanel } from '@/components/stock/RecentMovementsPanel';
 
 const EXIT_REASONS = [
   'Venda', 'Quebra', 'Perda', 'Transferência',
