@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Download, Filter } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Filter, User, Package } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,21 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/types/stock';
 
+type Row = MovementRow & { created_by: string | null; notes?: string | null };
+
+interface OperationGroup {
+  key: string;
+  type: string;
+  created_at: string;
+  created_by: string | null;
+  reason: string | null;
+  reference: string | null;
+  rows: Row[];
+  totalUnits: number;
+  productCount: number;
+  allReversed: boolean;
+}
+
 export function MovementHistoryView() {
   const { products } = useProducts();
   const [type, setType] = useState<'all' | 'entrada' | 'saida'>('all');
@@ -22,6 +37,8 @@ export function MovementHistoryView() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [place, setPlace] = useState('');
+  const [person, setPerson] = useState('all');
+  const [open, setOpen] = useState<Record<string, boolean>>({});
 
   const productMap = useMemo(() => {
     const m = new Map<string, Product>();
@@ -29,20 +46,34 @@ export function MovementHistoryView() {
     return m;
   }, [products]);
 
+  const { data: profiles = [] } = useQuery({
+    queryKey: ['movement-history-profiles'],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('user_id, name');
+      return (data || []) as { user_id: string; name: string }[];
+    },
+  });
+
+  const userNames = useMemo(() => {
+    const m = new Map<string, string>();
+    profiles.forEach(p => m.set(p.user_id, p.name));
+    return m;
+  }, [profiles]);
+
   const { data, isLoading } = useQuery({
     queryKey: ['movement-history', type, from, to],
-    queryFn: async (): Promise<{ rows: MovementRow[]; lines: Map<string, MovementLine[]> }> => {
+    queryFn: async (): Promise<{ rows: Row[]; lines: Map<string, MovementLine[]> }> => {
       let q = supabase
         .from('stock_movements_unified')
-        .select('id, product_id, movement_type, quantity, reason, reference, created_at, origem, reversed_at, reverses_movement_id')
+        .select('id, product_id, movement_type, quantity, reason, reference, notes, created_at, created_by, origem, reversed_at, reverses_movement_id')
         .order('created_at', { ascending: false })
-        .limit(500);
+        .limit(1000);
       if (type !== 'all') q = q.eq('movement_type', type);
       if (from) q = q.gte('created_at', `${from}T00:00:00`);
       if (to) q = q.lte('created_at', `${to}T23:59:59`);
       const { data: rowData, error } = await q;
       if (error) throw error;
-      const rows = (rowData || []) as MovementRow[];
+      const rows = (rowData || []) as Row[];
 
       const lines = new Map<string, MovementLine[]>();
       const ids = rows.map(r => r.id);
@@ -63,15 +94,22 @@ export function MovementHistoryView() {
     },
   });
 
-  const rows = data?.rows ?? [];
-  const lines = data?.lines ?? new Map<string, MovementLine[]>();
+  const rows = useMemo(() => data?.rows ?? [], [data]);
+  const lines = useMemo(() => data?.lines ?? new Map<string, MovementLine[]>(), [data]);
+
+  const peopleOptions = useMemo(() => {
+    const ids = Array.from(new Set(rows.map(r => r.created_by).filter(Boolean))) as string[];
+    return ids.map(id => ({ id, name: userNames.get(id) || 'Desconhecido' }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows, userNames]);
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase().trim();
     const placeTerm = place.toLowerCase().trim();
     return rows.filter(r => {
-      const p = productMap.get(r.product_id);
+      if (person !== 'all' && r.created_by !== person) return false;
       if (term) {
+        const p = productMap.get(r.product_id);
         const hay = `${p?.code ?? ''} ${p?.name ?? ''} ${r.reason ?? ''} ${r.reference ?? ''}`.toLowerCase();
         if (!hay.includes(term)) return false;
       }
@@ -83,27 +121,62 @@ export function MovementHistoryView() {
       }
       return true;
     });
-  }, [rows, lines, productMap, search, place]);
+  }, [rows, lines, productMap, search, place, person]);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, OperationGroup>();
+    filtered.forEach(r => {
+      const key = [r.movement_type, r.created_at, r.created_by ?? '', r.reason ?? '', r.reference ?? ''].join('|');
+      let g = map.get(key);
+      if (!g) {
+        g = {
+          key,
+          type: r.movement_type,
+          created_at: r.created_at,
+          created_by: r.created_by,
+          reason: r.reason ?? null,
+          reference: r.reference ?? null,
+          rows: [],
+          totalUnits: 0,
+          productCount: 0,
+          allReversed: true,
+        };
+        map.set(key, g);
+      }
+      g.rows.push(r);
+      g.totalUnits += r.quantity;
+      if (!r.reversed_at) g.allReversed = false;
+    });
+    const list = Array.from(map.values());
+    list.forEach(g => { g.productCount = new Set(g.rows.map(r => r.product_id)).size; });
+    return list.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
+  }, [filtered]);
 
   const exportCsv = () => {
-    const header = ['Data', 'Tipo', 'Código', 'Produto', 'Quantidade', 'Motivo', 'Referência', 'Detalhe', 'Estado'];
-    const body = filtered.map(r => {
-      const p = productMap.get(r.product_id);
-      const detail = (lines.get(r.id) ?? [])
-        .sort((a, b) => a.colis_number - b.colis_number)
-        .map(formatLine)
-        .join(' | ');
-      return [
-        format(new Date(r.created_at), 'yyyy-MM-dd HH:mm'),
-        r.movement_type,
-        p?.code ?? '',
-        p?.name ?? '',
-        r.quantity,
-        r.reason ?? '',
-        r.reference ?? '',
-        detail,
-        r.reversed_at ? 'anulado' : (r.reverses_movement_id ? 'reversão' : 'ativo'),
-      ];
+    const header = ['Data', 'Operação', 'Tipo', 'Responsável', 'Motivo', 'Referência', 'Código', 'Produto', 'Quantidade', 'Detalhe', 'Estado'];
+    const body: (string | number)[][] = [];
+    groups.forEach((g, idx) => {
+      const opId = `OP-${format(new Date(g.created_at), 'yyyyMMdd-HHmm')}-${idx + 1}`;
+      g.rows.forEach(r => {
+        const p = productMap.get(r.product_id);
+        const detail = (lines.get(r.id) ?? [])
+          .sort((a, b) => a.colis_number - b.colis_number)
+          .map(formatLine)
+          .join(' | ');
+        body.push([
+          format(new Date(r.created_at), 'yyyy-MM-dd HH:mm'),
+          opId,
+          r.movement_type,
+          (r.created_by && userNames.get(r.created_by)) || '',
+          r.reason ?? '',
+          r.reference ?? '',
+          p?.code ?? '',
+          p?.name ?? '',
+          r.quantity,
+          detail,
+          r.reversed_at ? 'anulado' : (r.reverses_movement_id ? 'reversão' : 'ativo'),
+        ]);
+      });
     });
     const csv = [header, ...body]
       .map(line => line.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
@@ -117,6 +190,15 @@ export function MovementHistoryView() {
     URL.revokeObjectURL(url);
   };
 
+  const totals = useMemo(() => {
+    let entradas = 0, saidas = 0;
+    filtered.forEach(r => {
+      if (r.reversed_at) return;
+      if (r.movement_type === 'entrada') entradas += r.quantity; else saidas += r.quantity;
+    });
+    return { entradas, saidas };
+  }, [filtered]);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -124,12 +206,12 @@ export function MovementHistoryView() {
           <CardTitle className="text-base flex items-center gap-2">
             <Filter className="h-4 w-4" />
             Filtros
-            <Button variant="outline" size="sm" className="ml-auto gap-2" onClick={exportCsv} disabled={filtered.length === 0}>
+            <Button variant="outline" size="sm" className="ml-auto gap-2" onClick={exportCsv} disabled={groups.length === 0}>
               <Download className="h-4 w-4" /> Exportar CSV
             </Button>
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <CardContent className="grid grid-cols-1 md:grid-cols-6 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Tipo</Label>
             <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
@@ -138,6 +220,18 @@ export function MovementHistoryView() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="entrada">Entradas</SelectItem>
                 <SelectItem value="saida">Saídas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Responsável</Label>
+            <Select value={person} onValueChange={setPerson}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {peopleOptions.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -162,57 +256,94 @@ export function MovementHistoryView() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            Movimentos <span className="text-sm font-normal text-muted-foreground">({filtered.length})</span>
+          <CardTitle className="text-base flex flex-wrap items-center gap-2">
+            Operações <span className="text-sm font-normal text-muted-foreground">({groups.length})</span>
+            <span className="ml-auto flex gap-2 text-xs font-normal">
+              <Badge variant="secondary">+{totals.entradas} un. entradas</Badge>
+              <Badge variant="destructive">−{totals.saidas} un. saídas</Badge>
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">A carregar…</p>
-          ) : filtered.length === 0 ? (
+          ) : groups.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sem movimentos para estes filtros.</p>
           ) : (
             <ScrollArea className="max-h-[600px]">
-              <ul className="space-y-3 pr-3">
-                {filtered.map(r => {
-                  const p = productMap.get(r.product_id);
-                  const rowLines = (lines.get(r.id) ?? []).sort((a, b) => a.colis_number - b.colis_number);
+              <ul className="space-y-2 pr-3">
+                {groups.map(g => {
+                  const isOpen = !!open[g.key];
                   return (
-                    <li key={r.id} className={cn('border-b last:border-0 pb-3', r.reversed_at && 'opacity-60')}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium truncate">{p?.name ?? 'Produto desconhecido'}</span>
-                        <Badge
-                          variant={r.movement_type === 'entrada' ? 'secondary' : 'destructive'}
-                          className="text-xs shrink-0"
-                        >
-                          {r.movement_type === 'entrada' ? '+' : '−'}{r.quantity}
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="font-mono">{p?.code ?? r.product_id.slice(0, 8)}</span>
-                        <span>{format(new Date(r.created_at), 'dd/MM/yyyy HH:mm')}</span>
-                        {r.reason && <span>· {r.reason}</span>}
-                        {r.reference && <span>· ref {r.reference}</span>}
-                        {r.reversed_at && (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0 border-destructive text-destructive">
-                            anulado
-                          </Badge>
-                        )}
-                        {r.reverses_movement_id && (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0">reversão</Badge>
-                        )}
-                      </div>
-                      {rowLines.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {rowLines.map(l => (
-                            <Badge
-                              key={l.id}
-                              variant="outline"
-                              className={cn('text-[10px] px-1.5 py-0', !l.location && 'border-amber-400 text-amber-700')}
-                            >
-                              {formatLine(l)}
+                    <li key={g.key} className={cn('rounded-lg border', g.allReversed && 'opacity-60')}>
+                      <button
+                        type="button"
+                        onClick={() => setOpen(o => ({ ...o, [g.key]: !o[g.key] }))}
+                        className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/50 transition-colors rounded-lg"
+                      >
+                        {isOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={g.type === 'entrada' ? 'secondary' : 'destructive'} className="text-xs">
+                              {g.type === 'entrada' ? 'Entrada' : 'Saída'}
                             </Badge>
-                          ))}
+                            <span className="text-sm font-medium">
+                              {g.productCount} produto{g.productCount === 1 ? '' : 's'} · {g.totalUnits} un.
+                            </span>
+                            {g.allReversed && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 border-destructive text-destructive">anulado</Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                            <span>{format(new Date(g.created_at), 'dd/MM/yyyy HH:mm')}</span>
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {(g.created_by && userNames.get(g.created_by)) || 'Sistema'}
+                            </span>
+                            {g.reason && <span>· {g.reason}</span>}
+                            {g.reference && <span>· ref {g.reference}</span>}
+                          </div>
+                        </div>
+                      </button>
+
+                      {isOpen && (
+                        <div className="border-t px-3 py-2 space-y-2">
+                          {g.rows.map(r => {
+                            const p = productMap.get(r.product_id);
+                            const rowLines = (lines.get(r.id) ?? []).sort((a, b) => a.colis_number - b.colis_number);
+                            return (
+                              <div key={r.id} className={cn('text-sm', r.reversed_at && 'opacity-60')}>
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="flex items-start gap-2 min-w-0">
+                                    <Package className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                                    <span className="min-w-0">
+                                      <span className="block truncate">{p?.name ?? 'Produto desconhecido'}</span>
+                                      <span className="block text-xs font-mono text-muted-foreground">
+                                        {p?.code ?? r.product_id.slice(0, 8)}
+                                      </span>
+                                    </span>
+                                  </span>
+                                  <Badge variant={r.movement_type === 'entrada' ? 'secondary' : 'destructive'} className="text-xs shrink-0">
+                                    {r.movement_type === 'entrada' ? '+' : '−'}{r.quantity}
+                                  </Badge>
+                                </div>
+                                {rowLines.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap gap-1 pl-6">
+                                    {rowLines.map(l => (
+                                      <Badge
+                                        key={l.id}
+                                        variant="outline"
+                                        className={cn('text-[10px] px-1.5 py-0', !l.location && 'border-amber-400 text-amber-700')}
+                                      >
+                                        {formatLine(l)}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+                                {r.notes && <p className="pl-6 text-xs italic text-muted-foreground">{r.notes}</p>}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </li>
