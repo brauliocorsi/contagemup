@@ -63,17 +63,25 @@ export function MovementHistoryView() {
   const { data, isLoading } = useQuery({
     queryKey: ['movement-history', type, from, to],
     queryFn: async (): Promise<{ rows: Row[]; lines: Map<string, MovementLine[]> }> => {
-      let q = supabase
-        .from('stock_movements_unified')
-        .select('id, product_id, movement_type, quantity, reason, reference, notes, created_at, created_by, origem, reversed_at, reverses_movement_id')
-        .order('created_at', { ascending: false })
-        .limit(1000);
-      if (type !== 'all') q = q.eq('movement_type', type);
-      if (from) q = q.gte('created_at', `${from}T00:00:00`);
-      if (to) q = q.lte('created_at', `${to}T23:59:59`);
-      const { data: rowData, error } = await q;
-      if (error) throw error;
-      const rows = (rowData || []) as Row[];
+      const rows: Row[] = [];
+      const pageSize = 1000;
+      const maxRows = 5000;
+      for (let page = 0; page * pageSize < maxRows; page++) {
+        let q = supabase
+          .from('stock_movements_unified')
+          .select('id, product_id, movement_type, quantity, reason, reference, notes, created_at, created_by, origem, reversed_at, reverses_movement_id')
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(page * pageSize, page * pageSize + pageSize - 1);
+        if (type !== 'all') q = q.eq('movement_type', type);
+        if (from) q = q.gte('created_at', `${from}T00:00:00`);
+        if (to) q = q.lte('created_at', `${to}T23:59:59`);
+        const { data: rowData, error } = await q;
+        if (error) throw error;
+        rows.push(...((rowData || []) as Row[]));
+        if (!rowData || rowData.length < pageSize) break;
+      }
+
 
       const lines = new Map<string, MovementLine[]>();
       const ids = rows.map(r => r.id);
