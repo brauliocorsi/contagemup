@@ -79,17 +79,29 @@ export function MovementHistoryView() {
       const ids = rows.map(r => r.id);
       if (ids.length > 0) {
         for (let i = 0; i < ids.length; i += 200) {
-          const { data: lineData } = await supabase
-            .from('stock_movement_lines')
-            .select('id, movement_id, colis_number, quantity, location, pallet_number')
-            .in('movement_id', ids.slice(i, i + 200));
-          (lineData || []).forEach(l => {
-            const arr = lines.get(l.movement_id) || [];
-            arr.push(l as MovementLine);
-            lines.set(l.movement_id, arr);
-          });
+          const chunk = ids.slice(i, i + 200);
+          // paginação: uma chamada devolve no máximo 1000 linhas
+          let page = 0;
+          const pageSize = 1000;
+          while (true) {
+            const { data: lineData, error: lineErr } = await supabase
+              .from('stock_movement_lines')
+              .select('id, movement_id, colis_number, quantity, location, pallet_number')
+              .in('movement_id', chunk)
+              .order('id', { ascending: true })
+              .range(page * pageSize, page * pageSize + pageSize - 1);
+            if (lineErr) throw lineErr;
+            (lineData || []).forEach(l => {
+              const arr = lines.get(l.movement_id) || [];
+              arr.push(l as MovementLine);
+              lines.set(l.movement_id, arr);
+            });
+            if (!lineData || lineData.length < pageSize) break;
+            page++;
+          }
         }
       }
+
       return { rows, lines };
     },
   });
