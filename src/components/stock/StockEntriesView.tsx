@@ -239,13 +239,12 @@ export function StockEntriesView() {
   };
 
   // ------- Submit -----------------------------------------------------------
-  const handleSubmit = async () => {
-    // Include the item currently being edited, if valid
+  const buildPending = (): CartItem[] | null => {
     const pending: CartItem[] = [...cart];
     if (selected && !allZero) {
       if (requiresOrderNumber && !orderNumber.trim()) {
         toast.error('Número de encomenda obrigatório para esta categoria');
-        return;
+        return null;
       }
       pending.push({
         key: 'current',
@@ -255,12 +254,32 @@ export function StockEntriesView() {
         orderNumber: requiresOrderNumber ? orderNumber.trim() : null,
       });
     }
-
     if (pending.length === 0) {
       toast.error('Carrinho vazio');
+      return null;
+    }
+    return pending;
+  };
+
+  const missingPlace = (items: CartItem[]) =>
+    items.flatMap(i =>
+      i.rows
+        .filter(r => !r.location && !r.pallet_number)
+        .map(r => `${i.product.code} · Coli ${r.colis_number} (${r.quantity} un.)`)
+    );
+
+  const handleSubmit = () => {
+    const pending = buildPending();
+    if (!pending) return;
+    const missing = missingPlace(pending);
+    if (missing.length > 0) {
+      setMissingWarning({ items: pending, missing });
       return;
     }
+    void runSubmit(pending);
+  };
 
+  const runSubmit = async (pending: CartItem[]) => {
     setSubmitting(true);
     const failed: string[] = [];
     let okItems = 0;
@@ -287,14 +306,17 @@ export function StockEntriesView() {
 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['counts'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['unlocated-counts'] });
 
       if (failed.length === 0) resetForm();
       else clearProductForm();
     } finally {
       setSubmitting(false);
+      setMissingWarning(null);
     }
   };
+
 
 
 
