@@ -19,6 +19,13 @@ import { LocationSelect } from '@/components/counting/LocationSelect';
 import { PalletSelect } from '@/components/counting/PalletSelect';
 import { PurchaseEntryView } from '@/components/stock/PurchaseEntryView';
 import { PurchaseEntryHistory } from '@/components/stock/PurchaseEntryHistory';
+import { RecentMovementsPanel } from '@/components/stock/RecentMovementsPanel';
+import { UnlocatedStockPanel } from '@/components/stock/UnlocatedStockPanel';
+import { MovementHistoryView } from '@/components/stock/MovementHistoryView';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
