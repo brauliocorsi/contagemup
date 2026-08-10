@@ -163,20 +163,24 @@ export function StockEntriesView() {
   const someZero = rows.length > 0 && rows.some(r => r.quantity === 0) && positiveRows.length > 0;
   const allZero = positiveRows.length === 0;
 
-  const resetForm = () => {
+  const clearProductForm = () => {
     setSelected(null);
     setSearch('');
     setMode('set');
     setSetQuantity(1);
     setRows([]);
+    setOrderNumber('');
+  };
+
+  const resetForm = () => {
+    clearProductForm();
     setReason('');
     setReference('');
-    setOrderNumber('');
     setNotes('');
   };
 
-  // ------- Submit -----------------------------------------------------------
-  const handleSubmit = async () => {
+  // ------- Cart -------------------------------------------------------------
+  const addToCart = () => {
     if (!selected) return;
     if (allZero) {
       toast.error('Indique quantidade em pelo menos um coli');
@@ -186,67 +190,112 @@ export function StockEntriesView() {
       toast.error('Número de encomenda obrigatório para esta categoria');
       return;
     }
+    const item: CartItem = {
+      key: `${selected.id}-${Date.now()}`,
+      product: selected,
+      rows: positiveRows.map(r => ({ ...r })),
+      totalUnits,
+      orderNumber: requiresOrderNumber ? orderNumber.trim() : null,
+    };
+    setCart(prev => [...prev, item]);
+    toast.success(`${selected.name} adicionado ao carrinho (${totalUnits} un.)`);
+    clearProductForm();
+    setPickerOpen(true);
+  };
+
+  const removeFromCart = (key: string) => {
+    setCart(prev => prev.filter(i => i.key !== key));
+  };
+
+  const cartUnits = cart.reduce((s, i) => s + i.totalUnits, 0);
+
+  const commitItem = async (item: CartItem) => {
+    const groups = new Map<string, ColiRow[]>();
+    for (const r of item.rows) {
+      const key = `${r.location || ''}|${r.pallet_number || ''}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
+    }
+
+    const effectiveReference = item.orderNumber ?? (reference.trim() || null);
+
+    for (const [key, group] of groups.entries()) {
+      const [loc, pal] = key.split('|');
+      const colis_quantities: Record<string, number> = {};
+      for (const r of group) colis_quantities[String(r.colis_number)] = r.quantity;
+
+      const { error } = await supabase.rpc('register_entry', {
+        p_product_id: item.product.id,
+        p_colis_quantities: colis_quantities,
+        p_location: loc || null,
+        p_pallet_number: pal || null,
+        p_reason: reason || null,
+        p_reference: effectiveReference,
+        p_notes: notes || null,
+      });
+      if (error) throw error;
+    }
+  };
+
+  // ------- Submit -----------------------------------------------------------
+  const handleSubmit = async () => {
+    // Include the item currently being edited, if valid
+    const pending: CartItem[] = [...cart];
+    if (selected && !allZero) {
+      if (requiresOrderNumber && !orderNumber.trim()) {
+        toast.error('Número de encomenda obrigatório para esta categoria');
+        return;
+      }
+      pending.push({
+        key: 'current',
+        product: selected,
+        rows: positiveRows.map(r => ({ ...r })),
+        totalUnits,
+        orderNumber: requiresOrderNumber ? orderNumber.trim() : null,
+      });
+    }
+
+    if (pending.length === 0) {
+      toast.error('Carrinho vazio');
+      return;
+    }
 
     setSubmitting(true);
+    const failed: string[] = [];
+    let okItems = 0;
+    let okUnits = 0;
     try {
-      // Group rows by (location|pallet)
-      const groups = new Map<string, ColiRow[]>();
-      for (const r of positiveRows) {
-        const key = `${r.location || ''}|${r.pallet_number || ''}`;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key)!.push(r);
+      for (const item of pending) {
+        try {
+          await commitItem(item);
+          okItems += 1;
+          okUnits += item.totalUnits;
+          setCart(prev => prev.filter(i => i.key !== item.key));
+        } catch (e) {
+          console.error('register_entry failed', item.product.code, e);
+          failed.push(item.product.code);
+        }
       }
 
-      const effectiveReference = requiresOrderNumber
-        ? orderNumber.trim()
-        : (reference.trim() || null);
-
-      let callsOk = 0;
-      const summary: { location: string; pallet: string; units: number; colis: number[] }[] = [];
-
-      for (const [key, group] of groups.entries()) {
-        const [loc, pal] = key.split('|');
-        const colis_quantities: Record<string, number> = {};
-        for (const r of group) colis_quantities[String(r.colis_number)] = r.quantity;
-
-        const { error } = await supabase.rpc('register_entry', {
-          p_product_id: selected.id,
-          p_colis_quantities: colis_quantities,
-          p_location: loc || null,
-          p_pallet_number: pal || null,
-          p_reason: reason || null,
-          p_reference: effectiveReference,
-          p_notes: notes || null,
-        });
-        if (error) throw error;
-        callsOk += 1;
-        summary.push({
-          location: loc || '—',
-          pallet: pal || '—',
-          units: group.reduce((s, r) => s + r.quantity, 0),
-          colis: group.map(r => r.colis_number),
-        });
+      if (okItems > 0) {
+        toast.success(`Entrada registada: ${okItems} produto(s), ${okUnits} unidades`);
       }
-
-      toast.success(
-        `Entrada registada: ${totalUnits} un. em ${callsOk} localização(ões) — ${
-          summary.map(s => `${s.location}${s.pallet !== '—' ? '/' + s.pallet : ''} (${s.units}un.)`).join(', ')
-        }`
-      );
+      if (failed.length > 0) {
+        toast.error(`Falha em: ${failed.join(', ')}`);
+      }
 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['counts'] });
       queryClient.invalidateQueries({ queryKey: ['recent-entries'] });
 
-      resetForm();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao registar entrada';
-      console.error('register_entry failed', e);
-      toast.error(msg);
+      if (failed.length === 0) resetForm();
+      else clearProductForm();
     } finally {
       setSubmitting(false);
     }
   };
+
+
 
   return (
     <div className="space-y-6">
