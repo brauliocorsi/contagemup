@@ -219,58 +219,140 @@ export function MovementHistoryView() {
     return { entradas, saidas };
   }, [filtered]);
 
+  const activeFilters = [
+    type !== 'all' && { key: 'type', label: type === 'entrada' ? 'Entradas' : 'Saídas', clear: () => setType('all') },
+    person !== 'all' && { key: 'person', label: `Resp: ${userNames.get(person) || 'Desconhecido'}`, clear: () => setPerson('all') },
+    !!search.trim() && { key: 'search', label: `“${search.trim()}”`, clear: () => setSearch('') },
+    !!place.trim() && { key: 'place', label: `Local: ${place.trim()}`, clear: () => setPlace('') },
+    !!from && { key: 'from', label: `De ${from}`, clear: () => setFrom('') },
+    !!to && { key: 'to', label: `Até ${to}`, clear: () => setTo('') },
+  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
+
+  const clearAll = () => {
+    setType('all'); setPerson('all'); setSearch(''); setPlace(''); setFrom(''); setTo('');
+  };
+
+  const setPreset = (days: number | null) => {
+    if (days === null) { setFrom(''); setTo(''); return; }
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days);
+    setFrom(format(start, 'yyyy-MM-dd'));
+    setTo(format(end, 'yyyy-MM-dd'));
+  };
+
+  const allOpen = groups.length > 0 && groups.every(g => open[g.key]);
+  const toggleAll = () => {
+    if (allOpen) { setOpen({}); return; }
+    const next: Record<string, boolean> = {};
+    groups.forEach(g => { next[g.key] = true; });
+    setOpen(next);
+  };
+
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            Filtros
-            <Button variant="outline" size="sm" className="ml-auto gap-2" onClick={exportCsv} disabled={groups.length === 0}>
-              <Download className="h-4 w-4" /> Exportar CSV
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-6 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Tipo</Label>
-            <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="entrada">Entradas</SelectItem>
-                <SelectItem value="saida">Saídas</SelectItem>
-              </SelectContent>
-            </Select>
+        <CardContent className="p-3 space-y-3">
+          {/* Linha principal: pesquisa + ações */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Pesquisar por código, produto, motivo ou referência…"
+                className="pl-8"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={advanced ? 'default' : 'outline'}
+                size="sm"
+                className="gap-2"
+                onClick={() => setAdvanced(v => !v)}
+              >
+                <Filter className="h-4 w-4" /> Filtros
+                {activeFilters.length > 0 && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{activeFilters.length}</Badge>
+                )}
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv} disabled={groups.length === 0}>
+                <Download className="h-4 w-4" /> CSV
+              </Button>
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Responsável</Label>
-            <Select value={person} onValueChange={setPerson}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {peopleOptions.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          {/* Atalhos de tipo e período */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {([['all', 'Todos'], ['entrada', 'Entradas'], ['saida', 'Saídas']] as const).map(([v, label]) => (
+              <Button
+                key={v}
+                size="sm"
+                variant={type === v ? 'default' : 'outline'}
+                className="h-7 px-3 text-xs"
+                onClick={() => setType(v)}
+              >
+                {label}
+              </Button>
+            ))}
+            <span className="mx-1 h-4 w-px bg-border" />
+            {([[0, 'Hoje'], [7, '7 dias'], [30, '30 dias'], [null, 'Tudo']] as [number | null, string][]).map(([d, label]) => (
+              <Button
+                key={label}
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => setPreset(d)}
+              >
+                {label}
+              </Button>
+            ))}
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Produto / motivo</Label>
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Código, nome…" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Localização / palete</Label>
-            <Input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Ex: B9, PLT057" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">De</Label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Até</Label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
+
+          {/* Filtros avançados */}
+          {advanced && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1 border-t">
+              <div className="space-y-1 pt-2">
+                <Label className="text-xs">Responsável</Label>
+                <Select value={person} onValueChange={setPerson}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {peopleOptions.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 md:pt-2">
+                <Label className="text-xs">Localização / palete</Label>
+                <Input className="h-9" value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Ex: B9, PLT057" />
+              </div>
+              <div className="space-y-1 md:pt-2">
+                <Label className="text-xs">De</Label>
+                <Input className="h-9" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              </div>
+              <div className="space-y-1 md:pt-2">
+                <Label className="text-xs">Até</Label>
+                <Input className="h-9" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {/* Chips ativos */}
+          {activeFilters.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {activeFilters.map(f => (
+                <Badge key={f.key} variant="secondary" className="gap-1 text-xs font-normal">
+                  {f.label}
+                  <button type="button" onClick={f.clear} aria-label={`Remover filtro ${f.label}`}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={clearAll}>Limpar tudo</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -278,9 +360,12 @@ export function MovementHistoryView() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex flex-wrap items-center gap-2">
             Operações <span className="text-sm font-normal text-muted-foreground">({groups.length})</span>
-            <span className="ml-auto flex gap-2 text-xs font-normal">
+            <span className="ml-auto flex items-center gap-2 text-xs font-normal">
               <Badge variant="secondary">+{totals.entradas} un. entradas</Badge>
               <Badge variant="destructive">−{totals.saidas} un. saídas</Badge>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={toggleAll} disabled={groups.length === 0}>
+                {allOpen ? 'Colapsar tudo' : 'Expandir tudo'}
+              </Button>
             </span>
           </CardTitle>
         </CardHeader>
@@ -290,7 +375,8 @@ export function MovementHistoryView() {
           ) : groups.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sem movimentos para estes filtros.</p>
           ) : (
-            <ScrollArea className="max-h-[600px]">
+            <ScrollArea className="h-[600px] w-full">
+
               <ul className="space-y-2 pr-3">
                 {groups.map(g => {
                   const isOpen = !!open[g.key];
