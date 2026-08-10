@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   TrendingDown, History, Truck, Search, Package, Layers, Plus, X,
-  MapPin, Box, Star, AlertTriangle, ShoppingCart, Check,
+  MapPin, Box, Star, AlertTriangle, ShoppingCart, Check, ChevronDown, ChevronRight, Minus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
