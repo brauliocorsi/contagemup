@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil, History } from 'lucide-react';
+import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil, History, ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -83,6 +83,7 @@ export function StockEntriesView() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [missingWarning, setMissingWarning] = useState<{ items: CartItem[]; missing: string[] } | null>(null);
 
   // ------- Derived ----------------------------------------------------------
