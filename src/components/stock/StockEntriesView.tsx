@@ -628,7 +628,48 @@ export function StockEntriesView() {
             </CardContent>
           </Card>
 
+          {cart.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Carrinho de entradas
+                  <Badge variant="secondary" className="ml-auto">{cartUnits} un.</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="max-h-[300px]">
+                  <ul className="space-y-2 pr-3">
+                    {cart.map(item => (
+                      <li key={item.key} className="border-b last:border-0 pb-2">
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{item.product.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{item.product.code}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.rows.map(r => `C${r.colis_number}: ${r.quantity}${r.location ? ` @${r.location}` : ''}${r.pallet_number ? `/${r.pallet_number}` : ''}`).join(' · ')}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="text-xs">+{item.totalUnits}</Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => removeFromCart(item.key)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          )}
+
           <RecentEntriesPanel />
+
         </div>
           </div>
         </TabsContent>
