@@ -256,7 +256,7 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['counts'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-exits'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-movements'] });
       queryClient.invalidateQueries({ queryKey: ['exit-locations'] });
 
       if (result.fully_fulfilled) {
@@ -488,7 +488,7 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
             </CardContent>
           </Card>
 
-          <RecentExitsPanel />
+          <RecentMovementsPanel type="saida" />
         </div>
       </div>
     </div>
@@ -834,94 +834,3 @@ function ColiLocationBlock({ coliNumber, required, totalSelected, ok, candidates
       )}
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Recent exits panel
-// ---------------------------------------------------------------------------
-interface UnifiedRow {
-  id: string;
-  product_id: string;
-  movement_type: string;
-  quantity: number;
-  reason: string | null;
-  reference: string | null;
-  created_at: string;
-  origem: string;
-}
-
-function RecentExitsPanel() {
-  const { products } = useProducts();
-  const productMap = useMemo(() => {
-    const m = new Map<string, Product>();
-    products.forEach(p => m.set(p.id, p));
-    return m;
-  }, [products]);
-
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ['recent-exits'],
-    queryFn: async (): Promise<UnifiedRow[]> => {
-      const { data, error } = await (supabase as unknown as {
-        from: (t: string) => {
-          select: (q: string) => {
-            eq: (col: string, v: string) => {
-              order: (col: string, opts: { ascending: boolean }) => {
-                limit: (n: number) => Promise<{ data: UnifiedRow[] | null; error: Error | null }>;
-              };
-            };
-          };
-        };
-      })
-        .from('stock_movements_unified')
-        .select('id, product_id, movement_type, quantity, reason, reference, created_at, origem')
-        .eq('movement_type', 'saida')
-        .order('created_at', { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return data || [];
-    },
-    refetchInterval: 30_000,
-  });
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Saídas recentes</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">A carregar…</p>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sem saídas ainda.</p>
-        ) : (
-          <ScrollArea className="max-h-[360px]">
-            <ul className="space-y-2 pr-3">
-              {rows.map(r => {
-                const p = productMap.get(r.product_id);
-                return (
-                  <li key={r.id} className="text-sm border-b last:border-0 pb-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium truncate">{p?.name ?? 'Produto desconhecido'}</span>
-                      <Badge variant="secondary" className="text-xs">−{r.quantity}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="font-mono">{p?.code ?? r.product_id.slice(0, 8)}</span>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={cn('text-[10px] px-1 py-0', r.origem === 'arquivo' && 'bg-muted')}>
-                          {r.origem}
-                        </Badge>
-                        <span>
-                          {formatDistanceToNow(new Date(r.created_at), { addSuffix: true, locale: pt })}
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </ScrollArea>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
