@@ -351,11 +351,26 @@ export function StockEntriesView() {
           <TabsTrigger value="historico" className="gap-2">
             <History className="h-4 w-4" /> Histórico de compras
           </TabsTrigger>
+          <TabsTrigger value="sem-local" className="gap-2">
+            <AlertTriangle className="h-4 w-4" /> Sem localização
+          </TabsTrigger>
+          <TabsTrigger value="movimentos" className="gap-2">
+            <ClipboardList className="h-4 w-4" /> Movimentos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="compra" className="mt-0">
           <PurchaseEntryView />
         </TabsContent>
+
+        <TabsContent value="sem-local" className="mt-0">
+          <UnlocatedStockPanel />
+        </TabsContent>
+
+        <TabsContent value="movimentos" className="mt-0">
+          <MovementHistoryView />
+        </TabsContent>
+
 
         <TabsContent value="historico" className="mt-0">
           <PurchaseEntryHistory />
