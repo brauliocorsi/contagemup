@@ -897,6 +897,54 @@ export type Database = {
           },
         ]
       }
+      stock_movement_lines: {
+        Row: {
+          colis_number: number
+          created_at: string
+          id: string
+          location: string | null
+          movement_id: string
+          pallet_number: string | null
+          product_id: string
+          quantity: number
+        }
+        Insert: {
+          colis_number: number
+          created_at?: string
+          id?: string
+          location?: string | null
+          movement_id: string
+          pallet_number?: string | null
+          product_id: string
+          quantity: number
+        }
+        Update: {
+          colis_number?: number
+          created_at?: string
+          id?: string
+          location?: string | null
+          movement_id?: string
+          pallet_number?: string | null
+          product_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movement_lines_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "stock_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movement_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movements: {
         Row: {
           created_at: string
@@ -908,6 +956,9 @@ export type Database = {
           quantity: number
           reason: string | null
           reference: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          reverses_movement_id: string | null
         }
         Insert: {
           created_at?: string
@@ -919,6 +970,9 @@ export type Database = {
           quantity: number
           reason?: string | null
           reference?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          reverses_movement_id?: string | null
         }
         Update: {
           created_at?: string
@@ -930,6 +984,9 @@ export type Database = {
           quantity?: number
           reason?: string | null
           reference?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          reverses_movement_id?: string | null
         }
         Relationships: [
           {
@@ -937,6 +994,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_reverses_movement_id_fkey"
+            columns: ["reverses_movement_id"]
+            isOneToOne: false
+            referencedRelation: "stock_movements"
             referencedColumns: ["id"]
           },
         ]
@@ -1184,12 +1248,18 @@ export type Database = {
           quantity: number | null
           reason: string | null
           reference: string | null
+          reversed_at: string | null
+          reverses_movement_id: string | null
         }
         Relationships: []
       }
     }
     Functions: {
       admin_reset_stock_data: { Args: never; Returns: Json }
+      assign_count_location: {
+        Args: { p_count_id: string; p_location: string; p_pallet: string }
+        Returns: string
+      }
       commit_exit_cart: {
         Args: {
           p_items: Json
@@ -1281,6 +1351,9 @@ export type Database = {
           quantity: number
           reason: string | null
           reference: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          reverses_movement_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1297,6 +1370,7 @@ export type Database = {
         }
         Returns: Json
       }
+      reverse_stock_movement: { Args: { p_movement_id: string }; Returns: Json }
       split_colis_counts: {
         Args: {
           p_colis_number: number
