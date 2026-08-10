@@ -130,7 +130,7 @@ export function RecentMovementsPanel({ type, title }: Props) {
           ) : rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sem movimentos ainda.</p>
           ) : (
-            <ScrollArea className="max-h-[420px]">
+            <ScrollArea className="h-[420px] w-full">
               <ul className="space-y-3 pr-3">
                 {rows.map(r => {
                   const p = productMap.get(r.product_id);
