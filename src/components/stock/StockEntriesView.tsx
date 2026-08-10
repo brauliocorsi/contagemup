@@ -47,6 +47,15 @@ interface ColiRow {
   suggested_pallet: string | null;
 }
 
+interface CartItem {
+  key: string;
+  product: Product;
+  rows: ColiRow[];
+  totalUnits: number;
+  orderNumber: string | null;
+}
+
+
 export function StockEntriesView() {
   const queryClient = useQueryClient();
   const { products } = useProducts();
