@@ -47,6 +47,15 @@ interface ColiRow {
   suggested_pallet: string | null;
 }
 
+interface CartItem {
+  key: string;
+  product: Product;
+  rows: ColiRow[];
+  totalUnits: number;
+  orderNumber: string | null;
+}
+
+
 export function StockEntriesView() {
   const queryClient = useQueryClient();
   const { products } = useProducts();
@@ -66,6 +75,7 @@ export function StockEntriesView() {
   const [orderNumber, setOrderNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [cart, setCart] = useState<CartItem[]>([]);
 
   // ------- Derived ----------------------------------------------------------
   const categoryColisCount = useMemo(() => {
@@ -154,20 +164,24 @@ export function StockEntriesView() {
   const someZero = rows.length > 0 && rows.some(r => r.quantity === 0) && positiveRows.length > 0;
   const allZero = positiveRows.length === 0;
 
-  const resetForm = () => {
+  const clearProductForm = () => {
     setSelected(null);
     setSearch('');
     setMode('set');
     setSetQuantity(1);
     setRows([]);
+    setOrderNumber('');
+  };
+
+  const resetForm = () => {
+    clearProductForm();
     setReason('');
     setReference('');
-    setOrderNumber('');
     setNotes('');
   };
 
-  // ------- Submit -----------------------------------------------------------
-  const handleSubmit = async () => {
+  // ------- Cart -------------------------------------------------------------
+  const addToCart = () => {
     if (!selected) return;
     if (allZero) {
       toast.error('Indique quantidade em pelo menos um coli');
@@ -177,67 +191,112 @@ export function StockEntriesView() {
       toast.error('Número de encomenda obrigatório para esta categoria');
       return;
     }
+    const item: CartItem = {
+      key: `${selected.id}-${Date.now()}`,
+      product: selected,
+      rows: positiveRows.map(r => ({ ...r })),
+      totalUnits,
+      orderNumber: requiresOrderNumber ? orderNumber.trim() : null,
+    };
+    setCart(prev => [...prev, item]);
+    toast.success(`${selected.name} adicionado ao carrinho (${totalUnits} un.)`);
+    clearProductForm();
+    setPickerOpen(true);
+  };
+
+  const removeFromCart = (key: string) => {
+    setCart(prev => prev.filter(i => i.key !== key));
+  };
+
+  const cartUnits = cart.reduce((s, i) => s + i.totalUnits, 0);
+
+  const commitItem = async (item: CartItem) => {
+    const groups = new Map<string, ColiRow[]>();
+    for (const r of item.rows) {
+      const key = `${r.location || ''}|${r.pallet_number || ''}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
+    }
+
+    const effectiveReference = item.orderNumber ?? (reference.trim() || null);
+
+    for (const [key, group] of groups.entries()) {
+      const [loc, pal] = key.split('|');
+      const colis_quantities: Record<string, number> = {};
+      for (const r of group) colis_quantities[String(r.colis_number)] = r.quantity;
+
+      const { error } = await supabase.rpc('register_entry', {
+        p_product_id: item.product.id,
+        p_colis_quantities: colis_quantities,
+        p_location: loc || null,
+        p_pallet_number: pal || null,
+        p_reason: reason || null,
+        p_reference: effectiveReference,
+        p_notes: notes || null,
+      });
+      if (error) throw error;
+    }
+  };
+
+  // ------- Submit -----------------------------------------------------------
+  const handleSubmit = async () => {
+    // Include the item currently being edited, if valid
+    const pending: CartItem[] = [...cart];
+    if (selected && !allZero) {
+      if (requiresOrderNumber && !orderNumber.trim()) {
+        toast.error('Número de encomenda obrigatório para esta categoria');
+        return;
+      }
+      pending.push({
+        key: 'current',
+        product: selected,
+        rows: positiveRows.map(r => ({ ...r })),
+        totalUnits,
+        orderNumber: requiresOrderNumber ? orderNumber.trim() : null,
+      });
+    }
+
+    if (pending.length === 0) {
+      toast.error('Carrinho vazio');
+      return;
+    }
 
     setSubmitting(true);
+    const failed: string[] = [];
+    let okItems = 0;
+    let okUnits = 0;
     try {
-      // Group rows by (location|pallet)
-      const groups = new Map<string, ColiRow[]>();
-      for (const r of positiveRows) {
-        const key = `${r.location || ''}|${r.pallet_number || ''}`;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key)!.push(r);
+      for (const item of pending) {
+        try {
+          await commitItem(item);
+          okItems += 1;
+          okUnits += item.totalUnits;
+          setCart(prev => prev.filter(i => i.key !== item.key));
+        } catch (e) {
+          console.error('register_entry failed', item.product.code, e);
+          failed.push(item.product.code);
+        }
       }
 
-      const effectiveReference = requiresOrderNumber
-        ? orderNumber.trim()
-        : (reference.trim() || null);
-
-      let callsOk = 0;
-      const summary: { location: string; pallet: string; units: number; colis: number[] }[] = [];
-
-      for (const [key, group] of groups.entries()) {
-        const [loc, pal] = key.split('|');
-        const colis_quantities: Record<string, number> = {};
-        for (const r of group) colis_quantities[String(r.colis_number)] = r.quantity;
-
-        const { error } = await supabase.rpc('register_entry', {
-          p_product_id: selected.id,
-          p_colis_quantities: colis_quantities,
-          p_location: loc || null,
-          p_pallet_number: pal || null,
-          p_reason: reason || null,
-          p_reference: effectiveReference,
-          p_notes: notes || null,
-        });
-        if (error) throw error;
-        callsOk += 1;
-        summary.push({
-          location: loc || '—',
-          pallet: pal || '—',
-          units: group.reduce((s, r) => s + r.quantity, 0),
-          colis: group.map(r => r.colis_number),
-        });
+      if (okItems > 0) {
+        toast.success(`Entrada registada: ${okItems} produto(s), ${okUnits} unidades`);
       }
-
-      toast.success(
-        `Entrada registada: ${totalUnits} un. em ${callsOk} localização(ões) — ${
-          summary.map(s => `${s.location}${s.pallet !== '—' ? '/' + s.pallet : ''} (${s.units}un.)`).join(', ')
-        }`
-      );
+      if (failed.length > 0) {
+        toast.error(`Falha em: ${failed.join(', ')}`);
+      }
 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['counts'] });
       queryClient.invalidateQueries({ queryKey: ['recent-entries'] });
 
-      resetForm();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao registar entrada';
-      console.error('register_entry failed', e);
-      toast.error(msg);
+      if (failed.length === 0) resetForm();
+      else clearProductForm();
     } finally {
       setSubmitting(false);
     }
   };
+
+
 
   return (
     <div className="space-y-6">
@@ -544,17 +603,73 @@ export function StockEntriesView() {
                   <span className="font-medium">{positiveRows.length} / {rows.length}</span>
                 </div>
                 <Button
-                  className="w-full bg-green-600 hover:bg-green-700"
-                  onClick={handleSubmit}
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={addToCart}
                   disabled={!selected || allZero || submitting}
                 >
-                  {submitting ? 'A registar…' : 'Confirmar entrada'}
+                  <ShoppingCart className="h-4 w-4" />
+                  Adicionar ao carrinho
                 </Button>
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  onClick={handleSubmit}
+                  disabled={submitting || (cart.length === 0 && (!selected || allZero))}
+                >
+                  {submitting
+                    ? 'A registar…'
+                    : cart.length > 0
+                      ? `Confirmar ${cart.length + (selected && !allZero ? 1 : 0)} entrada(s) — ${cartUnits + (selected && !allZero ? totalUnits : 0)} un.`
+                      : 'Confirmar entrada'}
+                </Button>
+
+
               </div>
             </CardContent>
           </Card>
 
+          {cart.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Carrinho de entradas
+                  <Badge variant="secondary" className="ml-auto">{cartUnits} un.</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="max-h-[300px]">
+                  <ul className="space-y-2 pr-3">
+                    {cart.map(item => (
+                      <li key={item.key} className="border-b last:border-0 pb-2">
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{item.product.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{item.product.code}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.rows.map(r => `C${r.colis_number}: ${r.quantity}${r.location ? ` @${r.location}` : ''}${r.pallet_number ? `/${r.pallet_number}` : ''}`).join(' · ')}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="text-xs">+{item.totalUnits}</Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => removeFromCart(item.key)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          )}
+
           <RecentEntriesPanel />
+
         </div>
           </div>
         </TabsContent>
