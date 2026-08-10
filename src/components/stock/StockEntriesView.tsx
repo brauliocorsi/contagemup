@@ -76,6 +76,7 @@ export function StockEntriesView() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [missingWarning, setMissingWarning] = useState<{ items: CartItem[]; missing: string[] } | null>(null);
 
   // ------- Derived ----------------------------------------------------------
   const categoryColisCount = useMemo(() => {
