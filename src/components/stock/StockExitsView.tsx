@@ -612,111 +612,174 @@ function CartItemCard({ item, onChange, onRemove }: CartItemCardProps) {
     return min === Infinity ? 0 : min;
   }, [locByColi, item.total_colis]);
 
+  const [expanded, setExpanded] = useState(false);
+
+  const totalUnitsRequested = item.mode === 'set'
+    ? item.setQuantity * item.total_colis
+    : Object.values(item.colisQuantities).reduce((s, n) => s + (n || 0), 0);
+
+  const locationsSummary = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(item.selections).forEach(sel => {
+      Object.entries(sel).forEach(([countId, qty]) => {
+        if (qty <= 0) return;
+        for (const rows of Object.values(locByColi)) {
+          const found = rows.find(r => r.id === countId);
+          if (found) { set.add(found.location || 'sem localização'); break; }
+        }
+      });
+    });
+    return Array.from(set);
+  }, [item.selections, locByColi]);
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <CardTitle className="text-base truncate">{item.product_name}</CardTitle>
-            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-              <span className="font-mono">{item.product_code}</span>
-              <span>·</span>
-              <span>Disponível: <span className="font-medium text-foreground">{totalAvailableSets} {item.mode === 'set' ? 'sets' : 'un. (mínimo por coli)'}</span></span>
-              <span>·</span>
-              <span>{item.total_colis} coli{item.total_colis > 1 ? 's' : ''}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={item.mode === 'set' ? 'default' : 'secondary'}>
-              {item.mode === 'set' ? <><Layers className="h-3 w-3 mr-1" />Set completo</> : <><Package className="h-3 w-3 mr-1" />Colis avulso</>}
+    <Card className="overflow-hidden">
+      {/* Compact line */}
+      <div className="flex items-center gap-3 p-3">
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="flex-1 min-w-0 text-left"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {expanded ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+            <span className="text-sm font-medium truncate">{item.product_name}</span>
+            <Badge variant={item.mode === 'set' ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
+              {item.mode === 'set' ? 'Set' : 'Avulso'}
             </Badge>
-            <Button size="icon" variant="ghost" onClick={onRemove} className="h-8 w-8">
-              <X className="h-4 w-4" />
+          </div>
+          <div className="pl-6 text-xs text-muted-foreground flex flex-wrap items-center gap-x-2">
+            <span className="font-mono">{item.product_code}</span>
+            <span>· disp. {totalAvailableSets}</span>
+            <span>· {item.total_colis} coli{item.total_colis > 1 ? 's' : ''}</span>
+            <span>· {totalUnitsRequested} un.</span>
+            {locationsSummary.length > 0 && (
+              <span className="flex items-center gap-1 truncate">
+                · <MapPin className="h-3 w-3" />{locationsSummary.join(', ')}
+              </span>
+            )}
+          </div>
+        </button>
+
+        {/* Quick quantity */}
+        {item.mode === 'set' ? (
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => onChange({ setQuantity: Math.max(1, item.setQuantity - 1) })}
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            <NumericInput
+              min={1}
+              value={item.setQuantity}
+              onChange={(v) => onChange({ setQuantity: v })}
+              className="w-16 h-8 text-center"
+            />
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => onChange({ setQuantity: item.setQuantity + 1 })}
+            >
+              <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Mode toggle + quantity */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {item.mode === 'set' ? (
-            <>
-              <Label className="text-sm">Sets:</Label>
-              <NumericInput
-                min={1}
-                value={item.setQuantity}
-                onChange={(v) => onChange({ setQuantity: v })}
-                className="w-24 h-9 text-center"
-              />
-              {item.total_colis > 1 && (
-                <Button variant="outline" size="sm" onClick={() => onChange({ mode: 'individual' })}>
-                  <Package className="h-3.5 w-3.5 mr-1" /> Tirar colis avulso
-                </Button>
-              )}
-            </>
-          ) : (
-            <>
-              <Label className="text-sm">Por coli:</Label>
-              <div className="flex flex-wrap gap-2">
-                {Array.from({ length: item.total_colis }, (_, i) => i + 1).map(n => (
-                  <div key={n} className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground">Coli {n}:</span>
-                    <NumericInput
-                      min={0}
-                      value={item.colisQuantities[n] || 0}
-                      onChange={(v) => onChange({
-                        colisQuantities: { ...item.colisQuantities, [n]: v },
-                      })}
-                      className="w-16 h-8 text-center text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => onChange({ mode: 'set' })}>
-                <Layers className="h-3.5 w-3.5 mr-1" /> Voltar a set completo
-              </Button>
-            </>
-          )}
-        </div>
+        ) : (
+          <Badge variant="secondary" className="shrink-0">{totalUnitsRequested} un.</Badge>
+        )}
 
-        {/* Location selection per coli */}
-        <div className="space-y-2 pt-2 border-t">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            Onde retirar (por coli)
-          </div>
-          {isLoading ? (
-            <p className="text-xs text-muted-foreground">A carregar localizações…</p>
-          ) : (
-            Array.from({ length: item.total_colis }, (_, i) => i + 1).map(coliNum => {
-              const required = item.mode === 'set' ? item.setQuantity : (item.colisQuantities[coliNum] || 0);
-              if (required <= 0) return null;
-              const candidates = locByColi[coliNum] || [];
-              const selected = item.selections[coliNum] || {};
-              const totalSelected = Object.values(selected).reduce((s, n) => s + n, 0);
-              const ok = totalSelected >= required;
+        <Button size="icon" variant="ghost" onClick={onRemove} className="h-8 w-8 shrink-0">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
 
-              return (
-                <ColiLocationBlock
-                  key={coliNum}
-                  coliNumber={coliNum}
-                  required={required}
-                  totalSelected={totalSelected}
-                  ok={ok}
-                  candidates={candidates}
-                  selected={selected}
-                  onSelectionChange={(newSel) => onChange({
-                    selections: { ...item.selections, [coliNum]: newSel },
-                  })}
+      {expanded && (
+        <CardContent className="space-y-3 border-t pt-3">
+          {/* Mode toggle + quantity */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {item.mode === 'set' ? (
+              <>
+                <Label className="text-sm">Sets:</Label>
+                <NumericInput
+                  min={1}
+                  value={item.setQuantity}
+                  onChange={(v) => onChange({ setQuantity: v })}
+                  className="w-24 h-9 text-center"
                 />
-              );
-            })
-          )}
-        </div>
-      </CardContent>
+                {item.total_colis > 1 && (
+                  <Button variant="outline" size="sm" onClick={() => onChange({ mode: 'individual' })}>
+                    <Package className="h-3.5 w-3.5 mr-1" /> Tirar colis avulso
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <Label className="text-sm">Por coli:</Label>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from({ length: item.total_colis }, (_, i) => i + 1).map(n => (
+                    <div key={n} className="flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground">Coli {n}:</span>
+                      <NumericInput
+                        min={0}
+                        value={item.colisQuantities[n] || 0}
+                        onChange={(v) => onChange({
+                          colisQuantities: { ...item.colisQuantities, [n]: v },
+                        })}
+                        className="w-16 h-8 text-center text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => onChange({ mode: 'set' })}>
+                  <Layers className="h-3.5 w-3.5 mr-1" /> Voltar a set completo
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Location selection per coli */}
+          <div className="space-y-2 pt-2 border-t">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              Onde retirar (por coli)
+            </div>
+            {isLoading ? (
+              <p className="text-xs text-muted-foreground">A carregar localizações…</p>
+            ) : (
+              Array.from({ length: item.total_colis }, (_, i) => i + 1).map(coliNum => {
+                const required = item.mode === 'set' ? item.setQuantity : (item.colisQuantities[coliNum] || 0);
+                if (required <= 0) return null;
+                const candidates = locByColi[coliNum] || [];
+                const selected = item.selections[coliNum] || {};
+                const totalSelected = Object.values(selected).reduce((s, n) => s + n, 0);
+                const ok = totalSelected >= required;
+
+                return (
+                  <ColiLocationBlock
+                    key={coliNum}
+                    coliNumber={coliNum}
+                    required={required}
+                    totalSelected={totalSelected}
+                    ok={ok}
+                    candidates={candidates}
+                    selected={selected}
+                    onSelectionChange={(newSel) => onChange({
+                      selections: { ...item.selections, [coliNum]: newSel },
+                    })}
+                  />
+                );
+              })
+            )}
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Coli location picker — shows sorted candidates with suggested top one
