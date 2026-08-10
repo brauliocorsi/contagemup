@@ -126,7 +126,7 @@ export function UnlocatedStockPanel() {
         {isLoading ? (
           <p className="text-sm text-muted-foreground">A carregar…</p>
         ) : (
-          <ScrollArea className="max-h-[420px]">
+          <ScrollArea className="h-[420px] w-full">
             <div className="space-y-2 pr-3">
               {filtered.map(({ row, product }) => {
                 const d = draft[row.id] || { location: '', pallet: '' };
