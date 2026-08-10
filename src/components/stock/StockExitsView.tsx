@@ -834,3 +834,4 @@ function ColiLocationBlock({ coliNumber, required, totalSelected, ok, candidates
       )}
     </div>
   );
+}
