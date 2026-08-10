@@ -39,6 +39,8 @@ export function MovementHistoryView() {
   const [place, setPlace] = useState('');
   const [person, setPerson] = useState('all');
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [advanced, setAdvanced] = useState(false);
+
 
   const productMap = useMemo(() => {
     const m = new Map<string, Product>();
