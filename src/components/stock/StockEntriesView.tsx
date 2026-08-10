@@ -603,12 +603,25 @@ export function StockEntriesView() {
                   <span className="font-medium">{positiveRows.length} / {rows.length}</span>
                 </div>
                 <Button
-                  className="w-full bg-green-600 hover:bg-green-700"
-                  onClick={handleSubmit}
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={addToCart}
                   disabled={!selected || allZero || submitting}
                 >
-                  {submitting ? 'A registar…' : 'Confirmar entrada'}
+                  <ShoppingCart className="h-4 w-4" />
+                  Adicionar ao carrinho
                 </Button>
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  onClick={handleSubmit}
+                  disabled={submitting || (cart.length === 0 && (!selected || allZero))}
+                >
+                  {submitting
+                    ? 'A registar…'
+                    : cart.length > 0
+                      ? `Confirmar ${cart.length + (selected && !allZero ? 1 : 0)} entrada(s) — ${cartUnits + (selected && !allZero ? totalUnits : 0)} un.`
+                      : 'Confirmar entrada'}
+
               </div>
             </CardContent>
           </Card>
