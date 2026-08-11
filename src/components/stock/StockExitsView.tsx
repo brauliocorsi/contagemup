@@ -121,6 +121,8 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
   // Product picker
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+
 
   const categoryColisCount = useCallback((category: string) => {
     const cat = categories.find(c => c.name === category);
