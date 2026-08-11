@@ -78,6 +78,7 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
 
   if (!product) return null;
 
+  const isNegativeStock = product.current_stock < 0;
   const isLowStock = product.current_stock <= product.min_stock;
   const availableStock = product.current_stock - product.damaged_stock;
   const erpStock = erpData ? Number(erpData.erp_stock) : null;
@@ -145,6 +146,11 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
             </div>
           )}
 
+          {isNegativeStock && (
+            <Badge variant="destructive" className="gap-1">
+              <AlertTriangle className="h-3 w-3" />Stock negativo ({product.current_stock})
+            </Badge>
+          )}
           {(isLowStock || product.damaged_stock > 0) && (
             <div className="flex flex-wrap gap-2 mt-2">
               {isLowStock && <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Stock baixo</Badge>}

@@ -13,7 +13,7 @@ interface ExportFilters {
 }
 
 const calcAvailable = (p: ProductWithCounts) =>
-  Math.max(0, p.completeSets - (p.damaged_stock || 0));
+  p.completeSets - (p.damaged_stock || 0);
 
 export function useCountingExport(
   filteredProducts: ProductWithCounts[],

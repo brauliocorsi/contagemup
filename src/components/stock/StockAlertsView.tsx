@@ -22,10 +22,10 @@ import {
 import { useStockAlerts } from '@/hooks/useStockAlerts';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type FilterType = 'all' | 'out_of_stock' | 'low_stock';
+type FilterType = 'all' | 'negative_stock' | 'out_of_stock' | 'low_stock';
 
 export function StockAlertsView() {
-  const { alerts, outOfStockCount, lowStockCount, totalAlerts, loading } = useStockAlerts();
+  const { alerts, negativeStockCount, outOfStockCount, lowStockCount, totalAlerts, loading } = useStockAlerts();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
 
@@ -92,6 +92,9 @@ export function StockAlertsView() {
               <div>
                 <div className="text-2xl font-bold text-destructive">{outOfStockCount}</div>
                 <p className="text-sm text-destructive/80">Produtos Esgotados</p>
+                {negativeStockCount > 0 && (
+                  <p className="text-xs text-destructive">{negativeStockCount} com stock negativo</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -137,6 +140,7 @@ export function StockAlertsView() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="negative_stock">Stock negativo</SelectItem>
                   <SelectItem value="out_of_stock">Esgotados</SelectItem>
                   <SelectItem value="low_stock">Stock Baixo</SelectItem>
                 </SelectContent>
@@ -189,7 +193,7 @@ export function StockAlertsView() {
                 </TableHeader>
                 <TableBody>
                   {filteredAlerts.map((alert) => {
-                    const isOutOfStock = alert.type === 'out_of_stock';
+                    const isOutOfStock = alert.type === 'out_of_stock' || alert.type === 'negative_stock';
                     return (
                       <TableRow
                         key={alert.product.id}
@@ -232,7 +236,7 @@ export function StockAlertsView() {
                             {isOutOfStock ? (
                               <>
                                 <PackageX className="h-3 w-3 mr-1" />
-                                Esgotado
+                                {alert.type === 'negative_stock' ? 'Negativo' : 'Esgotado'}
                               </>
                             ) : (
                               <>

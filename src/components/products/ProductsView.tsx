@@ -78,7 +78,7 @@ export function ProductsView() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
-  const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock' | 'negative_stock'>('all');
   const [filterOrderStatus, setFilterOrderStatus] = useState<'all' | 'with_orders' | 'without_orders'>('all');
   const [sortColumn, setSortColumn] = useState<'code' | 'name' | 'category' | 'stock' | 'lastCount' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -134,6 +134,7 @@ export function ProductsView() {
   };
 
   const getStockStatus = (stock: number, minStock: number = 5) => {
+    if (stock < 0) return 'negative_stock';
     if (stock <= 0) return 'out_of_stock';
     if (stock <= minStock) return 'low_stock';
     return 'in_stock';
@@ -222,7 +223,8 @@ export function ProductsView() {
     const inStock = products.filter(p => getStockStatus(p.current_stock, p.min_stock) === 'in_stock').length;
     const lowStock = products.filter(p => getStockStatus(p.current_stock, p.min_stock) === 'low_stock').length;
     const outOfStock = products.filter(p => getStockStatus(p.current_stock, p.min_stock) === 'out_of_stock').length;
-    return { inStock, lowStock, outOfStock };
+    const negativeStock = products.filter(p => getStockStatus(p.current_stock, p.min_stock) === 'negative_stock').length;
+    return { inStock, lowStock, outOfStock, negativeStock };
   }, [products]);
 
   // Order stats for filter
@@ -478,8 +480,14 @@ export function ProductsView() {
             </SelectItem>
             <SelectItem value="out_of_stock">
               <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
                 Esgotado ({stockStats.outOfStock})
+              </span>
+            </SelectItem>
+            <SelectItem value="negative_stock">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                Stock negativo ({stockStats.negativeStock})
               </span>
             </SelectItem>
           </SelectContent>
