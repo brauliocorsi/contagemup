@@ -390,7 +390,13 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
             Rascunho — nada sai do stock até clicar em <span className="font-medium">"Concluir e retirar do stock"</span>.
           </p>
         </div>
+        <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+          <FileSpreadsheet className="h-4 w-4" /> Importar ficheiro
+        </Button>
       </div>
+
+      <ImportExitsDialog open={importOpen} onOpenChange={setImportOpen} onConfirm={handleImported} />
+
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Main */}
