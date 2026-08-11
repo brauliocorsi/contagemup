@@ -26,6 +26,8 @@ import type { Product } from '@/types/stock';
 import { PickingHistoryView } from './PickingHistoryView';
 import { ERPExitsView, ERPExitCartItem } from './ERPExitsView';
 import { RecentMovementsPanel } from '@/components/stock/RecentMovementsPanel';
+import { ImportExitsDialog, ImportedExitLine } from '@/components/stock/ImportExitsDialog';
+
 
 const EXIT_REASONS = [
   'Venda', 'Quebra', 'Perda', 'Transferência',
