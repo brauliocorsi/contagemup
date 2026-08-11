@@ -166,7 +166,12 @@ export function ImportExitsDialog({ open, onOpenChange, onConfirm }: ImportExits
                   <Badge variant="destructive">{groups.insufficient.length} sem stock suficiente</Badge>
                   <Badge variant="secondary">{groups.ambiguous.length} ambíguos</Badge>
                   <Badge variant="outline">{groups.missing.length} não registados</Badge>
-                  {skipped.length > 0 && <Badge variant="outline">{skipped.length} linhas "encomendar" ignoradas</Badge>}
+                  {rows.some(r => r.details?.includes('encomend')) && (
+                    <Badge variant="outline">
+                      {rows.filter(r => r.details?.includes('encomend')).length} linhas "encomendar" incluídas
+                    </Badge>
+                  )}
+
                 </div>
 
                 <ScrollArea className="h-[420px] pr-3">
