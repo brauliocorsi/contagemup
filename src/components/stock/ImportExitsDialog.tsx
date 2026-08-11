@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import {
-  parsePickingFile, resolveRows, isStockRow, methodLabel,
+  parsePickingFile, resolveRows, methodLabel,
   type RawPickingRow, type ResolvedRow,
 } from '@/lib/stock/pickingImport';
 import type { Product } from '@/types/stock';
@@ -53,12 +53,9 @@ export function ImportExitsDialog({ open, onOpenChange, onConfirm }: ImportExits
     try {
       const raw = await parsePickingFile(file);
       if (raw.length === 0) throw new Error('Nenhuma linha válida encontrada no ficheiro.');
-      const stockRows = raw.filter(isStockRow);
-      setSkipped(raw.filter(r => !isStockRow(r)));
-      setRows(resolveRows(stockRows, products));
-      if (stockRows.length === 0) {
-        setError('O ficheiro não tem linhas marcadas como "stock".');
-      }
+      setSkipped([]);
+      setRows(resolveRows(raw, products));
+
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao ler o ficheiro');
       setRows([]); setSkipped([]);
@@ -169,7 +166,12 @@ export function ImportExitsDialog({ open, onOpenChange, onConfirm }: ImportExits
                   <Badge variant="destructive">{groups.insufficient.length} sem stock suficiente</Badge>
                   <Badge variant="secondary">{groups.ambiguous.length} ambíguos</Badge>
                   <Badge variant="outline">{groups.missing.length} não registados</Badge>
-                  {skipped.length > 0 && <Badge variant="outline">{skipped.length} linhas "encomendar" ignoradas</Badge>}
+                  {rows.some(r => r.details?.includes('encomend')) && (
+                    <Badge variant="outline">
+                      {rows.filter(r => r.details?.includes('encomend')).length} linhas "encomendar" incluídas
+                    </Badge>
+                  )}
+
                 </div>
 
                 <ScrollArea className="h-[420px] pr-3">
