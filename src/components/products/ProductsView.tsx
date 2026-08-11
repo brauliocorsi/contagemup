@@ -438,7 +438,7 @@ export function ProductsView() {
       </div>
 
       {/* Search and filters */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col lg:flex-row gap-2">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -492,6 +492,24 @@ export function ProductsView() {
             </SelectItem>
           </SelectContent>
         </Select>
+        <Button
+          variant={filterStockStatus === 'negative_stock' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilterStockStatus(prev => prev === 'negative_stock' ? 'all' : 'negative_stock')}
+          className={`whitespace-nowrap gap-2 transition-colors ${
+            filterStockStatus === 'negative_stock'
+              ? 'bg-red-600 hover:bg-red-700 text-white border-red-600'
+              : 'border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800'
+          }`}
+        >
+          <AlertTriangle className="h-4 w-4" />
+          Abaixo de zero
+          {stockStats.negativeStock > 0 && (
+            <Badge variant="secondary" className="ml-1 bg-red-100 text-red-700 hover:bg-red-100">
+              {stockStats.negativeStock}
+            </Badge>
+          )}
+        </Button>
         <Select value={filterOrderStatus} onValueChange={(v) => setFilterOrderStatus(v as typeof filterOrderStatus)}>
           <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterOrderStatus !== 'all' ? 'border-amber-500 bg-amber-50 text-amber-700' : ''}`}>
             <ShoppingBag className="h-4 w-4 mr-2" />
