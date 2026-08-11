@@ -57,6 +57,7 @@ interface VirtualizedProductRowProps {
 }
 
 const getStockStatus = (stock: number, minStock: number = 5) => {
+  if (stock < 0) return 'negative_stock';
   if (stock <= 0) return 'out_of_stock';
   if (stock <= minStock) return 'low_stock';
   return 'in_stock';
@@ -105,7 +106,10 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
   let badgeClassName: string;
   let dotClassName: string;
   
-  if (product.current_stock <= 0) {
+  if (product.current_stock < 0) {
+    badgeClassName = "bg-red-50 text-red-700 border-red-400 font-semibold";
+    dotClassName = "bg-red-500";
+  } else if (product.current_stock <= 0) {
     badgeClassName = "bg-slate-100 text-slate-500 border-slate-300";
     dotClassName = "bg-slate-400";
   } else if (status === 'low_stock') {
@@ -176,7 +180,8 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
             <div className="flex items-center gap-1">
               <Badge variant="outline" className={cn("gap-1 text-xs", badgeClassName)}>
                 <span className={cn("w-1.5 h-1.5 rounded-full", dotClassName)} />
-                {product.current_stock} {product.current_stock === 1 ? 'set' : 'sets'}
+                {product.current_stock} {Math.abs(product.current_stock) === 1 ? 'set' : 'sets'}
+                {product.current_stock < 0 && <span className="ml-1">negativo</span>}
               </Badge>
               {hasIncomplete && (
                 <Badge variant="outline" className="gap-0.5 px-1.5 py-0 h-5 bg-orange-50 text-orange-600 border-orange-300 text-[10px]">

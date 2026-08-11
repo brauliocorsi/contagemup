@@ -436,7 +436,7 @@ export function OrderNumberEntrySelector({
 
   // Calculate tracked vs untracked stock
   const trackedStock = completeOrders.length; // Complete orders = tracked units
-  const untrackedStock = Math.max(0, currentStock - trackedStock); // Generic stock without order numbers
+  const untrackedStock = currentStock - trackedStock; // Generic stock without order numbers
 
   return (
     <>
