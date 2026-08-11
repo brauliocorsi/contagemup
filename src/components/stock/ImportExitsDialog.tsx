@@ -53,12 +53,9 @@ export function ImportExitsDialog({ open, onOpenChange, onConfirm }: ImportExits
     try {
       const raw = await parsePickingFile(file);
       if (raw.length === 0) throw new Error('Nenhuma linha válida encontrada no ficheiro.');
-      const stockRows = raw.filter(isStockRow);
-      setSkipped(raw.filter(r => !isStockRow(r)));
-      setRows(resolveRows(stockRows, products));
-      if (stockRows.length === 0) {
-        setError('O ficheiro não tem linhas marcadas como "stock".');
-      }
+      setSkipped([]);
+      setRows(resolveRows(raw, products));
+
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao ler o ficheiro');
       setRows([]); setSkipped([]);
