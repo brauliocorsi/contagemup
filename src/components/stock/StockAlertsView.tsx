@@ -25,7 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 type FilterType = 'all' | 'negative_stock' | 'out_of_stock' | 'low_stock';
 
 export function StockAlertsView() {
-  const { alerts, outOfStockCount, lowStockCount, totalAlerts, loading } = useStockAlerts();
+  const { alerts, negativeStockCount, outOfStockCount, lowStockCount, totalAlerts, loading } = useStockAlerts();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
 
@@ -92,6 +92,9 @@ export function StockAlertsView() {
               <div>
                 <div className="text-2xl font-bold text-destructive">{outOfStockCount}</div>
                 <p className="text-sm text-destructive/80">Produtos Esgotados</p>
+                {negativeStockCount > 0 && (
+                  <p className="text-xs text-destructive">{negativeStockCount} com stock negativo</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -233,7 +236,7 @@ export function StockAlertsView() {
                             {isOutOfStock ? (
                               <>
                                 <PackageX className="h-3 w-3 mr-1" />
-                                Esgotado
+                                {alert.type === 'negative_stock' ? 'Negativo' : 'Esgotado'}
                               </>
                             ) : (
                               <>
