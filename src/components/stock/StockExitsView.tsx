@@ -490,9 +490,13 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
           <Card>
             <CardContent className="pt-6 space-y-4">
               <div className="space-y-2">
-                <Label>Motivo</Label>
+                <Label className={cn(!reason && cart.length > 0 && 'text-destructive')}>
+                  Motivo <span className="text-destructive">*</span>
+                </Label>
                 <Select value={reason} onValueChange={setReason}>
-                  <SelectTrigger><SelectValue placeholder="Selecione um motivo…" /></SelectTrigger>
+                  <SelectTrigger className={cn(!reason && cart.length > 0 && 'border-destructive')}>
+                    <SelectValue placeholder="Selecione um motivo…" />
+                  </SelectTrigger>
                   <SelectContent>
                     {EXIT_REASONS.map(r => (
                       <SelectItem key={r} value={r}>{r}</SelectItem>
