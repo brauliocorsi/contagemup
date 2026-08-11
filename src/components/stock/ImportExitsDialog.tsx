@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import {
-  parsePickingFile, resolveRows, isStockRow, methodLabel,
+  parsePickingFile, resolveRows, methodLabel,
   type RawPickingRow, type ResolvedRow,
 } from '@/lib/stock/pickingImport';
 import type { Product } from '@/types/stock';
