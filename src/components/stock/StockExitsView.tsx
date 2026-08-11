@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   TrendingDown, History, Truck, Search, Package, Layers, Plus, X,
-  MapPin, Box, Star, AlertTriangle, ShoppingCart, Check, ChevronDown, ChevronRight, Minus,
+  MapPin, Box, Star, AlertTriangle, ShoppingCart, Check, ChevronDown, ChevronRight, Minus, FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,8 @@ import type { Product } from '@/types/stock';
 import { PickingHistoryView } from './PickingHistoryView';
 import { ERPExitsView, ERPExitCartItem } from './ERPExitsView';
 import { RecentMovementsPanel } from '@/components/stock/RecentMovementsPanel';
+import { ImportExitsDialog, ImportedExitLine } from '@/components/stock/ImportExitsDialog';
+
 
 const EXIT_REASONS = [
   'Venda', 'Quebra', 'Perda', 'Transferência',
@@ -119,6 +121,8 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
   // Product picker
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+
 
   const categoryColisCount = useCallback((category: string) => {
     const cat = categories.find(c => c.name === category);
@@ -163,6 +167,45 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
       }];
     });
   }, [effectiveColis]);
+
+  // Handle imported file lines
+  const handleImported = useCallback((lines: ImportedExitLine[], ref: string, importNotes: string) => {
+    let added = 0;
+    setCart(prev => {
+      let next = [...prev];
+      lines.forEach(line => {
+        const p = products.find(pp => pp.id === line.product_id);
+        if (!p) return;
+        added++;
+        const existing = next.find(i => i.product_id === p.id);
+        if (existing) {
+          next = next.map(i => i.product_id === p.id
+            ? { ...i, mode: 'set' as const, setQuantity: i.setQuantity + line.quantity }
+            : i);
+          return;
+        }
+        const totalColis = effectiveColis(p);
+        next = [...next, {
+          product_id: p.id,
+          product_code: p.code,
+          product_name: p.name,
+          total_colis: totalColis,
+          mode: 'set' as const,
+          setQuantity: line.quantity,
+          colisQuantities: Object.fromEntries(
+            Array.from({ length: totalColis }, (_, i) => [i + 1, 0])
+          ),
+          selections: {},
+        }];
+      });
+      return next;
+    });
+    if (ref) setReference(prev => (prev ? `${prev}, ${ref}` : ref));
+    if (importNotes) setNotes(prev => (prev ? `${prev} | ${importNotes}` : importNotes));
+    toast.success(`${added} produto${added === 1 ? '' : 's'} importado${added === 1 ? '' : 's'} para o carrinho`);
+  }, [products, effectiveColis]);
+
+
 
 
   // Handle external (ERP) additions
@@ -347,7 +390,13 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
             Rascunho — nada sai do stock até clicar em <span className="font-medium">"Concluir e retirar do stock"</span>.
           </p>
         </div>
+        <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+          <FileSpreadsheet className="h-4 w-4" /> Importar ficheiro
+        </Button>
       </div>
+
+      <ImportExitsDialog open={importOpen} onOpenChange={setImportOpen} onConfirm={handleImported} />
+
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Main */}
