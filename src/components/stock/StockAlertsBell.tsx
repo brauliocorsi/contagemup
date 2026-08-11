@@ -109,7 +109,8 @@ export function StockAlertsBell({ onNavigateToProducts }: StockAlertsBellProps) 
 }
 
 function AlertListItem({ alert }: { alert: StockAlert }) {
-  const isOutOfStock = alert.type === 'out_of_stock';
+  const isNegative = alert.type === 'negative_stock';
+  const isOutOfStock = alert.type === 'out_of_stock' || isNegative;
 
   return (
     <div

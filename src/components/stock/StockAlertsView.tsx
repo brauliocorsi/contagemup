@@ -22,7 +22,7 @@ import {
 import { useStockAlerts } from '@/hooks/useStockAlerts';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type FilterType = 'all' | 'out_of_stock' | 'low_stock';
+type FilterType = 'all' | 'negative_stock' | 'out_of_stock' | 'low_stock';
 
 export function StockAlertsView() {
   const { alerts, outOfStockCount, lowStockCount, totalAlerts, loading } = useStockAlerts();
@@ -137,6 +137,7 @@ export function StockAlertsView() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="negative_stock">Stock negativo</SelectItem>
                   <SelectItem value="out_of_stock">Esgotados</SelectItem>
                   <SelectItem value="low_stock">Stock Baixo</SelectItem>
                 </SelectContent>
@@ -189,7 +190,7 @@ export function StockAlertsView() {
                 </TableHeader>
                 <TableBody>
                   {filteredAlerts.map((alert) => {
-                    const isOutOfStock = alert.type === 'out_of_stock';
+                    const isOutOfStock = alert.type === 'out_of_stock' || alert.type === 'negative_stock';
                     return (
                       <TableRow
                         key={alert.product.id}

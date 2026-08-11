@@ -213,12 +213,12 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
                     <Badge
                       variant="outline"
                       className={
-                        alert.type === 'out_of_stock'
+                        alert.type === 'out_of_stock' || alert.type === 'negative_stock'
                           ? 'bg-danger-soft text-danger border-danger/20'
                           : 'bg-warning-soft text-warning border-warning/20'
                       }
                     >
-                      {alert.type === 'out_of_stock' ? 'Esgotado' : 'Baixo'}
+                      {alert.type === 'negative_stock' ? 'Negativo' : alert.type === 'out_of_stock' ? 'Esgotado' : 'Baixo'}
                     </Badge>
                   </div>
                 </div>

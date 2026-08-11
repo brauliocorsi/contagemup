@@ -102,7 +102,8 @@ interface AlertItemProps {
 }
 
 function AlertItem({ alert, onClick }: AlertItemProps) {
-  const isOutOfStock = alert.type === 'out_of_stock';
+  const isNegative = alert.type === 'negative_stock';
+  const isOutOfStock = alert.type === 'out_of_stock' || isNegative;
 
   return (
     <div
