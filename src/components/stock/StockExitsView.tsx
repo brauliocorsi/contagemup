@@ -200,8 +200,9 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
       });
       return next;
     });
-    if (ref) setReference(prev => (prev ? `${prev}, ${ref}` : ref));
-    if (importNotes) setNotes(prev => (prev ? `${prev} | ${importNotes}` : importNotes));
+    if (ref) setReference(prev => (prev ? `${prev}, ${ref}` : ref).slice(0, 500));
+    if (importNotes) setNotes(prev => (prev ? `${prev} | ${importNotes}` : importNotes).slice(0, 2000));
+    setReason(prev => prev || 'Venda');
     toast.success(`${added} produto${added === 1 ? '' : 's'} importado${added === 1 ? '' : 's'} para o carrinho`);
   }, [products, effectiveColis]);
 
