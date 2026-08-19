@@ -24,7 +24,7 @@ interface PrintMenuProps {
 export function PrintMenu({ getItems, label = 'Imprimir', disabled, className, variant = 'outline' }: PrintMenuProps) {
   const [busy, setBusy] = useState(false);
 
-  const run = async (fn: () => Promise<void>) => {
+  const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     try {
       await fn();

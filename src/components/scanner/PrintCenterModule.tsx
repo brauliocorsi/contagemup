@@ -1,0 +1,277 @@
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader2, Printer, Download, Eye, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { printLabels, type LabelItem, type LabelFormat } from '@/lib/scanner/labels';
+import { COMMAND_SHEET, palletCode, locationCode } from '@/lib/scanner/commands';
+
+type Source = 'comandos' | 'localizacoes' | 'paletes' | 'produtos';
+
+interface Row {
+  id: string;
+  code: string;
+  title: string;
+  subtitle?: string;
+}
+
+export function PrintCenterModule() {
+  const [source, setSource] = useState<Source>('comandos');
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [format, setFormat] = useState<LabelFormat>('a4');
+  const [busy, setBusy] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const locations = useQuery({
+    queryKey: ['print-locations'],
+    enabled: source === 'localizacoes',
+    queryFn: async (): Promise<Row[]> => {
+      const { data, error } = await supabase
+        .from('warehouse_locations')
+        .select('id, code, notes')
+        .order('code');
+      if (error) throw error;
+      return (data || []).map((l) => ({
+        id: `loc-${l.id}`,
+        code: locationCode(l.code),
+        title: l.code,
+        subtitle: l.notes || 'Localização',
+      }));
+    },
+  });
+
+  const pallets = useQuery({
+    queryKey: ['print-pallets'],
+    enabled: source === 'paletes',
+    queryFn: async (): Promise<Row[]> => {
+      const { data, error } = await supabase
+        .from('warehouse_pallets')
+        .select('id, code, status')
+        .order('code');
+      if (error) throw error;
+      return (data || []).map((p) => ({
+        id: `pal-${p.id}`,
+        code: palletCode(p.code),
+        title: p.code,
+        subtitle: `Palete • ${p.status}`,
+      }));
+    },
+  });
+
+  const products = useQuery({
+    queryKey: ['print-products', search],
+    enabled: source === 'produtos' && search.trim().length >= 2,
+    queryFn: async (): Promise<Row[]> => {
+      const term = search.trim();
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, code, name, location, pallet_number')
+        .or(`code.ilike.%${term}%,name.ilike.%${term}%`)
+        .order('name')
+        .limit(50);
+      if (error) throw error;
+      return (data || []).map((p) => ({
+        id: `prod-${p.id}`,
+        code: p.code,
+        title: p.name,
+        subtitle: [p.code, p.location, p.pallet_number].filter(Boolean).join(' • '),
+      }));
+    },
+  });
+
+  const commandRows: Row[] = useMemo(
+    () =>
+      COMMAND_SHEET.map((c) => ({
+        id: `cmd-${c.code}`,
+        code: c.code,
+        title: c.label,
+        subtitle: c.description,
+      })),
+    []
+  );
+
+  const loading =
+    (source === 'localizacoes' && locations.isLoading) ||
+    (source === 'paletes' && pallets.isLoading) ||
+    (source === 'produtos' && products.isFetching);
+
+  const rows: Row[] = useMemo(() => {
+    const base =
+      source === 'comandos'
+        ? commandRows
+        : source === 'localizacoes'
+          ? locations.data || []
+          : source === 'paletes'
+            ? pallets.data || []
+            : products.data || [];
+    if (source === 'produtos') return base;
+    const term = search.trim().toLowerCase();
+    if (!term) return base;
+    return base.filter(
+      (r) => r.title.toLowerCase().includes(term) || r.code.toLowerCase().includes(term)
+    );
+  }, [source, search, commandRows, locations.data, pallets.data, products.data]);
+
+  const selectedRows = rows.filter((r) => selected[r.id]);
+  const toPrint = selectedRows.length ? selectedRows : rows;
+
+  const toggle = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }));
+  const selectAll = () => {
+    const next: Record<string, boolean> = { ...selected };
+    const all = rows.every((r) => selected[r.id]);
+    rows.forEach((r) => (next[r.id] = !all));
+    setSelected(next);
+  };
+
+  const items = (): LabelItem[] =>
+    toPrint.map((r) => ({ code: r.code, title: r.title, subtitle: r.subtitle }));
+
+  const run = async (mode: 'print' | 'download' | 'preview') => {
+    const list = items();
+    if (!list.length) {
+      toast.info('Nada para imprimir');
+      return;
+    }
+    setBusy(true);
+    try {
+      const filename = `etiquetas-${source}.pdf`;
+      const url = await printLabels(list, format, filename, mode);
+      if (mode === 'preview' && typeof url === 'string') setPreviewUrl(url);
+      if (mode === 'download') toast.success('PDF descarregado');
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Erro ao gerar PDF: ' + (e?.message || 'desconhecido'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Tabs
+        value={source}
+        onValueChange={(v) => {
+          setSource(v as Source);
+          setSearch('');
+          setSelected({});
+          setPreviewUrl(null);
+        }}
+      >
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="comandos" className="text-[11px]">Comandos</TabsTrigger>
+          <TabsTrigger value="localizacoes" className="text-[11px]">Locais</TabsTrigger>
+          <TabsTrigger value="paletes" className="text-[11px]">Paletes</TabsTrigger>
+          <TabsTrigger value="produtos" className="text-[11px]">Produtos</TabsTrigger>
+        </TabsList>
+        <TabsContent value={source} className="mt-3 space-y-3">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={source === 'produtos' ? 'Pesquisar produto (código ou nome)…' : 'Filtrar…'}
+          />
+
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="secondary">{rows.length} códigos</Badge>
+              {selectedRows.length > 0 && <Badge>{selectedRows.length} selecionados</Badge>}
+            </div>
+            <Button variant="ghost" size="sm" onClick={selectAll} disabled={!rows.length}>
+              {rows.every((r) => selected[r.id]) && rows.length ? 'Limpar' : 'Selecionar tudo'}
+            </Button>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[42vh]">
+                {loading ? (
+                  <div className="flex h-32 items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  </div>
+                ) : rows.length === 0 ? (
+                  <p className="p-6 text-center text-sm text-muted-foreground">
+                    {source === 'produtos' && search.trim().length < 2
+                      ? 'Escreve pelo menos 2 caracteres para pesquisar.'
+                      : 'Sem códigos para mostrar.'}
+                  </p>
+                ) : (
+                  <ul className="divide-y">
+                    {rows.map((r) => (
+                      <li key={r.id} className="flex items-center gap-3 px-3 py-2.5">
+                        <Checkbox checked={!!selected[r.id]} onCheckedChange={() => toggle(r.id)} />
+                        <button
+                          type="button"
+                          onClick={() => toggle(r.id)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <p className="truncate text-sm font-medium">{r.title}</p>
+                          <p className="truncate text-[11px] text-muted-foreground">{r.subtitle}</p>
+                        </button>
+                        <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px]">
+                          {r.code}
+                        </code>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <div className="flex gap-2">
+            <Button
+              variant={format === 'a4' ? 'default' : 'outline'}
+              size="sm"
+              className="flex-1"
+              onClick={() => setFormat('a4')}
+            >
+              Folha A4
+            </Button>
+            <Button
+              variant={format === 'thermal' ? 'default' : 'outline'}
+              size="sm"
+              className="flex-1"
+              onClick={() => setFormat('thermal')}
+            >
+              Térmica 100x50
+            </Button>
+          </div>
+
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={() => run('print')} disabled={busy}>
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+              Imprimir
+            </Button>
+            <Button variant="outline" onClick={() => run('preview')} disabled={busy} aria-label="Pré-visualizar">
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" onClick={() => run('download')} disabled={busy} aria-label="Descarregar">
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {previewUrl && (
+            <Card>
+              <CardContent className="space-y-2 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium">Pré-visualização</p>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewUrl(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <iframe title="Pré-visualização de etiquetas" src={previewUrl} className="h-[55vh] w-full rounded border" />
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
