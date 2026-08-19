@@ -9,6 +9,9 @@ import { RealtimeSyncProvider } from "@/hooks/useRealtimeSync";
 import Index from "./pages/Index";
 import InstallApp from "./pages/InstallApp";
 import NotFound from "./pages/NotFound";
+import { lazy, Suspense } from "react";
+
+const ScannerApp = lazy(() => import("./pages/ScannerApp"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
