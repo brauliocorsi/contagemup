@@ -66,7 +66,7 @@ async function output(doc: any, filename: string, mode: OutputMode = 'print'): P
 }
 
 /** Etiquetas em folha A4 (grelha 3x8, 70x37mm) */
-async function printA4(items: LabelItem[], filename: string) {
+async function printA4(items: LabelItem[], filename: string, mode: OutputMode = 'print') {
   const { jsPDF } = await loadPDF();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
@@ -109,11 +109,11 @@ async function printA4(items: LabelItem[], filename: string) {
     doc.text(item.code, x + w / 2, y + h - 4.5, { align: 'center' });
   });
 
-  await output(doc, filename);
+  return output(doc, filename, mode);
 }
 
 /** Etiqueta individual para impressora térmica 100x50mm */
-async function printThermal(items: LabelItem[], filename: string) {
+async function printThermal(items: LabelItem[], filename: string, mode: OutputMode = 'print') {
   const { jsPDF } = await loadPDF();
   const doc = new jsPDF({ unit: 'mm', format: [100, 50], orientation: 'landscape' });
 
@@ -142,18 +142,19 @@ async function printThermal(items: LabelItem[], filename: string) {
     doc.text(item.code, 50, 47, { align: 'center' });
   });
 
-  await output(doc, filename);
+  return output(doc, filename, mode);
 }
 
 export async function printLabels(
   items: LabelItem[],
   format: LabelFormat = 'a4',
-  filename = 'etiquetas.pdf'
-) {
+  filename = 'etiquetas.pdf',
+  mode: OutputMode = 'print'
+): Promise<string | void> {
   const list = expand(items).filter((i) => i.code && i.code.trim());
   if (list.length === 0) return;
-  if (format === 'thermal') return printThermal(list, filename);
-  return printA4(list, filename);
+  if (format === 'thermal') return printThermal(list, filename, mode);
+  return printA4(list, filename, mode);
 }
 
 /** Talão/resumo de uma operação concluída */
@@ -196,7 +197,7 @@ export async function printOperationReceipt(params: {
 }
 
 /** Folha de comandos operacionais */
-export async function printCommandSheet(format: LabelFormat = 'a4') {
+export async function printCommandSheet(format: LabelFormat = 'a4', mode: OutputMode = 'print') {
   return printLabels(
     COMMAND_SHEET.map((c) => ({
       code: c.code,
@@ -204,7 +205,8 @@ export async function printCommandSheet(format: LabelFormat = 'a4') {
       subtitle: c.description,
     })),
     format,
-    'comandos-scanner.pdf'
+    'comandos-scanner.pdf',
+    mode
   );
 }
 
