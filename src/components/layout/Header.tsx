@@ -4,7 +4,7 @@ import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { LogOut, User, ClipboardList, Moon, Sun, Download } from 'lucide-react';
+import { LogOut, User, ClipboardList, Moon, Sun, Download, ScanBarcode } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { StockAlertsBell } from '@/components/stock/StockAlertsBell';
