@@ -34,8 +34,25 @@ Nova área `/scanner`, com login existente, pensada para telemóvel: botões gra
 ## Códigos de barras e etiquetas
 
 - Leitura: tenta primeiro o código do produto do sistema; se não existir, mostra um ecrã para associar o código lido a um produto (fica guardado para futuras leituras).
-- Etiquetas geradas pelo sistema para produto/coli (`CÓDIGO-C1`) e paletes (`PAL-XXXX`).
+- Botão de impressão presente em **todos** os ecrãs do scanner: imprime a etiqueta do que está em foco (produto lido, coli, palete, localização ou a operação atual).
+- Etiquetas geradas pelo sistema para:
+  - Produto e coli (`CÓDIGO` e `CÓDIGO-C1`, com nome e coli visíveis).
+  - Paletes (`PAL-XXXX`).
+  - Localizações do armazém (`LOC-<código>`), para colar nas prateleiras/corredores.
+  - Operações concluídas (transferência, picking, conferência de entrada) — talão com resumo, data, responsável e código da operação para reimpressão/consulta.
 - Impressão em dois formatos à escolha: folha A4 com grelha de etiquetas, ou etiqueta individual para impressora térmica (100x50 mm).
+- Impressão em lote: todas as localizações, todos os paletes, ou todos os produtos de uma entrada/lista de picking de uma só vez.
+
+## Comandos por código de barras
+
+Folha de comandos imprimível (`CMD-*`) para operar sem tocar no ecrã. O leitor reconhece estes códigos em qualquer módulo:
+
+- `CMD-OK` (validar/confirmar), `CMD-NEXT` (avançar), `CMD-BACK` (voltar), `CMD-CANCEL` (cancelar operação).
+- `CMD-PRINT` (imprimir o item em foco), `CMD-QTY+` / `CMD-QTY-` (ajustar quantidade), `CMD-QTY-<n>` (definir quantidade).
+- `CMD-CLEAR` (limpar lista de scans), `CMD-FINISH` (concluir e gravar), `CMD-MODE-<módulo>` (saltar entre consulta, transferência, palete, picking, entradas).
+
+Cada comando dá feedback visual e sonoro; ações destrutivas (cancelar, limpar, concluir) pedem confirmação com `CMD-OK`.
+
 
 ## Detalhes técnicos
 
