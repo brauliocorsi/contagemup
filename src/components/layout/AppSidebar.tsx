@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History, Scale, ArrowLeftRight, ShoppingBag,
-  FileText, XCircle, MapPin, BarChart3, Warehouse, Settings, ChevronsLeft,
+  FileText, XCircle, MapPin, BarChart3, Warehouse, Settings, ChevronsLeft, ScanBarcode,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -134,6 +134,29 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+        <SidebarGroup className="mb-1">
+          {!collapsed && (
+            <SidebarGroupLabel className="text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 px-2 mb-1">
+              Mobile
+            </SidebarGroupLabel>
+          )}
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={collapsed ? 'Scanner' : undefined}
+                  className="group/item h-9 rounded-lg gap-2.5 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                >
+                  <a href="/scanner" target="_blank" rel="noreferrer">
+                    <ScanBarcode className="h-4 w-4 shrink-0 text-sidebar-foreground/55 group-hover/item:text-sidebar-foreground" />
+                    <span className="truncate">Scanner</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
     </Sidebar>
   );

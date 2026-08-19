@@ -1,0 +1,206 @@
+import JsBarcode from 'jsbarcode';
+import { loadPDF } from '@/lib/lazyPdf';
+import { COMMAND_SHEET } from './commands';
+
+export type LabelFormat = 'a4' | 'thermal';
+
+export interface LabelItem {
+  /** Valor codificado no código de barras */
+  code: string;
+  title: string;
+  subtitle?: string;
+  extra?: string[];
+  copies?: number;
+}
+
+function barcodeDataUrl(value: string, width = 2, height = 60): string {
+  const canvas = document.createElement('canvas');
+  try {
+    JsBarcode(canvas, value, {
+      format: 'CODE128',
+      width,
+      height,
+      displayValue: false,
+      margin: 0,
+    });
+  } catch {
+    return '';
+  }
+  return canvas.toDataURL('image/png');
+}
+
+function expand(items: LabelItem[]): LabelItem[] {
+  const out: LabelItem[] = [];
+  items.forEach((i) => {
+    const n = Math.max(1, i.copies || 1);
+    for (let k = 0; k < n; k++) out.push(i);
+  });
+  return out;
+}
+
+function truncate(doc: any, text: string, maxWidth: number): string {
+  let value = text || '';
+  while (value.length > 3 && doc.getTextWidth(value) > maxWidth) {
+    value = value.slice(0, -1);
+  }
+  return value === text ? text : value + '…';
+}
+
+async function output(doc: any, filename: string) {
+  doc.autoPrint();
+  const url = doc.output('bloburl');
+  const win = window.open(url, '_blank');
+  if (!win) doc.save(filename);
+}
+
+/** Etiquetas em folha A4 (grelha 3x8, 70x37mm) */
+async function printA4(items: LabelItem[], filename: string) {
+  const { jsPDF } = await loadPDF();
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  const cols = 3;
+  const rows = 8;
+  const w = 70;
+  const h = 35.7;
+  const marginX = 0;
+  const marginY = 5;
+  const perPage = cols * rows;
+
+  items.forEach((item, index) => {
+    if (index > 0 && index % perPage === 0) doc.addPage();
+    const i = index % perPage;
+    const x = marginX + (i % cols) * w;
+    const y = marginY + Math.floor(i / cols) * h;
+
+    doc.setDrawColor(220);
+    doc.rect(x + 1.5, y + 1, w - 3, h - 2);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(truncate(doc, item.title, w - 8), x + 4, y + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    let ty = y + 10;
+    if (item.subtitle) {
+      doc.text(truncate(doc, item.subtitle, w - 8), x + 4, ty);
+      ty += 3.5;
+    }
+    (item.extra || []).slice(0, 2).forEach((line) => {
+      doc.text(truncate(doc, line, w - 8), x + 4, ty);
+      ty += 3.5;
+    });
+
+    const img = barcodeDataUrl(item.code);
+    if (img) doc.addImage(img, 'PNG', x + 5, y + h - 20, w - 10, 12);
+    doc.setFontSize(8);
+    doc.text(item.code, x + w / 2, y + h - 4.5, { align: 'center' });
+  });
+
+  await output(doc, filename);
+}
+
+/** Etiqueta individual para impressora térmica 100x50mm */
+async function printThermal(items: LabelItem[], filename: string) {
+  const { jsPDF } = await loadPDF();
+  const doc = new jsPDF({ unit: 'mm', format: [100, 50], orientation: 'landscape' });
+
+  items.forEach((item, index) => {
+    if (index > 0) doc.addPage([100, 50], 'landscape');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text(truncate(doc, item.title, 92), 4, 8);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    let ty = 14;
+    if (item.subtitle) {
+      doc.text(truncate(doc, item.subtitle, 92), 4, ty);
+      ty += 4.5;
+    }
+    (item.extra || []).slice(0, 2).forEach((line) => {
+      doc.text(truncate(doc, line, 92), 4, ty);
+      ty += 4.5;
+    });
+
+    const img = barcodeDataUrl(item.code, 2, 80);
+    if (img) doc.addImage(img, 'PNG', 8, 27, 84, 15);
+    doc.setFontSize(10);
+    doc.text(item.code, 50, 47, { align: 'center' });
+  });
+
+  await output(doc, filename);
+}
+
+export async function printLabels(
+  items: LabelItem[],
+  format: LabelFormat = 'a4',
+  filename = 'etiquetas.pdf'
+) {
+  const list = expand(items).filter((i) => i.code && i.code.trim());
+  if (list.length === 0) return;
+  if (format === 'thermal') return printThermal(list, filename);
+  return printA4(list, filename);
+}
+
+/** Talão/resumo de uma operação concluída */
+export async function printOperationReceipt(params: {
+  title: string;
+  operationCode: string;
+  meta: Array<[string, string]>;
+  columns: string[];
+  rows: (string | number)[][];
+}) {
+  const { jsPDF, autoTable } = await loadPDF();
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text(params.title, 14, 18);
+
+  const img = barcodeDataUrl(params.operationCode, 1.6, 50);
+  if (img) doc.addImage(img, 'PNG', 140, 10, 55, 12);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(params.operationCode, 167.5, 26, { align: 'center' });
+
+  doc.setFontSize(9);
+  let y = 26;
+  params.meta.forEach(([label, value]) => {
+    doc.text(`${label}: ${value}`, 14, y);
+    y += 5;
+  });
+
+  autoTable(doc, {
+    startY: y + 3,
+    head: [params.columns],
+    body: params.rows,
+    styles: { fontSize: 8, cellPadding: 1.6 },
+    headStyles: { fillColor: [15, 76, 92] },
+  });
+
+  await output(doc, `${params.operationCode}.pdf`);
+}
+
+/** Folha de comandos operacionais */
+export async function printCommandSheet(format: LabelFormat = 'a4') {
+  return printLabels(
+    COMMAND_SHEET.map((c) => ({
+      code: c.code,
+      title: c.label,
+      subtitle: c.description,
+    })),
+    format,
+    'comandos-scanner.pdf'
+  );
+}
+
+export function productLabel(product: { code: string; name: string }, colisCodeValue?: string, colis?: number): LabelItem {
+  return {
+    code: colisCodeValue || product.code,
+    title: product.name,
+    subtitle: `Código: ${product.code}`,
+    extra: colis ? [`Coli ${colis}`] : undefined,
+  };
+}

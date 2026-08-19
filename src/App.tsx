@@ -9,6 +9,9 @@ import { RealtimeSyncProvider } from "@/hooks/useRealtimeSync";
 import Index from "./pages/Index";
 import InstallApp from "./pages/InstallApp";
 import NotFound from "./pages/NotFound";
+import { lazy, Suspense } from "react";
+
+const ScannerApp = lazy(() => import("./pages/ScannerApp"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +36,14 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/install" element={<InstallApp />} />
+                <Route
+                  path="/scanner"
+                  element={
+                    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">A carregar…</div>}>
+                      <ScannerApp />
+                    </Suspense>
+                  }
+                />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
