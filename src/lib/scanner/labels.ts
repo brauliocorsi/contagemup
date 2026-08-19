@@ -46,11 +46,23 @@ function truncate(doc: any, text: string, maxWidth: number): string {
   return value === text ? text : value + '…';
 }
 
-async function output(doc: any, filename: string) {
+export type OutputMode = 'print' | 'download' | 'preview';
+
+async function output(doc: any, filename: string, mode: OutputMode = 'print'): Promise<string | void> {
+  if (mode === 'preview') {
+    return doc.output('bloburl').toString();
+  }
+  if (mode === 'download') {
+    doc.save(filename);
+    return;
+  }
   doc.autoPrint();
   const url = doc.output('bloburl');
   const win = window.open(url, '_blank');
-  if (!win) doc.save(filename);
+  if (!win || win.closed || typeof win.closed === 'undefined') {
+    // Popup bloqueado (comum em mobile): descarrega o ficheiro.
+    doc.save(filename);
+  }
 }
 
 /** Etiquetas em folha A4 (grelha 3x8, 70x37mm) */
