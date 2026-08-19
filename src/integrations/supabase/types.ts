@@ -466,6 +466,41 @@ export type Database = {
         }
         Relationships: []
       }
+      product_barcodes: {
+        Row: {
+          barcode: string
+          created_at: string
+          created_by: string | null
+          id: string
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          barcode: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_barcodes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_changes: {
         Row: {
           change_type: string
@@ -583,6 +618,7 @@ export type Database = {
       }
       products: {
         Row: {
+          barcode: string | null
           category: string
           code: string
           created_at: string
@@ -590,6 +626,7 @@ export type Database = {
           damaged_stock: number
           description: string | null
           id: string
+          last_supplier: string | null
           location: string | null
           min_stock: number
           name: string
@@ -598,6 +635,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          barcode?: string | null
           category?: string
           code: string
           created_at?: string
@@ -605,6 +643,7 @@ export type Database = {
           damaged_stock?: number
           description?: string | null
           id?: string
+          last_supplier?: string | null
           location?: string | null
           min_stock?: number
           name: string
@@ -613,6 +652,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          barcode?: string | null
           category?: string
           code?: string
           created_at?: string
@@ -620,6 +660,7 @@ export type Database = {
           damaged_stock?: number
           description?: string | null
           id?: string
+          last_supplier?: string | null
           location?: string | null
           min_stock?: number
           name?: string
@@ -959,6 +1000,7 @@ export type Database = {
           reversed_at: string | null
           reversed_by: string | null
           reverses_movement_id: string | null
+          supplier_name: string | null
         }
         Insert: {
           created_at?: string
@@ -973,6 +1015,7 @@ export type Database = {
           reversed_at?: string | null
           reversed_by?: string | null
           reverses_movement_id?: string | null
+          supplier_name?: string | null
         }
         Update: {
           created_at?: string
@@ -987,6 +1030,7 @@ export type Database = {
           reversed_at?: string | null
           reversed_by?: string | null
           reverses_movement_id?: string | null
+          supplier_name?: string | null
         }
         Relationships: [
           {
@@ -1354,6 +1398,7 @@ export type Database = {
           reversed_at: string | null
           reversed_by: string | null
           reverses_movement_id: string | null
+          supplier_name: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1380,6 +1425,11 @@ export type Database = {
         }
         Returns: number
       }
+      transfer_pallet_location: {
+        Args: { p_location: string; p_pallet: string }
+        Returns: Json
+      }
+      transfer_stock_location: { Args: { p_items: Json }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
