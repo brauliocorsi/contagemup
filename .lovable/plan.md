@@ -69,8 +69,8 @@ Cada comando dá feedback visual e sonoro; ações destrutivas (cancelar, limpar
 
 ## Ordem de entrega
 
-1. Migração + rota `/scanner` + componente de leitura e consulta de produto.
-2. Transferência de produtos/colis e de paletes completos.
-3. Etiquetas (A4 + térmica).
+1. Migração + rota `/scanner` + leitura, comandos por código de barras e consulta de produto.
+2. Motor de etiquetas (produto/coli, palete, localização, operação) em A4 e térmica, com botão de impressão em todos os ecrãs.
+3. Transferência de produtos/colis e de paletes completos.
 4. Picking de saída.
 5. Conferência de entradas com fornecedor.
