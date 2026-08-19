@@ -4,7 +4,7 @@ import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { LogOut, User, ClipboardList, Moon, Sun, Download } from 'lucide-react';
+import { LogOut, User, ClipboardList, Moon, Sun, Download, ScanBarcode } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { StockAlertsBell } from '@/components/stock/StockAlertsBell';
@@ -58,6 +58,17 @@ export function Header({ onNavigateToProducts }: HeaderProps) {
             </Button>
           )}
           <GlobalProductSearch />
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            title="App Código de Barras"
+          >
+            <a href="/scanner" target="_blank" rel="noreferrer" aria-label="Abrir app de código de barras">
+              <ScanBarcode className="h-[18px] w-[18px]" />
+            </a>
+          </Button>
           <StockAlertsBell onNavigateToProducts={onNavigateToProducts} />
 
           <DropdownMenu>
