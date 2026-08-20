@@ -13,10 +13,22 @@ export interface LabelItem {
   copies?: number;
 }
 
+function sanitize(value: string): string {
+  // CODE128 só suporta ASCII (0-127). Remove acentos e caracteres inválidos.
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim();
+}
+
 function barcodeDataUrl(value: string, width = 2, height = 60): string {
   const canvas = document.createElement('canvas');
+  const safe = sanitize(value);
+  if (!safe) return '';
   try {
-    JsBarcode(canvas, value, {
+    JsBarcode(canvas, safe, {
       format: 'CODE128',
       width,
       height,
@@ -24,10 +36,21 @@ function barcodeDataUrl(value: string, width = 2, height = 60): string {
       margin: 0,
     });
   } catch {
-    return '';
+    try {
+      JsBarcode(canvas, safe.toUpperCase().replace(/[^0-9A-Z\-. $/+%]/g, ''), {
+        format: 'CODE39',
+        width,
+        height,
+        displayValue: false,
+        margin: 0,
+      });
+    } catch {
+      return '';
+    }
   }
   return canvas.toDataURL('image/png');
 }
+
 
 function expand(items: LabelItem[]): LabelItem[] {
   const out: LabelItem[] = [];
