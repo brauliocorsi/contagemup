@@ -35,14 +35,12 @@ import {
   Search,
   X,
   Split,
-  Truck,
   AlertTriangle,
-  MoveRight,
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
 import { useWarehouseMap, LocationWithProducts, ProductInLocation } from '@/hooks/useWarehouseMap';
-import { useWarehousePallets, WarehousePallet, WarehouseAisle } from '@/hooks/useWarehouseConfig';
+import { WarehouseAisle } from '@/hooks/useWarehouseConfig';
 import { useActiveSession } from '@/hooks/useActiveSession';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,7 +53,6 @@ interface DragItem {
   productCode: string;
   colisNumber: number;
   quantity: number;
-  palletNumber: string | null;
   fromLocationCode: string;
   isSplitEntry: boolean;
   totalQuantityForColi: number;
@@ -82,15 +79,13 @@ interface AisleStats {
 
 export function InteractiveWarehouseMap() {
   const { activeSession } = useActiveSession();
-  const { aisles, levels, locations, pallets, mapGrid, isLoading, moveProduct, movePartialProduct, refetch } = useWarehouseMap(activeSession?.id);
-  const { pallets: warehousePallets, isLoading: palletsLoading } = useWarehousePallets();
+  const { aisles, levels, locations, mapGrid, isLoading, moveProduct, movePartialProduct, refetch } = useWarehouseMap(activeSession?.id);
   
   const [selectedLocation, setSelectedLocation] = useState<LocationWithProducts | null>(null);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
   const [dropTargetCode, setDropTargetCode] = useState<string | null>(null);
   const [filterLevel, setFilterLevel] = useState<string>('all');
-  const [filterPallet, setFilterPallet] = useState<string>('all');
   
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -98,17 +93,6 @@ export function InteractiveWarehouseMap() {
   const [highlightedLocationId, setHighlightedLocationId] = useState<string | null>(null);
   const [highlightedAisleId, setHighlightedAisleId] = useState<string | null>(null);
   const highlightedRef = useRef<HTMLButtonElement>(null);
-  
-  // Pallet search state
-  const [palletSearchOpen, setPalletSearchOpen] = useState(false);
-  const [palletSearchQuery, setPalletSearchQuery] = useState('');
-  const [highlightedPallet, setHighlightedPallet] = useState<string | null>(null);
-  
-  // Pallet transfer dialog state
-  const [palletTransferOpen, setPalletTransferOpen] = useState(false);
-  const [selectedPalletForTransfer, setSelectedPalletForTransfer] = useState<string | null>(null);
-  const [targetLocationForPallet, setTargetLocationForPallet] = useState<string>('');
-  const [transferLoading, setTransferLoading] = useState(false);
   
   // Show products without location
   const [showNoLocationProducts, setShowNoLocationProducts] = useState(false);
