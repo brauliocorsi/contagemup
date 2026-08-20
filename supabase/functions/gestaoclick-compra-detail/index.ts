@@ -366,7 +366,28 @@ Deno.serve(async (req) => {
         }
       };
 
+      // Fast + reliable: fetch each missing product directly by ID (works for inactive products too).
+      if (pendingProductIds.size > 0) {
+        const ids = Array.from(pendingProductIds);
+        for (let i = 0; i < ids.length; i += 8) {
+          const chunk = ids.slice(i, i + 8);
+          await Promise.all(chunk.map(async (pid) => {
+            try {
+              const r = await fetchWithRetry(`https://api.gestaoclick.com/api/produtos/${pid}`, { method: 'GET', headers: apiHeaders });
+              if (!r.ok) { await r.text(); return; }
+              const j = await r.json();
+              const raw = j?.data ?? j;
+              const rows = Array.isArray(raw) ? raw : [raw];
+              consumeProducts(rows);
+            } catch (_e) { /* ignore */ }
+          }));
+          if (i + 8 < ids.length) await new Promise(r => setTimeout(r, 100));
+        }
+        console.log(`[compra-detail] resolucao directa por ID: ${ids.length - pendingProductIds.size}/${ids.length}`);
+      }
+
       // Scan active products first, then all products (inactive included) if anything is still missing.
+
       for (const productsBaseUrl of [
         'https://api.gestaoclick.com/api/produtos?ativo=1',
         'https://api.gestaoclick.com/api/produtos',
