@@ -18,6 +18,7 @@ interface UnlocatedRow {
   product_id: string;
   colis_number: number;
   quantity: number;
+  location?: string | null;
 }
 
 export function UnlocatedStockPanel() {
@@ -36,6 +37,19 @@ export function UnlocatedStockPanel() {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['unlocated-counts'],
     queryFn: async (): Promise<UnlocatedRow[]> => {
+      // Zonas livres (ex: conferência) contam como stock pendente de localização
+      const { data: stagingLocs } = await supabase
+        .from('warehouse_locations')
+        .select('code')
+        .eq('is_staging', true);
+      const stagingCodes = (stagingLocs || []).map(l => l.code).filter(Boolean);
+
+      const orFilter = [
+        'location.is.null',
+        'location.eq.',
+        ...stagingCodes.map(c => `location.eq.${c}`),
+      ].join(',');
+
       const all: UnlocatedRow[] = [];
       let from = 0;
       const step = 1000;
@@ -43,8 +57,8 @@ export function UnlocatedStockPanel() {
       for (;;) {
         const { data, error } = await supabase
           .from('counts')
-          .select('id, product_id, colis_number, quantity')
-          .or('location.is.null,location.eq.')
+          .select('id, product_id, colis_number, quantity, location')
+          .or(orFilter)
           .gt('quantity', 0)
           .order('product_id', { ascending: true })
           .order('id', { ascending: true })
@@ -57,6 +71,8 @@ export function UnlocatedStockPanel() {
       return all;
     },
   });
+
+
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase().trim();
