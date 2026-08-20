@@ -212,6 +212,25 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
     <div className="space-y-4">
       <ScanInput onScan={handleScan} label="Ler produto recebido (código ou COD-C1 para coli)" />
 
+      <div className="flex items-center gap-2 rounded-lg border bg-card p-2">
+        <span className="text-xs text-muted-foreground">Cada leitura conta</span>
+        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setStep((s) => Math.max(1, s - 1))}>
+          <Minus className="h-3.5 w-3.5" />
+        </Button>
+        <Input
+          type="number"
+          min={1}
+          className="h-8 w-16 text-center"
+          value={step}
+          onChange={(e) => setStep(Math.max(1, Number(e.target.value) || 1))}
+        />
+        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setStep((s) => s + 1)}>
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+        <span className="text-xs text-muted-foreground">un.</span>
+      </div>
+
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
