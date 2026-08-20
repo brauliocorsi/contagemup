@@ -407,42 +407,52 @@ export function PurchaseEntryView() {
               <div className="md:hidden space-y-3">
                 {rows.map(r => {
                   const exists = !!resolveProduct(r.item);
+                  const ja = enteredSets(r.item);
+                  const completo = exists && ja >= r.item.quantidade;
                   return (
-                    <div key={r.key} className="border rounded-lg p-3 space-y-2">
+                    <div key={r.key} className={`border rounded-lg p-3 space-y-2 ${completo ? 'opacity-70 bg-muted/40' : ''}`}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <p className="font-mono text-xs text-muted-foreground">{r.item.codigo || '—'}</p>
                           <p className="text-sm font-medium truncate">{r.item.nome}</p>
                         </div>
-                        {exists ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1 shrink-0">
-                            <CheckCircle2 className="h-3 w-3" /> Registado
-                          </Badge>
-                        ) : (
+                        {!exists ? (
                           <Badge variant="destructive" className="gap-1 shrink-0">
                             <AlertCircle className="h-3 w-3" /> Sem registo
                           </Badge>
+                        ) : completo ? (
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-300 gap-1 shrink-0">
+                            <CheckCircle2 className="h-3 w-3" /> Entrada feita
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1 shrink-0">
+                            <CheckCircle2 className="h-3 w-3" /> Registado
+                          </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-muted-foreground">Comprado:</span>
                         <span className="text-sm">{r.item.quantidade}</span>
-                        <span className="text-xs text-muted-foreground ml-3">Entrada:</span>
+                        <span className="text-xs text-muted-foreground ml-2">Já entrada:</span>
+                        <span className="text-sm">{ja}</span>
+                        <span className="text-xs text-muted-foreground ml-2">Entrada:</span>
                         <NumericInput
                           min={0}
                           max={9999}
                           value={r.qtyEntry}
                           onChange={v => setRow(r.key, { qtyEntry: v })}
                           className="h-9 w-24 text-center"
+                          disabled={completo}
                         />
                       </div>
                       {exists ? (
                         <label className="flex items-center gap-2 text-sm">
                           <Checkbox
-                            checked={r.selected}
+                            checked={r.selected && !completo}
+                            disabled={completo}
                             onCheckedChange={v => setRow(r.key, { selected: v === true })}
                           />
-                          Incluir na entrada
+                          {completo ? 'Já dado entrada nesta compra' : 'Incluir na entrada'}
                         </label>
                       ) : (
                         <Button size="sm" variant="outline" onClick={() => openQuickRegister(r.item)} className="w-full gap-1">
@@ -452,6 +462,7 @@ export function PurchaseEntryView() {
                     </div>
                   );
                 })}
+
               </div>
 
               {/* Desktop table */}
