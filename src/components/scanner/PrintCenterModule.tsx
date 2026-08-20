@@ -101,6 +101,16 @@ export function PrintCenterModule() {
         const names = colisNamesByCategory.get(p.category) || [];
         const total = Math.max(p.total_colis || 1, names.length, 1);
 
+        if (total <= 1) {
+          out.push({
+            id: `prod-${p.id}`,
+            code: productCode,
+            title: p.name,
+            subtitle: [productCode, names[0], base].filter(Boolean).join(' • '),
+          });
+          return;
+        }
+
         for (let n = 1; n <= total; n++) {
           out.push({
             id: `prod-${p.id}-c${n}`,
