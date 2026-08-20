@@ -224,6 +224,27 @@ export function PrintCenterModule() {
             placeholder={source === 'produtos' ? 'Pesquisar produto (código ou nome)…' : 'Filtrar…'}
           />
 
+          {source === 'produtos' && (
+            <div className="flex items-center justify-between rounded-md border px-3 py-2">
+              <div>
+                <p className="text-xs font-medium">Etiqueta por coli</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Gera um código por coli (ex.: ABC-C1, ABC-C2)
+                </p>
+              </div>
+              <Switch
+                checked={perColi}
+                onCheckedChange={(v) => {
+                  setPerColi(v);
+                  setSelected({});
+                }}
+                aria-label="Etiqueta por coli"
+              />
+            </div>
+          )}
+
+
+
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Badge variant="secondary">{rows.length} códigos</Badge>
