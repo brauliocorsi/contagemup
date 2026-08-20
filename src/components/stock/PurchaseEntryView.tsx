@@ -213,7 +213,10 @@ export function PurchaseEntryView() {
   };
 
 
-  const selectedRows = rows.filter(r => r.selected && !!resolveProduct(r.item) && r.qtyEntry > 0);
+  const selectedRows = rows.filter(r =>
+    r.selected && !!resolveProduct(r.item) && r.qtyEntry > 0 && enteredSets(r.item) < r.item.quantidade
+  );
+
 
   const iniciarEntrada = () => {
     if (!compra) return;
