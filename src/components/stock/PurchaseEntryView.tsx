@@ -311,6 +311,9 @@ export function PurchaseEntryView() {
 
   const registeredCount = rows.filter(r => !!resolveProduct(r.item)).length;
   const missingCount = rows.length - registeredCount;
+  const doneCount = rows.filter(r => !!resolveProduct(r.item) && enteredSets(r.item) >= r.item.quantidade).length;
+  const pendingCount = rows.filter(r => !!resolveProduct(r.item) && enteredSets(r.item) < r.item.quantidade).length;
+
 
   return (
     <div className="space-y-4">
