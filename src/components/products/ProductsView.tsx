@@ -510,6 +510,18 @@ export function ProductsView() {
             </Badge>
           )}
         </Button>
+        <Button
+          variant={onlyMissingSupplierCode ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setOnlyMissingSupplierCode(v => !v)}
+          className="whitespace-nowrap gap-2"
+        >
+          <ScanBarcode className="h-4 w-4" />
+          Sem cód. fornecedor
+          {missingSupplierCodeCount > 0 && (
+            <Badge variant="secondary" className="ml-1">{missingSupplierCodeCount}</Badge>
+          )}
+        </Button>
         <Select value={filterOrderStatus} onValueChange={(v) => setFilterOrderStatus(v as typeof filterOrderStatus)}>
           <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterOrderStatus !== 'all' ? 'border-amber-500 bg-amber-50 text-amber-700' : ''}`}>
             <ShoppingBag className="h-4 w-4 mr-2" />
