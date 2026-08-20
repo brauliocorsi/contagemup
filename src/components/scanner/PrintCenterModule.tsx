@@ -67,28 +67,69 @@ export function PrintCenterModule() {
   });
 
   const products = useQuery({
-    queryKey: ['print-products', search],
+    queryKey: ['print-products', search, perColi],
     enabled: source === 'produtos' && search.trim().length >= 2,
     queryFn: async (): Promise<Row[]> => {
       const term = search.trim();
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, code, name, location, pallet_number, barcode')
-        .or(`code.ilike.%${term}%,name.ilike.%${term}%,barcode.ilike.%${term}%`)
-        .order('name')
-        .limit(50);
+      const [{ data, error }, { data: cats }] = await Promise.all([
+        supabase
+          .from('products')
+          .select('id, code, name, location, pallet_number, barcode, total_colis, category')
+          .or(`code.ilike.%${term}%,name.ilike.%${term}%,barcode.ilike.%${term}%`)
+          .order('name')
+          .limit(50),
+        supabase.from('categories').select('name, colis_names'),
+      ]);
       if (error) throw error;
-      return (data || [])
-        .map((p) => ({
-          id: `prod-${p.id}`,
-          code: (p.barcode || p.code || '').trim(),
-          title: p.name,
-          subtitle: [p.code, p.location, p.pallet_number].filter(Boolean).join(' • '),
-        }))
-        .filter((r) => r.code.length > 0);
-    },
 
+      const colisNamesByCategory = new Map<string, string[]>();
+      (cats || []).forEach((c) => {
+        const names = c.colis_names && typeof c.colis_names === 'object' ? c.colis_names : {};
+        const keys = Object.keys(names as Record<string, unknown>).sort(
+          (a, b) => Number(a) - Number(b)
+        );
+        colisNamesByCategory.set(
+          c.name,
+          keys.map((k) => String((names as Record<string, unknown>)[k] ?? ''))
+        );
+      });
+
+      const out: Row[] = [];
+      (data || []).forEach((p) => {
+        const base = [p.location, p.pallet_number].filter(Boolean).join(' • ');
+
+        if (!perColi) {
+          const code = (p.barcode || p.code || '').trim();
+          if (!code) return;
+          out.push({
+            id: `prod-${p.id}`,
+            code,
+            title: p.name,
+            subtitle: [p.code, base].filter(Boolean).join(' • '),
+          });
+          return;
+        }
+
+        const productCode = (p.code || '').trim();
+        if (!productCode) return;
+        const names = colisNamesByCategory.get(p.category) || [];
+        const total = Math.max(p.total_colis || 1, names.length, 1);
+
+        for (let n = 1; n <= total; n++) {
+          out.push({
+            id: `prod-${p.id}-c${n}`,
+            code: colisCode(productCode, n),
+            title: p.name,
+            subtitle: [productCode, names[n - 1], `Coli ${n}/${total}`, base]
+              .filter(Boolean)
+              .join(' • '),
+          });
+        }
+      });
+      return out;
+    },
   });
+
 
   const commandRows: Row[] = useMemo(
     () =>
