@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Printer, Download, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { printLabels, type LabelItem, type LabelFormat } from '@/lib/scanner/labels';
-import { COMMAND_SHEET, palletCode, locationCode } from '@/lib/scanner/commands';
+import { COMMAND_SHEET, palletCode, locationCode, colisCode } from '@/lib/scanner/commands';
 
 type Source = 'comandos' | 'localizacoes' | 'paletes' | 'produtos';
 
