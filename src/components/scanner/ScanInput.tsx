@@ -92,8 +92,9 @@ export function ScanInput({
           undefined,
           videoRef.current!,
           (result) => {
-            if (result) emit(result.getText());
+            if (result) emit(result.getText(), true);
           }
+
         );
         if (cancelled) controls.stop();
         else controlsRef.current = controls;
