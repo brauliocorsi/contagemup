@@ -26,7 +26,7 @@ import { parseCommand, SCANNER_MODES, type QtyHandler, type ScannerMode } from '
 import { printCommandSheet } from '@/lib/scanner/labels';
 import { toast } from 'sonner';
 
-type View = 'home' | ScannerMode | 'impressao';
+type View = 'home' | ScannerMode | 'impressao' | 'fornecedor';
 
 const OPERATIONS: Array<{
   id: View;
