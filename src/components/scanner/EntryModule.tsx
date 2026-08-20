@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScanInput } from './ScanInput';
 import { PrintMenu } from './PrintMenu';
 import { LocationSelect } from '@/components/counting/LocationSelect';
+import { SupplierSelect } from '@/components/stock/SupplierSelect';
 import { useProductResolver, CONFERENCE_LOCATION } from '@/hooks/useScannerData';
 import { supabase } from '@/integrations/supabase/client';
 import { colisCode, locationCode, parseScan, type QtyHandler } from '@/lib/scanner/commands';
@@ -228,7 +229,7 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2 sm:grid-cols-2">
-          <Input placeholder="Fornecedor" value={supplier} onChange={(e) => setSupplier(e.target.value)} maxLength={120} />
+          <SupplierSelect value={supplier} onValueChange={setSupplier} placeholder="Fornecedor (GestãoClick)" />
           <Input placeholder="Referência / guia" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={80} />
           <LocationSelect value={location} onValueChange={setLocation} placeholder="Localização (CONF por defeito)" />
         </CardContent>

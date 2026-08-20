@@ -16,6 +16,7 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { LocationSelect } from '@/components/counting/LocationSelect';
+import { SupplierSelect } from '@/components/stock/SupplierSelect';
 import { PurchaseEntryView } from '@/components/stock/PurchaseEntryView';
 import { PurchaseEntryHistory } from '@/components/stock/PurchaseEntryHistory';
 import { RecentMovementsPanel } from '@/components/stock/RecentMovementsPanel';
@@ -78,6 +79,7 @@ export function StockEntriesView() {
   const [reference, setReference] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [supplier, setSupplier] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -234,9 +236,14 @@ export function StockEntriesView() {
         p_location: loc || null,
         p_reason: reason || null,
         p_reference: effectiveReference,
-        p_notes: notes || null,
+        p_notes: [supplier.trim() ? `Fornecedor: ${supplier.trim()}` : '', notes.trim()]
+          .filter(Boolean).join(' — ') || null,
       });
       if (error) throw error;
+    }
+
+    if (supplier.trim()) {
+      await supabase.from('products').update({ last_supplier: supplier.trim() }).eq('id', item.product.id);
     }
   };
 
@@ -648,6 +655,12 @@ export function StockEntriesView() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label>Fornecedor (opcional)</Label>
+                <SupplierSelect value={supplier} onValueChange={setSupplier} placeholder="Fornecedor (GestãoClick)" />
+              </div>
+
 
               {requiresOrderNumber ? (
                 <div className="space-y-2">
