@@ -16,7 +16,6 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { LocationSelect } from '@/components/counting/LocationSelect';
-import { PalletSelect } from '@/components/counting/PalletSelect';
 import { PurchaseEntryView } from '@/components/stock/PurchaseEntryView';
 import { PurchaseEntryHistory } from '@/components/stock/PurchaseEntryHistory';
 import { RecentMovementsPanel } from '@/components/stock/RecentMovementsPanel';
@@ -49,9 +48,7 @@ interface ColiRow {
   colis_number: number;
   quantity: number;
   location: string;
-  pallet_number: string;
   suggested_location: string | null;
-  suggested_pallet: string | null;
 }
 
 interface CartItem {
@@ -123,16 +120,16 @@ export function StockEntriesView() {
     (async () => {
       const { data } = await supabase
         .from('counts')
-        .select('colis_number, location, pallet_number, quantity, updated_at')
+        .select('colis_number, location, quantity, updated_at')
         .eq('product_id', selected.id)
         .gt('quantity', 0)
         .order('updated_at', { ascending: false });
 
       // pick first (most recent) per coli
-      const byColi = new Map<number, { location: string | null; pallet: string | null }>();
+      const byColi = new Map<number, { location: string | null }>();
       (data || []).forEach(r => {
         if (!byColi.has(r.colis_number)) {
-          byColi.set(r.colis_number, { location: r.location, pallet: r.pallet_number });
+          byColi.set(r.colis_number, { location: r.location });
         }
       });
 
@@ -141,14 +138,11 @@ export function StockEntriesView() {
         const n = i + 1;
         const suggestion = byColi.get(n);
         const loc = suggestion?.location ?? selected.location ?? '';
-        const pal = suggestion?.pallet ?? selected.pallet_number ?? '';
         return {
           colis_number: n,
           quantity: mode === 'set' ? setQuantity : 0,
           location: loc,
-          pallet_number: pal,
           suggested_location: suggestion?.location ?? null,
-          suggested_pallet: suggestion?.pallet ?? null,
         };
       });
       setRows(initial);
@@ -222,7 +216,7 @@ export function StockEntriesView() {
   const commitItem = async (item: CartItem) => {
     const groups = new Map<string, ColiRow[]>();
     for (const r of item.rows) {
-      const key = `${r.location || ''}|${r.pallet_number || ''}`;
+      const key = r.location || '';
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(r);
     }
@@ -230,7 +224,7 @@ export function StockEntriesView() {
     const effectiveReference = item.orderNumber ?? (reference.trim() || null);
 
     for (const [key, group] of groups.entries()) {
-      const [loc, pal] = key.split('|');
+      const loc = key;
       const colis_quantities: Record<string, number> = {};
       for (const r of group) colis_quantities[String(r.colis_number)] = r.quantity;
 
@@ -238,7 +232,6 @@ export function StockEntriesView() {
         p_product_id: item.product.id,
         p_colis_quantities: colis_quantities,
         p_location: loc || null,
-        p_pallet_number: pal || null,
         p_reason: reason || null,
         p_reference: effectiveReference,
         p_notes: notes || null,
@@ -273,7 +266,7 @@ export function StockEntriesView() {
   const missingPlace = (items: CartItem[]) =>
     items.flatMap(i =>
       i.rows
-        .filter(r => !r.location && !r.pallet_number)
+        .filter(r => !r.location)
         .map(r => `${i.product.code} · Coli ${r.colis_number} (${r.quantity} un.)`)
     );
 
@@ -588,13 +581,11 @@ export function StockEntriesView() {
                 <div className="border rounded-md divide-y">
                   {rows.map(r => {
                     const isSuggested =
-                      r.suggested_location &&
-                      r.location === r.suggested_location &&
-                      (r.pallet_number || '') === (r.suggested_pallet || '');
+                      r.suggested_location && r.location === r.suggested_location;
                     return (
                       <div
                         key={r.colis_number}
-                        className="grid grid-cols-1 md:grid-cols-[80px_120px_1fr_1fr_auto] gap-2 items-center p-3"
+                        className="grid grid-cols-1 md:grid-cols-[80px_120px_1fr_auto] gap-2 items-center p-3"
                       >
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="font-mono">
@@ -611,16 +602,6 @@ export function StockEntriesView() {
                           value={r.location}
                           onValueChange={(v) => updateRow(r.colis_number, { location: v })}
                           placeholder="Localização…"
-                        />
-                        <PalletSelect
-                          value={r.pallet_number}
-                          onValueChange={(v, loc) =>
-                            updateRow(r.colis_number, {
-                              pallet_number: v,
-                              location: loc || r.location,
-                            })
-                          }
-                          placeholder="Palete…"
                         />
                         <div className="text-xs">
                           {isSuggested ? (
@@ -754,7 +735,7 @@ export function StockEntriesView() {
                             <p className="text-sm font-medium truncate">{item.product.name}</p>
                             <p className="text-xs text-muted-foreground font-mono">{item.product.code}</p>
                             <p className="text-xs text-muted-foreground">
-                              {item.rows.map(r => `C${r.colis_number}: ${r.quantity}${r.location ? ` @${r.location}` : ''}${r.pallet_number ? `/${r.pallet_number}` : ''}`).join(' · ')}
+                              {item.rows.map(r => `C${r.colis_number}: ${r.quantity}${r.location ? ` @${r.location}` : ''}`).join(' · ')}
                             </p>
                           </div>
                           <Badge variant="outline" className="text-xs">+{item.totalUnits}</Badge>
