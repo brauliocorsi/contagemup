@@ -40,7 +40,7 @@ interface OrderEntry {
   order_number: string;
   colis_status: Record<string, boolean>;
   location: string | null;
-  pallet_number: string | null;
+  
   created_at: string;
   product_code?: string;
   product_name?: string;

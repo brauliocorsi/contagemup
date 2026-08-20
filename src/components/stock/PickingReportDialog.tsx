@@ -81,7 +81,6 @@ export function PickingReportDialog({
           colis_name: null,
           quantity: item.quantity,
           location: null,
-          pallet_number: null,
           level_name: null,
           aisle_name: null,
           requires_forklift: false,
@@ -96,7 +95,6 @@ export function PickingReportDialog({
             colis_name: coli.colis_name,
             quantity: coli.quantity,
             location: coli.location,
-            pallet_number: coli.pallet_number,
             level_name: coli.level_name,
             aisle_name: coli.aisle_name,
             requires_forklift: coli.requires_forklift,
@@ -165,7 +163,7 @@ export function PickingReportDialog({
       
       __PDFautoTable(doc, {
         startY: yPos,
-        head: [['☐', '#', 'Código', 'Produto', 'Coli', 'Nome Coli', 'Qtd', 'Local', 'Palete', 'Nível']],
+        head: [['☐', '#', 'Código', 'Produto', 'Coli', 'Nome Coli', 'Qtd', 'Local', 'Nível']],
         body: forkliftRows.map((row) => [
           '', // Checkbox
           row.productIndex.toString(),
@@ -175,7 +173,6 @@ export function PickingReportDialog({
           row.colis_name || '-',
           row.quantity.toString(),
           row.location || '-',
-          row.pallet_number || '-',
           row.level_name || '-',
         ]),
         styles: { fontSize: 8, cellPadding: 1.5 },
@@ -189,9 +186,8 @@ export function PickingReportDialog({
           4: { cellWidth: 12, halign: 'center' }, // Coli
           5: { cellWidth: 28 }, // Nome Coli
           6: { cellWidth: 10, halign: 'center' }, // Qtd
-          7: { cellWidth: 18 }, // Local
-          8: { cellWidth: 15 }, // Palete
-          9: { cellWidth: 18 }, // Nível
+          7: { cellWidth: 22 }, // Local
+          8: { cellWidth: 22 }, // Nível
         },
         margin: { left: 14, right: 14 },
       });
@@ -216,7 +212,7 @@ export function PickingReportDialog({
       
       __PDFautoTable(doc, {
         startY: yPos,
-        head: [['☐', '#', 'Código', 'Produto', 'Coli', 'Nome Coli', 'Qtd', 'Local', 'Palete', 'Nível']],
+        head: [['☐', '#', 'Código', 'Produto', 'Coli', 'Nome Coli', 'Qtd', 'Local', 'Nível']],
         body: footRows.map((row) => [
           '', // Checkbox
           row.productIndex.toString(),
@@ -226,7 +222,6 @@ export function PickingReportDialog({
           row.colis_name || '-',
           row.quantity.toString(),
           row.location || '-',
-          row.pallet_number || '-',
           row.level_name || '-',
         ]),
         styles: { fontSize: 8, cellPadding: 1.5 },
@@ -240,9 +235,8 @@ export function PickingReportDialog({
           4: { cellWidth: 12, halign: 'center' }, // Coli
           5: { cellWidth: 28 }, // Nome Coli
           6: { cellWidth: 10, halign: 'center' }, // Qtd
-          7: { cellWidth: 18 }, // Local
-          8: { cellWidth: 15 }, // Palete
-          9: { cellWidth: 18 }, // Nível
+          7: { cellWidth: 22 }, // Local
+          8: { cellWidth: 22 }, // Nível
         },
         margin: { left: 14, right: 14 },
       });
@@ -283,7 +277,7 @@ export function PickingReportDialog({
   };
 
   const renderColisDetail = (coli: ColisPickingDetail, totalColis: number) => {
-    const hasLocation = coli.location || coli.pallet_number;
+    const hasLocation = !!coli.location;
     
     return (
       <div
@@ -317,12 +311,6 @@ export function PickingReportDialog({
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <MapPin className="h-3 w-3" />
                   <span className="font-mono">{coli.location}</span>
-                </div>
-              )}
-              {coli.pallet_number && (
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Package className="h-3 w-3" />
-                  <span className="font-mono">{coli.pallet_number}</span>
                 </div>
               )}
               {coli.level_name && (
@@ -397,18 +385,11 @@ export function PickingReportDialog({
               )}
               
               {/* Location summary */}
-              {(item.uniqueLocations.length > 0 || item.uniquePallets.length > 0) && (
+              {item.uniqueLocations.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-2 border-t mt-2">
-                  {item.uniqueLocations.length > 0 && (
-                    <div className="text-xs text-muted-foreground">
-                      <span className="font-medium">Locais:</span> {item.uniqueLocations.join(', ')}
-                    </div>
-                  )}
-                  {item.uniquePallets.length > 0 && (
-                    <div className="text-xs text-muted-foreground">
-                      <span className="font-medium">Paletes:</span> {item.uniquePallets.join(', ')}
-                    </div>
-                  )}
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-medium">Locais:</span> {item.uniqueLocations.join(', ')}
+                  </div>
                 </div>
               )}
             </div>
