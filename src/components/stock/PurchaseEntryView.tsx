@@ -14,7 +14,6 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { LocationSelect } from '@/components/counting/LocationSelect';
-import { PalletSelect } from '@/components/counting/PalletSelect';
 import { ProductForm } from '@/components/products/ProductForm';
 import { useProducts } from '@/hooks/useProducts';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,7 +57,6 @@ export function PurchaseEntryView() {
 
   const [locOpen, setLocOpen] = useState(false);
   const [location, setLocation] = useState('');
-  const [palletNumber, setPalletNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
@@ -264,7 +262,6 @@ export function PurchaseEntryView() {
           p_product_id: product.id,
           p_colis_quantities: colisQty,
           p_location: location || null,
-          p_pallet_number: palletNumber || null,
           p_reason: 'Compra',
           p_reference: refText,
           p_notes: `Item Gestão Click: ${r.item.nome}`,
@@ -578,7 +575,7 @@ export function PurchaseEntryView() {
           <DialogHeader>
             <DialogTitle>Localização da entrada</DialogTitle>
             <DialogDescription>
-              Escolha a localização e palete a aplicar a todos os itens selecionados.
+              Escolha a localização a aplicar a todos os itens selecionados.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -586,14 +583,6 @@ export function PurchaseEntryView() {
               value={location}
               onValueChange={setLocation}
               placeholder="Localização (opcional)…"
-            />
-            <PalletSelect
-              value={palletNumber}
-              onValueChange={(v, loc) => {
-                setPalletNumber(v);
-                if (loc) setLocation(loc);
-              }}
-              placeholder="Palete (opcional)…"
             />
           </div>
           <DialogFooter>

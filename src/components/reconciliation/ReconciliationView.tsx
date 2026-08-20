@@ -377,7 +377,7 @@ export function ReconciliationView() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Pesquisar por código, nome, localização ou palete..."
+              placeholder="Pesquisar por código, nome ou localização..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -460,14 +460,7 @@ export function ReconciliationView() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {item.pallet_number ? (
-                            <Badge variant="outline" className="font-normal">
-                              <Package className="h-3 w-3 mr-1" />
-                              {item.pallet_number}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
+                          <span className="text-muted-foreground text-sm">-</span>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                           {item.notes || '-'}

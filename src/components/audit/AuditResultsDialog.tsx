@@ -59,7 +59,6 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
       const XLSX = await loadXLSX();
     const data = audit.items.map(item => ({
       'Localização': item.location,
-      'Palete': item.pallet_number || '-',
       'Código': item.product_code,
       'Produto': item.product_name,
       'Coli': item.colis_number || '-',
@@ -152,9 +151,6 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
                         <MapPin className="h-3 w-3 text-muted-foreground" />
                         <span className="font-mono text-sm">{item.location}</span>
                       </div>
-                      {item.pallet_number && (
-                        <span className="text-xs text-muted-foreground">📦 {item.pallet_number}</span>
-                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5">

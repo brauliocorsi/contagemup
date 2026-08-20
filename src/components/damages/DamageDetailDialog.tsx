@@ -54,18 +54,12 @@ export function DamageDetailDialog({ open, onOpenChange, damage }: DamageDetailD
           </div>
 
           {/* Location */}
-          {(damage.location || damage.pallet_number) && (
+          {damage.location && (
             <div className="space-y-1">
               {damage.location && (
                 <div className="flex items-center gap-3">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">{damage.location}</span>
-                </div>
-              )}
-              {damage.pallet_number && (
-                <div className="flex items-center gap-3">
-                  <Box className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{damage.pallet_number}</span>
                 </div>
               )}
             </div>
