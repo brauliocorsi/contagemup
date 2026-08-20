@@ -204,6 +204,23 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="edit-supplier-code" className="flex items-center gap-1">
+                <ScanBarcode className="h-3 w-3" />
+                Código do Fornecedor
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="edit-supplier-code"
+                  placeholder="Código de barras do fornecedor"
+                  value={supplierCode}
+                  onChange={(e) => setSupplierCode(e.target.value)}
+                />
+                <Button type="button" variant="outline" onClick={() => setSupplierCode(code)}>
+                  Igual ao interno
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="edit-location" className="flex items-center gap-1">
                 <MapPin className="h-3 w-3" />
                 Localização
