@@ -154,6 +154,34 @@ export function PurchaseEntryView() {
     setQuickOpen(true);
   };
 
+  const [bulkRegistering, setBulkRegistering] = useState(false);
+
+  const registarTodosEmFalta = async () => {
+    const missing = rows.filter(r => !resolveProduct(r.item) && r.item.codigo && r.item.nome);
+    if (missing.length === 0) return;
+    setBulkRegistering(true);
+    let ok = 0;
+    const failed: string[] = [];
+    for (const r of missing) {
+      const res = await createProduct({
+        code: r.item.codigo,
+        name: r.item.nome,
+        category: 'Geral',
+        total_colis: 1,
+        description: null,
+      });
+      if (res) ok++;
+      else failed.push(r.item.codigo);
+    }
+    setBulkRegistering(false);
+    if (ok > 0) {
+      toast.success(`${ok} produto(s) cadastrado(s)`);
+      setTimeout(() => setRows(prev => prev.map(r => ({ ...r, selected: true }))), 300);
+    }
+    if (failed.length) toast.error(`Falha ao cadastrar: ${failed.join(', ')}`);
+  };
+
+
   const selectedRows = rows.filter(r => r.selected && !!resolveProduct(r.item) && r.qtyEntry > 0);
 
   const iniciarEntrada = () => {
