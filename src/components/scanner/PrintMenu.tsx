@@ -61,7 +61,7 @@ export function PrintMenu({ getItems, label = 'Imprimir', disabled, className, v
         <DropdownMenuItem onClick={() => doPrint('thermal')}>Térmica 100x50mm</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Operação</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => run(() => printCommandSheet('a4'))}>
+        <DropdownMenuItem onClick={() => run(() => printCommandSheet('ql700'))}>
           Folha de comandos
         </DropdownMenuItem>
       </DropdownMenuContent>
