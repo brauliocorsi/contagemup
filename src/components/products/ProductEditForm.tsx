@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, MapPin, AlertTriangle } from 'lucide-react';
+import { Loader2, MapPin, AlertTriangle, ScanBarcode } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import { useActiveProductCounts, ActiveCountInfo } from '@/hooks/useActiveProductCounts';
 import { Product } from '@/types/stock';
