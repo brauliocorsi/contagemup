@@ -29,6 +29,8 @@ export function PrintCenterModule() {
   const [format, setFormat] = useState<LabelFormat>('a4');
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [perColi, setPerColi] = useState(true);
+
 
   const locations = useQuery({
     queryKey: ['print-locations'],
