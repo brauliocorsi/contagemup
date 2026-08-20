@@ -28,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { 
   useWarehouseLocations, 
   useWarehouseAisles, 
@@ -51,6 +53,7 @@ export function LocationsConfig() {
     level_id: '',
     position_in_aisle: 1,
     notes: '',
+    is_staging: false,
   });
 
   const openCreateDialog = () => {
@@ -61,6 +64,7 @@ export function LocationsConfig() {
       level_id: levels[0]?.id || '',
       position_in_aisle: 1,
       notes: '',
+      is_staging: false,
     });
     setIsDialogOpen(true);
   };
@@ -73,6 +77,7 @@ export function LocationsConfig() {
       level_id: location.level_id || '',
       position_in_aisle: location.position_in_aisle,
       notes: location.notes || '',
+      is_staging: !!location.is_staging,
     });
     setIsDialogOpen(true);
   };
@@ -80,27 +85,24 @@ export function LocationsConfig() {
   const handleSubmit = async () => {
     if (!formData.code.trim()) return;
 
+    const payload = {
+      code: formData.code,
+      aisle_id: formData.is_staging ? null : (formData.aisle_id || null),
+      level_id: formData.is_staging ? null : (formData.level_id || null),
+      position_in_aisle: formData.is_staging ? 1 : formData.position_in_aisle,
+      notes: formData.notes || null,
+      is_staging: formData.is_staging,
+    };
+
     if (editingLocation) {
-      await updateLocation.mutateAsync({
-        id: editingLocation.id,
-        code: formData.code,
-        aisle_id: formData.aisle_id || null,
-        level_id: formData.level_id || null,
-        position_in_aisle: formData.position_in_aisle,
-        notes: formData.notes || null,
-      });
+      await updateLocation.mutateAsync({ id: editingLocation.id, ...payload });
     } else {
-      await createLocation.mutateAsync({
-        code: formData.code,
-        aisle_id: formData.aisle_id || null,
-        level_id: formData.level_id || null,
-        position_in_aisle: formData.position_in_aisle,
-        notes: formData.notes || null,
-      });
+      await createLocation.mutateAsync(payload);
     }
 
     setIsDialogOpen(false);
   };
+
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -154,6 +156,9 @@ export function LocationsConfig() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-mono font-bold">{location.code}</p>
+                    {location.is_staging && (
+                      <Badge variant="secondary">Zona livre / conferência</Badge>
+                    )}
                     {location.aisle && (
                       <span 
                         className="px-2 py-0.5 rounded text-xs text-white"
@@ -224,69 +229,89 @@ export function LocationsConfig() {
                 className="font-mono"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Rua</Label>
-                <Select
-                  value={formData.aisle_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, aisle_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecionar rua" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {aisles.map((aisle) => (
-                      <SelectItem key={aisle.id} value={aisle.id}>
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: aisle.color }}
-                          />
-                          {aisle.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5 pr-4">
+                <Label htmlFor="staging">Zona livre (sem rua/rack)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Ex: zona de conferência. O stock aqui fica pendente de localização.
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label>Nível</Label>
-                <Select
-                  value={formData.level_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, level_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecionar nível" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {levels.map((level) => (
-                      <SelectItem key={level.id} value={level.id}>
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: level.color }}
-                          />
-                          {level.name}
-                          {level.requires_forklift && (
-                            <Forklift className="h-3 w-3 text-amber-500" />
-                          )}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="position">Posição na Rua</Label>
-              <Input
-                id="position"
-                type="number"
-                min={1}
-                value={formData.position_in_aisle}
-                onChange={(e) => setFormData(prev => ({ ...prev, position_in_aisle: parseInt(e.target.value) || 1 }))}
+              <Switch
+                id="staging"
+                checked={formData.is_staging}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_staging: checked }))}
               />
             </div>
+            {!formData.is_staging && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Rua</Label>
+                    <Select
+                      value={formData.aisle_id || 'none'}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, aisle_id: value === 'none' ? '' : value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar rua" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem rua</SelectItem>
+                        {aisles.map((aisle) => (
+                          <SelectItem key={aisle.id} value={aisle.id}>
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: aisle.color }}
+                              />
+                              {aisle.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nível</Label>
+                    <Select
+                      value={formData.level_id || 'none'}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, level_id: value === 'none' ? '' : value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar nível" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem nível</SelectItem>
+                        {levels.map((level) => (
+                          <SelectItem key={level.id} value={level.id}>
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: level.color }}
+                              />
+                              {level.name}
+                              {level.requires_forklift && (
+                                <Forklift className="h-3 w-3 text-amber-500" />
+                              )}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="position">Posição na Rua</Label>
+                  <Input
+                    id="position"
+                    type="number"
+                    min={1}
+                    value={formData.position_in_aisle}
+                    onChange={(e) => setFormData(prev => ({ ...prev, position_in_aisle: parseInt(e.target.value) || 1 }))}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="notes">Observações (opcional)</Label>
               <Input

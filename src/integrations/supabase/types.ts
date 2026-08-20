@@ -1198,6 +1198,7 @@ export type Database = {
           code: string
           created_at: string
           id: string
+          is_staging: boolean
           level_id: string | null
           notes: string | null
           position_in_aisle: number
@@ -1208,6 +1209,7 @@ export type Database = {
           code: string
           created_at?: string
           id?: string
+          is_staging?: boolean
           level_id?: string | null
           notes?: string | null
           position_in_aisle?: number
@@ -1218,6 +1220,7 @@ export type Database = {
           code?: string
           created_at?: string
           id?: string
+          is_staging?: boolean
           level_id?: string | null
           notes?: string | null
           position_in_aisle?: number

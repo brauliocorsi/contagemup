@@ -32,6 +32,7 @@ export interface WarehouseLocation {
   level_id: string | null;
   position_in_aisle: number;
   notes: string | null;
+  is_staging?: boolean;
   created_at: string;
   updated_at: string;
   aisle?: WarehouseAisle | null;
