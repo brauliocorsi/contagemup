@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft, ShoppingBag, FileText, FileSpreadsheet, ShieldCheck } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft, ShoppingBag, FileText, FileSpreadsheet, ShieldCheck, ScanBarcode } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -80,6 +80,7 @@ export function ProductsView() {
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
   const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock' | 'negative_stock'>('all');
   const [filterOrderStatus, setFilterOrderStatus] = useState<'all' | 'with_orders' | 'without_orders'>('all');
+  const [onlyMissingSupplierCode, setOnlyMissingSupplierCode] = useState(false);
   const [sortColumn, setSortColumn] = useState<'code' | 'name' | 'category' | 'stock' | 'lastCount' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -147,6 +148,7 @@ export function ProductsView() {
       const matchesSearch = 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.supplier_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.location?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const hasCount = !!lastCounts[product.id];
@@ -166,9 +168,12 @@ export function ProductsView() {
         filterOrderStatus === 'all' ||
         (filterOrderStatus === 'with_orders' && hasOrders) ||
         (filterOrderStatus === 'without_orders' && !hasOrders);
+
+      const matchesSupplierCode = !onlyMissingSupplierCode || !product.supplier_code;
       
-      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus;
+      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus && matchesSupplierCode;
     });
+
 
     // Apply sorting
     if (sortColumn) {
@@ -200,7 +205,7 @@ export function ProductsView() {
     }
     
     return result;
-  }, [products, searchTerm, filterCountStatus, filterStockStatus, filterOrderStatus, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
+  }, [products, searchTerm, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
 
   // Virtualizer for products table
   const rowVirtualizer = useVirtualizer({
@@ -267,6 +272,7 @@ export function ProductsView() {
 
   const productsWithDamagesCount = useMemo(() => filteredProducts.filter(p => (p.damaged_stock || 0) > 0).length, [filteredProducts]);
   const productsWithoutDamagesCount = useMemo(() => filteredProducts.filter(p => (p.damaged_stock || 0) === 0).length, [filteredProducts]);
+  const missingSupplierCodeCount = useMemo(() => products.filter(p => !p.supplier_code).length, [products]);
 
   const exportProductsCSV = useCallback((prods: Product[], filename: string) => {
     if (prods.length === 0) { toast({ title: 'Nenhum produto para exportar' }); return; }
@@ -503,6 +509,18 @@ export function ProductsView() {
             <Badge variant="secondary" className="ml-1 bg-red-100 text-red-700 hover:bg-red-100">
               {stockStats.negativeStock}
             </Badge>
+          )}
+        </Button>
+        <Button
+          variant={onlyMissingSupplierCode ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setOnlyMissingSupplierCode(v => !v)}
+          className="whitespace-nowrap gap-2"
+        >
+          <ScanBarcode className="h-4 w-4" />
+          Sem cód. fornecedor
+          {missingSupplierCodeCount > 0 && (
+            <Badge variant="secondary" className="ml-1">{missingSupplierCodeCount}</Badge>
           )}
         </Button>
         <Select value={filterOrderStatus} onValueChange={(v) => setFilterOrderStatus(v as typeof filterOrderStatus)}>

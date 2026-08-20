@@ -140,6 +140,11 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
       {isColumnVisible('code') && (
         <div className="p-2 truncate font-mono text-sm" style={getColWidth('code')}>
           {product.code}
+          {product.supplier_code && product.supplier_code !== product.code && (
+            <span className="block truncate text-[10px] text-muted-foreground" title={`Cód. fornecedor: ${product.supplier_code}`}>
+              F: {product.supplier_code}
+            </span>
+          )}
         </div>
       )}
 

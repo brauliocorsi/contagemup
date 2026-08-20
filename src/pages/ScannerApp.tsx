@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   Loader2,
   LayoutGrid,
+  Tags,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { LoginForm } from '@/components/auth/LoginForm';
@@ -21,11 +22,12 @@ import { TransferModule } from '@/components/scanner/TransferModule';
 import { PickingModule } from '@/components/scanner/PickingModule';
 import { EntryModule } from '@/components/scanner/EntryModule';
 import { PrintCenterModule } from '@/components/scanner/PrintCenterModule';
+import { SupplierCodeModule } from '@/components/scanner/SupplierCodeModule';
 import { parseCommand, SCANNER_MODES, type QtyHandler, type ScannerMode } from '@/lib/scanner/commands';
 import { printCommandSheet } from '@/lib/scanner/labels';
 import { toast } from 'sonner';
 
-type View = 'home' | ScannerMode | 'impressao';
+type View = 'home' | ScannerMode | 'impressao' | 'fornecedor';
 
 const OPERATIONS: Array<{
   id: View;
@@ -61,6 +63,13 @@ const OPERATIONS: Array<{
     description: 'Conferência de entradas e fornecedor',
     icon: PackagePlus,
     accent: 'bg-primary-soft text-primary',
+  },
+  {
+    id: 'fornecedor',
+    label: 'Cód. Fornecedor',
+    description: 'Associar códigos de barras do fornecedor',
+    icon: Tags,
+    accent: 'bg-warning-soft text-warning',
   },
   {
     id: 'impressao',
@@ -192,6 +201,7 @@ export default function ScannerApp() {
         {view === 'transferencia' && <TransferModule onCommand={handleCommand} />}
         {view === 'picking' && <PickingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'entradas' && <EntryModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
+        {view === 'fornecedor' && <SupplierCodeModule onCommand={handleCommand} />}
         {view === 'impressao' && <PrintCenterModule />}
       </main>
 

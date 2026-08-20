@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, MapPin, AlertTriangle } from 'lucide-react';
+import { Loader2, MapPin, AlertTriangle, ScanBarcode } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import { useActiveProductCounts, ActiveCountInfo } from '@/hooks/useActiveProductCounts';
 import { Product } from '@/types/stock';
@@ -29,6 +29,7 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
   const [totalColis, setTotalColis] = useState(product.total_colis);
   const [description, setDescription] = useState(product.description || '');
   const [location, setLocation] = useState(product.location || '');
+  const [supplierCode, setSupplierCode] = useState(product.supplier_code || '');
   const [minStock, setMinStock] = useState(product.min_stock ?? 5);
   const [activeCounts, setActiveCounts] = useState<ActiveCountInfo[]>([]);
   const [showColisWarning, setShowColisWarning] = useState(false);
@@ -41,6 +42,7 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
     setTotalColis(product.total_colis);
     setDescription(product.description || '');
     setLocation(product.location || '');
+    setSupplierCode(product.supplier_code || '');
     setMinStock(product.min_stock ?? 5);
     setShowColisWarning(false);
     setActiveCounts([]);
@@ -77,6 +79,7 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
       total_colis: totalColis,
       description: description || null,
       location: location || null,
+      supplier_code: supplierCode.trim() || null,
       min_stock: minStock
     });
 
@@ -200,6 +203,23 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-supplier-code" className="flex items-center gap-1">
+                <ScanBarcode className="h-3 w-3" />
+                Código do Fornecedor
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="edit-supplier-code"
+                  placeholder="Código de barras do fornecedor"
+                  value={supplierCode}
+                  onChange={(e) => setSupplierCode(e.target.value)}
+                />
+                <Button type="button" variant="outline" onClick={() => setSupplierCode(code)}>
+                  Igual ao interno
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-location" className="flex items-center gap-1">

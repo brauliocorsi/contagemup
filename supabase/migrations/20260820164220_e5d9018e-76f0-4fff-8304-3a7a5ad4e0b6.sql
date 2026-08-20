@@ -1,0 +1,2 @@
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS supplier_code text;
+CREATE UNIQUE INDEX IF NOT EXISTS products_supplier_code_unique ON public.products (supplier_code) WHERE supplier_code IS NOT NULL;

@@ -9,6 +9,9 @@ export interface Product {
   current_stock: number;
   min_stock: number;
   damaged_stock: number;
+  barcode?: string | null;
+  supplier_code?: string | null;
+  last_supplier?: string | null;
   created_at: string;
   updated_at: string;
 }
