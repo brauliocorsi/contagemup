@@ -205,7 +205,7 @@ export function ProductsView() {
     }
     
     return result;
-  }, [products, searchTerm, filterCountStatus, filterStockStatus, filterOrderStatus, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
+  }, [products, searchTerm, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
 
   // Virtualizer for products table
   const rowVirtualizer = useVirtualizer({
