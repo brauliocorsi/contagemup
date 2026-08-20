@@ -11,7 +11,6 @@ export interface PickingItem {
   product_name: string;
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
   requires_forklift: boolean;
   level_name: string | null;
   aisle_name: string | null;
@@ -43,7 +42,6 @@ export interface CreatePickingSessionData {
     product_name: string;
     quantity: number;
     location?: string;
-    pallet_number?: string;
     requires_forklift?: boolean;
     level_name?: string;
     aisle_name?: string;
@@ -156,7 +154,6 @@ export function usePickingHistory(filters?: PickingFilters) {
         product_name: item.product_name,
         quantity: item.quantity,
         location: item.location || null,
-        pallet_number: item.pallet_number || null,
         requires_forklift: item.requires_forklift ?? false,
         level_name: item.level_name || null,
         aisle_name: item.aisle_name || null,
@@ -218,7 +215,7 @@ export function usePickingData(productIds: string[]) {
       // Fetch counts for the products
       const { data: counts, error: countsError } = await supabase
         .from('counts')
-        .select('product_id, location, pallet_number, colis_number, quantity')
+        .select('product_id, location, colis_number, quantity')
         .in('product_id', productIds);
 
       if (countsError) throw countsError;
@@ -255,7 +252,6 @@ export function usePickingData(productIds: string[]) {
       // Group counts by product
       const productLocations: Record<string, {
         location: string | null;
-        pallet_number: string | null;
         colis_number: number;
         quantity: number;
         requires_forklift: boolean;
@@ -271,7 +267,6 @@ export function usePickingData(productIds: string[]) {
         const meta = count.location ? locationMetadata[count.location] : null;
         productLocations[count.product_id].push({
           location: count.location,
-          pallet_number: count.pallet_number,
           colis_number: count.colis_number,
           quantity: count.quantity,
           requires_forklift: meta?.requires_forklift ?? false,

@@ -6,20 +6,17 @@ export interface ProductWithCounts {
   name: string;
   category: string;
   location?: string | null;
-  pallet_number?: string | null;
   total_colis: number;
   completeSets: number;
   hasPartialProduct: boolean;
   status: string;
   uniqueLocations: string[];
-  uniquePallets: string[];
   current_stock?: number;
   damaged_stock?: number;
   colisDetails: Array<{
     colis_number: number;
     quantity: number;
     location?: string | null;
-    pallet_number?: string | null;
   }>;
 }
 
@@ -27,7 +24,6 @@ export interface FilterState {
   searchTerm: string;
   filterStatus: string;
   filterLocation: string;
-  filterPallet: string;
   filterCategory: string;
 }
 
@@ -35,7 +31,7 @@ export function useCountingFilters(
   sessionFilteredProducts: ProductWithCounts[],
   filters: FilterState
 ) {
-  const { searchTerm, filterStatus, filterLocation, filterPallet, filterCategory } = filters;
+  const { searchTerm, filterStatus, filterLocation, filterCategory } = filters;
 
   // Extract unique categories from session filtered products with counts
   const categoriesWithCounts = useMemo(() => {
@@ -73,30 +69,7 @@ export function useCountingFilters(
     return sessionFilteredProducts.filter(p => !p.location?.trim()).length;
   }, [sessionFilteredProducts]);
 
-  // Count products without pallet
-  const productsWithoutPallet = useMemo(() => {
-    return sessionFilteredProducts.filter(p => 
-      p.uniquePallets.length === 0 && !p.pallet_number?.trim()
-    ).length;
-  }, [sessionFilteredProducts]);
 
-  // Extract unique pallets with counts
-  const palletsWithCounts = useMemo(() => {
-    const countMap: Record<string, number> = {};
-    sessionFilteredProducts.forEach(p => {
-      p.uniquePallets.forEach(pallet => {
-        if (pallet) {
-          countMap[pallet] = (countMap[pallet] || 0) + 1;
-        }
-      });
-      if (p.uniquePallets.length === 0 && p.pallet_number?.trim()) {
-        countMap[p.pallet_number.trim()] = (countMap[p.pallet_number.trim()] || 0) + 1;
-      }
-    });
-    return Object.entries(countMap)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [sessionFilteredProducts]);
 
   // Status counts
   const statusCounts = useMemo(() => {
@@ -113,8 +86,7 @@ export function useCountingFilters(
       const matchesSearch = 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (product.location && product.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (product.pallet_number && product.pallet_number.toLowerCase().includes(searchTerm.toLowerCase()));
+        (product.location && product.location.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const isCompleteEnough = product.completeSets > 0;
       const isPending = product.hasPartialProduct;
@@ -132,18 +104,12 @@ export function useCountingFilters(
         (filterLocation === '__empty__' && productLocations.length === 0) ||
         productLocations.includes(filterLocation);
       
-      const productPallets = product.uniquePallets.length > 0 
-        ? product.uniquePallets 
-        : (product.pallet_number?.trim() ? [product.pallet_number.trim()] : []);
-      const matchesPallet = filterPallet === 'all' || 
-        (filterPallet === '__empty__' && productPallets.length === 0) ||
-        productPallets.includes(filterPallet);
       
       const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
 
-      return matchesSearch && matchesFilter && matchesLocation && matchesPallet && matchesCategory;
+      return matchesSearch && matchesFilter && matchesLocation && matchesCategory;
     });
-  }, [sessionFilteredProducts, searchTerm, filterStatus, filterLocation, filterPallet, filterCategory]);
+  }, [sessionFilteredProducts, searchTerm, filterStatus, filterLocation, filterCategory]);
 
   // Grouped products
   const incompleteProducts = filteredProducts.filter(p => p.hasPartialProduct);
@@ -157,9 +123,7 @@ export function useCountingFilters(
     otherProducts,
     categoriesWithCounts,
     locationsWithCounts,
-    palletsWithCounts,
     statusCounts,
     productsWithoutLocation,
-    productsWithoutPallet,
   };
 }

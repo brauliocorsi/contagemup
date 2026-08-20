@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Trash2, Edit, MapPin, Box, History, ClipboardList, Eye, Split, AlertTriangle, CheckCircle, ArrowRightLeft } from 'lucide-react';
+import { Trash2, Edit, MapPin, History, ClipboardList, Eye, Split, AlertTriangle, CheckCircle, ArrowRightLeft } from 'lucide-react';
 import { classifyLocation } from '@/lib/locationUtils';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
