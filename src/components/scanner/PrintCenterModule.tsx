@@ -274,6 +274,14 @@ export function PrintCenterModule() {
 
           <div className="flex gap-2">
             <Button
+              variant={format === 'ql700' ? 'default' : 'outline'}
+              size="sm"
+              className="flex-1"
+              onClick={() => setFormat('ql700')}
+            >
+              QL-700 62x29
+            </Button>
+            <Button
               variant={format === 'a4' ? 'default' : 'outline'}
               size="sm"
               className="flex-1"
