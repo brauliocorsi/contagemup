@@ -87,6 +87,25 @@ export function PurchaseEntryView() {
     return productByName.get(normalizeName(item.nome));
   }, [productByCode, productByName]);
 
+  // Fetch how much was already entered for this purchase (non-reversed entries)
+  const fetchEntered = useCallback(async (compraNumero: string) => {
+    const marker = `Compra GC #${compraNumero}`;
+    const { data, error } = await supabase
+      .from('stock_movements')
+      .select('product_id, quantity, reversed_at')
+      .eq('movement_type', 'entrada')
+      .ilike('reference', `%${marker}%`);
+    if (error) return {} as Record<string, number>;
+    const map: Record<string, number> = {};
+    for (const m of data || []) {
+      if (m.reversed_at) continue;
+      map[m.product_id] = (map[m.product_id] || 0) + (m.quantity || 0);
+    }
+    setEnteredUnits(map);
+    setDuplicateWarning(Object.keys(map).length > 0);
+    return map;
+  }, []);
+
   const carregar = async () => {
     const n = numero.trim();
     if (!n) {
@@ -97,6 +116,7 @@ export function PurchaseEntryView() {
     setCompra(null);
     setRows([]);
     setDuplicateWarning(false);
+    setEnteredUnits({});
     try {
       const { data, error } = await supabase.functions.invoke<GcCompraDetailResponse>(
         'gestaoclick-compra-detail',
@@ -106,27 +126,24 @@ export function PurchaseEntryView() {
       if (!data?.compra) throw new Error('Resposta inválida do Gestão Click');
 
       setCompra(data.compra);
+
+      const entered = await fetchEntered(data.compra.numero);
+
       const initialRows: RowState[] = (data.itens || []).map((it, idx) => {
         const match = resolveProduct(it);
+        const comprado = Math.max(0, Math.min(9999, Math.round(it.quantidade || 0)));
+        const totalColis = Math.max(1, match?.total_colis || 1);
+        const jaSets = match ? Math.round((entered[match.id] || 0) / totalColis) : 0;
+        const restante = Math.max(0, comprado - jaSets);
         return {
           key: `${it.codigo || normalizeName(it.nome) || 'sem-codigo'}-${idx}`,
           item: { ...it, codigo: it.codigo || match?.code || '' },
-          qtyEntry: Math.max(0, Math.min(9999, Math.round(it.quantidade || 0))),
-          selected: !!match,
+          qtyEntry: restante,
+          selected: !!match && restante > 0,
         };
       });
 
       setRows(initialRows);
-
-      // Check duplicate — has this compra been entered before?
-      const marker = `Compra GC #${data.compra.numero}`;
-      const { data: dup } = await supabase
-        .from('stock_movements')
-        .select('id')
-        .eq('movement_type', 'entrada')
-        .ilike('reference', `%${marker}%`)
-        .limit(1);
-      if (dup && dup.length > 0) setDuplicateWarning(true);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Erro ao carregar compra';
       toast.error(msg);
@@ -134,6 +151,15 @@ export function PurchaseEntryView() {
       setLoading(false);
     }
   };
+
+  // Sets already entered for a row
+  const enteredSets = useCallback((item: GcCompraItem) => {
+    const p = resolveProduct(item);
+    if (!p) return 0;
+    const totalColis = Math.max(1, p.total_colis || 1);
+    return Math.round((enteredUnits[p.id] || 0) / totalColis);
+  }, [resolveProduct, enteredUnits]);
+
 
   const setRow = (key: string, patch: Partial<RowState>) => {
     setRows(prev => prev.map(r => r.key === key ? { ...r, ...patch } : r));
