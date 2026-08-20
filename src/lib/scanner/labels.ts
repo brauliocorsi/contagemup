@@ -272,7 +272,7 @@ export async function printLabels(
   filename = 'etiquetas.pdf',
   mode: OutputMode = 'print'
 ): Promise<string | void> {
-  const list = expand(items).filter((i) => i.code && i.code.trim());
+  const list = expand(dedupeByCode(items)).filter((i) => i.code && i.code.trim());
   if (list.length === 0) return;
   if (format === 'ql700') return printQL700(list, filename, mode);
   if (format === 'thermal') return printThermal(list, filename, mode);

@@ -61,22 +61,27 @@ export function ProductInquiryModule({ onCommand }: Props) {
 
   const labels = (): LabelItem[] => {
     if (!detail) return [];
-    const items: LabelItem[] = [
-      { code: detail.product.code, title: detail.product.name, subtitle: `Código: ${detail.product.code}` },
-    ];
-    Object.keys(detail.byColis)
+    const colis = Object.keys(detail.byColis)
       .map(Number)
-      .sort((a, b) => a - b)
-      .forEach((coli) => {
-        const rows = detail.byColis[coli];
-        items.push({
-          code: colisCode(detail.product.code, coli),
-          title: detail.product.name,
-          subtitle: `Coli ${coli} • ${detail.product.code}`,
-          extra: [rows.map((r) => r.location || 'S/L').join(', ')],
-        });
-      });
-    return items;
+      .sort((a, b) => a - b);
+    const totalColis = Math.max(detail.product.total_colis || 1, colis.length, 1);
+
+    // 1 coli → apenas a etiqueta do produto (sem sufixo -C1)
+    if (totalColis <= 1) {
+      return [
+        { code: detail.product.code, title: detail.product.name, subtitle: `Código: ${detail.product.code}` },
+      ];
+    }
+
+    return colis.map((coli) => {
+      const rows = detail.byColis[coli];
+      return {
+        code: colisCode(detail.product.code, coli),
+        title: detail.product.name,
+        subtitle: `Coli ${coli} • ${detail.product.code}`,
+        extra: [rows.map((r) => r.location || 'S/L').join(', ')],
+      };
+    });
   };
 
   return (
