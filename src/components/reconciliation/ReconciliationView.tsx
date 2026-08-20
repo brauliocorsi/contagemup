@@ -417,12 +417,6 @@ export function ReconciliationView() {
                           Localização
                         </div>
                       </TableHead>
-                      <TableHead>
-                        <div className="flex items-center gap-1">
-                          <Package className="h-3 w-3" />
-                          Palete
-                        </div>
-                      </TableHead>
                       <TableHead>Notas</TableHead>
                     </TableRow>
                   </TableHeader>

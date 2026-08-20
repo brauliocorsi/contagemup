@@ -125,7 +125,6 @@ export function ResetStockDialog({ open, onOpenChange }: ResetStockDialogProps) 
             <div className="flex flex-wrap gap-1">
               <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300">Produtos</Badge>
               <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300">Localizações</Badge>
-              <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300">Paletes</Badge>
               <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300">Nº de Colis</Badge>
               <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300">Categorias</Badge>
               <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300">Utilizadores</Badge>

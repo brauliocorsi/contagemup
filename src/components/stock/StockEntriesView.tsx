@@ -773,7 +773,7 @@ export function StockEntriesView() {
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  Estes colis vão entrar sem localização nem palete e não aparecerão nas vistas de armazém:
+                  Estes colis vão entrar sem localização e não aparecerão nas vistas de armazém:
                 </p>
                 <ul className="text-xs list-disc pl-5 max-h-40 overflow-auto">
                   {missingWarning?.missing.map(m => <li key={m}>{m}</li>)}

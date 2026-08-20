@@ -267,7 +267,6 @@ export function BulkStockCorrectionDialog({
                 quantity: item.targetStock,
                 session_id: null,
                 location: null,
-                pallet_number: null,
               });
 
             if (insertError) throw insertError;

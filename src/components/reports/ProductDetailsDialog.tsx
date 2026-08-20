@@ -21,7 +21,6 @@ interface ProductWithCounts {
   name: string;
   category: string;
   location: string | null;
-  palletNumber: string | null;
   total_colis: number;
   completeSets: number;
   hasPartialProduct: boolean;
@@ -41,7 +40,6 @@ const FIELD_LABELS: Record<string, string> = {
   description: 'Descrição',
   total_colis: 'Total Colis',
   location: 'Localização',
-  pallet_number: 'Nº Palete',
 };
 
 export function ProductDetailsDialog({ product, open, onOpenChange }: ProductDetailsDialogProps) {
@@ -176,13 +174,6 @@ export function ProductDetailsDialog({ product, open, onOpenChange }: ProductDet
                     <div>
                       <p className="text-xs text-muted-foreground">Localização</p>
                       <p className="font-medium">{product.location || '-'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Box className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Nº Palete</p>
-                      <p className="font-medium">{product.palletNumber || '-'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
