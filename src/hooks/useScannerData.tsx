@@ -43,6 +43,14 @@ export function useProductResolver() {
       .limit(5);
     if (byBarcode.data && byBarcode.data.length > 0) return byBarcode.data as Product[];
 
+    const bySupplierCode = await supabase
+      .from('products')
+      .select('*')
+      .eq('supplier_code', code)
+      .limit(5);
+    if (bySupplierCode.data && bySupplierCode.data.length > 0) return bySupplierCode.data as Product[];
+
+
     const alias = await supabase
       .from('product_barcodes')
       .select('product_id')
