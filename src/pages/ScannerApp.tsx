@@ -63,6 +63,13 @@ const OPERATIONS: Array<{
     accent: 'bg-primary-soft text-primary',
   },
   {
+    id: 'fornecedor',
+    label: 'Cód. Fornecedor',
+    description: 'Associar códigos de barras do fornecedor',
+    icon: Tags,
+    accent: 'bg-warning-soft text-warning',
+  },
+  {
     id: 'impressao',
     label: 'Imprimir códigos',
     description: 'Comandos, locais e produtos',
