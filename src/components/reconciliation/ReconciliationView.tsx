@@ -417,12 +417,6 @@ export function ReconciliationView() {
                           Localização
                         </div>
                       </TableHead>
-                      <TableHead>
-                        <div className="flex items-center gap-1">
-                          <Package className="h-3 w-3" />
-                          Palete
-                        </div>
-                      </TableHead>
                       <TableHead>Notas</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -458,9 +452,6 @@ export function ReconciliationView() {
                           ) : (
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-muted-foreground text-sm">-</span>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                           {item.notes || '-'}
