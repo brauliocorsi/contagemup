@@ -13,7 +13,6 @@ export interface ScanCountRow {
   colis_number: number;
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
   updated_at: string;
 }
 
@@ -75,7 +74,7 @@ export function useProductStockDetail(productId: string | null) {
         supabase.from('products').select('*').eq('id', productId).maybeSingle(),
         supabase
           .from('counts')
-          .select('id, product_id, colis_number, quantity, location, pallet_number, updated_at')
+          .select('id, product_id, colis_number, quantity, location, updated_at')
           .eq('product_id', productId)
           .order('colis_number', { ascending: true }),
       ]);
@@ -100,43 +99,10 @@ export function useProductStockDetail(productId: string | null) {
   });
 }
 
-export interface PalletContentRow extends ScanCountRow {
-  product_code: string;
-  product_name: string;
-}
-
-export function usePalletContents(pallet: string | null) {
-  return useQuery({
-    queryKey: ['scanner-pallet', pallet],
-    enabled: !!pallet,
-    staleTime: 15 * 1000,
-    queryFn: async (): Promise<PalletContentRow[]> => {
-      if (!pallet) return [];
-      const { data, error } = await supabase
-        .from('counts')
-        .select('id, product_id, colis_number, quantity, location, pallet_number, updated_at, products(code, name)')
-        .eq('pallet_number', pallet);
-      if (error) throw error;
-      return (data || []).map((r: any) => ({
-        id: r.id,
-        product_id: r.product_id,
-        colis_number: r.colis_number,
-        quantity: r.quantity,
-        location: r.location,
-        pallet_number: r.pallet_number,
-        updated_at: r.updated_at,
-        product_code: r.products?.code || '',
-        product_name: r.products?.name || '',
-      }));
-    },
-  });
-}
-
 export interface TransferItem {
   count_id: string;
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
 }
 
 export function useScannerTransfers() {
@@ -144,10 +110,8 @@ export function useScannerTransfers() {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['scanner-stock'] });
-    queryClient.invalidateQueries({ queryKey: ['scanner-pallet'] });
     queryClient.invalidateQueries({ queryKey: ['counts'] });
     queryClient.invalidateQueries({ queryKey: ['products'] });
-    queryClient.invalidateQueries({ queryKey: ['warehouse-pallets'] });
   };
 
   const transferItems = useMutation({
@@ -165,23 +129,7 @@ export function useScannerTransfers() {
     onError: (error) => toast.error('Erro na transferência: ' + mapDatabaseError(error)),
   });
 
-  const transferPallet = useMutation({
-    mutationFn: async ({ pallet, location }: { pallet: string; location: string }) => {
-      const { data, error } = await supabase.rpc('transfer_pallet_location', {
-        p_pallet: pallet,
-        p_location: location,
-      });
-      if (error) throw error;
-      return data as unknown as { rows: number };
-    },
-    onSuccess: (data) => {
-      invalidate();
-      toast.success(`Palete movida (${data?.rows ?? 0} registo(s))`);
-    },
-    onError: (error) => toast.error('Erro ao mover palete: ' + mapDatabaseError(error)),
-  });
-
-  return { transferItems, transferPallet };
+  return { transferItems };
 }
 
 /** Associa um código de barras lido a um produto (alias). */

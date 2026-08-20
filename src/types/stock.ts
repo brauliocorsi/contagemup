@@ -6,7 +6,6 @@ export interface Product {
   total_colis: number;
   description: string | null;
   location: string | null;
-  pallet_number: string | null;
   current_stock: number;
   min_stock: number;
   damaged_stock: number;
@@ -45,7 +44,6 @@ export interface Count {
   colis_number: number;
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
   counted_by: string | null;
   counted_at: string;
   updated_at: string;
@@ -56,7 +54,6 @@ export interface ColisLocationEntry {
   countId: string; // ID of the count record
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
 }
 
 // Updated ColisDetail to support multiple locations per coli
@@ -64,7 +61,6 @@ export interface ColisDetail {
   colis_number: number;
   quantity: number; // Total quantity across all locations
   location: string | null; // Primary location (first one)
-  pallet_number: string | null; // Primary pallet (first one)
   // New: Array of all location entries for this coli
   locationEntries: ColisLocationEntry[];
   hasMultipleLocations: boolean;
@@ -79,14 +75,11 @@ export interface ProductWithCounts extends Product {
   hasPartialProduct: boolean;
   totalExcessParts: number; // NEW: Total number of loose/excess parts
   location: string | null;
-  palletNumber: string | null;
   status: 'complete' | 'incomplete' | 'excess' | 'not_counted';
-  // Per-coli location/pallet tracking
+  // Per-coli location tracking
   colisDetails: ColisDetail[];
   uniqueLocations: string[];
-  uniquePallets: string[];
   hasMultipleLocations: boolean;
-  hasMultiplePallets: boolean;
 }
 
 export interface Profile {
@@ -105,7 +98,6 @@ export interface StockDistribution {
   countId?: string; // Existing count ID (if editing)
   quantity: number;
   location: string;
-  pallet_number: string;
 }
 
 // Order number entry for products that require order tracking
@@ -116,7 +108,6 @@ export interface OrderNumberEntry {
   colis_status: Record<string, boolean>; // {"1": true, "2": false, ...}
   is_complete: boolean; // Computed: all colis are true
   location: string | null;
-  pallet_number: string | null;
   created_at: string;
   updated_at: string;
 }

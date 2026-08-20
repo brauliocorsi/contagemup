@@ -4,7 +4,6 @@ import {
   ScanBarcode,
   Search,
   ArrowRightLeft,
-  Truck,
   ClipboardList,
   PackagePlus,
   Home,
@@ -19,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ProductInquiryModule } from '@/components/scanner/ProductInquiryModule';
 import { TransferModule } from '@/components/scanner/TransferModule';
-import { PalletModule } from '@/components/scanner/PalletModule';
 import { PickingModule } from '@/components/scanner/PickingModule';
 import { EntryModule } from '@/components/scanner/EntryModule';
 import { PrintCenterModule } from '@/components/scanner/PrintCenterModule';
@@ -39,7 +37,7 @@ const OPERATIONS: Array<{
   {
     id: 'consulta',
     label: 'Consulta',
-    description: 'Stock, localização, palete e reservas',
+    description: 'Stock, localização e reservas',
     icon: Search,
     accent: 'bg-primary/10 text-primary',
   },
@@ -49,13 +47,6 @@ const OPERATIONS: Array<{
     description: 'Mover produtos e colis entre locais',
     icon: ArrowRightLeft,
     accent: 'bg-info-soft text-info',
-  },
-  {
-    id: 'palete',
-    label: 'Paletes',
-    description: 'Mover paletes completas de local',
-    icon: Truck,
-    accent: 'bg-warning-soft text-warning',
   },
   {
     id: 'picking',
@@ -74,7 +65,7 @@ const OPERATIONS: Array<{
   {
     id: 'impressao',
     label: 'Imprimir códigos',
-    description: 'Comandos, locais, paletes e produtos',
+    description: 'Comandos, locais e produtos',
     icon: Printer,
     accent: 'bg-muted text-foreground',
   },
@@ -84,7 +75,6 @@ const NAV: Array<{ id: View; label: string; icon: typeof Search }> = [
   { id: 'home', label: 'Início', icon: LayoutGrid },
   { id: 'consulta', label: 'Consulta', icon: Search },
   { id: 'transferencia', label: 'Transf.', icon: ArrowRightLeft },
-  { id: 'palete', label: 'Paletes', icon: Truck },
   { id: 'picking', label: 'Picking', icon: ClipboardList },
   { id: 'entradas', label: 'Entradas', icon: PackagePlus },
 ];
@@ -200,14 +190,13 @@ export default function ScannerApp() {
         )}
         {view === 'consulta' && <ProductInquiryModule onCommand={handleCommand} />}
         {view === 'transferencia' && <TransferModule onCommand={handleCommand} />}
-        {view === 'palete' && <PalletModule onCommand={handleCommand} />}
         {view === 'picking' && <PickingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'entradas' && <EntryModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'impressao' && <PrintCenterModule />}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur">
-        <div className="mx-auto grid max-w-3xl grid-cols-6">
+        <div className="mx-auto grid max-w-3xl grid-cols-5">
           {NAV.map((m) => {
             const Icon = m.icon;
             const active = view === m.id;

@@ -188,81 +188,7 @@ export function InteractiveWarehouseMap() {
   const clearHighlight = () => {
     setHighlightedLocationId(null);
     setHighlightedAisleId(null);
-    setHighlightedPallet(null);
   };
-
-  // Build searchable pallets list with their locations
-  const searchablePallets = useMemo(() => {
-    const palletsWithLocations: { code: string; locationCode: string; locationId: string; aisleId: string | null; productCount: number; totalQuantity: number }[] = [];
-    
-    locations.forEach(loc => {
-      const palletGroups: Record<string, { count: number; qty: number }> = {};
-      loc.products.forEach(p => {
-        if (p.palletNumber) {
-          const existing = palletGroups[p.palletNumber];
-          if (existing) {
-            existing.count++;
-            existing.qty += p.quantity;
-          } else {
-            palletGroups[p.palletNumber] = { count: 1, qty: p.quantity };
-          }
-        }
-      });
-      
-      Object.entries(palletGroups).forEach(([palletCode, data]) => {
-        palletsWithLocations.push({
-          code: palletCode,
-          locationCode: loc.code,
-          locationId: loc.id,
-          aisleId: loc.aisle_id,
-          productCount: data.count,
-          totalQuantity: data.qty,
-        });
-      });
-    });
-    
-    return palletsWithLocations;
-  }, [locations]);
-
-  // Get unique pallets with locations
-  const uniquePalletsInWarehouse = useMemo(() => {
-    const palletMap: Record<string, { locations: string[]; aisleIds: (string | null)[]; totalProducts: number; totalQuantity: number }> = {};
-    
-    searchablePallets.forEach(p => {
-      const existing = palletMap[p.code];
-      if (existing) {
-        if (!existing.locations.includes(p.locationCode)) {
-          existing.locations.push(p.locationCode);
-        }
-        if (p.aisleId && !existing.aisleIds.includes(p.aisleId)) {
-          existing.aisleIds.push(p.aisleId);
-        }
-        existing.totalProducts += p.productCount;
-        existing.totalQuantity += p.totalQuantity;
-      } else {
-        palletMap[p.code] = {
-          locations: [p.locationCode],
-          aisleIds: p.aisleId ? [p.aisleId] : [],
-          totalProducts: p.productCount,
-          totalQuantity: p.totalQuantity,
-        };
-      }
-    });
-    
-    return Object.entries(palletMap).map(([code, data]) => ({
-      code,
-      ...data,
-    }));
-  }, [searchablePallets]);
-
-  // Filter pallet search results
-  const filteredPalletResults = useMemo(() => {
-    if (!palletSearchQuery.trim()) return uniquePalletsInWarehouse.slice(0, 10);
-    const query = palletSearchQuery.toLowerCase();
-    return uniquePalletsInWarehouse
-      .filter(p => p.code.toLowerCase().includes(query))
-      .slice(0, 10);
-  }, [uniquePalletsInWarehouse, palletSearchQuery]);
 
   // Get products without location
   const productsWithoutLocation = useMemo(() => {
@@ -275,68 +201,13 @@ export function InteractiveWarehouseMap() {
     return noLocationProducts;
   }, [locations]);
 
-  // Handle pallet selection
-  const handleSelectPallet = (palletCode: string, firstAisleId: string | null) => {
-    setHighlightedPallet(palletCode);
-    setFilterPallet(palletCode);
-    setPalletSearchOpen(false);
-    setPalletSearchQuery('');
-    
-    // Scroll to first aisle containing this pallet
-    if (firstAisleId) {
-      setTimeout(() => {
-        const aisleCard = document.getElementById(`aisle-card-${firstAisleId}`);
-        if (aisleCard) {
-          aisleCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
-    }
-  };
-
-  // Open pallet transfer dialog
-  const openPalletTransfer = (palletCode: string) => {
-    setSelectedPalletForTransfer(palletCode);
-    setTargetLocationForPallet('');
-    setPalletTransferOpen(true);
-  };
-
-  // Handle pallet transfer
-  const handlePalletTransfer = async () => {
-    if (!selectedPalletForTransfer || !targetLocationForPallet.trim() || !activeSession) return;
-    
-    setTransferLoading(true);
-    try {
-      // Update all counts with this pallet to the new location
-      const { error } = await supabase
-        .from('counts')
-        .update({ location: targetLocationForPallet.toUpperCase() })
-        .eq('pallet_number', selectedPalletForTransfer)
-        .eq('session_id', activeSession.id);
-      
-      if (error) throw error;
-      
-      toast.success(`Palete ${selectedPalletForTransfer} transferida para ${targetLocationForPallet.toUpperCase()}`);
-      setPalletTransferOpen(false);
-      setSelectedPalletForTransfer(null);
-      refetch();
-    } catch (error: any) {
-      toast.error('Erro ao transferir palete: ' + error.message);
-    } finally {
-      setTransferLoading(false);
-    }
-  };
-
   // Filter locations based on selected filters
   const filteredLocations = useMemo(() => {
     return locations.filter(loc => {
       if (filterLevel !== 'all' && loc.level_id !== filterLevel) return false;
-      if (filterPallet !== 'all') {
-        const hasPallet = loc.products.some(p => p.palletNumber === filterPallet);
-        if (!hasPallet) return false;
-      }
       return true;
     });
-  }, [locations, filterLevel, filterPallet]);
+  }, [locations, filterLevel]);
 
   // Get stats per aisle
   const getAisleStats = (aisleId: string): AisleStats => {
@@ -375,9 +246,8 @@ export function InteractiveWarehouseMap() {
     const totalProducts = locations.reduce((sum, l) => sum + l.totalProducts, 0);
     const forkliftRequired = locations.filter(l => l.requiresForklift && l.totalColis > 0).length;
     const splitLocations = locations.filter(l => l.products.some(p => p.isSplitEntry)).length;
-    const totalPallets = uniquePalletsInWarehouse.length;
-    return { totalLocations, occupiedLocations, totalColis, totalQuantity, totalProducts, forkliftRequired, splitLocations, totalPallets };
-  }, [locations, uniquePalletsInWarehouse]);
+    return { totalLocations, occupiedLocations, totalColis, totalQuantity, totalProducts, forkliftRequired, splitLocations };
+  }, [locations]);
 
   const handleDragStart = (item: DragItem) => {
     setDraggedItem(item);
@@ -421,11 +291,6 @@ export function InteractiveWarehouseMap() {
 
   const getLocationColor = (location: LocationWithProducts, isHighlighted: boolean) => {
     if (isHighlighted) return 'bg-yellow-300 border-yellow-500 ring-4 ring-yellow-400 animate-pulse';
-    
-    // Check if location contains highlighted pallet
-    if (highlightedPallet && location.products.some(p => p.palletNumber === highlightedPallet)) {
-      return 'bg-purple-200 border-purple-500 ring-2 ring-purple-400';
-    }
     
     if (location.totalColis === 0) return 'bg-muted/30 border-muted';
     // Check if any products are split entries
