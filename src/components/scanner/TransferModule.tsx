@@ -63,11 +63,26 @@ export function TransferModule({ onCommand }: Props) {
       toast.error(`Produto não encontrado: ${parsed.value}`);
       return;
     }
-    setProduct(results[0]);
-    setSelected({});
-    if (parsed.kind === 'colis' && parsed.colis) {
-      toast.success(`${results[0].name} — coli ${parsed.colis}`);
+    const found = results[0];
+
+    // Leitura repetida do mesmo produto: incrementa a quantidade em vez de reiniciar.
+    if (product && found.id === product.id && detail) {
+      const coli = parsed.colis;
+      const row = coli ? detail.rows.find((r) => r.colis_number === coli) : detail.rows[0];
+      if (row) {
+        setSelected((prev) => {
+          const next = Math.min(row.quantity, (prev[row.id] || 0) + 1);
+          toast.success(`${found.name} — coli ${row.colis_number}: ${next}/${row.quantity}`);
+          return { ...prev, [row.id]: next };
+        });
+        return;
+      }
     }
+
+    setProduct(found);
+    setSelected({});
+    toast.success(parsed.colis ? `${found.name} — coli ${parsed.colis}` : found.name);
+
   };
 
   const addSelection = () => {
