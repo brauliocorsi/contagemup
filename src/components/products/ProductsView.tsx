@@ -80,6 +80,7 @@ export function ProductsView() {
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
   const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock' | 'negative_stock'>('all');
   const [filterOrderStatus, setFilterOrderStatus] = useState<'all' | 'with_orders' | 'without_orders'>('all');
+  const [onlyMissingSupplierCode, setOnlyMissingSupplierCode] = useState(false);
   const [sortColumn, setSortColumn] = useState<'code' | 'name' | 'category' | 'stock' | 'lastCount' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
