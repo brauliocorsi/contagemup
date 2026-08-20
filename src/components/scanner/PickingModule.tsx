@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { PrintMenu } from './PrintMenu';
 import { useProducts } from '@/hooks/useProducts';
 import { parsePickingFile, resolveRows, type ResolvedRow } from '@/lib/stock/pickingImport';
 import { supabase } from '@/integrations/supabase/client';
-import { parseScan } from '@/lib/scanner/commands';
+import { parseScan, type QtyHandler } from '@/lib/scanner/commands';
 import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,9 +22,10 @@ interface PickLine extends ResolvedRow {
 
 interface Props {
   onCommand?: (raw: string) => boolean;
+  registerQtyHandler?: (handler: QtyHandler | null) => void;
 }
 
-export function PickingModule({ onCommand }: Props) {
+export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const { products } = useProducts();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -32,6 +33,10 @@ export function PickingModule({ onCommand }: Props) {
   const [reference, setReference] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState(1);
+  const [lastKey, setLastKey] = useState<string | null>(null);
+  const stepRef = useRef(step);
+  stepRef.current = step;
 
   const totals = useMemo(() => {
     const requested = lines.reduce((s, l) => s + l.quantity, 0);
@@ -61,7 +66,31 @@ export function PickingModule({ onCommand }: Props) {
         l.key === key ? { ...l, picked: Math.max(0, Math.min(l.quantity, l.picked + delta)) } : l
       )
     );
+    setLastKey(key);
   };
+
+  const setPicked = (key: string, value: number) => {
+    setLines((prev) =>
+      prev.map((l) => (l.key === key ? { ...l, picked: Math.max(0, Math.min(l.quantity, value)) } : l))
+    );
+    setLastKey(key);
+  };
+
+  /** Comandos CMD-QTY sobre a última linha conferida. */
+  useEffect(() => {
+    if (!registerQtyHandler) return;
+    const handler: QtyHandler = ({ delta, set }) => {
+      if (!lastKey) {
+        toast.error('Leia primeiro um produto da lista');
+        return;
+      }
+      if (typeof set === 'number') setPicked(lastKey, set);
+      else if (delta) bump(lastKey, delta);
+    };
+    registerQtyHandler(handler);
+    return () => registerQtyHandler(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerQtyHandler, lastKey]);
 
   const handleScan = (raw: string) => {
     if (onCommand?.(raw)) return;
@@ -78,10 +107,13 @@ export function PickingModule({ onCommand }: Props) {
       return;
     }
     if (match.picked >= match.quantity) {
-      toast.warning(`${match.name} já está completo`);
+      toast.warning(`${match.name} já está completo (${match.picked}/${match.quantity})`);
       return;
     }
-    bump(match.key, 1);
+    const inc = Math.max(1, stepRef.current);
+    const next = Math.min(match.quantity, match.picked + inc);
+    setPicked(match.key, next);
+    toast.success(`${match.name}: ${next}/${match.quantity}`);
   };
 
   const labels = (): LabelItem[] =>
@@ -154,6 +186,24 @@ export function PickingModule({ onCommand }: Props) {
     <div className="space-y-4">
       <ScanInput onScan={handleScan} label="Conferir produto da lista" />
 
+      <div className="flex items-center gap-2 rounded-lg border bg-card p-2">
+        <span className="text-xs text-muted-foreground">Cada leitura conta</span>
+        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setStep((s) => Math.max(1, s - 1))}>
+          <Minus className="h-3.5 w-3.5" />
+        </Button>
+        <Input
+          type="number"
+          min={1}
+          className="h-8 w-16 text-center"
+          value={step}
+          onChange={(e) => setStep(Math.max(1, Number(e.target.value) || 1))}
+        />
+        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setStep((s) => s + 1)}>
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+        <span className="text-xs text-muted-foreground">un.</span>
+      </div>
+
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
@@ -221,9 +271,20 @@ export function PickingModule({ onCommand }: Props) {
                           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => bump(l.key, -1)}>
                             <Minus className="h-3.5 w-3.5" />
                           </Button>
-                          <Badge variant={done ? 'default' : 'secondary'} className="min-w-14 justify-center">
-                            {l.picked}/{l.quantity}
-                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={l.quantity}
+                              className="h-8 w-16 text-center"
+                              value={l.picked}
+                              onFocus={() => setLastKey(l.key)}
+                              onChange={(e) => setPicked(l.key, Number(e.target.value) || 0)}
+                            />
+                            <Badge variant={done ? 'default' : 'secondary'} className="min-w-10 justify-center">
+                              /{l.quantity}
+                            </Badge>
+                          </div>
                           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => bump(l.key, 1)}>
                             <Plus className="h-3.5 w-3.5" />
                           </Button>
