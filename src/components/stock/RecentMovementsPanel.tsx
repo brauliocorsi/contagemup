@@ -36,11 +36,10 @@ export interface MovementLine {
   colis_number: number;
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
 }
 
 export function formatLine(l: MovementLine) {
-  const place = [l.location, l.pallet_number].filter(Boolean).join('/');
+  const place = l.location || '';
   return `C${l.colis_number}: ${l.quantity} un.${place ? ` @ ${place}` : ' (sem local)'}`;
 }
 
@@ -62,7 +61,7 @@ export function useMovements(type: 'entrada' | 'saida', limit = 15) {
       if (ids.length > 0) {
         const { data: lineData } = await supabase
           .from('stock_movement_lines')
-          .select('id, movement_id, colis_number, quantity, location, pallet_number')
+          .select('id, movement_id, colis_number, quantity, location')
           .in('movement_id', ids);
         (lineData || []).forEach(l => {
           const arr = lines.get(l.movement_id) || [];

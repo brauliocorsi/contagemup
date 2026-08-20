@@ -24,7 +24,6 @@ function mapToOrderNumberEntry(
     order_number: string;
     colis_status: Json | null;
     location: string | null;
-    pallet_number: string | null;
     created_at: string;
     updated_at: string;
   },
@@ -48,7 +47,6 @@ function mapToOrderNumberEntry(
     colis_status: colisStatus,
     is_complete: isComplete,
     location: row.location,
-    pallet_number: row.pallet_number,
     created_at: row.created_at,
     updated_at: row.updated_at
   };
@@ -91,7 +89,6 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
   const addOrderNumber = async (
     orderNumber: string,
     location?: string | null,
-    palletNumber?: string | null,
     addAsComplete: boolean = true // NEW: Option to add empty or complete
   ): Promise<OrderNumberEntry | null> => {
     if (!productId) return null;
@@ -109,8 +106,7 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
           product_id: productId,
           order_number: orderNumber.trim(),
           colis_status: colisStatus,
-          location: location || null,
-          pallet_number: palletNumber || null
+          location: location || null
         })
         .select()
         .single();
@@ -149,8 +145,7 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
                 product_id: productId, 
                 colis_number: i, 
                 quantity: 1, 
-                location: location || null, 
-                pallet_number: palletNumber || null 
+                location: location || null
               });
           }
         }
@@ -257,32 +252,21 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
     }
   };
 
-  // Update location and pallet for an order number
+  // Update location for an order number
   // Passing null means "keep existing value", passing empty string means "clear"
   const updateOrderLocation = async (
     orderId: string,
-    location: string | null,
-    palletNumber: string | null
+    location: string | null
   ): Promise<boolean> => {
     try {
       const order = orderNumbers.find(o => o.id === orderId);
       if (!order) return false;
 
-      // Build update object - only include fields that were explicitly provided
-      const updateData: { location?: string | null; pallet_number?: string | null } = {};
-      
-      if (location !== null) {
-        updateData.location = location || null;
-      }
-      if (palletNumber !== null) {
-        updateData.pallet_number = palletNumber || null;
-      }
-
-      if (Object.keys(updateData).length === 0) return true;
+      if (location === null) return true;
 
       const { error } = await supabase
         .from('stock_order_numbers')
-        .update(updateData)
+        .update({ location: location || null })
         .eq('id', orderId);
 
       if (error) throw error;
@@ -291,8 +275,7 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
         if (o.id === orderId) {
           return { 
             ...o, 
-            location: location !== null ? (location || null) : o.location,
-            pallet_number: palletNumber !== null ? (palletNumber || null) : o.pallet_number
+            location: location || null
           };
         }
         return o;
@@ -397,8 +380,7 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
   // This is used when assigning an order number to stock that was already counted
   const convertStockToOrder = async (
     orderNumber: string,
-    location?: string | null,
-    palletNumber?: string | null
+    location?: string | null
   ): Promise<OrderNumberEntry | null> => {
     if (!productId) return null;
 
@@ -415,8 +397,7 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
           product_id: productId,
           order_number: orderNumber.trim(),
           colis_status: colisStatus,
-          location: location || null,
-          pallet_number: palletNumber || null
+          location: location || null
         })
         .select()
         .single();

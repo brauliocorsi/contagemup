@@ -96,7 +96,7 @@ export function MovementHistoryView() {
           while (true) {
             const { data: lineData, error: lineErr } = await supabase
               .from('stock_movement_lines')
-              .select('id, movement_id, colis_number, quantity, location, pallet_number')
+              .select('id, movement_id, colis_number, quantity, location')
               .in('movement_id', chunk)
               .order('id', { ascending: true })
               .range(page * pageSize, page * pageSize + pageSize - 1);
@@ -138,7 +138,7 @@ export function MovementHistoryView() {
       if (placeTerm) {
         const ls = lines.get(r.id) ?? [];
         const match = ls.some(l =>
-          `${l.location ?? ''} ${l.pallet_number ?? ''}`.toLowerCase().includes(placeTerm));
+          `${l.location ?? ''}`.toLowerCase().includes(placeTerm));
         if (!match) return false;
       }
       return true;
@@ -327,8 +327,8 @@ export function MovementHistoryView() {
                 </Select>
               </div>
               <div className="space-y-1 md:pt-2">
-                <Label className="text-xs">Localização / palete</Label>
-                <Input className="h-9" value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Ex: B9, PLT057" />
+                <Label className="text-xs">Localização</Label>
+                <Input className="h-9" value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Ex: B9" />
               </div>
               <div className="space-y-1 md:pt-2">
                 <Label className="text-xs">De</Label>

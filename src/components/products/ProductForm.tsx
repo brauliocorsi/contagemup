@@ -6,11 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Loader2, MapPin, Box } from 'lucide-react';
+import { Plus, Loader2, MapPin } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 
 interface ProductFormProps {
-  onSubmit: (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null; min_stock?: number }) => Promise<boolean>;
+  onSubmit: (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; min_stock?: number }) => Promise<boolean>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   initialCode?: string;
@@ -44,7 +44,6 @@ export function ProductForm({
   const [totalColis, setTotalColis] = useState(1);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
-  const [palletNumber, setPalletNumber] = useState('');
   const [minStock, setMinStock] = useState(5);
 
   // Sync initial values when dialog opens (e.g. pre-fill from external caller)
@@ -66,7 +65,6 @@ export function ProductForm({
       total_colis: totalColis,
       description: description || null,
       location: location || null,
-      pallet_number: palletNumber || null,
       min_stock: minStock
     });
 
@@ -77,7 +75,6 @@ export function ProductForm({
       setTotalColis(1);
       setDescription('');
       setLocation('');
-      setPalletNumber('');
       setMinStock(5);
       setOpen(false);
       onCreated?.();
@@ -175,31 +172,17 @@ export function ProductForm({
                 rows={2}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="location" className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  Localização
-                </Label>
-                <Input
-                  id="location"
-                  placeholder="Ex: Armazém A - C3"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pallet" className="flex items-center gap-1">
-                  <Box className="h-3 w-3" />
-                  Nº Palete
-                </Label>
-                <Input
-                  id="pallet"
-                  placeholder="Ex: PAL-001"
-                  value={palletNumber}
-                  onChange={(e) => setPalletNumber(e.target.value)}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="location" className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                Localização
+              </Label>
+              <Input
+                id="location"
+                placeholder="Ex: Armazém A - C3"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter>

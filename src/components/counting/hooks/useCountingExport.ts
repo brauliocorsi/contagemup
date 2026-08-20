@@ -8,7 +8,6 @@ interface ExportFilters {
   filterStatus: string;
   filterCategory: string;
   filterLocation: string;
-  filterPallet: string;
   searchTerm: string;
 }
 
@@ -20,7 +19,7 @@ export function useCountingExport(
   filters: ExportFilters,
   productIdsWithDamages?: Set<string>
 ) {
-  const { filterStatus, filterCategory, filterLocation, filterPallet, searchTerm } = filters;
+  const { filterStatus, filterCategory, filterLocation, searchTerm } = filters;
 
   // Helper function to calculate missing colis for a product
   const getMissingColisInfo = useCallback((product: ProductWithCounts) => {
@@ -71,19 +70,18 @@ export function useCountingExport(
   }, []);
 
   // Shared headers
-  const fullHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Avarias', 'Stock Disponível', 'Distribuição Colis', 'Status', 'Colis Faltantes'];
-  const completeHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Avarias', 'Stock Disponível', 'Distribuição Colis'];
-  const incompleteHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Sets Completos', 'Avarias', 'Stock Disponível', 'Distribuição Colis', 'Colis Faltantes', 'Detalhes'];
+  const fullHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Colis/Set', 'Sets Completos', 'Avarias', 'Stock Disponível', 'Distribuição Colis', 'Status', 'Colis Faltantes'];
+  const completeHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Colis/Set', 'Sets Completos', 'Avarias', 'Stock Disponível', 'Distribuição Colis'];
+  const incompleteHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Colis/Set', 'Sets Completos', 'Avarias', 'Stock Disponível', 'Distribuição Colis', 'Colis Faltantes', 'Detalhes'];
 
   const getLocations = (p: ProductWithCounts) => p.uniqueLocations.length > 0 ? p.uniqueLocations.join(', ') : (p.location || '-');
-  const getPallets = (p: ProductWithCounts) => p.uniquePallets.length > 0 ? p.uniquePallets.join(', ') : (p.pallet_number || '-');
   const getStatus = (p: ProductWithCounts) => p.completeSets > 0 ? (p.hasPartialProduct ? 'Completo + Pendente' : 'Completo') : (p.status === 'not_counted' ? 'Não Contado' : 'Incompleto');
 
   // --- CSV exports ---
   const exportFilteredReport = useCallback(() => {
     if (filteredProducts.length === 0) { toast.error('Nenhum produto para exportar'); return; }
     const rows = filteredProducts.map(p => [
-      p.code, p.name, p.category, getLocations(p), getPallets(p),
+      p.code, p.name, p.category, getLocations(p),
       p.total_colis.toString(), p.completeSets.toString(),
       (p.damaged_stock || 0).toString(), calcAvailable(p).toString(),
       getColisDistribution(p), getStatus(p), getMissingColisInfo(p)
@@ -107,7 +105,6 @@ export function useCountingExport(
       ['Status', filterStatus !== 'all' ? filterStatus : 'Todos'],
       ['Categoria', filterCategory !== 'all' ? filterCategory : 'Todas'],
       ['Localização', filterLocation !== 'all' ? (filterLocation === '__empty__' ? 'Sem localização' : filterLocation) : 'Todas'],
-      ['Palete', filterPallet !== 'all' ? (filterPallet === '__empty__' ? 'Sem palete' : filterPallet) : 'Todos'],
       ['Pesquisa', searchTerm || '-']
     ];
 
@@ -124,7 +121,7 @@ export function useCountingExport(
     link.click();
     URL.revokeObjectURL(link.href);
     toast.success(`${filteredProducts.length} produtos exportados`);
-  }, [filteredProducts, filterStatus, filterCategory, filterLocation, filterPallet, searchTerm, getColisDistribution, getMissingColisInfo]);
+  }, [filteredProducts, filterStatus, filterCategory, filterLocation, searchTerm, getColisDistribution, getMissingColisInfo]);
 
   const exportIncompleteReport = useCallback(() => {
     const incomplete = filteredProducts.filter(p => p.hasPartialProduct || (p.total_colis > 1 && p.colisDetails.length > 0));
@@ -138,7 +135,7 @@ export function useCountingExport(
       .map(p => {
         const missingInfo = getMissingColisInfo(p);
         const details = p.hasPartialProduct ? 'Tem pendências' : (missingInfo !== '-' ? 'Colis em falta' : '-');
-        return [p.code, p.name, p.category, getLocations(p), getPallets(p),
+        return [p.code, p.name, p.category, getLocations(p),
           p.total_colis.toString(), p.completeSets.toString(),
           (p.damaged_stock || 0).toString(), calcAvailable(p).toString(),
           getColisDistribution(p), missingInfo, details];
@@ -158,7 +155,7 @@ export function useCountingExport(
     const complete = filteredProducts.filter(p => p.completeSets > 0 && !p.hasPartialProduct);
     if (complete.length === 0) { toast.info('Nenhum produto 100% completo para exportar'); return; }
     const rows = complete.map(p => [
-      p.code, p.name, p.category, getLocations(p), getPallets(p),
+      p.code, p.name, p.category, getLocations(p),
       p.total_colis.toString(), p.completeSets.toString(),
       (p.damaged_stock || 0).toString(), calcAvailable(p).toString(),
       getColisDistribution(p)
@@ -184,7 +181,7 @@ export function useCountingExport(
   const exportFilteredReportExcel = useCallback(() => {
     if (filteredProducts.length === 0) { toast.error('Nenhum produto para exportar'); return; }
     const rows = filteredProducts.map(p => [
-      p.code, p.name, p.category, getLocations(p), getPallets(p),
+      p.code, p.name, p.category, getLocations(p),
       p.total_colis, p.completeSets, p.damaged_stock || 0, calcAvailable(p),
       getColisDistribution(p), getStatus(p), getMissingColisInfo(p)
     ]);
@@ -202,13 +199,12 @@ export function useCountingExport(
       [], ['Filtros Aplicados'], ['Status', filterStatus !== 'all' ? filterStatus : 'Todos'],
       ['Categoria', filterCategory !== 'all' ? filterCategory : 'Todas'],
       ['Localização', filterLocation !== 'all' ? (filterLocation === '__empty__' ? 'Sem localização' : filterLocation) : 'Todas'],
-      ['Palete', filterPallet !== 'all' ? (filterPallet === '__empty__' ? 'Sem palete' : filterPallet) : 'Todos'],
       ['Pesquisa', searchTerm || '-']
     ];
 
     exportToExcel([fullHeaders, ...rows, ...summaryRows], `relatorio_contagem_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`, 'Contagem');
     toast.success(`${filteredProducts.length} produtos exportados para Excel`);
-  }, [filteredProducts, filterStatus, filterCategory, filterLocation, filterPallet, searchTerm, getColisDistribution, getMissingColisInfo, exportToExcel]);
+  }, [filteredProducts, filterStatus, filterCategory, filterLocation, searchTerm, getColisDistribution, getMissingColisInfo, exportToExcel]);
 
   const exportIncompleteReportExcel = useCallback(() => {
     const incomplete = filteredProducts.filter(p => p.hasPartialProduct || (p.total_colis > 1 && p.colisDetails.length > 0));
@@ -221,7 +217,7 @@ export function useCountingExport(
       .map(p => {
         const missingInfo = getMissingColisInfo(p);
         const details = p.hasPartialProduct ? 'Tem pendências' : (missingInfo !== '-' ? 'Colis em falta' : '-');
-        return [p.code, p.name, p.category, getLocations(p), getPallets(p),
+        return [p.code, p.name, p.category, getLocations(p),
           p.total_colis, p.completeSets, p.damaged_stock || 0, calcAvailable(p),
           getColisDistribution(p), missingInfo, details];
       });
@@ -234,7 +230,7 @@ export function useCountingExport(
     const complete = filteredProducts.filter(p => p.completeSets > 0 && !p.hasPartialProduct);
     if (complete.length === 0) { toast.info('Nenhum produto 100% completo para exportar'); return; }
     const rows = complete.map(p => [
-      p.code, p.name, p.category, getLocations(p), getPallets(p),
+      p.code, p.name, p.category, getLocations(p),
       p.total_colis, p.completeSets, p.damaged_stock || 0, calcAvailable(p),
       getColisDistribution(p)
     ]);
@@ -258,7 +254,7 @@ export function useCountingExport(
 
   const buildRows = useCallback((products: ProductWithCounts[]) => {
     return products.map(p => [
-      p.code, p.name, p.category, getLocations(p), getPallets(p),
+      p.code, p.name, p.category, getLocations(p),
       p.total_colis, p.completeSets, p.damaged_stock || 0, calcAvailable(p),
       getColisDistribution(p), getStatus(p), getMissingColisInfo(p)
     ]);

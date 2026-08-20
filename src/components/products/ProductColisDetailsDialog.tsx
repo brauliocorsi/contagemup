@@ -11,7 +11,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
 import { classifyLocation, LocationInfo } from '@/lib/locationUtils';
 import { 
-  Package, MapPin, Box, Tags, Layers, 
+  Package, MapPin, Tags, Layers, 
   CheckCircle2, AlertCircle, Clock, PlusCircle, 
   Pencil, Trash2, User, Info, ArrowUpDown, Warehouse
 } from 'lucide-react';
@@ -23,7 +23,6 @@ interface ColisLocationInfo {
   colisNumber: number;
   quantity: number;
   location: string | null;
-  palletNumber: string | null;
 }
 
 interface LastCountInfo {
@@ -34,7 +33,6 @@ interface LastCountInfo {
   countedAt: string;
   colisLocations: ColisLocationInfo[];
   uniqueLocations: string[];
-  uniquePallets: string[];
 }
 
 interface ProductColisDetailsDialogProps {
@@ -51,7 +49,6 @@ const FIELD_LABELS: Record<string, string> = {
   description: 'Descrição',
   total_colis: 'Total Colis',
   location: 'Localização',
-  pallet_number: 'Nº Palete',
   current_stock: 'Stock Atual',
   min_stock: 'Stock Mínimo',
 };
@@ -143,17 +140,12 @@ export function ProductColisDetailsDialog({ product, lastCount, open, onOpenChan
 
   // Group colis by location for summary
   const colisByLocation: Record<string, ColisLocationInfo[]> = {};
-  const colisByPallet: Record<string, ColisLocationInfo[]> = {};
   
   lastCount?.colisLocations.forEach(c => {
     const loc = c.location || 'Sem localização';
-    const pallet = c.palletNumber || 'Sem palete';
     
     if (!colisByLocation[loc]) colisByLocation[loc] = [];
     colisByLocation[loc].push(c);
-    
-    if (!colisByPallet[pallet]) colisByPallet[pallet] = [];
-    colisByPallet[pallet].push(c);
   });
 
   return (
@@ -208,15 +200,6 @@ export function ProductColisDetailsDialog({ product, lastCount, open, onOpenChan
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-3 flex items-center gap-2">
-                  <Box className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Palete Base</p>
-                    <p className="font-medium text-sm truncate">{product.pallet_number || '-'}</p>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Colis Details Tabs */}
@@ -256,7 +239,6 @@ export function ProductColisDetailsDialog({ product, lastCount, open, onOpenChan
                             <TableHead>Nome</TableHead>
                             <TableHead>Localização</TableHead>
                             <TableHead>Tipo</TableHead>
-                            <TableHead>Palete</TableHead>
                             <TableHead className="text-right">Qtd</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -289,16 +271,6 @@ export function ProductColisDetailsDialog({ product, lastCount, open, onOpenChan
                                 </TableCell>
                                 <TableCell>
                                   <LocationTypeBadge location={colisData?.location || null} />
-                                </TableCell>
-                                <TableCell>
-                                  {colisData?.palletNumber ? (
-                                    <span className="flex items-center gap-1 text-sm">
-                                      <Box className="h-3 w-3 text-muted-foreground" />
-                                      {colisData.palletNumber}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">-</span>
-                                  )}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   {colisData ? (
@@ -371,39 +343,6 @@ export function ProductColisDetailsDialog({ product, lastCount, open, onOpenChan
                     </CardContent>
                   </Card>
 
-                  {/* By Pallet */}
-                  <Card>
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Box className="h-4 w-4" />
-                        Por Palete
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      {Object.keys(colisByPallet).length > 0 ? (
-                        <div className="space-y-2">
-                          {Object.entries(colisByPallet).map(([pallet, colis]) => (
-                            <div key={pallet} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                              <div className="flex items-center gap-2">
-                                <Box className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm font-medium">{pallet}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">
-                                  Colis: {colis.map(c => `C${c.colisNumber}`).join(', ')}
-                                </span>
-                                <Badge variant="secondary">{colis.length}</Badge>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          Sem dados de palete
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
                 </div>
               </TabsContent>
 
