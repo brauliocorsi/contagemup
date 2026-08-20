@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { PackagePlus, Trash2, CheckCircle2, Loader2, Truck } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { PackagePlus, Trash2, CheckCircle2, Loader2, Truck, Minus, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { LocationSelect } from '@/components/counting/LocationSelect';
 import { PalletSelect } from '@/components/counting/PalletSelect';
 import { useProductResolver, CONFERENCE_LOCATION } from '@/hooks/useScannerData';
 import { supabase } from '@/integrations/supabase/client';
-import { colisCode, locationCode, palletCode, parseScan } from '@/lib/scanner/commands';
+import { colisCode, locationCode, palletCode, parseScan, type QtyHandler } from '@/lib/scanner/commands';
 import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,9 +25,10 @@ interface EntryLine {
 
 interface Props {
   onCommand?: (raw: string) => boolean;
+  registerQtyHandler?: (handler: QtyHandler | null) => void;
 }
 
-export function EntryModule({ onCommand }: Props) {
+export function EntryModule({ onCommand, registerQtyHandler }: Props) {
   const resolve = useProductResolver();
   const queryClient = useQueryClient();
   const [lines, setLines] = useState<EntryLine[]>([]);
@@ -36,6 +37,43 @@ export function EntryModule({ onCommand }: Props) {
   const [location, setLocation] = useState(CONFERENCE_LOCATION);
   const [pallet, setPallet] = useState('');
   const [saving, setSaving] = useState(false);
+  /** Cada leitura conta N unidades. */
+  const [step, setStep] = useState(1);
+  const [lastTarget, setLastTarget] = useState<{ key: string; coli: number } | null>(null);
+  const stepRef = useRef(step);
+  stepRef.current = step;
+
+  const setColisQty = (key: string, coli: number, qty: number) => {
+    setLines((prev) =>
+      prev.map((l) => (l.key === key ? { ...l, colis: { ...l.colis, [coli]: Math.max(0, qty) } } : l))
+    );
+    setLastTarget({ key, coli });
+  };
+
+  const bumpColis = (key: string, coli: number, delta: number) => {
+    setLines((prev) =>
+      prev.map((l) =>
+        l.key === key ? { ...l, colis: { ...l.colis, [coli]: Math.max(0, (l.colis[coli] || 0) + delta) } } : l
+      )
+    );
+    setLastTarget({ key, coli });
+  };
+
+  /** Comandos CMD-QTY aplicados à última linha lida. */
+  useEffect(() => {
+    if (!registerQtyHandler) return;
+    const handler: QtyHandler = ({ delta, set }) => {
+      if (!lastTarget) {
+        toast.error('Leia primeiro um produto');
+        return;
+      }
+      if (typeof set === 'number') setColisQty(lastTarget.key, lastTarget.coli, set);
+      else if (delta) bumpColis(lastTarget.key, lastTarget.coli, delta);
+    };
+    registerQtyHandler(handler);
+    return () => registerQtyHandler(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerQtyHandler, lastTarget]);
 
   const handleScan = async (raw: string) => {
     if (onCommand?.(raw)) return;
@@ -57,25 +95,28 @@ export function EntryModule({ onCommand }: Props) {
     }
     const product = results[0];
     const coli = parsed.colis || 1;
+    const inc = Math.max(1, stepRef.current);
 
     setLines((prev) => {
       const existing = prev.find((l) => l.product.id === product.id);
       if (existing) {
-        return prev.map((l) =>
+        const next = prev.map((l) =>
           l.product.id === product.id
-            ? { ...l, colis: { ...l.colis, [coli]: (l.colis[coli] || 0) + 1 } }
+            ? { ...l, colis: { ...l.colis, [coli]: (l.colis[coli] || 0) + inc } }
             : l
         );
+        const line = next.find((l) => l.product.id === product.id)!;
+        setLastTarget({ key: line.key, coli });
+        toast.success(`${product.name} — coli ${coli}: ${line.colis[coli]} un.`);
+        return next;
       }
-      return [...prev, { key: `${product.id}-${Date.now()}`, product, colis: { [coli]: 1 } }];
+      const key = `${product.id}-${Date.now()}`;
+      setLastTarget({ key, coli });
+      toast.success(`${product.name} — coli ${coli}: ${inc} un.`);
+      return [...prev, { key, product, colis: { [coli]: inc } }];
     });
   };
 
-  const setColisQty = (key: string, coli: number, qty: number) => {
-    setLines((prev) =>
-      prev.map((l) => (l.key === key ? { ...l, colis: { ...l.colis, [coli]: Math.max(0, qty) } } : l))
-    );
-  };
 
   const labels = (): LabelItem[] => {
     const items: LabelItem[] = [];
