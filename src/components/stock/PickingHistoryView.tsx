@@ -202,14 +202,13 @@ export function PickingHistoryView() {
       
       __PDFautoTable(doc, {
         startY: yPos,
-        head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Palete', 'Nível']],
+        head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Nível']],
         body: groups.forkliftItems.map((item, idx) => [
           (idx + 1).toString(),
           item.product_code,
           item.product_name.substring(0, 30) + (item.product_name.length > 30 ? '...' : ''),
           item.quantity.toString(),
           item.location || '-',
-          item.pallet_number || '-',
           item.level_name || '-',
         ]),
         styles: { fontSize: 9, cellPadding: 2 },
@@ -220,9 +219,8 @@ export function PickingHistoryView() {
           1: { cellWidth: 25, fontStyle: 'bold' },
           2: { cellWidth: 50 },
           3: { cellWidth: 15, halign: 'center' },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 20 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 25 },
         },
         margin: { left: 14, right: 14 },
       });
@@ -246,14 +244,13 @@ export function PickingHistoryView() {
       
       __PDFautoTable(doc, {
         startY: yPos,
-        head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Palete', 'Nível']],
+        head: [['#', 'Código', 'Produto', 'Qtd', 'Localização', 'Nível']],
         body: groups.floorItems.map((item, idx) => [
           (idx + 1).toString(),
           item.product_code,
           item.product_name.substring(0, 30) + (item.product_name.length > 30 ? '...' : ''),
           item.quantity.toString(),
           item.location || '-',
-          item.pallet_number || '-',
           item.level_name || '-',
         ]),
         styles: { fontSize: 9, cellPadding: 2 },
@@ -264,9 +261,8 @@ export function PickingHistoryView() {
           1: { cellWidth: 25, fontStyle: 'bold' },
           2: { cellWidth: 50 },
           3: { cellWidth: 15, halign: 'center' },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 20 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 25 },
         },
         margin: { left: 14, right: 14 },
       });
@@ -699,12 +695,6 @@ function ItemRow({ item }: { item: PickingItem }) {
             <MapPin className="h-3 w-3 mr-1" />
             {item.location}
             {item.level_name && ` • ${item.level_name}`}
-          </Badge>
-        )}
-        {item.pallet_number && (
-          <Badge variant="outline" className="text-xs font-normal">
-            <Package className="h-3 w-3 mr-1" />
-            {item.pallet_number}
           </Badge>
         )}
         <Badge variant="secondary" className="text-xs">

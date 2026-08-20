@@ -769,7 +769,7 @@ function OrderRow({
         {/* Expandable colis list */}
         <CollapsibleContent>
           <div className="border-t border-dashed px-3 py-2 space-y-3">
-            {/* Editable location and pallet fields */}
+            {/* Editable location field */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
                 <MapPin className="h-3 w-3" />
