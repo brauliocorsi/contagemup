@@ -18,15 +18,13 @@ interface CountingProductListProps {
   onIncrementAtLocation: (productId: string, colisNumber: number, countId: string) => void;
   onDecrementAtLocation: (productId: string, colisNumber: number, countId: string) => void;
   onLocationChange: (productId: string, location: string) => void;
-  onPalletChange: (productId: string, palletNumber: string) => void;
   onColisLocationChange: (productId: string, colisNumber: number, location: string) => void;
-  onColisPalletChange: (productId: string, colisNumber: number, pallet: string) => void;
   onAddColi: (productId: string, newTotalColis: number) => Promise<void>;
   onRemoveColi: (productId: string, newTotalColis: number) => Promise<void>;
   onCodeChange: (productId: string, newCode: string) => Promise<boolean>;
   onSplitStock: (productId: string, colisNumber: number, distributions: StockDistribution[]) => Promise<boolean>;
-  onMergeStock: (productId: string, colisNumber: number, location: string, pallet: string) => Promise<boolean>;
-  onReportDamage: (data: { product_id: string; quantity: number; colis_number?: number; damage_type: string; description?: string; location?: string; pallet_number?: string }) => Promise<unknown>;
+  onMergeStock: (productId: string, colisNumber: number, location: string) => Promise<boolean>;
+  onReportDamage: (data: { product_id: string; quantity: number; colis_number?: number; damage_type: string; description?: string; location?: string }) => Promise<unknown>;
 }
 
 interface VirtualizedGridProps {
@@ -40,15 +38,13 @@ interface VirtualizedGridProps {
   onIncrementAtLocation: (productId: string, colisNumber: number, countId: string) => void;
   onDecrementAtLocation: (productId: string, colisNumber: number, countId: string) => void;
   onLocationChange: (productId: string, location: string) => void;
-  onPalletChange: (productId: string, palletNumber: string) => void;
   onColisLocationChange: (productId: string, colisNumber: number, location: string) => void;
-  onColisPalletChange: (productId: string, colisNumber: number, pallet: string) => void;
   onAddColi: (productId: string, newTotalColis: number) => Promise<void>;
   onRemoveColi: (productId: string, newTotalColis: number) => Promise<void>;
   onCodeChange: (productId: string, newCode: string) => Promise<boolean>;
   onSplitStock: (productId: string, colisNumber: number, distributions: StockDistribution[]) => Promise<boolean>;
-  onMergeStock: (productId: string, colisNumber: number, location: string, pallet: string) => Promise<boolean>;
-  onReportDamage: (data: { product_id: string; quantity: number; colis_number?: number; damage_type: string; description?: string; location?: string; pallet_number?: string }) => Promise<unknown>;
+  onMergeStock: (productId: string, colisNumber: number, location: string) => Promise<boolean>;
+  onReportDamage: (data: { product_id: string; quantity: number; colis_number?: number; damage_type: string; description?: string; location?: string }) => Promise<unknown>;
   emptyMessage?: { icon: React.ReactNode; text: string };
 }
 
@@ -63,9 +59,7 @@ function VirtualizedGrid({
   onIncrementAtLocation,
   onDecrementAtLocation,
   onLocationChange,
-  onPalletChange,
   onColisLocationChange,
-  onColisPalletChange,
   onAddColi,
   onRemoveColi,
   onCodeChange,
@@ -169,9 +163,7 @@ function VirtualizedGrid({
                     onIncrementAtLocation={onIncrementAtLocation}
                     onDecrementAtLocation={onDecrementAtLocation}
                     onLocationChange={onLocationChange}
-                    onPalletChange={onPalletChange}
                     onColisLocationChange={onColisLocationChange}
-                    onColisPalletChange={onColisPalletChange}
                     onAddColi={onAddColi}
                     onRemoveColi={onRemoveColi}
                     onCodeChange={onCodeChange}
@@ -206,9 +198,7 @@ export function CountingProductList({
   onIncrementAtLocation,
   onDecrementAtLocation,
   onLocationChange,
-  onPalletChange,
   onColisLocationChange,
-  onColisPalletChange,
   onAddColi,
   onRemoveColi,
   onCodeChange,
@@ -226,9 +216,7 @@ export function CountingProductList({
     onIncrementAtLocation,
     onDecrementAtLocation,
     onLocationChange,
-    onPalletChange,
     onColisLocationChange,
-    onColisPalletChange,
     onAddColi,
     onRemoveColi,
     onCodeChange,

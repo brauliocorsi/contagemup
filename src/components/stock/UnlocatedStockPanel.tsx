@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LocationSelect } from '@/components/counting/LocationSelect';
-import { PalletSelect } from '@/components/counting/PalletSelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useProducts } from '@/hooks/useProducts';
@@ -25,7 +24,7 @@ export function UnlocatedStockPanel() {
   const queryClient = useQueryClient();
   const { products } = useProducts();
   const [search, setSearch] = useState('');
-  const [draft, setDraft] = useState<Record<string, { location: string; pallet: string }>>({});
+  const [draft, setDraft] = useState<Record<string, { location: string }>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const productMap = useMemo(() => {
@@ -89,8 +88,8 @@ export function UnlocatedStockPanel() {
 
   const save = async (row: UnlocatedRow) => {
     const d = draft[row.id];
-    if (!d?.location && !d?.pallet) {
-      toast.error('Indique uma localização ou palete');
+    if (!d?.location) {
+      toast.error('Indique uma localização');
       return;
     }
     setSavingId(row.id);
@@ -98,7 +97,6 @@ export function UnlocatedStockPanel() {
       const { error } = await supabase.rpc('assign_count_location', {
         p_count_id: row.id,
         p_location: d.location || '',
-        p_pallet: d.pallet || '',
       });
       if (error) throw error;
       toast.success('Localização atribuída');
@@ -145,7 +143,7 @@ export function UnlocatedStockPanel() {
           <ScrollArea className="h-[420px] w-full">
             <div className="space-y-2 pr-3">
               {filtered.map(({ row, product }) => {
-                const d = draft[row.id] || { location: '', pallet: '' };
+                const d = draft[row.id] || { location: '' };
                 return (
                   <div key={row.id} className="border rounded-md p-3 space-y-2">
                     <div className="flex items-center gap-2">
@@ -156,18 +154,11 @@ export function UnlocatedStockPanel() {
                       <Badge variant="outline" className="text-xs">Coli {row.colis_number}</Badge>
                       <Badge variant="secondary" className="text-xs">{row.quantity} un.</Badge>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
                       <LocationSelect
                         value={d.location}
-                        onValueChange={(v) => setDraft(prev => ({ ...prev, [row.id]: { ...d, location: v } }))}
+                        onValueChange={(v) => setDraft(prev => ({ ...prev, [row.id]: { location: v } }))}
                         placeholder="Localização…"
-                      />
-                      <PalletSelect
-                        value={d.pallet}
-                        onValueChange={(v, loc) =>
-                          setDraft(prev => ({ ...prev, [row.id]: { location: loc || d.location, pallet: v } }))
-                        }
-                        placeholder="Palete…"
                       />
                       <Button
                         size="sm"

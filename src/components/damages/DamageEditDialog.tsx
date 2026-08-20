@@ -19,7 +19,6 @@ interface DamageEditDialogProps {
     description?: string | null;
     quantity?: number;
     location?: string | null;
-    pallet_number?: string | null;
     colis_number?: number | null;
   }) => Promise<unknown>;
   isLoading?: boolean;
@@ -36,7 +35,6 @@ export function DamageEditDialog({
   const [description, setDescription] = useState(damage.description || '');
   const [quantity, setQuantity] = useState(damage.quantity);
   const [location, setLocation] = useState(damage.location || '');
-  const [palletNumber, setPalletNumber] = useState(damage.pallet_number || '');
   const [colisNumber, setColisNumber] = useState<string>(damage.colis_number?.toString() || '');
 
   useEffect(() => {
@@ -44,7 +42,6 @@ export function DamageEditDialog({
     setDescription(damage.description || '');
     setQuantity(damage.quantity);
     setLocation(damage.location || '');
-    setPalletNumber(damage.pallet_number || '');
     setColisNumber(damage.colis_number?.toString() || '');
   }, [damage]);
 
@@ -57,7 +54,6 @@ export function DamageEditDialog({
       description: description || null,
       quantity,
       location: location || null,
-      pallet_number: palletNumber || null,
       colis_number: colisNumber ? parseInt(colisNumber) : null,
     });
 
@@ -120,14 +116,6 @@ export function DamageEditDialog({
               <Input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="Opcional"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Palete</Label>
-              <Input
-                value={palletNumber}
-                onChange={(e) => setPalletNumber(e.target.value)}
                 placeholder="Opcional"
               />
             </div>

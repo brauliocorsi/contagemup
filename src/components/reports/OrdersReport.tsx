@@ -40,7 +40,7 @@ interface OrderEntry {
   order_number: string;
   colis_status: Record<string, boolean>;
   location: string | null;
-  pallet_number: string | null;
+  
   created_at: string;
   product_code?: string;
   product_name?: string;
@@ -92,7 +92,6 @@ export function OrdersReport() {
             order_number: order.order_number,
             colis_status: colisStatus,
             location: order.location,
-            pallet_number: order.pallet_number,
             created_at: order.created_at,
             product_code: product?.code,
             product_name: product?.name,
@@ -180,7 +179,7 @@ export function OrdersReport() {
   const exportToCSV = () => {
     if (filteredOrders.length === 0) return;
 
-    const headers = ['Nº Encomenda', 'Código Produto', 'Nome Produto', 'Status', 'Colis Presentes', 'Total Colis', 'Localização', 'Palete', 'Data'];
+    const headers = ['Nº Encomenda', 'Código Produto', 'Nome Produto', 'Status', 'Colis Presentes', 'Total Colis', 'Localização', 'Data'];
     const rows = filteredOrders.map(o => [
       o.order_number,
       o.product_code || '',
@@ -189,7 +188,6 @@ export function OrdersReport() {
       o.present_colis.toString(),
       o.total_colis.toString(),
       o.location || '',
-      o.pallet_number || '',
       format(new Date(o.created_at), 'dd/MM/yyyy HH:mm'),
     ]);
 
@@ -416,10 +414,7 @@ export function OrdersReport() {
                             {order.location && (
                               <span>{order.location}</span>
                             )}
-                            {order.pallet_number && (
-                              <span className="text-muted-foreground">Palete: {order.pallet_number}</span>
-                            )}
-                            {!order.location && !order.pallet_number && (
+                            {!order.location && (
                               <span className="text-muted-foreground">-</span>
                             )}
                           </div>

@@ -132,7 +132,6 @@ export type Database = {
           counted_by: string | null
           id: string
           location: string | null
-          pallet_number: string | null
           product_id: string
           quantity: number
           session_id: string | null
@@ -144,7 +143,6 @@ export type Database = {
           counted_by?: string | null
           id?: string
           location?: string | null
-          pallet_number?: string | null
           product_id: string
           quantity?: number
           session_id?: string | null
@@ -156,7 +154,6 @@ export type Database = {
           counted_by?: string | null
           id?: string
           location?: string | null
-          pallet_number?: string | null
           product_id?: string
           quantity?: number
           session_id?: string | null
@@ -276,7 +273,6 @@ export type Database = {
           id: string
           location: string
           notes: string | null
-          pallet_number: string | null
           product_code: string
           product_id: string | null
           product_name: string
@@ -294,7 +290,6 @@ export type Database = {
           id?: string
           location: string
           notes?: string | null
-          pallet_number?: string | null
           product_code: string
           product_id?: string | null
           product_name: string
@@ -312,7 +307,6 @@ export type Database = {
           id?: string
           location?: string
           notes?: string | null
-          pallet_number?: string | null
           product_code?: string
           product_id?: string | null
           product_name?: string
@@ -380,7 +374,6 @@ export type Database = {
           id: string
           level_name: string | null
           location: string | null
-          pallet_number: string | null
           picked_at: string
           picking_session_id: string
           product_code: string
@@ -394,7 +387,6 @@ export type Database = {
           id?: string
           level_name?: string | null
           location?: string | null
-          pallet_number?: string | null
           picked_at?: string
           picking_session_id: string
           product_code: string
@@ -408,7 +400,6 @@ export type Database = {
           id?: string
           level_name?: string | null
           location?: string | null
-          pallet_number?: string | null
           picked_at?: string
           picking_session_id?: string
           product_code?: string
@@ -550,7 +541,6 @@ export type Database = {
           description: string | null
           id: string
           location: string | null
-          pallet_number: string | null
           product_id: string
           quantity: number
           reported_by: string | null
@@ -560,7 +550,6 @@ export type Database = {
           source_colis_number: number | null
           source_count_id: string | null
           source_location: string | null
-          source_pallet_number: string | null
           status: string
           updated_at: string
         }
@@ -571,7 +560,6 @@ export type Database = {
           description?: string | null
           id?: string
           location?: string | null
-          pallet_number?: string | null
           product_id: string
           quantity?: number
           reported_by?: string | null
@@ -581,7 +569,6 @@ export type Database = {
           source_colis_number?: number | null
           source_count_id?: string | null
           source_location?: string | null
-          source_pallet_number?: string | null
           status?: string
           updated_at?: string
         }
@@ -592,7 +579,6 @@ export type Database = {
           description?: string | null
           id?: string
           location?: string | null
-          pallet_number?: string | null
           product_id?: string
           quantity?: number
           reported_by?: string | null
@@ -602,7 +588,6 @@ export type Database = {
           source_colis_number?: number | null
           source_count_id?: string | null
           source_location?: string | null
-          source_pallet_number?: string | null
           status?: string
           updated_at?: string
         }
@@ -630,7 +615,6 @@ export type Database = {
           location: string | null
           min_stock: number
           name: string
-          pallet_number: string | null
           total_colis: number
           updated_at: string
         }
@@ -647,7 +631,6 @@ export type Database = {
           location?: string | null
           min_stock?: number
           name: string
-          pallet_number?: string | null
           total_colis?: number
           updated_at?: string
         }
@@ -664,7 +647,6 @@ export type Database = {
           location?: string | null
           min_stock?: number
           name?: string
-          pallet_number?: string | null
           total_colis?: number
           updated_at?: string
         }
@@ -709,7 +691,6 @@ export type Database = {
           id: string
           location: string | null
           notes: string | null
-          pallet_number: string | null
           product_code: string
           product_id: string | null
           product_name: string
@@ -725,7 +706,6 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string | null
-          pallet_number?: string | null
           product_code: string
           product_id?: string | null
           product_name: string
@@ -741,7 +721,6 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string | null
-          pallet_number?: string | null
           product_code?: string
           product_id?: string | null
           product_name?: string
@@ -945,7 +924,6 @@ export type Database = {
           id: string
           location: string | null
           movement_id: string
-          pallet_number: string | null
           product_id: string
           quantity: number
         }
@@ -955,7 +933,6 @@ export type Database = {
           id?: string
           location?: string | null
           movement_id: string
-          pallet_number?: string | null
           product_id: string
           quantity: number
         }
@@ -965,7 +942,6 @@ export type Database = {
           id?: string
           location?: string | null
           movement_id?: string
-          pallet_number?: string | null
           product_id?: string
           quantity?: number
         }
@@ -1092,7 +1068,6 @@ export type Database = {
           id: string
           location: string | null
           order_number: string
-          pallet_number: string | null
           product_id: string
           updated_at: string
         }
@@ -1102,7 +1077,6 @@ export type Database = {
           id?: string
           location?: string | null
           order_number: string
-          pallet_number?: string | null
           product_id: string
           updated_at?: string
         }
@@ -1112,7 +1086,6 @@ export type Database = {
           id?: string
           location?: string | null
           order_number?: string
-          pallet_number?: string | null
           product_id?: string
           updated_at?: string
         }
@@ -1243,44 +1216,6 @@ export type Database = {
           },
         ]
       }
-      warehouse_pallets: {
-        Row: {
-          code: string
-          created_at: string
-          current_location_id: string | null
-          id: string
-          notes: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          current_location_id?: string | null
-          id?: string
-          notes?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          current_location_id?: string | null
-          id?: string
-          notes?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "warehouse_pallets_current_location_id_fkey"
-            columns: ["current_location_id"]
-            isOneToOne: false
-            referencedRelation: "warehouse_locations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       stock_movements_unified: {
@@ -1304,7 +1239,7 @@ export type Database = {
     Functions: {
       admin_reset_stock_data: { Args: never; Returns: Json }
       assign_count_location: {
-        Args: { p_count_id: string; p_location: string; p_pallet: string }
+        Args: { p_count_id: string; p_location: string }
         Returns: string
       }
       commit_exit_cart: {
@@ -1333,7 +1268,6 @@ export type Database = {
         Args: {
           p_colis_number: number
           p_location: string
-          p_pallet: string
           p_product_id: string
           p_session_id: string
         }
@@ -1346,7 +1280,6 @@ export type Database = {
           p_damage_type: string
           p_description: string
           p_location: string
-          p_pallet_number: string
           p_product_id: string
           p_quantity: number
         }
@@ -1357,7 +1290,6 @@ export type Database = {
           description: string | null
           id: string
           location: string | null
-          pallet_number: string | null
           product_id: string
           quantity: number
           reported_by: string | null
@@ -1367,7 +1299,6 @@ export type Database = {
           source_colis_number: number | null
           source_count_id: string | null
           source_location: string | null
-          source_pallet_number: string | null
           status: string
           updated_at: string
         }
@@ -1383,7 +1314,6 @@ export type Database = {
           p_colis_quantities: Json
           p_location: string
           p_notes: string
-          p_pallet_number: string
           p_product_id: string
           p_reason: string
           p_reference: string
@@ -1427,10 +1357,6 @@ export type Database = {
           p_session_id: string
         }
         Returns: number
-      }
-      transfer_pallet_location: {
-        Args: { p_location: string; p_pallet: string }
-        Returns: Json
       }
       transfer_stock_location: { Args: { p_items: Json }; Returns: Json }
     }

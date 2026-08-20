@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Map, ChevronDown, ChevronUp, Package, MapPin, CheckCircle2, AlertCircle, Box, Eye, Warehouse } from 'lucide-react';
+import { Map, ChevronDown, ChevronUp, Package, MapPin, CheckCircle2, AlertCircle, Eye, Warehouse } from 'lucide-react';
 import { ProductWithCounts, ColisDetail } from '@/types/stock';
 import { cn } from '@/lib/utils';
 import { classifyLocation } from '@/lib/locationUtils';
@@ -26,7 +26,6 @@ interface ColisInZone {
   colisName: string | null;
   totalColis: number;
   quantity: number;
-  palletNumber: string | null;
 }
 
 interface ZoneData {
@@ -71,8 +70,7 @@ export function WarehouseMap({ productsWithCounts, categoryColisNamesMap, onProd
           colisNumber: coli.colis_number,
           colisName: colisNames?.[coli.colis_number.toString()] || null,
           totalColis: product.total_colis,
-          quantity: coli.quantity,
-          palletNumber: coli.pallet_number
+          quantity: coli.quantity
         });
       });
 
@@ -411,7 +409,6 @@ export function WarehouseMap({ productsWithCounts, categoryColisNamesMap, onProd
                         <TableHead className="py-2 sticky top-0 bg-muted/30">Coli</TableHead>
                         <TableHead className="py-2 sticky top-0 bg-muted/30">Parte</TableHead>
                         <TableHead className="py-2 text-center sticky top-0 bg-muted/30">Qtd</TableHead>
-                        <TableHead className="py-2 sticky top-0 bg-muted/30">Palete</TableHead>
                         {onProductClick && <TableHead className="py-2 w-16 sticky top-0 bg-muted/30">Ver</TableHead>}
                       </TableRow>
                     </TableHeader>
@@ -443,16 +440,6 @@ export function WarehouseMap({ productsWithCounts, categoryColisNamesMap, onProd
                               {coli.quantity}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-1.5">
-                            {coli.palletNumber ? (
-                              <Badge variant="secondary" className="text-xs">
-                                <Box className="h-2.5 w-2.5 mr-1" />
-                                {coli.palletNumber}
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
                           {onProductClick && (
                             <TableCell className="py-1.5">
                               <Button
@@ -472,7 +459,7 @@ export function WarehouseMap({ productsWithCounts, categoryColisNamesMap, onProd
                       ))}
                       {selectedZone.colisInZone.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                          <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                             Nenhum coli registado nesta localização
                           </TableCell>
                         </TableRow>

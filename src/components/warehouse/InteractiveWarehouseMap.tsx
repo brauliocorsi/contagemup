@@ -35,14 +35,12 @@ import {
   Search,
   X,
   Split,
-  Truck,
   AlertTriangle,
-  MoveRight,
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
 import { useWarehouseMap, LocationWithProducts, ProductInLocation } from '@/hooks/useWarehouseMap';
-import { useWarehousePallets, WarehousePallet, WarehouseAisle } from '@/hooks/useWarehouseConfig';
+import { WarehouseAisle } from '@/hooks/useWarehouseConfig';
 import { useActiveSession } from '@/hooks/useActiveSession';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,7 +53,6 @@ interface DragItem {
   productCode: string;
   colisNumber: number;
   quantity: number;
-  palletNumber: string | null;
   fromLocationCode: string;
   isSplitEntry: boolean;
   totalQuantityForColi: number;
@@ -82,15 +79,13 @@ interface AisleStats {
 
 export function InteractiveWarehouseMap() {
   const { activeSession } = useActiveSession();
-  const { aisles, levels, locations, pallets, mapGrid, isLoading, moveProduct, movePartialProduct, refetch } = useWarehouseMap(activeSession?.id);
-  const { pallets: warehousePallets, isLoading: palletsLoading } = useWarehousePallets();
+  const { aisles, levels, locations, mapGrid, isLoading, moveProduct, movePartialProduct, refetch } = useWarehouseMap(activeSession?.id);
   
   const [selectedLocation, setSelectedLocation] = useState<LocationWithProducts | null>(null);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
   const [dropTargetCode, setDropTargetCode] = useState<string | null>(null);
   const [filterLevel, setFilterLevel] = useState<string>('all');
-  const [filterPallet, setFilterPallet] = useState<string>('all');
   
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -98,17 +93,6 @@ export function InteractiveWarehouseMap() {
   const [highlightedLocationId, setHighlightedLocationId] = useState<string | null>(null);
   const [highlightedAisleId, setHighlightedAisleId] = useState<string | null>(null);
   const highlightedRef = useRef<HTMLButtonElement>(null);
-  
-  // Pallet search state
-  const [palletSearchOpen, setPalletSearchOpen] = useState(false);
-  const [palletSearchQuery, setPalletSearchQuery] = useState('');
-  const [highlightedPallet, setHighlightedPallet] = useState<string | null>(null);
-  
-  // Pallet transfer dialog state
-  const [palletTransferOpen, setPalletTransferOpen] = useState(false);
-  const [selectedPalletForTransfer, setSelectedPalletForTransfer] = useState<string | null>(null);
-  const [targetLocationForPallet, setTargetLocationForPallet] = useState<string>('');
-  const [transferLoading, setTransferLoading] = useState(false);
   
   // Show products without location
   const [showNoLocationProducts, setShowNoLocationProducts] = useState(false);
@@ -204,81 +188,7 @@ export function InteractiveWarehouseMap() {
   const clearHighlight = () => {
     setHighlightedLocationId(null);
     setHighlightedAisleId(null);
-    setHighlightedPallet(null);
   };
-
-  // Build searchable pallets list with their locations
-  const searchablePallets = useMemo(() => {
-    const palletsWithLocations: { code: string; locationCode: string; locationId: string; aisleId: string | null; productCount: number; totalQuantity: number }[] = [];
-    
-    locations.forEach(loc => {
-      const palletGroups: Record<string, { count: number; qty: number }> = {};
-      loc.products.forEach(p => {
-        if (p.palletNumber) {
-          const existing = palletGroups[p.palletNumber];
-          if (existing) {
-            existing.count++;
-            existing.qty += p.quantity;
-          } else {
-            palletGroups[p.palletNumber] = { count: 1, qty: p.quantity };
-          }
-        }
-      });
-      
-      Object.entries(palletGroups).forEach(([palletCode, data]) => {
-        palletsWithLocations.push({
-          code: palletCode,
-          locationCode: loc.code,
-          locationId: loc.id,
-          aisleId: loc.aisle_id,
-          productCount: data.count,
-          totalQuantity: data.qty,
-        });
-      });
-    });
-    
-    return palletsWithLocations;
-  }, [locations]);
-
-  // Get unique pallets with locations
-  const uniquePalletsInWarehouse = useMemo(() => {
-    const palletMap: Record<string, { locations: string[]; aisleIds: (string | null)[]; totalProducts: number; totalQuantity: number }> = {};
-    
-    searchablePallets.forEach(p => {
-      const existing = palletMap[p.code];
-      if (existing) {
-        if (!existing.locations.includes(p.locationCode)) {
-          existing.locations.push(p.locationCode);
-        }
-        if (p.aisleId && !existing.aisleIds.includes(p.aisleId)) {
-          existing.aisleIds.push(p.aisleId);
-        }
-        existing.totalProducts += p.productCount;
-        existing.totalQuantity += p.totalQuantity;
-      } else {
-        palletMap[p.code] = {
-          locations: [p.locationCode],
-          aisleIds: p.aisleId ? [p.aisleId] : [],
-          totalProducts: p.productCount,
-          totalQuantity: p.totalQuantity,
-        };
-      }
-    });
-    
-    return Object.entries(palletMap).map(([code, data]) => ({
-      code,
-      ...data,
-    }));
-  }, [searchablePallets]);
-
-  // Filter pallet search results
-  const filteredPalletResults = useMemo(() => {
-    if (!palletSearchQuery.trim()) return uniquePalletsInWarehouse.slice(0, 10);
-    const query = palletSearchQuery.toLowerCase();
-    return uniquePalletsInWarehouse
-      .filter(p => p.code.toLowerCase().includes(query))
-      .slice(0, 10);
-  }, [uniquePalletsInWarehouse, palletSearchQuery]);
 
   // Get products without location
   const productsWithoutLocation = useMemo(() => {
@@ -291,68 +201,13 @@ export function InteractiveWarehouseMap() {
     return noLocationProducts;
   }, [locations]);
 
-  // Handle pallet selection
-  const handleSelectPallet = (palletCode: string, firstAisleId: string | null) => {
-    setHighlightedPallet(palletCode);
-    setFilterPallet(palletCode);
-    setPalletSearchOpen(false);
-    setPalletSearchQuery('');
-    
-    // Scroll to first aisle containing this pallet
-    if (firstAisleId) {
-      setTimeout(() => {
-        const aisleCard = document.getElementById(`aisle-card-${firstAisleId}`);
-        if (aisleCard) {
-          aisleCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
-    }
-  };
-
-  // Open pallet transfer dialog
-  const openPalletTransfer = (palletCode: string) => {
-    setSelectedPalletForTransfer(palletCode);
-    setTargetLocationForPallet('');
-    setPalletTransferOpen(true);
-  };
-
-  // Handle pallet transfer
-  const handlePalletTransfer = async () => {
-    if (!selectedPalletForTransfer || !targetLocationForPallet.trim() || !activeSession) return;
-    
-    setTransferLoading(true);
-    try {
-      // Update all counts with this pallet to the new location
-      const { error } = await supabase
-        .from('counts')
-        .update({ location: targetLocationForPallet.toUpperCase() })
-        .eq('pallet_number', selectedPalletForTransfer)
-        .eq('session_id', activeSession.id);
-      
-      if (error) throw error;
-      
-      toast.success(`Palete ${selectedPalletForTransfer} transferida para ${targetLocationForPallet.toUpperCase()}`);
-      setPalletTransferOpen(false);
-      setSelectedPalletForTransfer(null);
-      refetch();
-    } catch (error: any) {
-      toast.error('Erro ao transferir palete: ' + error.message);
-    } finally {
-      setTransferLoading(false);
-    }
-  };
-
   // Filter locations based on selected filters
   const filteredLocations = useMemo(() => {
     return locations.filter(loc => {
       if (filterLevel !== 'all' && loc.level_id !== filterLevel) return false;
-      if (filterPallet !== 'all') {
-        const hasPallet = loc.products.some(p => p.palletNumber === filterPallet);
-        if (!hasPallet) return false;
-      }
       return true;
     });
-  }, [locations, filterLevel, filterPallet]);
+  }, [locations, filterLevel]);
 
   // Get stats per aisle
   const getAisleStats = (aisleId: string): AisleStats => {
@@ -391,9 +246,8 @@ export function InteractiveWarehouseMap() {
     const totalProducts = locations.reduce((sum, l) => sum + l.totalProducts, 0);
     const forkliftRequired = locations.filter(l => l.requiresForklift && l.totalColis > 0).length;
     const splitLocations = locations.filter(l => l.products.some(p => p.isSplitEntry)).length;
-    const totalPallets = uniquePalletsInWarehouse.length;
-    return { totalLocations, occupiedLocations, totalColis, totalQuantity, totalProducts, forkliftRequired, splitLocations, totalPallets };
-  }, [locations, uniquePalletsInWarehouse]);
+    return { totalLocations, occupiedLocations, totalColis, totalQuantity, totalProducts, forkliftRequired, splitLocations };
+  }, [locations]);
 
   const handleDragStart = (item: DragItem) => {
     setDraggedItem(item);
@@ -437,11 +291,6 @@ export function InteractiveWarehouseMap() {
 
   const getLocationColor = (location: LocationWithProducts, isHighlighted: boolean) => {
     if (isHighlighted) return 'bg-yellow-300 border-yellow-500 ring-4 ring-yellow-400 animate-pulse';
-    
-    // Check if location contains highlighted pallet
-    if (highlightedPallet && location.products.some(p => p.palletNumber === highlightedPallet)) {
-      return 'bg-purple-200 border-purple-500 ring-2 ring-purple-400';
-    }
     
     if (location.totalColis === 0) return 'bg-muted/30 border-muted';
     // Check if any products are split entries
@@ -524,15 +373,6 @@ export function InteractiveWarehouseMap() {
           </Card>
           <Card className="p-3">
             <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-purple-500" />
-              <div>
-                <p className="text-xl font-bold">{stats.totalPallets}</p>
-                <p className="text-xs text-muted-foreground">Paletes</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
               <Split className="h-4 w-4 text-blue-600" />
               <div>
                 <p className="text-xl font-bold">{stats.splitLocations}</p>
@@ -597,71 +437,6 @@ export function InteractiveWarehouseMap() {
               </PopoverContent>
             </Popover>
 
-            {/* Pallet Search */}
-            <Popover open={palletSearchOpen} onOpenChange={setPalletSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[200px] justify-start">
-                  <Truck className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span className="text-muted-foreground">Buscar palete...</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[350px] p-0" align="start">
-                <Command>
-                  <CommandInput 
-                    placeholder="Código da palete..." 
-                    value={palletSearchQuery}
-                    onValueChange={setPalletSearchQuery}
-                  />
-                  <CommandList>
-                    <CommandEmpty>Nenhuma palete encontrada.</CommandEmpty>
-                    <CommandGroup heading="Paletes no armazém">
-                      {filteredPalletResults.map((pallet, idx) => (
-                        <CommandItem
-                          key={`${pallet.code}-${idx}`}
-                          value={pallet.code}
-                          onSelect={() => handleSelectPallet(pallet.code, pallet.aisleIds[0] || null)}
-                          className="cursor-pointer"
-                        >
-                          <div className="flex flex-col flex-1">
-                            <span className="font-medium flex items-center gap-2">
-                              <Truck className="h-3 w-3" />
-                              {pallet.code}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {pallet.totalProducts} entradas • {pallet.totalQuantity} un • {pallet.locations.length} localização{pallet.locations.length > 1 ? 'ões' : ''}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {pallet.locations.slice(0, 2).map((loc, i) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {loc}
-                              </Badge>
-                            ))}
-                            {pallet.locations.length > 2 && (
-                              <Badge variant="secondary" className="text-xs">
-                                +{pallet.locations.length - 2}
-                              </Badge>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 ml-1"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openPalletTransfer(pallet.code);
-                            }}
-                          >
-                            <MoveRight className="h-3 w-3" />
-                          </Button>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-
             {/* Highlighted location indicator */}
             {highlightedLocationId && (
               <Badge variant="default" className="bg-yellow-500 text-yellow-950 gap-1">
@@ -674,34 +449,6 @@ export function InteractiveWarehouseMap() {
                   onClick={clearHighlight}
                 >
                   <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            )}
-
-            {/* Highlighted pallet indicator */}
-            {highlightedPallet && (
-              <Badge variant="default" className="bg-purple-500 text-purple-950 gap-1">
-                <Truck className="h-3 w-3" />
-                Palete {highlightedPallet}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-4 w-4 ml-1 hover:bg-purple-600"
-                  onClick={() => {
-                    setHighlightedPallet(null);
-                    setFilterPallet('all');
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-4 w-4 hover:bg-purple-600"
-                  onClick={() => openPalletTransfer(highlightedPallet)}
-                  title="Transferir palete"
-                >
-                  <MoveRight className="h-3 w-3" />
                 </Button>
               </Badge>
             )}
@@ -719,22 +466,6 @@ export function InteractiveWarehouseMap() {
                 {levels.map(level => (
                   <SelectItem key={level.id} value={level.id}>
                     {level.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterPallet} onValueChange={setFilterPallet}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Todas as paletes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as paletes</SelectItem>
-                {uniquePalletsInWarehouse.map(pallet => (
-                  <SelectItem key={pallet.code} value={pallet.code}>
-                    <span className="flex items-center gap-1">
-                      <Truck className="h-3 w-3" />
-                      {pallet.code}
-                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -774,10 +505,6 @@ export function InteractiveWarehouseMap() {
           <div className="flex items-center gap-2">
             <Forklift className="h-4 w-4 text-orange-500" />
             <span className="text-muted-foreground">Precisa empilhador</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Truck className="h-4 w-4 text-purple-500" />
-            <span className="text-muted-foreground">Palete destacada</span>
           </div>
         </div>
 
@@ -1039,7 +766,7 @@ export function InteractiveWarehouseMap() {
           {selectedLocation && (
             <div className="flex-1 overflow-auto space-y-4">
               {/* Stats */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="text-center p-3 rounded-lg bg-muted/50">
                   <p className="text-2xl font-bold">{selectedLocation.totalProducts}</p>
                   <p className="text-xs text-muted-foreground">Produtos</p>
@@ -1051,12 +778,6 @@ export function InteractiveWarehouseMap() {
                 <div className="text-center p-3 rounded-lg bg-purple-50">
                   <p className="text-2xl font-bold text-purple-600">{selectedLocation.totalQuantity}</p>
                   <p className="text-xs text-muted-foreground">Unidades</p>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-green-50">
-                  <p className="text-2xl font-bold text-green-600">
-                    {new Set(selectedLocation.products.map(p => p.palletNumber).filter(Boolean)).size}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Paletes</p>
                 </div>
               </div>
 
@@ -1116,11 +837,6 @@ export function InteractiveWarehouseMap() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {product.palletNumber && (
-                              <Badge variant="outline" className="text-xs">
-                                {product.palletNumber}
-                              </Badge>
-                            )}
                             <Badge className={cn(
                               product.isSplitEntry 
                                 ? "bg-blue-100 text-blue-700 hover:bg-blue-100" 
@@ -1155,92 +871,6 @@ export function InteractiveWarehouseMap() {
         </DialogContent>
       </Dialog>
 
-      {/* Pallet Transfer Dialog */}
-      <Dialog open={palletTransferOpen} onOpenChange={setPalletTransferOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Truck className="h-5 w-5" />
-              Transferir Palete
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedPalletForTransfer && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2 mb-2">
-                  <Truck className="h-4 w-4 text-purple-600" />
-                  <span className="font-bold">{selectedPalletForTransfer}</span>
-                </div>
-                {(() => {
-                  const palletInfo = uniquePalletsInWarehouse.find(p => p.code === selectedPalletForTransfer);
-                  if (!palletInfo) return null;
-                  return (
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p>{palletInfo.totalProducts} entrada{palletInfo.totalProducts > 1 ? 's' : ''} • {palletInfo.totalQuantity} unidades</p>
-                      <p>Localização atual: {palletInfo.locations.join(', ')}</p>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="target-location">Nova localização</Label>
-                <div className="flex gap-2">
-                  <Select value={targetLocationForPallet} onValueChange={setTargetLocationForPallet}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Selecionar localização..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations
-                        .filter(loc => loc.code && loc.code.trim() !== '')
-                        .map(loc => (
-                          <SelectItem key={loc.id} value={loc.code}>
-                            <span className="flex items-center gap-2">
-                              <MapPin className="h-3 w-3" />
-                              {loc.code}
-                              <span className="text-muted-foreground text-xs">
-                                ({loc.aisleName} - {loc.levelShortName})
-                              </span>
-                              {loc.requiresForklift && (
-                                <Forklift className="h-3 w-3 text-orange-500" />
-                              )}
-                            </span>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Todos os produtos desta palete serão movidos para a nova localização
-                </p>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPalletTransferOpen(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handlePalletTransfer}
-              disabled={!targetLocationForPallet || transferLoading}
-            >
-              {transferLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Transferindo...
-                </>
-              ) : (
-                <>
-                  <MoveRight className="h-4 w-4 mr-2" />
-                  Transferir
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

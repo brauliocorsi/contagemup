@@ -186,11 +186,6 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary" />
               <span className="font-mono font-medium">{currentItem.location}</span>
-              {currentItem.pallet_number && (
-                <Badge variant="secondary" className="text-xs">
-                  📦 {currentItem.pallet_number}
-                </Badge>
-              )}
             </div>
             <Badge variant="outline">
               {currentIndex + 1} / {allItems.length}

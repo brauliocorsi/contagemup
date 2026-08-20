@@ -103,9 +103,8 @@ export function useReconciliation() {
         status = 'shortage';
       }
 
-      // Get location and pallet from product or its counts
+      // Get location from product or its counts
       const location = product?.location || null;
-      const palletNumber = product?.pallet_number || null;
 
       items.push({
         reconciliation_id: reconciliation.id,
@@ -116,8 +115,7 @@ export function useReconciliation() {
         counted_quantity: countedQuantity,
         status,
         notes: null,
-        location,
-        pallet_number: palletNumber
+        location
       });
     }
 
@@ -137,8 +135,7 @@ export function useReconciliation() {
           counted_quantity: product.completeSets,
           status: 'surplus',
           notes: 'Produto não constava no ficheiro importado',
-          location: product.location || null,
-          pallet_number: product.pallet_number || null
+          location: product.location || null
         });
       }
     }

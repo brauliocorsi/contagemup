@@ -13,7 +13,6 @@ export interface UnifiedMovement {
   notes?: string | null;
   colis_number?: number;
   location?: string | null;
-  pallet_number?: string | null;
   session_name?: string | null;
 }
 
@@ -112,7 +111,6 @@ export function useProductMovementHistory(productId: string | null) {
             reason: session?.reason,
             reference: session?.reference,
             location: pi.location,
-            pallet_number: pi.pallet_number,
           });
         }
       }

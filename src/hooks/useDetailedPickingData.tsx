@@ -16,7 +16,6 @@ interface CountData {
   colis_number: number;
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
 }
 
 interface LocationMetadata {
@@ -54,7 +53,7 @@ export function useDetailedPickingData(items: MovementItem[]) {
       // 2. Fetch counts for all products (location data per coli)
       const { data: countsData, error: countsError } = await supabase
         .from('counts')
-        .select('product_id, colis_number, quantity, location, pallet_number')
+        .select('product_id, colis_number, quantity, location')
         .in('product_id', productIds);
 
       if (countsError) throw countsError;
@@ -135,7 +134,6 @@ export function useDetailedPickingData(items: MovementItem[]) {
             colis_name: categoryColisNames[String(count.colis_number)] || null,
             quantity: count.quantity,
             location: count.location,
-            pallet_number: count.pallet_number,
             requires_forklift: locMeta?.requires_forklift ?? false,
             level_name: locMeta?.level_name ?? null,
             aisle_name: locMeta?.aisle_name ?? null,
@@ -162,7 +160,6 @@ export function useDetailedPickingData(items: MovementItem[]) {
               colis_name: categoryColisNames[String(i)] || null,
               quantity: 0,
               location: null,
-              pallet_number: null,
               requires_forklift: false,
               level_name: null,
               aisle_name: null,
@@ -171,9 +168,8 @@ export function useDetailedPickingData(items: MovementItem[]) {
           }
         }
 
-        // Calculate unique locations and pallets
+        // Calculate unique locations
         const uniqueLocations = [...new Set(colisDetails.map(c => c.location).filter(Boolean))] as string[];
-        const uniquePallets = [...new Set(colisDetails.map(c => c.pallet_number).filter(Boolean))] as string[];
         const hasForkliftRequired = colisDetails.some(c => c.requires_forklift);
 
         return {
@@ -187,7 +183,6 @@ export function useDetailedPickingData(items: MovementItem[]) {
           hasMultipleLocations: uniqueLocations.length > 1,
           hasForkliftRequired,
           uniqueLocations,
-          uniquePallets,
         };
       });
 

@@ -26,7 +26,7 @@ import {
 interface DamagesTableProps {
   damages: ProductDamageWithProduct[];
   onResolve: (data: { id: string; resolution_type: string; resolution_notes?: string }) => Promise<unknown>;
-  onUpdate: (data: { id: string; damage_type?: string; description?: string | null; quantity?: number; location?: string | null; pallet_number?: string | null; colis_number?: number | null }) => Promise<unknown>;
+  onUpdate: (data: { id: string; damage_type?: string; description?: string | null; quantity?: number; location?: string | null; colis_number?: number | null }) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
   isResolving?: boolean;
   isUpdating?: boolean;
@@ -178,13 +178,7 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
                           {damage.location}
                         </div>
                       )}
-                      {damage.pallet_number && (
-                        <div className="flex items-center gap-1">
-                          <Box className="h-3 w-3 text-muted-foreground" />
-                          {damage.pallet_number}
-                        </div>
-                      )}
-                      {!damage.location && !damage.pallet_number && (
+                      {!damage.location && (
                         <span className="text-muted-foreground">—</span>
                       )}
                     </div>

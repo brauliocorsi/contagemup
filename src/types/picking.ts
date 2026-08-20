@@ -6,7 +6,6 @@ export interface ColisPickingDetail {
   colis_name: string | null; // From category colis_names
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
   requires_forklift: boolean;
   level_name: string | null;
   aisle_name: string | null;
@@ -23,7 +22,6 @@ export interface PickingItemDetailed extends MovementItem {
   hasMultipleLocations: boolean;
   hasForkliftRequired: boolean;
   uniqueLocations: string[];
-  uniquePallets: string[];
 }
 
 // Flattened row for PDF export - one row per coli
@@ -35,7 +33,6 @@ export interface PickingPDFRow {
   colis_name: string | null;
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
   level_name: string | null;
   aisle_name: string | null;
   requires_forklift: boolean;

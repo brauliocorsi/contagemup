@@ -13,7 +13,6 @@ interface ReportDamageInput {
   damage_type: string;
   description?: string;
   location?: string;
-  pallet_number?: string;
 }
 
 interface ResolveDamageInput {
@@ -70,7 +69,6 @@ export function useDamages() {
           damage_type: input.damage_type,
           description: input.description || null,
           location: input.location || null,
-          pallet_number: input.pallet_number || null,
           reported_by: user?.id || null,
         })
         .select()
@@ -164,7 +162,7 @@ export function useDamages() {
 
   // Update damage
   const updateDamageMutation = useMutation({
-    mutationFn: async (input: { id: string; damage_type?: string; description?: string | null; quantity?: number; location?: string | null; pallet_number?: string | null; colis_number?: number | null }) => {
+    mutationFn: async (input: { id: string; damage_type?: string; description?: string | null; quantity?: number; location?: string | null; colis_number?: number | null }) => {
       const { id, ...updates } = input;
       
       // If quantity changed, adjust damaged_stock

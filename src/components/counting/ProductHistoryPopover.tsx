@@ -22,7 +22,6 @@ const FIELD_LABELS: Record<string, string> = {
   total_colis: 'Nº Colis',
   description: 'Descrição',
   location: 'Localização',
-  pallet_number: 'Palete'
 };
 
 const CHANGE_TYPE_LABELS: Record<string, string> = {

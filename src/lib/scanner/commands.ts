@@ -22,7 +22,6 @@ export interface ParsedCommand {
 export const SCANNER_MODES = [
   { id: 'consulta', label: 'Consulta' },
   { id: 'transferencia', label: 'Transferência' },
-  { id: 'palete', label: 'Paletes' },
   { id: 'picking', label: 'Picking' },
   { id: 'entradas', label: 'Entradas' },
 ] as const;
@@ -72,17 +71,11 @@ export const COMMAND_SHEET: Array<{ code: string; label: string; description: st
   { code: 'CMD-FINISH', label: 'Concluir', description: 'Grava a operação (confirma com OK)' },
   { code: 'CMD-MODE-consulta', label: 'Ir para Consulta', description: 'Muda de módulo' },
   { code: 'CMD-MODE-transferencia', label: 'Ir para Transferência', description: 'Muda de módulo' },
-  { code: 'CMD-MODE-palete', label: 'Ir para Paletes', description: 'Muda de módulo' },
   { code: 'CMD-MODE-picking', label: 'Ir para Picking', description: 'Muda de módulo' },
   { code: 'CMD-MODE-entradas', label: 'Ir para Entradas', description: 'Muda de módulo' },
 ];
 
 /** Códigos internos gerados pelo sistema */
-export function palletCode(code: string) {
-  const clean = (code || '').trim().toUpperCase();
-  return clean.startsWith('PAL-') ? clean : `PAL-${clean}`;
-}
-
 export function locationCode(code: string) {
   const clean = (code || '').trim().toUpperCase();
   return clean.startsWith('LOC-') ? clean : `LOC-${clean}`;
@@ -93,7 +86,7 @@ export function colisCode(productCode: string, colis: number) {
 }
 
 export interface ParsedScan {
-  kind: 'command' | 'pallet' | 'location' | 'colis' | 'code';
+  kind: 'command' | 'location' | 'colis' | 'code';
   value: string;
   colis?: number;
   command?: ParsedCommand;
@@ -106,7 +99,6 @@ export function parseScan(raw: string): ParsedScan {
   if (cmd) return { kind: 'command', value, command: cmd };
 
   const upper = value.toUpperCase();
-  if (upper.startsWith('PAL-')) return { kind: 'pallet', value: value.slice(4) };
   if (upper.startsWith('LOC-')) return { kind: 'location', value: value.slice(4) };
 
   const colis = value.match(/^(.+)-C(\d+)$/i);

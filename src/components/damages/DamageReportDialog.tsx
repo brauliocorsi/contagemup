@@ -21,7 +21,6 @@ interface DamageReportDialogProps {
     damage_type: string;
     description?: string;
     location?: string;
-    pallet_number?: string;
   }) => Promise<unknown>;
   isLoading?: boolean;
 }
@@ -38,7 +37,6 @@ export function DamageReportDialog({
   const [damageType, setDamageType] = useState<string>('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState(product.location || '');
-  const [palletNumber, setPalletNumber] = useState(product.pallet_number || '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +50,6 @@ export function DamageReportDialog({
       damage_type: damageType,
       description: description || undefined,
       location: location || undefined,
-      pallet_number: palletNumber || undefined,
     });
 
     // Reset form
@@ -61,7 +58,6 @@ export function DamageReportDialog({
     setDamageType('');
     setDescription('');
     setLocation(product.location || '');
-    setPalletNumber(product.pallet_number || '');
     onOpenChange(false);
   };
 
@@ -71,7 +67,6 @@ export function DamageReportDialog({
     setDamageType('');
     setDescription('');
     setLocation(product.location || '');
-    setPalletNumber(product.pallet_number || '');
     onOpenChange(false);
   };
 
@@ -163,15 +158,6 @@ export function DamageReportDialog({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="palletNumber">Palete</Label>
-              <Input
-                id="palletNumber"
-                value={palletNumber}
-                onChange={(e) => setPalletNumber(e.target.value)}
-                placeholder="Ex: P001"
-              />
-            </div>
           </div>
 
           <DialogFooter>

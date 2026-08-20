@@ -31,7 +31,7 @@ export function DamagesView() {
     
     if (damagesToExport.length === 0) return;
 
-    const headers = ['Produto', 'Código', 'Tipo de Dano', 'Quantidade', 'Coli', 'Localização', 'Palete', 'Data', 'Descrição', 'Estado', 'Resolução', 'Notas de Resolução', 'Data Resolução'];
+    const headers = ['Produto', 'Código', 'Tipo de Dano', 'Quantidade', 'Coli', 'Localização', 'Data', 'Descrição', 'Estado', 'Resolução', 'Notas de Resolução', 'Data Resolução'];
     const rows = damagesToExport.map(d => [
       d.product?.name || '',
       d.product?.code || '',
@@ -39,7 +39,6 @@ export function DamagesView() {
       d.quantity.toString(),
       d.colis_number?.toString() || '',
       d.location || '',
-      d.pallet_number || '',
       format(new Date(d.created_at), 'dd/MM/yyyy HH:mm', { locale: pt }),
       d.description || '',
       d.status === 'active' ? 'Ativo' : 'Resolvido',
@@ -71,7 +70,7 @@ export function DamagesView() {
       ['Relatório de Avarias', '', '', '', '', '', '', '', '', '', '', '', ''],
       [`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}`, '', '', '', '', '', '', '', '', '', '', '', ''],
       [''],
-      ['Produto', 'Código', 'Tipo de Dano', 'Quantidade', 'Coli', 'Localização', 'Palete', 'Data', 'Descrição', 'Estado', 'Resolução', 'Notas de Resolução', 'Data Resolução'],
+      ['Produto', 'Código', 'Tipo de Dano', 'Quantidade', 'Coli', 'Localização', 'Data', 'Descrição', 'Estado', 'Resolução', 'Notas de Resolução', 'Data Resolução'],
       ...damagesToExport.map(d => [
         d.product?.name || '',
         d.product?.code || '',
@@ -79,8 +78,7 @@ export function DamagesView() {
         d.quantity,
         d.colis_number || '',
         d.location || '',
-        d.pallet_number || '',
-        format(new Date(d.created_at), 'dd/MM/yyyy HH:mm', { locale: pt }),
+          format(new Date(d.created_at), 'dd/MM/yyyy HH:mm', { locale: pt }),
         d.description || '',
         d.status === 'active' ? 'Ativo' : 'Resolvido',
         d.resolution_type || '',

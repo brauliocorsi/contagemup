@@ -4,11 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, MapPin, Box, AlertCircle, CheckCircle2, Pencil, Check, X } from 'lucide-react';
+import { Plus, Trash2, MapPin, AlertCircle, CheckCircle2, Pencil, Check, X } from 'lucide-react';
 import { ColisDetail, StockDistribution } from '@/types/stock';
 import { cn } from '@/lib/utils';
 import { LocationSelect } from './LocationSelect';
-import { PalletSelect } from './PalletSelect';
 
 interface SplitStockDialogProps {
   open: boolean;
@@ -46,8 +45,7 @@ export function SplitStockDialog({
             id: `existing-${idx}`,
             countId: entry.countId,
             quantity: entry.quantity,
-            location: entry.location || '',
-            pallet_number: entry.pallet_number || ''
+            location: entry.location || ''
           }))
         );
       } else if (colisDetail.quantity > 0) {
@@ -55,16 +53,14 @@ export function SplitStockDialog({
         setDistributions([{
           id: 'initial',
           quantity: colisDetail.quantity,
-          location: colisDetail.location || '',
-          pallet_number: colisDetail.pallet_number || ''
+          location: colisDetail.location || ''
         }]);
       } else {
         // Start with empty distribution
         setDistributions([{
           id: 'new-0',
           quantity: 0,
-          location: '',
-          pallet_number: ''
+          location: ''
         }]);
       }
     }
@@ -93,8 +89,7 @@ export function SplitStockDialog({
       {
         id: `new-${Date.now()}`,
         quantity: 0,
-        location: '',
-        pallet_number: ''
+        location: ''
       }
     ]);
   };
@@ -289,7 +284,7 @@ export function SplitStockDialog({
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {/* Quantity */}
                   <div className="space-y-1">
                     <Label className="text-xs">Quantidade</Label>
@@ -301,27 +296,7 @@ export function SplitStockDialog({
                     />
                   </div>
 
-                  {/* Pallet - auto-preenche localização */}
-                  <div className="space-y-1">
-                    <Label className="text-xs flex items-center gap-1">
-                      <Box className="h-3 w-3" />
-                      Palete
-                    </Label>
-                    <PalletSelect
-                      value={dist.pallet_number}
-                      onValueChange={(value, derivedLocation) => {
-                        updateDistribution(dist.id, 'pallet_number', value);
-                        // Auto-preencher localização do palete (se disponível)
-                        if (derivedLocation) {
-                          updateDistribution(dist.id, 'location', derivedLocation);
-                        }
-                      }}
-                      placeholder="Selecionar..."
-                      className="h-8"
-                    />
-                  </div>
-
-                  {/* Location - editável, auto-preenchida pelo palete */}
+                  {/* Location */}
                   <div className="space-y-1">
                     <Label className="text-xs flex items-center gap-1">
                       <MapPin className="h-3 w-3" />

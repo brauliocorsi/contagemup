@@ -118,7 +118,6 @@ export function StockStatusReport() {
       'Sets Completos': p.completeSets,
       'Total Unidades': p.counts.reduce((sum, c) => sum + c.quantity, 0),
       'Localizações': p.uniqueLocations.join(', ') || '-',
-      'Paletes': p.uniquePallets.join(', ') || '-',
     }));
     const completeSheet = XLSX.utils.json_to_sheet(completeData);
     XLSX.utils.book_append_sheet(workbook, completeSheet, 'Completos');

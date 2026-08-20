@@ -7,7 +7,7 @@ import { ScanInput } from './ScanInput';
 import { PrintMenu } from './PrintMenu';
 import { useProductResolver, useProductStockDetail, useLinkBarcode } from '@/hooks/useScannerData';
 import { useProductSales } from '@/hooks/useProductSales';
-import { colisCode, palletCode, locationCode, parseScan } from '@/lib/scanner/commands';
+import { colisCode, locationCode, parseScan } from '@/lib/scanner/commands';
 import type { LabelItem } from '@/lib/scanner/labels';
 import type { Product } from '@/types/stock';
 import { toast } from 'sonner';
@@ -73,7 +73,7 @@ export function ProductInquiryModule({ onCommand }: Props) {
           code: colisCode(detail.product.code, coli),
           title: detail.product.name,
           subtitle: `Coli ${coli} • ${detail.product.code}`,
-          extra: [rows.map((r) => `${r.location || 'S/L'}${r.pallet_number ? ` / ${r.pallet_number}` : ''}`).join(', ')],
+          extra: [rows.map((r) => r.location || 'S/L').join(', ')],
         });
       });
     return items;
@@ -81,7 +81,7 @@ export function ProductInquiryModule({ onCommand }: Props) {
 
   return (
     <div className="space-y-4">
-      <ScanInput onScan={handleScan} label="Ler produto, coli, palete ou localização" placeholder="Código do produto…" />
+      <ScanInput onScan={handleScan} label="Ler produto, coli ou localização" placeholder="Código do produto…" />
 
       {candidates.length > 0 && (
         <Card>
@@ -160,7 +160,6 @@ export function ProductInquiryModule({ onCommand }: Props) {
                           <span className="flex items-center gap-1.5">
                             <MapPin className="h-3 w-3 text-muted-foreground" />
                             {r.location || 'Sem localização'}
-                            {r.pallet_number && <span className="text-muted-foreground">• {r.pallet_number}</span>}
                           </span>
                           <span className="font-semibold">{r.quantity}</span>
                         </div>
@@ -229,7 +228,7 @@ export function ProductInquiryModule({ onCommand }: Props) {
       {!detail && !isLoading && candidates.length === 0 && (
         <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
           <Package className="mx-auto mb-2 h-8 w-8 opacity-40" />
-          Leia um código para consultar stock, localização e palete.
+          Leia um código para consultar stock e localização.
         </div>
       )}
     </div>

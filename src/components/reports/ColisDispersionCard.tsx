@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { MapPin, Box, ChevronDown, ChevronUp, AlertCircle, Search, Package, FileDown } from 'lucide-react';
+import { MapPin, ChevronDown, ChevronUp, AlertCircle, Search, Package, FileDown } from 'lucide-react';
 import { ProductWithCounts, ColisDetail } from '@/types/stock';
 import { cn } from '@/lib/utils';
 
@@ -26,10 +26,8 @@ interface DispersedProduct {
     colisName: string | null;
     quantity: number;
     location: string | null;
-    palletNumber: string | null;
   }[];
   uniqueLocations: string[];
-  uniquePallets: string[];
 }
 
 export function ColisDispersionCard({ 
@@ -41,10 +39,10 @@ export function ColisDispersionCard({
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [isOpen, setIsOpen] = useState(true);
 
-  // Get products with multiple locations or pallets (dispersed colis)
+  // Get products with multiple locations (dispersed colis)
   const dispersedProducts = useMemo(() => {
     return productsWithCounts
-      .filter(p => p.hasMultipleLocations || p.hasMultiplePallets || p.uniqueLocations.length > 0)
+      .filter(p => p.hasMultipleLocations || p.uniqueLocations.length > 0)
       .map(p => {
         const colisNames = categoryColisNamesMap[p.category];
         return {
@@ -57,19 +55,16 @@ export function ColisDispersionCard({
             colisNumber: c.colis_number,
             colisName: colisNames?.[c.colis_number.toString()] || null,
             quantity: c.quantity,
-            location: c.location,
-            palletNumber: c.pallet_number
+            location: c.location
           })),
           uniqueLocations: p.uniqueLocations,
-          uniquePallets: p.uniquePallets,
-          hasMultipleLocations: p.hasMultipleLocations,
-          hasMultiplePallets: p.hasMultiplePallets
+          hasMultipleLocations: p.hasMultipleLocations
         };
       })
       .sort((a, b) => {
-        // Sort by dispersed first (multiple locations/pallets)
-        const aDispersed = a.uniqueLocations.length > 1 || a.uniquePallets.length > 1;
-        const bDispersed = b.uniqueLocations.length > 1 || b.uniquePallets.length > 1;
+        // Sort by dispersed first (multiple locations)
+        const aDispersed = a.uniqueLocations.length > 1;
+        const bDispersed = b.uniqueLocations.length > 1;
         if (aDispersed && !bDispersed) return -1;
         if (!aDispersed && bDispersed) return 1;
         return a.name.localeCompare(b.name);
@@ -82,8 +77,7 @@ export function ColisDispersionCard({
     return dispersedProducts.filter(p =>
       p.code.toLowerCase().includes(term) ||
       p.name.toLowerCase().includes(term) ||
-      p.uniqueLocations.some(l => l.toLowerCase().includes(term)) ||
-      p.uniquePallets.some(pal => pal.toLowerCase().includes(term))
+      p.uniqueLocations.some(l => l.toLowerCase().includes(term))
     );
   }, [dispersedProducts, searchTerm]);
 
@@ -110,7 +104,7 @@ export function ColisDispersionCard({
   // Stats
   const stats = useMemo(() => {
     const dispersed = dispersedProducts.filter(p => 
-      p.uniqueLocations.length > 1 || p.uniquePallets.length > 1
+      p.uniqueLocations.length > 1
     ).length;
     const totalWithLocation = dispersedProducts.filter(p => p.uniqueLocations.length > 0).length;
     return { dispersed, totalWithLocation, total: dispersedProducts.length };
@@ -120,7 +114,7 @@ export function ColisDispersionCard({
   const exportToCSV = () => {
     if (filteredProducts.length === 0) return;
 
-    const headers = ['Código', 'Nome', 'Categoria', 'Coli', 'Nome Coli', 'Quantidade', 'Localização', 'Palete'];
+    const headers = ['Código', 'Nome', 'Categoria', 'Coli', 'Nome Coli', 'Quantidade', 'Localização'];
     const rows: string[][] = [];
 
     filteredProducts.forEach(product => {
@@ -132,8 +126,7 @@ export function ColisDispersionCard({
           `${coli.colisNumber}/${product.totalColis}`,
           coli.colisName || '-',
           coli.quantity.toString(),
-          coli.location || '-',
-          coli.palletNumber || '-'
+          coli.location || '-'
         ]);
       });
     });
@@ -220,7 +213,7 @@ export function ColisDispersionCard({
             <div className="space-y-2 max-h-[500px] overflow-y-auto">
               {filteredProducts.map(product => {
                 const isExpanded = expandedProducts.has(product.id);
-                const isDispersed = product.uniqueLocations.length > 1 || product.uniquePallets.length > 1;
+                const isDispersed = product.uniqueLocations.length > 1;
 
                 return (
                   <Collapsible
@@ -293,26 +286,18 @@ export function ColisDispersionCard({
                                     Localização
                                   </div>
                                 </TableHead>
-                                <TableHead className="py-1.5 text-xs">
-                                  <div className="flex items-center gap-1">
-                                    <Box className="h-3 w-3" />
-                                    Palete
-                                  </div>
-                                </TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {product.colisDetails.map(coli => {
                                 const primaryLocation = product.uniqueLocations[0];
-                                const primaryPallet = product.uniquePallets[0];
                                 const locDiff = coli.location && coli.location !== primaryLocation;
-                                const palDiff = coli.palletNumber && coli.palletNumber !== primaryPallet;
 
                                 return (
                                   <TableRow 
                                     key={coli.colisNumber}
                                     className={cn(
-                                      (locDiff || palDiff) && "bg-orange-50"
+                                      locDiff && "bg-orange-50"
                                     )}
                                   >
                                     <TableCell className="py-1.5 text-sm font-medium">
@@ -334,21 +319,6 @@ export function ColisDispersionCard({
                                           )}
                                         >
                                           {coli.location}
-                                        </Badge>
-                                      ) : (
-                                        <span className="text-xs text-muted-foreground">-</span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="py-1.5">
-                                      {coli.palletNumber ? (
-                                        <Badge 
-                                          variant={palDiff ? "default" : "secondary"}
-                                          className={cn(
-                                            "text-xs",
-                                            palDiff && "bg-orange-100 text-orange-800 hover:bg-orange-100"
-                                          )}
-                                        >
-                                          {coli.palletNumber}
                                         </Badge>
                                       ) : (
                                         <span className="text-xs text-muted-foreground">-</span>

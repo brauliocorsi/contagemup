@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, MapPin, Box, AlertTriangle } from 'lucide-react';
+import { Loader2, MapPin, AlertTriangle } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import { useActiveProductCounts, ActiveCountInfo } from '@/hooks/useActiveProductCounts';
 import { Product } from '@/types/stock';
@@ -29,7 +29,6 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
   const [totalColis, setTotalColis] = useState(product.total_colis);
   const [description, setDescription] = useState(product.description || '');
   const [location, setLocation] = useState(product.location || '');
-  const [palletNumber, setPalletNumber] = useState(product.pallet_number || '');
   const [minStock, setMinStock] = useState(product.min_stock ?? 5);
   const [activeCounts, setActiveCounts] = useState<ActiveCountInfo[]>([]);
   const [showColisWarning, setShowColisWarning] = useState(false);
@@ -42,7 +41,6 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
     setTotalColis(product.total_colis);
     setDescription(product.description || '');
     setLocation(product.location || '');
-    setPalletNumber(product.pallet_number || '');
     setMinStock(product.min_stock ?? 5);
     setShowColisWarning(false);
     setActiveCounts([]);
@@ -79,7 +77,6 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
       total_colis: totalColis,
       description: description || null,
       location: location || null,
-      pallet_number: palletNumber || null,
       min_stock: minStock
     });
 
@@ -204,31 +201,17 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
                 rows={2}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-location" className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  Localização
-                </Label>
-                <Input
-                  id="edit-location"
-                  placeholder="Ex: Armazém A - C3"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-pallet" className="flex items-center gap-1">
-                  <Box className="h-3 w-3" />
-                  Nº Palete
-                </Label>
-                <Input
-                  id="edit-pallet"
-                  placeholder="Ex: PAL-001"
-                  value={palletNumber}
-                  onChange={(e) => setPalletNumber(e.target.value)}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-location" className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                Localização
+              </Label>
+              <Input
+                id="edit-location"
+                placeholder="Ex: Armazém A - C3"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter>

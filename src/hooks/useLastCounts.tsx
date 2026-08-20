@@ -6,7 +6,6 @@ interface ColisLocationInfo {
   colisNumber: number;
   quantity: number;
   location: string | null;
-  palletNumber: string | null;
   countId: string;
 }
 
@@ -17,7 +16,6 @@ interface SplitEntry {
     countId: string;
     quantity: number;
     location: string | null;
-    palletNumber: string | null;
   }[];
   totalQuantity: number;
 }
@@ -30,7 +28,6 @@ interface LastCountInfo {
   countedAt: string;
   colisLocations: ColisLocationInfo[];
   uniqueLocations: string[];
-  uniquePallets: string[];
   // New: split tracking
   splitEntries: SplitEntry[];
   hasSplitColis: boolean;
@@ -44,7 +41,6 @@ interface CountRow {
   colis_number: number;
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
   counted_at: string;
 }
 
@@ -57,7 +53,7 @@ const fetchCountsAndSessions = async () => {
   const [countsResult, sessionsResult] = await Promise.all([
     supabase
       .from('counts')
-      .select('id, product_id, session_id, colis_number, quantity, location, pallet_number, counted_at')
+      .select('id, product_id, session_id, colis_number, quantity, location, counted_at')
       .order('counted_at', { ascending: false }),
     supabase
       .from('counting_sessions')
@@ -101,7 +97,6 @@ const processLastCounts = (counts: CountRow[], sessions: SessionRow[]): Record<s
       colisNumber: number;
       quantity: number;
       location: string | null;
-      palletNumber: string | null;
     }>;
   }> = {};
 
@@ -123,8 +118,7 @@ const processLastCounts = (counts: CountRow[], sessions: SessionRow[]): Record<s
         countId: count.id,
         colisNumber: count.colis_number,
         quantity: count.quantity,
-        location: count.location,
-        palletNumber: count.pallet_number
+        location: count.location
       });
     }
   });
@@ -150,7 +144,6 @@ const processLastCounts = (counts: CountRow[], sessions: SessionRow[]): Record<s
           colisNumber: parseInt(colisNum),
           quantity: totalQty,
           location: primary.location,
-          palletNumber: primary.palletNumber,
           countId: primary.countId
         };
       })
@@ -164,8 +157,7 @@ const processLastCounts = (counts: CountRow[], sessions: SessionRow[]): Record<s
         entries: entries.map(e => ({
           countId: e.countId,
           quantity: e.quantity,
-          location: e.location,
-          palletNumber: e.palletNumber
+          location: e.location
         })),
         totalQuantity: entries.reduce((sum, e) => sum + e.quantity, 0)
       }));
@@ -177,12 +169,6 @@ const processLastCounts = (counts: CountRow[], sessions: SessionRow[]): Record<s
         .filter((loc): loc is string => loc !== null && loc.trim() !== '')
     )].sort();
 
-    const uniquePallets = [...new Set(
-      info.allEntries
-        .map(e => e.palletNumber)
-        .filter((p): p is string => p !== null && p.trim() !== '')
-    )].sort();
-
     result[productId] = {
       productId,
       sessionId: info.sessionId,
@@ -191,7 +177,6 @@ const processLastCounts = (counts: CountRow[], sessions: SessionRow[]): Record<s
       countedAt: info.countedAt,
       colisLocations,
       uniqueLocations,
-      uniquePallets,
       splitEntries,
       hasSplitColis: splitEntries.length > 0,
       splitColisCount: splitEntries.length

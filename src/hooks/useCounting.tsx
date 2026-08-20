@@ -103,7 +103,7 @@ export function useCounting(sessionId: string | null) {
     // Primeiro tentar buscar com session_id específico
     let query = supabase
       .from('counts')
-      .select('id, quantity, location, pallet_number, session_id')
+      .select('id, quantity, location, session_id')
       .eq('product_id', productId)
       .eq('colis_number', colisNumber);
     
@@ -362,54 +362,6 @@ export function useCounting(sessionId: string | null) {
     return true;
   };
 
-  const updatePalletNumber = async (productId: string, palletNumber: string) => {
-    if (!sessionId || !user) return false;
-
-    // Update pallet number for all colis of this product in this session
-    const productCounts = counts.filter(c => c.product_id === productId);
-    
-    if (productCounts.length === 0) {
-      // Create a count entry for colis 1 with quantity 0 just to store pallet number
-      const { error } = await supabase
-        .from('counts')
-        .insert({
-          session_id: sessionId,
-          product_id: productId,
-          colis_number: 1,
-          quantity: 0,
-          pallet_number: palletNumber,
-          counted_by: user.id
-        });
-
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível guardar o número da palete',
-          variant: 'destructive'
-        });
-        return false;
-      }
-    } else {
-      // Update all existing counts for this product with the pallet number
-      const { error } = await supabase
-        .from('counts')
-        .update({ pallet_number: palletNumber })
-        .eq('session_id', sessionId)
-        .eq('product_id', productId);
-
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível atualizar o número da palete',
-          variant: 'destructive'
-        });
-        return false;
-      }
-    }
-
-    invalidateCounts();
-    return true;
-  };
 
   const updateColisLocation = async (productId: string, colisNumber: number, location: string) => {
     if (!sessionId || !user) return false;
@@ -470,87 +422,7 @@ export function useCounting(sessionId: string | null) {
     return product?.current_stock || 0;
   };
 
-  // Função auxiliar para buscar localização do palete
-  const getLocationFromPallet = async (palletCode: string): Promise<string | null> => {
-    if (!palletCode) return null;
-    
-    const { data: pallet } = await supabase
-      .from('warehouse_pallets')
-      .select(`
-        current_location_id,
-        location:warehouse_locations(code)
-      `)
-      .eq('code', palletCode)
-      .maybeSingle();
-    
-    // @ts-ignore - nested select type issue
-    return pallet?.location?.code || null;
-  };
 
-  const updateColisPalletNumber = async (
-    productId: string, 
-    colisNumber: number, 
-    palletNumber: string,
-    locationFromPallet?: string // Localização derivada do palete (opcional, se já conhecida)
-  ) => {
-    if (!sessionId || !user) return false;
-
-    const existingCount = counts.find(
-      c => c.product_id === productId && c.colis_number === colisNumber
-    );
-
-    // Determinar a localização do palete automaticamente
-    let derivedLocation = locationFromPallet;
-    if (derivedLocation === undefined && palletNumber) {
-      derivedLocation = await getLocationFromPallet(palletNumber) || undefined;
-    }
-
-    if (existingCount) {
-      const { error } = await supabase
-        .from('counts')
-        .update({ 
-          pallet_number: palletNumber,
-          location: derivedLocation || existingCount.location // Actualizar localização também
-        })
-        .eq('id', existingCount.id);
-
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível atualizar o número da palete',
-          variant: 'destructive'
-        });
-        return false;
-      }
-    } else {
-      // CORRIGIDO: Buscar quantidade correcta antes de inserir (não usar 0!)
-      const targetQuantity = await getCorrectQuantityForProduct(productId);
-      
-      const { error } = await supabase
-        .from('counts')
-        .insert({
-          session_id: sessionId,
-          product_id: productId,
-          colis_number: colisNumber,
-          quantity: targetQuantity, // Usa stock actual, NÃO 0!
-          pallet_number: palletNumber,
-          location: derivedLocation || null,
-          counted_by: user.id
-        });
-
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível guardar o número da palete',
-          variant: 'destructive'
-        });
-        return false;
-      }
-    }
-
-    invalidateCounts();
-    return true;
-  };
 
   // Memoized function to process a single product with counts
   // Now accepts optional categoryColisNames to calculate effective total colis
@@ -593,7 +465,6 @@ export function useCounting(sessionId: string | null) {
         .map(d => ({
           quantity: d.quantity,
           location: d.location || null,
-          pallet_number: d.pallet_number || null,
         }));
 
       const { error } = await supabase.rpc('split_colis_counts', {
@@ -622,7 +493,7 @@ export function useCounting(sessionId: string | null) {
   };
 
   // Merge all location entries for a coli into a single location (atomic RPC — works for non-admins)
-  const mergeColisStock = async (productId: string, colisNumber: number, targetLocation: string, targetPallet: string) => {
+  const mergeColisStock = async (productId: string, colisNumber: number, targetLocation: string) => {
     if (!sessionId || !user) return false;
 
     try {
@@ -631,7 +502,6 @@ export function useCounting(sessionId: string | null) {
         p_session_id: sessionId,
         p_colis_number: colisNumber,
         p_location: targetLocation || '',
-        p_pallet: targetPallet || '',
       });
 
       if (error) throw error;
@@ -753,9 +623,7 @@ export function useCounting(sessionId: string | null) {
     incrementCount,
     decrementCount,
     updateLocation,
-    updatePalletNumber,
     updateColisLocation,
-    updateColisPalletNumber,
     getProductWithCounts,
     deleteOrphanCounts,
     splitColisStock,

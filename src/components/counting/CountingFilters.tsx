@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Filter, Tags, MapPin, Box, X } from 'lucide-react';
+import { Search, Filter, Tags, MapPin, X } from 'lucide-react';
 
 interface FilterOption {
   name: string;
@@ -24,15 +24,11 @@ interface CountingFiltersProps {
   onFilterCategoryChange: (value: string) => void;
   filterLocation: string;
   onFilterLocationChange: (value: string) => void;
-  filterPallet: string;
-  onFilterPalletChange: (value: string) => void;
   totalProducts: number;
   statusCounts: StatusCounts;
   categoriesWithCounts: FilterOption[];
   locationsWithCounts: FilterOption[];
-  palletsWithCounts: FilterOption[];
   productsWithoutLocation: number;
-  productsWithoutPallet: number;
   onClearFilters: () => void;
   hasActiveFilters: boolean;
   children?: React.ReactNode; // For export menu
@@ -47,15 +43,11 @@ export function CountingFilters({
   onFilterCategoryChange,
   filterLocation,
   onFilterLocationChange,
-  filterPallet,
-  onFilterPalletChange,
   totalProducts,
   statusCounts,
   categoriesWithCounts,
   locationsWithCounts,
-  palletsWithCounts,
   productsWithoutLocation,
-  productsWithoutPallet,
   onClearFilters,
   hasActiveFilters,
   children,
@@ -65,7 +57,7 @@ export function CountingFilters({
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Pesquisar por nome, código, localização ou palete..."
+          placeholder="Pesquisar por nome, código ou localização..."
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-10"
@@ -115,21 +107,6 @@ export function CountingFilters({
           </SelectContent>
         </Select>
 
-        <Select value={filterPallet} onValueChange={onFilterPalletChange}>
-          <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterPallet !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
-            <Box className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Palete" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos paletes ({totalProducts})</SelectItem>
-            {productsWithoutPallet > 0 && (
-              <SelectItem value="__empty__">Sem palete ({productsWithoutPallet})</SelectItem>
-            )}
-            {palletsWithCounts.map(({ name, count }) => (
-              <SelectItem key={name} value={name}>{name} ({count})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
 
         {hasActiveFilters && (
           <Button 

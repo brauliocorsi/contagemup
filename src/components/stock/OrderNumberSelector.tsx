@@ -27,7 +27,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { LocationSelect } from '@/components/counting/LocationSelect';
-import { PalletSelect } from '@/components/counting/PalletSelect';
 
 interface OrderNumberExitSelectorProps {
   productId: string;
@@ -201,20 +200,12 @@ export function OrderNumberExitSelector({
             </div>
             {verificationResult.order && (
               <div className="mt-2 space-y-1">
-                {(verificationResult.order.location || verificationResult.order.pallet_number) && (
+                {verificationResult.order.location && (
                   <div className="flex gap-2 text-xs">
-                    {verificationResult.order.location && (
-                      <Badge variant="outline" className="gap-1">
-                        <MapPin className="h-2.5 w-2.5" />
-                        {verificationResult.order.location}
-                      </Badge>
-                    )}
-                    {verificationResult.order.pallet_number && (
-                      <Badge variant="outline" className="gap-1">
-                        <Package className="h-2.5 w-2.5" />
-                        {verificationResult.order.pallet_number}
-                      </Badge>
-                    )}
+                    <Badge variant="outline" className="gap-1">
+                      <MapPin className="h-2.5 w-2.5" />
+                      {verificationResult.order.location}
+                    </Badge>
                   </div>
                 )}
                 {totalColis > 1 && (
@@ -290,7 +281,6 @@ interface OrderNumberEntrySelectorProps {
   totalColis: number;
   currentStock: number; // Total stock from products table
   location?: string;
-  palletNumber?: string;
   colisNames?: Record<string, string> | null;
   onOrderAdded: () => void;
   onOrderDeleted?: () => void;
@@ -303,7 +293,6 @@ export function OrderNumberEntrySelector({
   totalColis: productTotalColis,
   currentStock,
   location,
-  palletNumber,
   colisNames,
   onOrderAdded,
   onOrderDeleted,
@@ -331,7 +320,7 @@ export function OrderNumberEntrySelector({
     
     setAdding(true);
     const isComplete = addAsComplete === 'complete';
-    const result = await addOrderNumber(newOrderNumber.trim(), location, palletNumber, isComplete);
+    const result = await addOrderNumber(newOrderNumber.trim(), location, isComplete);
     setAdding(false);
     
     if (result) {
@@ -351,7 +340,7 @@ export function OrderNumberEntrySelector({
     }
     
     setConverting(true);
-    const result = await convertStockToOrder(convertOrderNumber.trim(), location, palletNumber);
+    const result = await convertStockToOrder(convertOrderNumber.trim(), location);
     setConverting(false);
     
     if (result) {
@@ -407,12 +396,7 @@ export function OrderNumberEntrySelector({
   };
 
   const handleLocationChange = async (orderId: string, newLocation: string) => {
-    await updateOrderLocation(orderId, newLocation, null);
-    await refetch();
-  };
-
-  const handlePalletChange = async (orderId: string, newPallet: string) => {
-    await updateOrderLocation(orderId, null, newPallet);
+    await updateOrderLocation(orderId, newLocation);
     await refetch();
   };
 
@@ -604,7 +588,6 @@ export function OrderNumberEntrySelector({
                       onToggleExpand={() => toggleOrderExpanded(order.id)}
                       onColisToggle={handleColisToggle}
                       onLocationChange={handleLocationChange}
-                      onPalletChange={handlePalletChange}
                       onDelete={() => setDeleteConfirmOrder(order)}
                       updatingColis={updatingColis}
                       getColisName={getColisName}
@@ -630,7 +613,6 @@ export function OrderNumberEntrySelector({
                       onToggleExpand={() => toggleOrderExpanded(order.id)}
                       onColisToggle={handleColisToggle}
                       onLocationChange={handleLocationChange}
-                      onPalletChange={handlePalletChange}
                       onDelete={() => setDeleteConfirmOrder(order)}
                       updatingColis={updatingColis}
                       getColisName={getColisName}
@@ -714,7 +696,6 @@ interface OrderRowProps {
   onToggleExpand: () => void;
   onColisToggle: (orderId: string, colisNumber: number, currentValue: boolean) => void;
   onLocationChange: (orderId: string, newLocation: string) => void;
-  onPalletChange: (orderId: string, newPallet: string) => void;
   onDelete: () => void;
   updatingColis: string | null;
   getColisName: (colisNumber: number) => string;
@@ -727,7 +708,6 @@ function OrderRow({
   onToggleExpand,
   onColisToggle,
   onLocationChange,
-  onPalletChange,
   onDelete,
   updatingColis,
   getColisName,
@@ -772,12 +752,6 @@ function OrderRow({
                 {order.location}
               </Badge>
             )}
-            {order.pallet_number && (
-              <Badge variant="outline" className="text-xs gap-0.5">
-                <Package className="h-2.5 w-2.5" />
-                {order.pallet_number}
-              </Badge>
-            )}
             <Button
               variant="ghost"
               size="sm"
@@ -795,28 +769,16 @@ function OrderRow({
         {/* Expandable colis list */}
         <CollapsibleContent>
           <div className="border-t border-dashed px-3 py-2 space-y-3">
-            {/* Editable location and pallet fields */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  Localização
-                </Label>
-                <LocationSelect
-                  value={order.location || ''}
-                  onValueChange={(value) => onLocationChange(order.id, value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Package className="h-3 w-3" />
-                  Palete
-                </Label>
-                <PalletSelect
-                  value={order.pallet_number || ''}
-                  onValueChange={(value) => onPalletChange(order.id, value)}
-                />
-              </div>
+            {/* Editable location field */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                Localização
+              </Label>
+              <LocationSelect
+                value={order.location || ''}
+                onValueChange={(value) => onLocationChange(order.id, value)}
+              />
             </div>
             
             {/* Colis checklist */}

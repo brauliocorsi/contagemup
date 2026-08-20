@@ -13,9 +13,9 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2, Printer, Download, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { printLabels, type LabelItem, type LabelFormat } from '@/lib/scanner/labels';
-import { COMMAND_SHEET, palletCode, locationCode, colisCode } from '@/lib/scanner/commands';
+import { COMMAND_SHEET, locationCode, colisCode } from '@/lib/scanner/commands';
 
-type Source = 'comandos' | 'localizacoes' | 'paletes' | 'produtos';
+type Source = 'comandos' | 'localizacoes' | 'produtos';
 
 interface Row {
   id: string;
@@ -52,24 +52,6 @@ export function PrintCenterModule() {
     },
   });
 
-  const pallets = useQuery({
-    queryKey: ['print-pallets'],
-    enabled: source === 'paletes',
-    queryFn: async (): Promise<Row[]> => {
-      const { data, error } = await supabase
-        .from('warehouse_pallets')
-        .select('id, code, status')
-        .order('code');
-      if (error) throw error;
-      return (data || []).map((p) => ({
-        id: `pal-${p.id}`,
-        code: palletCode(p.code),
-        title: p.code,
-        subtitle: `Palete • ${p.status}`,
-      }));
-    },
-  });
-
   const products = useQuery({
     queryKey: ['print-products', search, perColi],
     enabled: source === 'produtos' && search.trim().length >= 2,
@@ -78,7 +60,7 @@ export function PrintCenterModule() {
       const [{ data, error }, { data: cats }] = await Promise.all([
         supabase
           .from('products')
-          .select('id, code, name, location, pallet_number, barcode, total_colis, category')
+          .select('id, code, name, location, barcode, total_colis, category')
           .or(`code.ilike.%${term}%,name.ilike.%${term}%,barcode.ilike.%${term}%`)
           .order('name')
           .limit(50),
@@ -100,7 +82,7 @@ export function PrintCenterModule() {
 
       const out: Row[] = [];
       (data || []).forEach((p) => {
-        const base = [p.location, p.pallet_number].filter(Boolean).join(' • ');
+        const base = p.location || '';
 
         if (!perColi) {
           const code = (p.barcode || p.code || '').trim();
@@ -148,7 +130,6 @@ export function PrintCenterModule() {
 
   const loading =
     (source === 'localizacoes' && locations.isLoading) ||
-    (source === 'paletes' && pallets.isLoading) ||
     (source === 'produtos' && products.isFetching);
 
   const rows: Row[] = useMemo(() => {
@@ -157,16 +138,14 @@ export function PrintCenterModule() {
         ? commandRows
         : source === 'localizacoes'
           ? locations.data || []
-          : source === 'paletes'
-            ? pallets.data || []
-            : products.data || [];
+          : products.data || [];
     if (source === 'produtos') return base;
     const term = search.trim().toLowerCase();
     if (!term) return base;
     return base.filter(
       (r) => r.title.toLowerCase().includes(term) || r.code.toLowerCase().includes(term)
     );
-  }, [source, search, commandRows, locations.data, pallets.data, products.data]);
+  }, [source, search, commandRows, locations.data, products.data]);
 
   const selectedRows = rows.filter((r) => selected[r.id]);
   const toPrint = selectedRows.length ? selectedRows : rows;
@@ -213,10 +192,9 @@ export function PrintCenterModule() {
           setPreviewUrl(null);
         }}
       >
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="comandos" className="text-[11px]">Comandos</TabsTrigger>
           <TabsTrigger value="localizacoes" className="text-[11px]">Locais</TabsTrigger>
-          <TabsTrigger value="paletes" className="text-[11px]">Paletes</TabsTrigger>
           <TabsTrigger value="produtos" className="text-[11px]">Produtos</TabsTrigger>
         </TabsList>
         <TabsContent value={source} className="mt-3 space-y-3">
