@@ -16,6 +16,7 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { LocationSelect } from '@/components/counting/LocationSelect';
+import { SupplierSelect } from '@/components/stock/SupplierSelect';
 import { PurchaseEntryView } from '@/components/stock/PurchaseEntryView';
 import { PurchaseEntryHistory } from '@/components/stock/PurchaseEntryHistory';
 import { RecentMovementsPanel } from '@/components/stock/RecentMovementsPanel';
@@ -78,6 +79,7 @@ export function StockEntriesView() {
   const [reference, setReference] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [supplier, setSupplier] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
