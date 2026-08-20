@@ -28,7 +28,7 @@ export function PrintCenterModule() {
   const [source, setSource] = useState<Source>('comandos');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [format, setFormat] = useState<LabelFormat>('a4');
+  const [format, setFormat] = useState<LabelFormat>('ql700');
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [perColi, setPerColi] = useState(true);
@@ -273,6 +273,14 @@ export function PrintCenterModule() {
           </Card>
 
           <div className="flex gap-2">
+            <Button
+              variant={format === 'ql700' ? 'default' : 'outline'}
+              size="sm"
+              className="flex-1"
+              onClick={() => setFormat('ql700')}
+            >
+              QL-700 62x29
+            </Button>
             <Button
               variant={format === 'a4' ? 'default' : 'outline'}
               size="sm"

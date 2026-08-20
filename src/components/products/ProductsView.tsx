@@ -789,7 +789,7 @@ export function ProductsView() {
                     </span>
                   </div>
                 )}
-                <div className="flex-shrink-0 p-2 font-medium text-muted-foreground text-sm text-right" style={{ width: '144px' }}>
+                <div className="flex-shrink-0 p-2 font-medium text-muted-foreground text-sm text-right" style={{ width: '176px' }}>
                   Ações
                 </div>
               </div>

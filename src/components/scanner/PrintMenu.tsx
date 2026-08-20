@@ -36,7 +36,7 @@ export function PrintMenu({ getItems, label = 'Imprimir', disabled, className, v
     }
   };
 
-  const doPrint = (format: 'a4' | 'thermal') =>
+  const doPrint = (format: 'a4' | 'ql700' | 'thermal') =>
     run(async () => {
       const items = getItems();
       if (!items.length) {
@@ -56,11 +56,12 @@ export function PrintMenu({ getItems, label = 'Imprimir', disabled, className, v
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="z-50 bg-popover">
         <DropdownMenuLabel>Etiquetas</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => doPrint('ql700')}>Brother QL-700 (62x29mm)</DropdownMenuItem>
         <DropdownMenuItem onClick={() => doPrint('a4')}>Folha A4 (3x8)</DropdownMenuItem>
         <DropdownMenuItem onClick={() => doPrint('thermal')}>Térmica 100x50mm</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Operação</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => run(() => printCommandSheet('a4'))}>
+        <DropdownMenuItem onClick={() => run(() => printCommandSheet('ql700'))}>
           Folha de comandos
         </DropdownMenuItem>
       </DropdownMenuContent>
