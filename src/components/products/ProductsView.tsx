@@ -15,6 +15,8 @@ import { ProductColisDetailsDialog } from './ProductColisDetailsDialog';
 import { ImportProducts } from './ImportProducts';
 import { BulkMinStockDialog } from './BulkMinStockDialog';
 import { VirtualizedProductRow } from './VirtualizedProductRow';
+import { BulkLabelPrintButton } from './BulkLabelPrintButton';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
