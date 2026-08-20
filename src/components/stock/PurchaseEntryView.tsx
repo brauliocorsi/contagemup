@@ -166,13 +166,16 @@ export function PurchaseEntryView() {
   };
 
   const allRegisteredSelected = useMemo(() => {
-    const registeredRows = rows.filter(r => !!resolveProduct(r.item));
+    const registeredRows = rows.filter(r => !!resolveProduct(r.item) && enteredSets(r.item) < r.item.quantidade);
     if (registeredRows.length === 0) return false;
     return registeredRows.every(r => r.selected);
-  }, [rows, resolveProduct]);
+  }, [rows, resolveProduct, enteredSets]);
 
   const toggleAll = (checked: boolean) => {
-    setRows(prev => prev.map(r => (resolveProduct(r.item) ? { ...r, selected: checked } : r)));
+    setRows(prev => prev.map(r =>
+      (resolveProduct(r.item) && enteredSets(r.item) < r.item.quantidade) ? { ...r, selected: checked } : r
+    ));
+
   };
 
 
