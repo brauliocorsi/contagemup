@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -400,10 +399,9 @@ export function PurchaseEntryView() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden md:block">
-                <ScrollArea className="max-h-[520px]">
+              <div className="hidden max-h-[520px] overflow-auto md:block">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-card">
                       <TableRow>
                         <TableHead className="w-10">
                           <Checkbox
@@ -464,7 +462,6 @@ export function PurchaseEntryView() {
                       })}
                     </TableBody>
                   </Table>
-                </ScrollArea>
               </div>
             </CardContent>
           </Card>
