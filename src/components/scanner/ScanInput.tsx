@@ -134,8 +134,10 @@ export function ScanInput({
                 e.preventDefault();
                 emit(value);
                 setValue('');
+                inputRef.current?.focus();
               }
             }}
+
           />
         </div>
         <Button
