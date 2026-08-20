@@ -49,6 +49,8 @@ export function PurchaseEntryView() {
   const [compra, setCompra] = useState<GcCompraHeader | null>(null);
   const [rows, setRows] = useState<RowState[]>([]);
   const [duplicateWarning, setDuplicateWarning] = useState(false);
+  // units already entered for this purchase, per product id
+  const [enteredUnits, setEnteredUnits] = useState<Record<string, number>>({});
 
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickCode, setQuickCode] = useState('');
@@ -59,6 +61,7 @@ export function PurchaseEntryView() {
   const [palletNumber, setPalletNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+
 
   const productByCode = useMemo(() => {
     const m = new Map<string, Product>();
@@ -84,6 +87,25 @@ export function PurchaseEntryView() {
     return productByName.get(normalizeName(item.nome));
   }, [productByCode, productByName]);
 
+  // Fetch how much was already entered for this purchase (non-reversed entries)
+  const fetchEntered = useCallback(async (compraNumero: string) => {
+    const marker = `Compra GC #${compraNumero}`;
+    const { data, error } = await supabase
+      .from('stock_movements')
+      .select('product_id, quantity, reversed_at')
+      .eq('movement_type', 'entrada')
+      .ilike('reference', `%${marker}%`);
+    if (error) return {} as Record<string, number>;
+    const map: Record<string, number> = {};
+    for (const m of data || []) {
+      if (m.reversed_at) continue;
+      map[m.product_id] = (map[m.product_id] || 0) + (m.quantity || 0);
+    }
+    setEnteredUnits(map);
+    setDuplicateWarning(Object.keys(map).length > 0);
+    return map;
+  }, []);
+
   const carregar = async () => {
     const n = numero.trim();
     if (!n) {
@@ -94,6 +116,7 @@ export function PurchaseEntryView() {
     setCompra(null);
     setRows([]);
     setDuplicateWarning(false);
+    setEnteredUnits({});
     try {
       const { data, error } = await supabase.functions.invoke<GcCompraDetailResponse>(
         'gestaoclick-compra-detail',
@@ -103,27 +126,24 @@ export function PurchaseEntryView() {
       if (!data?.compra) throw new Error('Resposta inválida do Gestão Click');
 
       setCompra(data.compra);
+
+      const entered = await fetchEntered(data.compra.numero);
+
       const initialRows: RowState[] = (data.itens || []).map((it, idx) => {
         const match = resolveProduct(it);
+        const comprado = Math.max(0, Math.min(9999, Math.round(it.quantidade || 0)));
+        const totalColis = Math.max(1, match?.total_colis || 1);
+        const jaSets = match ? Math.round((entered[match.id] || 0) / totalColis) : 0;
+        const restante = Math.max(0, comprado - jaSets);
         return {
           key: `${it.codigo || normalizeName(it.nome) || 'sem-codigo'}-${idx}`,
           item: { ...it, codigo: it.codigo || match?.code || '' },
-          qtyEntry: Math.max(0, Math.min(9999, Math.round(it.quantidade || 0))),
-          selected: !!match,
+          qtyEntry: restante,
+          selected: !!match && restante > 0,
         };
       });
 
       setRows(initialRows);
-
-      // Check duplicate — has this compra been entered before?
-      const marker = `Compra GC #${data.compra.numero}`;
-      const { data: dup } = await supabase
-        .from('stock_movements')
-        .select('id')
-        .eq('movement_type', 'entrada')
-        .ilike('reference', `%${marker}%`)
-        .limit(1);
-      if (dup && dup.length > 0) setDuplicateWarning(true);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Erro ao carregar compra';
       toast.error(msg);
@@ -132,18 +152,30 @@ export function PurchaseEntryView() {
     }
   };
 
+  // Sets already entered for a row
+  const enteredSets = useCallback((item: GcCompraItem) => {
+    const p = resolveProduct(item);
+    if (!p) return 0;
+    const totalColis = Math.max(1, p.total_colis || 1);
+    return Math.round((enteredUnits[p.id] || 0) / totalColis);
+  }, [resolveProduct, enteredUnits]);
+
+
   const setRow = (key: string, patch: Partial<RowState>) => {
     setRows(prev => prev.map(r => r.key === key ? { ...r, ...patch } : r));
   };
 
   const allRegisteredSelected = useMemo(() => {
-    const registeredRows = rows.filter(r => !!resolveProduct(r.item));
+    const registeredRows = rows.filter(r => !!resolveProduct(r.item) && enteredSets(r.item) < r.item.quantidade);
     if (registeredRows.length === 0) return false;
     return registeredRows.every(r => r.selected);
-  }, [rows, resolveProduct]);
+  }, [rows, resolveProduct, enteredSets]);
 
   const toggleAll = (checked: boolean) => {
-    setRows(prev => prev.map(r => (resolveProduct(r.item) ? { ...r, selected: checked } : r)));
+    setRows(prev => prev.map(r =>
+      (resolveProduct(r.item) && enteredSets(r.item) < r.item.quantidade) ? { ...r, selected: checked } : r
+    ));
+
   };
 
 
@@ -175,13 +207,19 @@ export function PurchaseEntryView() {
     setBulkRegistering(false);
     if (ok > 0) {
       toast.success(`${ok} produto(s) cadastrado(s)`);
-      setTimeout(() => setRows(prev => prev.map(r => ({ ...r, selected: true }))), 300);
+      setTimeout(() => setRows(prev => prev.map(r => (
+        enteredSets(r.item) >= r.item.quantidade ? r : { ...r, selected: true }
+      ))), 300);
+
     }
     if (failed.length) toast.error(`Falha ao cadastrar: ${failed.join(', ')}`);
   };
 
 
-  const selectedRows = rows.filter(r => r.selected && !!resolveProduct(r.item) && r.qtyEntry > 0);
+  const selectedRows = rows.filter(r =>
+    r.selected && !!resolveProduct(r.item) && r.qtyEntry > 0 && enteredSets(r.item) < r.item.quantidade
+  );
+
 
   const iniciarEntrada = () => {
     if (!compra) return;
@@ -259,12 +297,26 @@ export function PurchaseEntryView() {
       console.warn('Falhas na entrada por compra:', failed);
     }
 
-    // Reload duplicate check
-    if (ok > 0) setDuplicateWarning(true);
+    // Refresh what has already been entered for this purchase
+    if (ok > 0) {
+      const entered = await fetchEntered(compra.numero);
+      setRows(prev => prev.map(r => {
+        const p = resolveProduct(r.item);
+        if (!p) return r;
+        const totalColis = Math.max(1, p.total_colis || 1);
+        const jaSets = Math.round((entered[p.id] || 0) / totalColis);
+        const restante = Math.max(0, Math.round(r.item.quantidade || 0) - jaSets);
+        return { ...r, qtyEntry: restante, selected: restante > 0 ? r.selected : false };
+      }));
+    }
   };
+
 
   const registeredCount = rows.filter(r => !!resolveProduct(r.item)).length;
   const missingCount = rows.length - registeredCount;
+  const doneCount = rows.filter(r => !!resolveProduct(r.item) && enteredSets(r.item) >= r.item.quantidade).length;
+  const pendingCount = rows.filter(r => !!resolveProduct(r.item) && enteredSets(r.item) < r.item.quantidade).length;
+
 
   return (
     <div className="space-y-4">
@@ -330,17 +382,24 @@ export function PurchaseEntryView() {
                     </Button>
                   </>
                 )}
-
+                {doneCount > 0 && (
+                  <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                    {doneCount} já com entrada
+                  </Badge>
+                )}
+                <Badge variant="outline">{pendingCount} por dar entrada</Badge>
               </div>
 
               {duplicateWarning && (
                 <Alert className="mt-4 border-amber-300 bg-amber-50 text-amber-900">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    Já existem entradas registadas para esta compra. Pode prosseguir na mesma se necessário.
+                    Esta compra já tem entradas registadas. Os itens já dados entrada estão marcados
+                    e bloqueados; apenas as quantidades em falta serão registadas.
                   </AlertDescription>
                 </Alert>
               )}
+
             </CardContent>
           </Card>
 
@@ -351,42 +410,52 @@ export function PurchaseEntryView() {
               <div className="md:hidden space-y-3">
                 {rows.map(r => {
                   const exists = !!resolveProduct(r.item);
+                  const ja = enteredSets(r.item);
+                  const completo = exists && ja >= r.item.quantidade;
                   return (
-                    <div key={r.key} className="border rounded-lg p-3 space-y-2">
+                    <div key={r.key} className={`border rounded-lg p-3 space-y-2 ${completo ? 'opacity-70 bg-muted/40' : ''}`}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <p className="font-mono text-xs text-muted-foreground">{r.item.codigo || '—'}</p>
                           <p className="text-sm font-medium truncate">{r.item.nome}</p>
                         </div>
-                        {exists ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1 shrink-0">
-                            <CheckCircle2 className="h-3 w-3" /> Registado
-                          </Badge>
-                        ) : (
+                        {!exists ? (
                           <Badge variant="destructive" className="gap-1 shrink-0">
                             <AlertCircle className="h-3 w-3" /> Sem registo
                           </Badge>
+                        ) : completo ? (
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-300 gap-1 shrink-0">
+                            <CheckCircle2 className="h-3 w-3" /> Entrada feita
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1 shrink-0">
+                            <CheckCircle2 className="h-3 w-3" /> Registado
+                          </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-muted-foreground">Comprado:</span>
                         <span className="text-sm">{r.item.quantidade}</span>
-                        <span className="text-xs text-muted-foreground ml-3">Entrada:</span>
+                        <span className="text-xs text-muted-foreground ml-2">Já entrada:</span>
+                        <span className="text-sm">{ja}</span>
+                        <span className="text-xs text-muted-foreground ml-2">Entrada:</span>
                         <NumericInput
                           min={0}
                           max={9999}
                           value={r.qtyEntry}
                           onChange={v => setRow(r.key, { qtyEntry: v })}
                           className="h-9 w-24 text-center"
+                          disabled={completo}
                         />
                       </div>
                       {exists ? (
                         <label className="flex items-center gap-2 text-sm">
                           <Checkbox
-                            checked={r.selected}
+                            checked={r.selected && !completo}
+                            disabled={completo}
                             onCheckedChange={v => setRow(r.key, { selected: v === true })}
                           />
-                          Incluir na entrada
+                          {completo ? 'Já dado entrada nesta compra' : 'Incluir na entrada'}
                         </label>
                       ) : (
                         <Button size="sm" variant="outline" onClick={() => openQuickRegister(r.item)} className="w-full gap-1">
@@ -396,6 +465,7 @@ export function PurchaseEntryView() {
                     </div>
                   );
                 })}
+
               </div>
 
               {/* Desktop table */}
@@ -413,6 +483,7 @@ export function PurchaseEntryView() {
                         <TableHead>Código</TableHead>
                         <TableHead>Nome</TableHead>
                         <TableHead className="text-right w-24">Comprado</TableHead>
+                        <TableHead className="text-right w-24">Já entrada</TableHead>
                         <TableHead className="w-32">Qtd. entrada</TableHead>
                         <TableHead className="w-40">Estado</TableHead>
                       </TableRow>
@@ -420,18 +491,21 @@ export function PurchaseEntryView() {
                     <TableBody>
                       {rows.map(r => {
                         const exists = !!resolveProduct(r.item);
+                        const ja = enteredSets(r.item);
+                        const completo = exists && ja >= r.item.quantidade;
                         return (
-                          <TableRow key={r.key}>
+                          <TableRow key={r.key} className={completo ? 'opacity-70 bg-muted/40' : ''}>
                             <TableCell>
                               <Checkbox
-                                checked={r.selected}
-                                disabled={!exists}
+                                checked={r.selected && !completo}
+                                disabled={!exists || completo}
                                 onCheckedChange={v => setRow(r.key, { selected: v === true })}
                               />
                             </TableCell>
                             <TableCell className="font-mono text-xs">{r.item.codigo || '—'}</TableCell>
                             <TableCell className="max-w-[380px] truncate">{r.item.nome}</TableCell>
                             <TableCell className="text-right">{r.item.quantidade}</TableCell>
+                            <TableCell className="text-right">{ja}</TableCell>
                             <TableCell>
                               <NumericInput
                                 min={0}
@@ -439,14 +513,11 @@ export function PurchaseEntryView() {
                                 value={r.qtyEntry}
                                 onChange={v => setRow(r.key, { qtyEntry: v })}
                                 className="h-9 text-center"
+                                disabled={completo}
                               />
                             </TableCell>
                             <TableCell>
-                              {exists ? (
-                                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1">
-                                  <CheckCircle2 className="h-3 w-3" /> Registado
-                                </Badge>
-                              ) : (
+                              {!exists ? (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -455,11 +526,20 @@ export function PurchaseEntryView() {
                                 >
                                   <Plus className="h-3 w-3" /> Cadastrar
                                 </Button>
+                              ) : completo ? (
+                                <Badge className="bg-blue-100 text-blue-800 border-blue-300 gap-1">
+                                  <CheckCircle2 className="h-3 w-3" /> Entrada feita
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1">
+                                  <CheckCircle2 className="h-3 w-3" /> Registado
+                                </Badge>
                               )}
                             </TableCell>
                           </TableRow>
                         );
                       })}
+
                     </TableBody>
                   </Table>
               </div>
