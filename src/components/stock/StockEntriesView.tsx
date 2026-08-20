@@ -656,6 +656,12 @@ export function StockEntriesView() {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label>Fornecedor (opcional)</Label>
+                <SupplierSelect value={supplier} onValueChange={setSupplier} placeholder="Fornecedor (GestãoClick)" />
+              </div>
+
+
               {requiresOrderNumber ? (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
