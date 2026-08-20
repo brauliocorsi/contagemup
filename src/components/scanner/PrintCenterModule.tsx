@@ -73,18 +73,21 @@ export function PrintCenterModule() {
       const term = search.trim();
       const { data, error } = await supabase
         .from('products')
-        .select('id, code, name, location, pallet_number')
-        .or(`code.ilike.%${term}%,name.ilike.%${term}%`)
+        .select('id, code, name, location, pallet_number, barcode')
+        .or(`code.ilike.%${term}%,name.ilike.%${term}%,barcode.ilike.%${term}%`)
         .order('name')
         .limit(50);
       if (error) throw error;
-      return (data || []).map((p) => ({
-        id: `prod-${p.id}`,
-        code: p.code,
-        title: p.name,
-        subtitle: [p.code, p.location, p.pallet_number].filter(Boolean).join(' • '),
-      }));
+      return (data || [])
+        .map((p) => ({
+          id: `prod-${p.id}`,
+          code: (p.barcode || p.code || '').trim(),
+          title: p.name,
+          subtitle: [p.code, p.location, p.pallet_number].filter(Boolean).join(' • '),
+        }))
+        .filter((r) => r.code.length > 0);
     },
+
   });
 
   const commandRows: Row[] = useMemo(

@@ -13,10 +13,22 @@ export interface LabelItem {
   copies?: number;
 }
 
+function sanitize(value: string): string {
+  // CODE128 só suporta ASCII (0-127). Remove acentos e caracteres inválidos.
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim();
+}
+
 function barcodeDataUrl(value: string, width = 2, height = 60): string {
   const canvas = document.createElement('canvas');
+  const safe = sanitize(value);
+  if (!safe) return '';
   try {
-    JsBarcode(canvas, value, {
+    JsBarcode(canvas, safe, {
       format: 'CODE128',
       width,
       height,
@@ -24,10 +36,21 @@ function barcodeDataUrl(value: string, width = 2, height = 60): string {
       margin: 0,
     });
   } catch {
-    return '';
+    try {
+      JsBarcode(canvas, safe.toUpperCase().replace(/[^0-9A-Z\-. $/+%]/g, ''), {
+        format: 'CODE39',
+        width,
+        height,
+        displayValue: false,
+        margin: 0,
+      });
+    } catch {
+      return '';
+    }
   }
   return canvas.toDataURL('image/png');
 }
+
 
 function expand(items: LabelItem[]): LabelItem[] {
   const out: LabelItem[] = [];
@@ -48,22 +71,70 @@ function truncate(doc: any, text: string, maxWidth: number): string {
 
 export type OutputMode = 'print' | 'download' | 'preview';
 
+function downloadBlob(blob: Blob, filename: string): boolean {
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 10000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Imprime via iframe oculto — funciona dentro de iframes/preview onde window.open é bloqueado. */
+function printViaIframe(url: string): boolean {
+  try {
+    const frame = document.createElement('iframe');
+    frame.style.position = 'fixed';
+    frame.style.right = '0';
+    frame.style.bottom = '0';
+    frame.style.width = '0';
+    frame.style.height = '0';
+    frame.style.border = '0';
+    frame.src = url;
+    frame.onload = () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } catch {
+        /* ignorado */
+      }
+    };
+    document.body.appendChild(frame);
+    setTimeout(() => frame.remove(), 60000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function output(doc: any, filename: string, mode: OutputMode = 'print'): Promise<string | void> {
   if (mode === 'preview') {
-    return doc.output('bloburl').toString();
+    return URL.createObjectURL(doc.output('blob'));
   }
+  const blob: Blob = doc.output('blob');
   if (mode === 'download') {
-    doc.save(filename);
+    if (!downloadBlob(blob, filename)) doc.save(filename);
     return;
   }
   doc.autoPrint();
-  const url = doc.output('bloburl');
+  const printable: Blob = doc.output('blob');
+  const url = URL.createObjectURL(printable);
   const win = window.open(url, '_blank');
-  if (!win || win.closed || typeof win.closed === 'undefined') {
-    // Popup bloqueado (comum em mobile): descarrega o ficheiro.
-    doc.save(filename);
-  }
+  if (win && !win.closed) return;
+  // Popup bloqueado (mobile/preview em iframe): tenta imprimir via iframe e descarrega como último recurso.
+  if (!printViaIframe(url)) downloadBlob(printable, filename);
 }
+
 
 /** Etiquetas em folha A4 (grelha 3x8, 70x37mm) */
 async function printA4(items: LabelItem[], filename: string, mode: OutputMode = 'print') {
