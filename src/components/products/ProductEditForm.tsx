@@ -29,6 +29,7 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
   const [totalColis, setTotalColis] = useState(product.total_colis);
   const [description, setDescription] = useState(product.description || '');
   const [location, setLocation] = useState(product.location || '');
+  const [supplierCode, setSupplierCode] = useState(product.supplier_code || '');
   const [minStock, setMinStock] = useState(product.min_stock ?? 5);
   const [activeCounts, setActiveCounts] = useState<ActiveCountInfo[]>([]);
   const [showColisWarning, setShowColisWarning] = useState(false);
