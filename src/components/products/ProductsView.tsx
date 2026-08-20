@@ -15,6 +15,8 @@ import { ProductColisDetailsDialog } from './ProductColisDetailsDialog';
 import { ImportProducts } from './ImportProducts';
 import { BulkMinStockDialog } from './BulkMinStockDialog';
 import { VirtualizedProductRow } from './VirtualizedProductRow';
+import { BulkLabelPrintButton } from './BulkLabelPrintButton';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -590,6 +592,12 @@ export function ProductsView() {
             </DropdownMenuSub>
           </DropdownMenuContent>
         </DropdownMenu>
+        <BulkLabelPrintButton
+          label={`Etiquetas (${filteredProducts.length})`}
+          getProducts={() => filteredProducts}
+          className="whitespace-nowrap"
+        />
+
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className="whitespace-nowrap">
@@ -635,6 +643,12 @@ export function ProductsView() {
             <Settings2 className="h-4 w-4 mr-2" />
             Definir Stock Mínimo
           </Button>
+          <BulkLabelPrintButton
+            size="sm"
+            label="Imprimir etiquetas"
+            getProducts={() => filteredProducts.filter(p => selectedProducts.has(p.id))}
+          />
+
           <Button
             variant="ghost"
             size="sm"
