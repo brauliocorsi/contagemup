@@ -340,3 +340,29 @@ export function productLabel(product: { code: string; name: string }, colisCodeV
     extra: colis ? [`Coli ${colis}`] : undefined,
   };
 }
+
+/**
+ * Etiquetas de um produto respeitando os colis.
+ * Com mais de 1 coli gera uma etiqueta por coli com o código `CODIGO-C1`, `CODIGO-C2`, ...
+ */
+export function productColiLabels(
+  product: { code: string; name: string; total_colis?: number | null },
+  options?: { copies?: number; colisNames?: Record<string, string> | null }
+): LabelItem[] {
+  const total = Math.max(1, product.total_colis || 1);
+  const copies = Math.max(1, options?.copies || 1);
+  if (total <= 1) {
+    return [{ ...productLabel(product), copies }];
+  }
+  return Array.from({ length: total }, (_, idx) => {
+    const n = idx + 1;
+    const name = options?.colisNames?.[String(n)];
+    return {
+      code: `${product.code}-C${n}`,
+      title: product.name,
+      subtitle: `Código: ${product.code}`,
+      extra: [name ? `Coli ${n}/${total} - ${name}` : `Coli ${n}/${total}`],
+      copies,
+    };
+  });
+}
