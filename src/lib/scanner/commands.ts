@@ -114,3 +114,6 @@ export function parseScan(raw: string): ParsedScan {
 
   return { kind: 'code', value };
 }
+
+/** Handler de quantidade partilhado entre a app e o módulo ativo (comandos CMD-QTY). */
+export type QtyHandler = (opts: { delta?: number; set?: number }) => void;
