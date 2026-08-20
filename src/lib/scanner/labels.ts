@@ -2,7 +2,11 @@ import JsBarcode from 'jsbarcode';
 import { loadPDF } from '@/lib/lazyPdf';
 import { COMMAND_SHEET } from './commands';
 
-export type LabelFormat = 'a4' | 'thermal';
+export type LabelFormat = 'a4' | 'ql700' | 'thermal';
+
+/** Dimensões da etiqueta Brother QL-700 (DK-11209 / 62x29mm) */
+export const QL700_WIDTH_MM = 62;
+export const QL700_HEIGHT_MM = 29;
 
 export interface LabelItem {
   /** Valor codificado no código de barras */
