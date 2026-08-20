@@ -59,6 +59,7 @@ export function useCounting(sessionId: string | null) {
           .from('counts')
           .select('*')
           .or(`session_id.eq.${sessionId},session_id.is.null`)
+          .order('id', { ascending: true })
           .range(from, from + pageSize - 1);
         
         if (error) {
