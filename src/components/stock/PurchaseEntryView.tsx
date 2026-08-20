@@ -207,7 +207,10 @@ export function PurchaseEntryView() {
     setBulkRegistering(false);
     if (ok > 0) {
       toast.success(`${ok} produto(s) cadastrado(s)`);
-      setTimeout(() => setRows(prev => prev.map(r => ({ ...r, selected: true }))), 300);
+      setTimeout(() => setRows(prev => prev.map(r => (
+        enteredSets(r.item) >= r.item.quantidade ? r : { ...r, selected: true }
+      ))), 300);
+
     }
     if (failed.length) toast.error(`Falha ao cadastrar: ${failed.join(', ')}`);
   };
