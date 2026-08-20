@@ -220,14 +220,61 @@ async function printThermal(items: LabelItem[], filename: string, mode: OutputMo
   return output(doc, filename, mode);
 }
 
+/** Etiqueta Brother QL-700 — rolo contínuo 62x29mm (DK-11209), 1 etiqueta por página */
+async function printQL700(items: LabelItem[], filename: string, mode: OutputMode = 'print') {
+  const { jsPDF } = await loadPDF();
+  const W = QL700_WIDTH_MM;
+  const H = QL700_HEIGHT_MM;
+  // Margens de segurança da QL-700 (área não imprimível ~1.5mm)
+  const M = 2;
+  const innerW = W - M * 2;
+
+  const doc = new jsPDF({ unit: 'mm', format: [W, H], orientation: 'landscape' });
+
+  items.forEach((item, index) => {
+    if (index > 0) doc.addPage([W, H], 'landscape');
+
+    // Título (nome do produto/local) — até 2 linhas
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    const titleLines: string[] = doc.splitTextToSize(item.title || '', innerW).slice(0, 2);
+    let ty = M + 2.6;
+    titleLines.forEach((line: string) => {
+      doc.text(line, M, ty);
+      ty += 2.9;
+    });
+
+    // Linha de contexto (código interno / coli)
+    const info = [item.subtitle, ...(item.extra || [])].filter(Boolean).join('  •  ');
+    if (info) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.text(truncate(doc, info, innerW), M, ty);
+    }
+
+    // Código de barras ocupa a largura útil, alinhado ao fundo
+    const barH = 9.5;
+    const barY = H - M - 4.2 - barH;
+    const img = barcodeDataUrl(item.code, 2, 120);
+    if (img) doc.addImage(img, 'PNG', M, barY, innerW, barH);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.text(truncate(doc, item.code, innerW), W / 2, H - M - 0.4, { align: 'center' });
+  });
+
+  return output(doc, filename, mode);
+}
+
 export async function printLabels(
   items: LabelItem[],
-  format: LabelFormat = 'a4',
+  format: LabelFormat = 'ql700',
   filename = 'etiquetas.pdf',
   mode: OutputMode = 'print'
 ): Promise<string | void> {
   const list = expand(items).filter((i) => i.code && i.code.trim());
   if (list.length === 0) return;
+  if (format === 'ql700') return printQL700(list, filename, mode);
   if (format === 'thermal') return printThermal(list, filename, mode);
   return printA4(list, filename, mode);
 }
