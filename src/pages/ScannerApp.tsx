@@ -22,6 +22,7 @@ import { TransferModule } from '@/components/scanner/TransferModule';
 import { PickingModule } from '@/components/scanner/PickingModule';
 import { EntryModule } from '@/components/scanner/EntryModule';
 import { PrintCenterModule } from '@/components/scanner/PrintCenterModule';
+import { SupplierCodeModule } from '@/components/scanner/SupplierCodeModule';
 import { parseCommand, SCANNER_MODES, type QtyHandler, type ScannerMode } from '@/lib/scanner/commands';
 import { printCommandSheet } from '@/lib/scanner/labels';
 import { toast } from 'sonner';
