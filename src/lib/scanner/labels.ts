@@ -56,6 +56,19 @@ function barcodeDataUrl(value: string, width = 2, height = 60): string {
 }
 
 
+/** Remove códigos repetidos, mantendo o maior número de cópias pedido */
+function dedupeByCode(items: LabelItem[]): LabelItem[] {
+  const map = new Map<string, LabelItem>();
+  items.forEach((i) => {
+    const key = (i.code || '').trim();
+    if (!key) return;
+    const prev = map.get(key);
+    if (!prev) map.set(key, i);
+    else if ((i.copies || 1) > (prev.copies || 1)) map.set(key, i);
+  });
+  return Array.from(map.values());
+}
+
 function expand(items: LabelItem[]): LabelItem[] {
   const out: LabelItem[] = [];
   items.forEach((i) => {
