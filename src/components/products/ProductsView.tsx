@@ -643,6 +643,12 @@ export function ProductsView() {
             <Settings2 className="h-4 w-4 mr-2" />
             Definir Stock Mínimo
           </Button>
+          <BulkLabelPrintButton
+            size="sm"
+            label="Imprimir etiquetas"
+            getProducts={() => filteredProducts.filter(p => selectedProducts.has(p.id))}
+          />
+
           <Button
             variant="ghost"
             size="sm"
