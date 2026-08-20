@@ -26,7 +26,6 @@ export function getProductWithCounts(
       countId: count.id,
       quantity: count.quantity,
       location: count.location,
-      pallet_number: count.pallet_number,
     }));
 
     const totalQuantity = locationEntries.reduce((sum, e) => sum + e.quantity, 0);
@@ -38,7 +37,6 @@ export function getProductWithCounts(
       colis_number: i,
       quantity: totalQuantity,
       location: primaryEntry?.location || null,
-      pallet_number: primaryEntry?.pallet_number || null,
       locationEntries,
       hasMultipleLocations: locationEntries.filter((e) => e.quantity > 0).length > 1,
     });
@@ -49,16 +47,9 @@ export function getProductWithCounts(
   );
   const uniqueLocations = [...new Set(allLocations)].sort();
 
-  const allPallets = colisDetails.flatMap((c) =>
-    c.locationEntries.map((e) => e.pallet_number).filter((p): p is string => p !== null && p.trim() !== ''),
-  );
-  const uniquePallets = [...new Set(allPallets)].sort();
-
   const hasMultipleLocations = uniqueLocations.length > 1 || colisDetails.some((c) => c.hasMultipleLocations);
-  const hasMultiplePallets = uniquePallets.length > 1;
 
   const location = uniqueLocations[0] || product.location || null;
-  const palletNumber = uniquePallets[0] || product.pallet_number || null;
 
   const quantities = Object.values(colisQuantities);
   const completeSets = quantities.length > 0 ? Math.min(...quantities) : 0;
@@ -99,12 +90,9 @@ export function getProductWithCounts(
     hasPartialProduct,
     totalExcessParts,
     location,
-    palletNumber,
     status,
     colisDetails,
     uniqueLocations,
-    uniquePallets,
     hasMultipleLocations,
-    hasMultiplePallets,
   };
 }

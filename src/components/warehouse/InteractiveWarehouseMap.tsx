@@ -373,15 +373,6 @@ export function InteractiveWarehouseMap() {
           </Card>
           <Card className="p-3">
             <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-purple-500" />
-              <div>
-                <p className="text-xl font-bold">{stats.totalPallets}</p>
-                <p className="text-xs text-muted-foreground">Paletes</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
               <Split className="h-4 w-4 text-blue-600" />
               <div>
                 <p className="text-xl font-bold">{stats.splitLocations}</p>
@@ -446,71 +437,6 @@ export function InteractiveWarehouseMap() {
               </PopoverContent>
             </Popover>
 
-            {/* Pallet Search */}
-            <Popover open={palletSearchOpen} onOpenChange={setPalletSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[200px] justify-start">
-                  <Truck className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span className="text-muted-foreground">Buscar palete...</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[350px] p-0" align="start">
-                <Command>
-                  <CommandInput 
-                    placeholder="Código da palete..." 
-                    value={palletSearchQuery}
-                    onValueChange={setPalletSearchQuery}
-                  />
-                  <CommandList>
-                    <CommandEmpty>Nenhuma palete encontrada.</CommandEmpty>
-                    <CommandGroup heading="Paletes no armazém">
-                      {filteredPalletResults.map((pallet, idx) => (
-                        <CommandItem
-                          key={`${pallet.code}-${idx}`}
-                          value={pallet.code}
-                          onSelect={() => handleSelectPallet(pallet.code, pallet.aisleIds[0] || null)}
-                          className="cursor-pointer"
-                        >
-                          <div className="flex flex-col flex-1">
-                            <span className="font-medium flex items-center gap-2">
-                              <Truck className="h-3 w-3" />
-                              {pallet.code}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {pallet.totalProducts} entradas • {pallet.totalQuantity} un • {pallet.locations.length} localização{pallet.locations.length > 1 ? 'ões' : ''}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {pallet.locations.slice(0, 2).map((loc, i) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {loc}
-                              </Badge>
-                            ))}
-                            {pallet.locations.length > 2 && (
-                              <Badge variant="secondary" className="text-xs">
-                                +{pallet.locations.length - 2}
-                              </Badge>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 ml-1"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openPalletTransfer(pallet.code);
-                            }}
-                          >
-                            <MoveRight className="h-3 w-3" />
-                          </Button>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-
             {/* Highlighted location indicator */}
             {highlightedLocationId && (
               <Badge variant="default" className="bg-yellow-500 text-yellow-950 gap-1">
@@ -523,34 +449,6 @@ export function InteractiveWarehouseMap() {
                   onClick={clearHighlight}
                 >
                   <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            )}
-
-            {/* Highlighted pallet indicator */}
-            {highlightedPallet && (
-              <Badge variant="default" className="bg-purple-500 text-purple-950 gap-1">
-                <Truck className="h-3 w-3" />
-                Palete {highlightedPallet}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-4 w-4 ml-1 hover:bg-purple-600"
-                  onClick={() => {
-                    setHighlightedPallet(null);
-                    setFilterPallet('all');
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-4 w-4 hover:bg-purple-600"
-                  onClick={() => openPalletTransfer(highlightedPallet)}
-                  title="Transferir palete"
-                >
-                  <MoveRight className="h-3 w-3" />
                 </Button>
               </Badge>
             )}
@@ -568,22 +466,6 @@ export function InteractiveWarehouseMap() {
                 {levels.map(level => (
                   <SelectItem key={level.id} value={level.id}>
                     {level.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterPallet} onValueChange={setFilterPallet}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Todas as paletes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as paletes</SelectItem>
-                {uniquePalletsInWarehouse.map(pallet => (
-                  <SelectItem key={pallet.code} value={pallet.code}>
-                    <span className="flex items-center gap-1">
-                      <Truck className="h-3 w-3" />
-                      {pallet.code}
-                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -623,10 +505,6 @@ export function InteractiveWarehouseMap() {
           <div className="flex items-center gap-2">
             <Forklift className="h-4 w-4 text-orange-500" />
             <span className="text-muted-foreground">Precisa empilhador</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Truck className="h-4 w-4 text-purple-500" />
-            <span className="text-muted-foreground">Palete destacada</span>
           </div>
         </div>
 
