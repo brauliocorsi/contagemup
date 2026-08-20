@@ -79,6 +79,7 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
       total_colis: totalColis,
       description: description || null,
       location: location || null,
+      supplier_code: supplierCode.trim() || null,
       min_stock: minStock
     });
 
