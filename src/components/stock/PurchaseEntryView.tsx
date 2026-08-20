@@ -315,10 +315,23 @@ export function PurchaseEntryView() {
                   {registeredCount} registados
                 </Badge>
                 {missingCount > 0 && (
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                    {missingCount} sem registo
-                  </Badge>
+                  <>
+                    <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                      {missingCount} sem registo
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      disabled={bulkRegistering}
+                      onClick={registarTodosEmFalta}
+                    >
+                      {bulkRegistering ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                      Cadastrar todos em falta
+                    </Button>
+                  </>
                 )}
+
               </div>
 
               {duplicateWarning && (
