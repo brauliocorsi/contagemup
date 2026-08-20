@@ -31,8 +31,10 @@ async function fetchPage(baseUrl: string, page: number, headers: Record<string, 
 }
 
 function normalizeCode(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase();
+  // Preserve the ERP casing — codes are shown and registered as-is.
+  return String(value ?? '').trim();
 }
+
 
 function normalizeIdentifier(value: unknown): string {
   return String(value ?? '').trim();
