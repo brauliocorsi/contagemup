@@ -8,10 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+
 import { Loader2, Printer, Download, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { printLabels, type LabelItem, type LabelFormat } from '@/lib/scanner/labels';
-import { COMMAND_SHEET, palletCode, locationCode } from '@/lib/scanner/commands';
+import { COMMAND_SHEET, palletCode, locationCode, colisCode } from '@/lib/scanner/commands';
 
 type Source = 'comandos' | 'localizacoes' | 'paletes' | 'produtos';
 
@@ -29,6 +31,8 @@ export function PrintCenterModule() {
   const [format, setFormat] = useState<LabelFormat>('a4');
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [perColi, setPerColi] = useState(true);
+
 
   const locations = useQuery({
     queryKey: ['print-locations'],
@@ -67,28 +71,69 @@ export function PrintCenterModule() {
   });
 
   const products = useQuery({
-    queryKey: ['print-products', search],
+    queryKey: ['print-products', search, perColi],
     enabled: source === 'produtos' && search.trim().length >= 2,
     queryFn: async (): Promise<Row[]> => {
       const term = search.trim();
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, code, name, location, pallet_number, barcode')
-        .or(`code.ilike.%${term}%,name.ilike.%${term}%,barcode.ilike.%${term}%`)
-        .order('name')
-        .limit(50);
+      const [{ data, error }, { data: cats }] = await Promise.all([
+        supabase
+          .from('products')
+          .select('id, code, name, location, pallet_number, barcode, total_colis, category')
+          .or(`code.ilike.%${term}%,name.ilike.%${term}%,barcode.ilike.%${term}%`)
+          .order('name')
+          .limit(50),
+        supabase.from('categories').select('name, colis_names'),
+      ]);
       if (error) throw error;
-      return (data || [])
-        .map((p) => ({
-          id: `prod-${p.id}`,
-          code: (p.barcode || p.code || '').trim(),
-          title: p.name,
-          subtitle: [p.code, p.location, p.pallet_number].filter(Boolean).join(' • '),
-        }))
-        .filter((r) => r.code.length > 0);
-    },
 
+      const colisNamesByCategory = new Map<string, string[]>();
+      (cats || []).forEach((c) => {
+        const names = c.colis_names && typeof c.colis_names === 'object' ? c.colis_names : {};
+        const keys = Object.keys(names as Record<string, unknown>).sort(
+          (a, b) => Number(a) - Number(b)
+        );
+        colisNamesByCategory.set(
+          c.name,
+          keys.map((k) => String((names as Record<string, unknown>)[k] ?? ''))
+        );
+      });
+
+      const out: Row[] = [];
+      (data || []).forEach((p) => {
+        const base = [p.location, p.pallet_number].filter(Boolean).join(' • ');
+
+        if (!perColi) {
+          const code = (p.barcode || p.code || '').trim();
+          if (!code) return;
+          out.push({
+            id: `prod-${p.id}`,
+            code,
+            title: p.name,
+            subtitle: [p.code, base].filter(Boolean).join(' • '),
+          });
+          return;
+        }
+
+        const productCode = (p.code || '').trim();
+        if (!productCode) return;
+        const names = colisNamesByCategory.get(p.category) || [];
+        const total = Math.max(p.total_colis || 1, names.length, 1);
+
+        for (let n = 1; n <= total; n++) {
+          out.push({
+            id: `prod-${p.id}-c${n}`,
+            code: colisCode(productCode, n),
+            title: p.name,
+            subtitle: [productCode, names[n - 1], `Coli ${n}/${total}`, base]
+              .filter(Boolean)
+              .join(' • '),
+          });
+        }
+      });
+      return out;
+    },
   });
+
 
   const commandRows: Row[] = useMemo(
     () =>
@@ -180,6 +225,27 @@ export function PrintCenterModule() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder={source === 'produtos' ? 'Pesquisar produto (código ou nome)…' : 'Filtrar…'}
           />
+
+          {source === 'produtos' && (
+            <div className="flex items-center justify-between rounded-md border px-3 py-2">
+              <div>
+                <p className="text-xs font-medium">Etiqueta por coli</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Gera um código por coli (ex.: ABC-C1, ABC-C2)
+                </p>
+              </div>
+              <Switch
+                checked={perColi}
+                onCheckedChange={(v) => {
+                  setPerColi(v);
+                  setSelected({});
+                }}
+                aria-label="Etiqueta por coli"
+              />
+            </div>
+          )}
+
+
 
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
