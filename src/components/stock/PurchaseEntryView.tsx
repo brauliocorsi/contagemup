@@ -376,17 +376,24 @@ export function PurchaseEntryView() {
                     </Button>
                   </>
                 )}
-
+                {doneCount > 0 && (
+                  <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                    {doneCount} já com entrada
+                  </Badge>
+                )}
+                <Badge variant="outline">{pendingCount} por dar entrada</Badge>
               </div>
 
               {duplicateWarning && (
                 <Alert className="mt-4 border-amber-300 bg-amber-50 text-amber-900">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    Já existem entradas registadas para esta compra. Pode prosseguir na mesma se necessário.
+                    Esta compra já tem entradas registadas. Os itens já dados entrada estão marcados
+                    e bloqueados; apenas as quantidades em falta serão registadas.
                   </AlertDescription>
                 </Alert>
               )}
+
             </CardContent>
           </Card>
 
