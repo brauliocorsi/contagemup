@@ -336,7 +336,8 @@ Deno.serve(async (req) => {
       const pendingNames = new Set(requiredNames);
 
       const stillPending = () =>
-        pendingProductIds.size > 0 || pendingVariationIds.size > 0 || pendingNames.size > 0;
+        pendingProductIds.size > 0 || pendingVariationIds.size > 0;
+
 
       // deno-lint-ignore no-explicit-any
       const consumeProducts = (products: any[]) => {
