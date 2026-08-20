@@ -42,6 +42,7 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
     setTotalColis(product.total_colis);
     setDescription(product.description || '');
     setLocation(product.location || '');
+    setSupplierCode(product.supplier_code || '');
     setMinStock(product.min_stock ?? 5);
     setShowColisWarning(false);
     setActiveCounts([]);
