@@ -590,6 +590,12 @@ export function ProductsView() {
             </DropdownMenuSub>
           </DropdownMenuContent>
         </DropdownMenu>
+        <BulkLabelPrintButton
+          label={`Etiquetas (${filteredProducts.length})`}
+          getProducts={() => filteredProducts}
+          className="whitespace-nowrap"
+        />
+
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className="whitespace-nowrap">
