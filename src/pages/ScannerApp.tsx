@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   Loader2,
   LayoutGrid,
+  Tags,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { LoginForm } from '@/components/auth/LoginForm';
