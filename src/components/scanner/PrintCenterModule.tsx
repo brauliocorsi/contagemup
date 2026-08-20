@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+
 import { Loader2, Printer, Download, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { printLabels, type LabelItem, type LabelFormat } from '@/lib/scanner/labels';
