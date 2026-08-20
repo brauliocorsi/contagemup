@@ -263,20 +263,42 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {Array.from({ length: Math.max(1, l.product.total_colis) }, (_, i) => i + 1).map((coli) => (
                   <div key={coli} className="space-y-1">
                     <span className="text-[10px] text-muted-foreground">Coli {coli}</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="h-9"
-                      value={l.colis[coli] ?? ''}
-                      onChange={(e) => setColisQty(l.key, coli, Number(e.target.value) || 0)}
-                    />
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        onClick={() => bumpColis(l.key, coli, -1)}
+                        aria-label={`Diminuir coli ${coli}`}
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </Button>
+                      <Input
+                        type="number"
+                        min={0}
+                        className="h-9 text-center"
+                        value={l.colis[coli] ?? ''}
+                        onFocus={() => setLastTarget({ key: l.key, coli })}
+                        onChange={(e) => setColisQty(l.key, coli, Number(e.target.value) || 0)}
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        onClick={() => bumpColis(l.key, coli, 1)}
+                        aria-label={`Aumentar coli ${coli}`}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
+
             </div>
           ))}
 
