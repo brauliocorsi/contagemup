@@ -148,6 +148,7 @@ export function ProductsView() {
       const matchesSearch = 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.supplier_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.location?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const hasCount = !!lastCounts[product.id];
@@ -167,9 +168,12 @@ export function ProductsView() {
         filterOrderStatus === 'all' ||
         (filterOrderStatus === 'with_orders' && hasOrders) ||
         (filterOrderStatus === 'without_orders' && !hasOrders);
+
+      const matchesSupplierCode = !onlyMissingSupplierCode || !product.supplier_code;
       
-      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus;
+      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus && matchesSupplierCode;
     });
+
 
     // Apply sorting
     if (sortColumn) {
