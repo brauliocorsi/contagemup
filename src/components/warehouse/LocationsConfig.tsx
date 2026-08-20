@@ -51,6 +51,7 @@ export function LocationsConfig() {
     level_id: '',
     position_in_aisle: 1,
     notes: '',
+    is_staging: false,
   });
 
   const openCreateDialog = () => {
@@ -61,6 +62,7 @@ export function LocationsConfig() {
       level_id: levels[0]?.id || '',
       position_in_aisle: 1,
       notes: '',
+      is_staging: false,
     });
     setIsDialogOpen(true);
   };
@@ -73,6 +75,7 @@ export function LocationsConfig() {
       level_id: location.level_id || '',
       position_in_aisle: location.position_in_aisle,
       notes: location.notes || '',
+      is_staging: !!location.is_staging,
     });
     setIsDialogOpen(true);
   };
@@ -80,27 +83,24 @@ export function LocationsConfig() {
   const handleSubmit = async () => {
     if (!formData.code.trim()) return;
 
+    const payload = {
+      code: formData.code,
+      aisle_id: formData.is_staging ? null : (formData.aisle_id || null),
+      level_id: formData.is_staging ? null : (formData.level_id || null),
+      position_in_aisle: formData.is_staging ? 1 : formData.position_in_aisle,
+      notes: formData.notes || null,
+      is_staging: formData.is_staging,
+    };
+
     if (editingLocation) {
-      await updateLocation.mutateAsync({
-        id: editingLocation.id,
-        code: formData.code,
-        aisle_id: formData.aisle_id || null,
-        level_id: formData.level_id || null,
-        position_in_aisle: formData.position_in_aisle,
-        notes: formData.notes || null,
-      });
+      await updateLocation.mutateAsync({ id: editingLocation.id, ...payload });
     } else {
-      await createLocation.mutateAsync({
-        code: formData.code,
-        aisle_id: formData.aisle_id || null,
-        level_id: formData.level_id || null,
-        position_in_aisle: formData.position_in_aisle,
-        notes: formData.notes || null,
-      });
+      await createLocation.mutateAsync(payload);
     }
 
     setIsDialogOpen(false);
   };
+
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
