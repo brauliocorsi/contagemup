@@ -21,10 +21,8 @@ interface LastCountData {
     colisNumber: number;
     quantity: number;
     location: string | null;
-    palletNumber: string | null;
   }>;
   uniqueLocations: string[];
-  uniquePallets: string[];
   hasSplitColis: boolean;
   splitColisCount: number;
   splitEntries: Array<{
@@ -277,20 +275,7 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
                         </Badge>
                       )
                     ) : null}
-                    {lastCount.uniquePallets.length > 0 && (
-                      lastCount.uniquePallets.length === 1 ? (
-                        <Badge variant="outline" className="text-xs flex items-center gap-1">
-                          <Box className="h-2.5 w-2.5" />
-                          {lastCount.uniquePallets[0]}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs flex items-center gap-1 bg-purple-50 text-purple-700 border-purple-300">
-                          <Box className="h-2.5 w-2.5" />
-                          {lastCount.uniquePallets.length} paletes
-                        </Badge>
-                      )
-                    )}
-                    {lastCount.uniqueLocations.length === 0 && lastCount.uniquePallets.length === 0 && !lastCount.hasSplitColis && (
+                    {lastCount.uniqueLocations.length === 0 && !lastCount.hasSplitColis && (
                       <span className="text-xs text-muted-foreground">-</span>
                     )}
                   </div>
@@ -321,10 +306,6 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
                               {locInfo.shortLabel}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Box className="h-2.5 w-2.5 text-muted-foreground" />
-                            <span>{c.palletNumber || '-'}</span>
-                          </div>
                           <Badge variant="secondary" className="text-[10px]">
                             {c.quantity}
                           </Badge>
@@ -354,18 +335,6 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
             <span className="flex items-center gap-1 text-muted-foreground text-sm">
               <MapPin className="h-3 w-3 flex-shrink-0" />
               <span className="truncate">{product.location}</span>
-            </span>
-          ) : '-'}
-        </div>
-      )}
-
-      {/* Pallet */}
-      {isColumnVisible('pallet') && (
-        <div className="p-2 truncate" style={getColWidth('pallet')}>
-          {product.pallet_number ? (
-            <span className="flex items-center gap-1 text-muted-foreground text-sm">
-              <Box className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{product.pallet_number}</span>
             </span>
           ) : '-'}
         </div>

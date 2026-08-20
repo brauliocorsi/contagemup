@@ -5,7 +5,6 @@ import {
   useWarehouseAisles, 
   useWarehouseLevels, 
   useWarehouseLocations, 
-  useWarehousePallets,
   WarehouseLocation,
   WarehouseLevel,
   WarehouseAisle
@@ -20,7 +19,6 @@ export interface ProductInLocation {
   productCode: string;
   colisNumber: number;
   quantity: number;
-  palletNumber: string | null;
   // For split stock: indicates if this is one of multiple locations for same coli
   isSplitEntry: boolean;
   totalQuantityForColi: number; // Total across all locations for this coli
@@ -51,7 +49,6 @@ export function useWarehouseMap(sessionId?: string) {
   const { aisles, isLoading: aislesLoading } = useWarehouseAisles();
   const { levels, isLoading: levelsLoading } = useWarehouseLevels();
   const { locations, isLoading: locationsLoading } = useWarehouseLocations();
-  const { pallets, isLoading: palletsLoading } = useWarehousePallets();
 
   // Fetch counts for the current session (or all counts if no session)
   const { data: counts = [], isLoading: countsLoading } = useQuery({
@@ -132,7 +129,6 @@ export function useWarehouseMap(sessionId?: string) {
           productCode: count.product?.code || '',
           colisNumber: count.colis_number,
           quantity: count.quantity,
-          palletNumber: count.pallet_number,
           isSplitEntry,
           totalQuantityForColi,
         });
@@ -233,13 +229,12 @@ export function useWarehouseMap(sessionId?: string) {
     }
   };
 
-  const isLoading = aislesLoading || levelsLoading || locationsLoading || palletsLoading || countsLoading;
+  const isLoading = aislesLoading || levelsLoading || locationsLoading || countsLoading;
 
   return {
     aisles,
     levels,
     locations: locationsWithProducts,
-    pallets,
     mapGrid,
     isLoading,
     moveProduct,

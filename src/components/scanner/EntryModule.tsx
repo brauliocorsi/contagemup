@@ -7,10 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { ScanInput } from './ScanInput';
 import { PrintMenu } from './PrintMenu';
 import { LocationSelect } from '@/components/counting/LocationSelect';
-import { PalletSelect } from '@/components/counting/PalletSelect';
 import { useProductResolver, CONFERENCE_LOCATION } from '@/hooks/useScannerData';
 import { supabase } from '@/integrations/supabase/client';
-import { colisCode, locationCode, palletCode, parseScan, type QtyHandler } from '@/lib/scanner/commands';
+import { colisCode, locationCode, parseScan, type QtyHandler } from '@/lib/scanner/commands';
 import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,7 +34,6 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
   const [supplier, setSupplier] = useState('');
   const [reference, setReference] = useState('');
   const [location, setLocation] = useState(CONFERENCE_LOCATION);
-  const [pallet, setPallet] = useState('');
   const [saving, setSaving] = useState(false);
   /** Cada leitura conta N unidades. */
   const [step, setStep] = useState(1);
@@ -83,10 +81,6 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
       setLocation(parsed.value);
       return;
     }
-    if (parsed.kind === 'pallet') {
-      setPallet(parsed.value);
-      return;
-    }
 
     const results = await resolve(parsed.value);
     if (results.length === 0) {
@@ -127,14 +121,13 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
             code: colisCode(l.product.code, Number(coli)),
             title: l.product.name,
             subtitle: `Coli ${coli} • ${l.product.code}`,
-            extra: [`${location || 'S/L'}${pallet ? ` / ${pallet}` : ''}`, supplier ? `Fornecedor: ${supplier}` : ''].filter(Boolean),
+            extra: [location || 'S/L', supplier ? `Fornecedor: ${supplier}` : ''].filter(Boolean),
             copies: qty,
           });
         }
       });
     });
     if (location) items.push({ code: locationCode(location), title: `Localização ${location}`, subtitle: 'Armazém' });
-    if (pallet) items.push({ code: palletCode(pallet), title: `Palete ${pallet}`, subtitle: location });
     return items;
   };
 
@@ -159,7 +152,6 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
           p_product_id: line.product.id,
           p_colis_quantities: colis_quantities as unknown as never,
           p_location: location || CONFERENCE_LOCATION,
-          p_pallet_number: pallet || null,
           p_reason: 'Conferência de entrada',
           p_reference: reference || null,
           p_notes: supplier ? `Fornecedor: ${supplier}` : null,
@@ -183,7 +175,6 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
           ['Fornecedor', supplier || '—'],
           ['Referência', reference || '—'],
           ['Localização', location || CONFERENCE_LOCATION],
-          ['Palete', pallet || '—'],
           ['Data', new Date().toLocaleString('pt-PT')],
         ],
         columns: ['Código', 'Produto', 'Coli', 'Quantidade'],
@@ -201,7 +192,6 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
       toast.success(`Entrada registada: ${ok} produto(s)`);
       setLines([]);
       setReference('');
-      setPallet('');
       setLocation(CONFERENCE_LOCATION);
     }
     if (failed.length) toast.error(`Falha em: ${failed.join(', ')}`);
@@ -241,14 +231,6 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
           <Input placeholder="Fornecedor" value={supplier} onChange={(e) => setSupplier(e.target.value)} maxLength={120} />
           <Input placeholder="Referência / guia" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={80} />
           <LocationSelect value={location} onValueChange={setLocation} placeholder="Localização (CONF por defeito)" />
-          <PalletSelect
-            value={pallet}
-            onValueChange={(v, loc) => {
-              setPallet(v);
-              if (loc) setLocation(loc);
-            }}
-            placeholder="Palete (opcional)"
-          />
         </CardContent>
       </Card>
 

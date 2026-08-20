@@ -39,17 +39,6 @@ export interface WarehouseLocation {
   level?: WarehouseLevel | null;
 }
 
-export interface WarehousePallet {
-  id: string;
-  code: string;
-  current_location_id: string | null;
-  status: string;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-  location?: WarehouseLocation | null;
-}
-
 export function useWarehouseAisles() {
   const queryClient = useQueryClient();
 
@@ -288,91 +277,4 @@ export function useWarehouseLocations() {
   });
 
   return { locations, isLoading, createLocation, updateLocation, deleteLocation };
-}
-
-export function useWarehousePallets() {
-  const queryClient = useQueryClient();
-
-  const { data: pallets = [], isLoading } = useQuery({
-    queryKey: ['warehouse-pallets'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('warehouse_pallets')
-        .select(`
-          *,
-          location:warehouse_locations(
-            *,
-            aisle:warehouse_aisles(*),
-            level:warehouse_levels(*)
-          )
-        `)
-        .order('code', { ascending: true });
-      
-      if (error) throw error;
-      return data as WarehousePallet[];
-    },
-  });
-
-  const createPallet = useMutation({
-    mutationFn: async (pallet: Partial<WarehousePallet>) => {
-      const { location, ...rest } = pallet as any;
-      const { data, error } = await supabase
-        .from('warehouse_pallets')
-        .insert(rest)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouse-pallets'] });
-      toast.success('Palete criado com sucesso');
-    },
-    onError: (error) => {
-      toast.error('Erro ao criar palete: ' + mapDatabaseError(error));
-    },
-  });
-
-  const updatePallet = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<WarehousePallet> & { id: string }) => {
-      const { location, ...rest } = updates as any;
-      const { data, error } = await supabase
-        .from('warehouse_pallets')
-        .update(rest)
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouse-pallets'] });
-      toast.success('Palete atualizado com sucesso');
-    },
-    onError: (error) => {
-      toast.error('Erro ao atualizar palete: ' + mapDatabaseError(error));
-    },
-  });
-
-  const deletePallet = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('warehouse_pallets')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouse-pallets'] });
-      toast.success('Palete removido com sucesso');
-    },
-    onError: (error) => {
-      toast.error('Erro ao remover palete: ' + mapDatabaseError(error));
-    },
-  });
-
-  return { pallets, isLoading, createPallet, updatePallet, deletePallet };
 }

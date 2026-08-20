@@ -43,12 +43,11 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   lastCount: 140,
   colisLocations: 180,
   location: 120,
-  pallet: 100,
   sales: 100,
   actions: 120,
 };
 
-type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'damages' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'pallet' | 'sales';
+type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'damages' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'sales';
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   code: 'Código',
@@ -61,11 +60,10 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   lastCount: 'Última Contagem',
   colisLocations: 'Colis/Localização',
   location: 'Localização',
-  pallet: 'Palete',
   sales: 'Vendas',
 };
 
-const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'damages', 'totalUnits', 'lastCount', 'colisLocations', 'location', 'pallet', 'sales'];
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['code', 'name', 'category', 'colis', 'stock', 'damages', 'totalUnits', 'lastCount', 'colisLocations', 'location', 'sales'];
 
 export function ProductsView() {
   const { products, loading, createProduct, updateProduct, deleteProduct, importProducts } = useProducts();
@@ -147,8 +145,7 @@ export function ProductsView() {
       const matchesSearch = 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.pallet_number?.toLowerCase().includes(searchTerm.toLowerCase());
+        product.location?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const hasCount = !!lastCounts[product.id];
       const matchesCountStatus = 
@@ -248,7 +245,7 @@ export function ProductsView() {
     XLSX.writeFile(workbook, filename);
   }, []);
 
-  const productHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Palete', 'Colis/Set', 'Stock (Sets)', 'Avarias', 'Última Contagem', 'Sessão', 'Data Contagem'];
+  const productHeaders = ['Código', 'Nome', 'Categoria', 'Localização', 'Colis/Set', 'Stock (Sets)', 'Avarias', 'Última Contagem', 'Sessão', 'Data Contagem'];
 
   const buildProductRow = useCallback((product: Product) => {
     const lastCount = lastCounts[product.id];
@@ -257,7 +254,6 @@ export function ProductsView() {
       product.name,
       product.category,
       product.location || '-',
-      product.pallet_number || '-',
       product.total_colis,
       product.current_stock,
       product.damaged_stock || 0,
@@ -351,7 +347,7 @@ export function ProductsView() {
     clearSelection();
   };
 
-  const handleCreateProduct = async (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; pallet_number: string | null }) => {
+  const handleCreateProduct = async (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null }) => {
     const result = await createProduct(product);
     if (result) {
       await logChange(result.id, 'created');
@@ -396,9 +392,6 @@ export function ProductsView() {
       if (updates.location !== undefined && updates.location !== originalProduct.location) {
         changes.push({ field: 'location', oldValue: originalProduct.location, newValue: updates.location });
       }
-      if (updates.pallet_number !== undefined && updates.pallet_number !== originalProduct.pallet_number) {
-        changes.push({ field: 'pallet_number', oldValue: originalProduct.pallet_number, newValue: updates.pallet_number });
-      }
       
       if (changes.length > 0) {
         await logMultipleChanges(id, changes);
@@ -442,7 +435,7 @@ export function ProductsView() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Pesquisar por nome, código, localização ou palete..."
+            placeholder="Pesquisar por nome, código ou localização..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -778,14 +771,6 @@ export function ProductsView() {
                     style={{ width: `${DEFAULT_COLUMN_WIDTHS.location}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.location}px` }}
                   >
                     Localização
-                  </div>
-                )}
-                {isColumnVisible('pallet') && (
-                  <div 
-                    className="p-2 font-medium text-muted-foreground text-sm"
-                    style={{ width: `${DEFAULT_COLUMN_WIDTHS.pallet}px`, minWidth: `${DEFAULT_COLUMN_WIDTHS.pallet}px` }}
-                  >
-                    Palete
                   </div>
                 )}
                 {isColumnVisible('sales') && (

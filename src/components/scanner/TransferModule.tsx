@@ -7,10 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { ScanInput } from './ScanInput';
 import { PrintMenu } from './PrintMenu';
 import { LocationSelect } from '@/components/counting/LocationSelect';
-import { PalletSelect } from '@/components/counting/PalletSelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useProductResolver, useScannerTransfers } from '@/hooks/useScannerData';
-import { colisCode, locationCode, palletCode, parseScan } from '@/lib/scanner/commands';
+import { colisCode, locationCode, parseScan } from '@/lib/scanner/commands';
 import type { LabelItem } from '@/lib/scanner/labels';
 import { toast } from 'sonner';
 
@@ -20,12 +19,10 @@ interface PendingItem {
   quantity: number;
   available: number;
   location: string | null;
-  pallet_number: string | null;
   product_code: string;
   product_name: string;
   colis_number: number;
   from_location: string | null;
-  from_pallet: string | null;
 }
 
 interface Props {
@@ -36,7 +33,6 @@ export function TransferModule({ onCommand }: Props) {
   const resolve = useProductResolver();
   const [origin, setOrigin] = useState('');
   const [destLocation, setDestLocation] = useState('');
-  const [destPallet, setDestPallet] = useState('');
   const [step, setStep] = useState(1);
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -57,7 +53,7 @@ export function TransferModule({ onCommand }: Props) {
 
     let query = supabase
       .from('counts')
-      .select('id, colis_number, quantity, location, pallet_number')
+      .select('id, colis_number, quantity, location')
       .eq('product_id', product.id)
       .order('quantity', { ascending: false });
     if (origin) query = query.eq('location', origin);
@@ -96,12 +92,10 @@ export function TransferModule({ onCommand }: Props) {
           quantity: qty,
           available: row.quantity,
           location: null,
-          pallet_number: null,
           product_code: product.code,
           product_name: product.name,
           colis_number: row.colis_number,
           from_location: row.location,
-          from_pallet: row.pallet_number,
         },
       ];
     });
@@ -121,11 +115,6 @@ export function TransferModule({ onCommand }: Props) {
       }
       return;
     }
-    if (parsed.kind === 'pallet') {
-      setDestPallet(parsed.value);
-      toast.success(`Palete destino: ${parsed.value}`);
-      return;
-    }
 
     setBusy(true);
     try {
@@ -140,33 +129,30 @@ export function TransferModule({ onCommand }: Props) {
       code: colisCode(p.product_code, p.colis_number),
       title: p.product_name,
       subtitle: `Coli ${p.colis_number} • ${p.quantity} un.`,
-      extra: [`${destLocation || 'S/L'}${destPallet ? ` / ${destPallet}` : ''}`],
+      extra: [destLocation || 'S/L'],
     }));
     if (origin) items.push({ code: locationCode(origin), title: `Localização ${origin}`, subtitle: 'Origem' });
     if (destLocation) items.push({ code: locationCode(destLocation), title: `Localização ${destLocation}`, subtitle: 'Destino' });
-    if (destPallet) items.push({ code: palletCode(destPallet), title: `Palete ${destPallet}`, subtitle: destLocation || '' });
     return items;
   };
 
   const commit = () => {
     const rows = pending.filter((p) => p.quantity > 0);
     if (rows.length === 0) return;
-    if (!destLocation && !destPallet) {
-      toast.error('Defina a localização ou palete de destino');
+    if (!destLocation) {
+      toast.error('Defina a localização de destino');
       return;
     }
     transferItems.mutate(
       rows.map((p) => ({
         count_id: p.count_id,
         quantity: p.quantity,
-        location: destLocation || null,
-        pallet_number: destPallet || null,
+        location: destLocation,
       })),
       {
         onSuccess: () => {
           setPending([]);
           setDestLocation('');
-          setDestPallet('');
         },
       }
     );
@@ -176,7 +162,7 @@ export function TransferModule({ onCommand }: Props) {
     <div className="space-y-4">
       <ScanInput
         onScan={handleScan}
-        label="1) LOC- origem  •  2) ler produtos (cada leitura soma)  •  3) LOC-/PAL- destino"
+        label="1) LOC- origem  •  2) ler produtos (cada leitura soma)  •  3) LOC- destino"
       />
 
       <Card>
@@ -188,14 +174,6 @@ export function TransferModule({ onCommand }: Props) {
         <CardContent className="grid gap-2 sm:grid-cols-3">
           <LocationSelect value={origin} onValueChange={setOrigin} placeholder="Local de origem" />
           <LocationSelect value={destLocation} onValueChange={setDestLocation} placeholder="Localização destino" />
-          <PalletSelect
-            value={destPallet}
-            onValueChange={(v, loc) => {
-              setDestPallet(v);
-              if (loc && !destLocation) setDestLocation(loc);
-            }}
-            placeholder="Palete destino"
-          />
         </CardContent>
         <CardContent className="flex items-center gap-2 pt-0 text-xs text-muted-foreground">
           <span>Cada leitura conta</span>
@@ -214,7 +192,7 @@ export function TransferModule({ onCommand }: Props) {
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm">Itens lidos ({pending.length})</CardTitle>
-          <PrintMenu getItems={labels} label="Imprimir" disabled={pending.length === 0 && !destLocation && !destPallet} />
+          <PrintMenu getItems={labels} label="Imprimir" disabled={pending.length === 0 && !destLocation} />
         </CardHeader>
         <CardContent className="space-y-2">
           {pending.length === 0 && (
@@ -227,9 +205,7 @@ export function TransferModule({ onCommand }: Props) {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{p.product_name}</p>
                 <p className="truncate text-muted-foreground">
-                  Coli {p.colis_number} • {p.from_location || 'S/L'}
-                  {p.from_pallet ? ` / ${p.from_pallet}` : ''} → {destLocation || 'S/L'}
-                  {destPallet ? ` / ${destPallet}` : ''}
+                  Coli {p.colis_number} • {p.from_location || 'S/L'} → {destLocation || 'S/L'}
                 </p>
               </div>
               <Badge variant="secondary" className="shrink-0">máx {p.available}</Badge>

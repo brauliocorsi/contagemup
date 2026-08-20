@@ -766,7 +766,7 @@ export function InteractiveWarehouseMap() {
           {selectedLocation && (
             <div className="flex-1 overflow-auto space-y-4">
               {/* Stats */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="text-center p-3 rounded-lg bg-muted/50">
                   <p className="text-2xl font-bold">{selectedLocation.totalProducts}</p>
                   <p className="text-xs text-muted-foreground">Produtos</p>
@@ -778,12 +778,6 @@ export function InteractiveWarehouseMap() {
                 <div className="text-center p-3 rounded-lg bg-purple-50">
                   <p className="text-2xl font-bold text-purple-600">{selectedLocation.totalQuantity}</p>
                   <p className="text-xs text-muted-foreground">Unidades</p>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-green-50">
-                  <p className="text-2xl font-bold text-green-600">
-                    {new Set(selectedLocation.products.map(p => p.palletNumber).filter(Boolean)).size}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Paletes</p>
                 </div>
               </div>
 
@@ -843,11 +837,6 @@ export function InteractiveWarehouseMap() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {product.palletNumber && (
-                              <Badge variant="outline" className="text-xs">
-                                {product.palletNumber}
-                              </Badge>
-                            )}
                             <Badge className={cn(
                               product.isSplitEntry 
                                 ? "bg-blue-100 text-blue-700 hover:bg-blue-100" 
@@ -882,92 +871,6 @@ export function InteractiveWarehouseMap() {
         </DialogContent>
       </Dialog>
 
-      {/* Pallet Transfer Dialog */}
-      <Dialog open={palletTransferOpen} onOpenChange={setPalletTransferOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Truck className="h-5 w-5" />
-              Transferir Palete
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedPalletForTransfer && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2 mb-2">
-                  <Truck className="h-4 w-4 text-purple-600" />
-                  <span className="font-bold">{selectedPalletForTransfer}</span>
-                </div>
-                {(() => {
-                  const palletInfo = uniquePalletsInWarehouse.find(p => p.code === selectedPalletForTransfer);
-                  if (!palletInfo) return null;
-                  return (
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p>{palletInfo.totalProducts} entrada{palletInfo.totalProducts > 1 ? 's' : ''} • {palletInfo.totalQuantity} unidades</p>
-                      <p>Localização atual: {palletInfo.locations.join(', ')}</p>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="target-location">Nova localização</Label>
-                <div className="flex gap-2">
-                  <Select value={targetLocationForPallet} onValueChange={setTargetLocationForPallet}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Selecionar localização..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations
-                        .filter(loc => loc.code && loc.code.trim() !== '')
-                        .map(loc => (
-                          <SelectItem key={loc.id} value={loc.code}>
-                            <span className="flex items-center gap-2">
-                              <MapPin className="h-3 w-3" />
-                              {loc.code}
-                              <span className="text-muted-foreground text-xs">
-                                ({loc.aisleName} - {loc.levelShortName})
-                              </span>
-                              {loc.requiresForklift && (
-                                <Forklift className="h-3 w-3 text-orange-500" />
-                              )}
-                            </span>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Todos os produtos desta palete serão movidos para a nova localização
-                </p>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPalletTransferOpen(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handlePalletTransfer}
-              disabled={!targetLocationForPallet || transferLoading}
-            >
-              {transferLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Transferindo...
-                </>
-              ) : (
-                <>
-                  <MoveRight className="h-4 w-4 mr-2" />
-                  Transferir
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
