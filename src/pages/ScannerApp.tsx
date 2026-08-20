@@ -200,6 +200,7 @@ export default function ScannerApp() {
         {view === 'transferencia' && <TransferModule onCommand={handleCommand} />}
         {view === 'picking' && <PickingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'entradas' && <EntryModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
+        {view === 'fornecedor' && <SupplierCodeModule onCommand={handleCommand} />}
         {view === 'impressao' && <PrintCenterModule />}
       </main>
 
