@@ -453,9 +453,6 @@ export function ReconciliationView() {
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <span className="text-muted-foreground text-sm">-</span>
-                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                           {item.notes || '-'}
                         </TableCell>
