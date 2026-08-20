@@ -80,6 +80,53 @@ export function ScanInput({
     onScan(clean);
   };
 
+  /**
+   * Mantém o campo de leitura sempre focado para o scanner nunca falhar.
+   * Só recupera o foco quando ninguém está a escrever noutro campo, num
+   * diálogo ou menu aberto — assim não rouba o foco às quantidades.
+   */
+  useEffect(() => {
+    if (!autoFocus) return;
+
+    const canSteal = () => {
+      const el = document.activeElement as HTMLElement | null;
+      if (el === inputRef.current) return false;
+      if (document.querySelector('[role="dialog"], [role="listbox"], [role="menu"]')) return false;
+      if (!el || el === document.body || el.tagName === 'HTML') return true;
+      const tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable) return false;
+      // Botões e outros elementos: recupera o foco após a interação terminar.
+      return true;
+    };
+
+    const refocus = () => {
+      if (canSteal()) inputRef.current?.focus();
+    };
+
+    const id = window.setInterval(refocus, 700);
+    const onPointerUp = () => window.setTimeout(refocus, 60);
+    const onVisibility = () => {
+      if (!document.hidden) window.setTimeout(refocus, 120);
+    };
+    /** Se o operador ler um código sem ter o campo focado, redireciona a escrita. */
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.length !== 1) return;
+      if (!canSteal()) return;
+      inputRef.current?.focus();
+    };
+
+    document.addEventListener('pointerup', onPointerUp);
+    document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [autoFocus]);
+
 
   useEffect(() => {
     let cancelled = false;
