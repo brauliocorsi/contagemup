@@ -294,9 +294,20 @@ export function PurchaseEntryView() {
       console.warn('Falhas na entrada por compra:', failed);
     }
 
-    // Reload duplicate check
-    if (ok > 0) setDuplicateWarning(true);
+    // Refresh what has already been entered for this purchase
+    if (ok > 0) {
+      const entered = await fetchEntered(compra.numero);
+      setRows(prev => prev.map(r => {
+        const p = resolveProduct(r.item);
+        if (!p) return r;
+        const totalColis = Math.max(1, p.total_colis || 1);
+        const jaSets = Math.round((entered[p.id] || 0) / totalColis);
+        const restante = Math.max(0, Math.round(r.item.quantidade || 0) - jaSets);
+        return { ...r, qtyEntry: restante, selected: restante > 0 ? r.selected : false };
+      }));
+    }
   };
+
 
   const registeredCount = rows.filter(r => !!resolveProduct(r.item)).length;
   const missingCount = rows.length - registeredCount;
