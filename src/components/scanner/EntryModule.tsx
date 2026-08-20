@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { PackagePlus, Trash2, CheckCircle2, Loader2, Truck } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { PackagePlus, Trash2, CheckCircle2, Loader2, Truck, Minus, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { LocationSelect } from '@/components/counting/LocationSelect';
 import { PalletSelect } from '@/components/counting/PalletSelect';
 import { useProductResolver, CONFERENCE_LOCATION } from '@/hooks/useScannerData';
 import { supabase } from '@/integrations/supabase/client';
-import { colisCode, locationCode, palletCode, parseScan } from '@/lib/scanner/commands';
+import { colisCode, locationCode, palletCode, parseScan, type QtyHandler } from '@/lib/scanner/commands';
 import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,9 +25,10 @@ interface EntryLine {
 
 interface Props {
   onCommand?: (raw: string) => boolean;
+  registerQtyHandler?: (handler: QtyHandler | null) => void;
 }
 
-export function EntryModule({ onCommand }: Props) {
+export function EntryModule({ onCommand, registerQtyHandler }: Props) {
   const resolve = useProductResolver();
   const queryClient = useQueryClient();
   const [lines, setLines] = useState<EntryLine[]>([]);
@@ -36,6 +37,43 @@ export function EntryModule({ onCommand }: Props) {
   const [location, setLocation] = useState(CONFERENCE_LOCATION);
   const [pallet, setPallet] = useState('');
   const [saving, setSaving] = useState(false);
+  /** Cada leitura conta N unidades. */
+  const [step, setStep] = useState(1);
+  const [lastTarget, setLastTarget] = useState<{ key: string; coli: number } | null>(null);
+  const stepRef = useRef(step);
+  stepRef.current = step;
+
+  const setColisQty = (key: string, coli: number, qty: number) => {
+    setLines((prev) =>
+      prev.map((l) => (l.key === key ? { ...l, colis: { ...l.colis, [coli]: Math.max(0, qty) } } : l))
+    );
+    setLastTarget({ key, coli });
+  };
+
+  const bumpColis = (key: string, coli: number, delta: number) => {
+    setLines((prev) =>
+      prev.map((l) =>
+        l.key === key ? { ...l, colis: { ...l.colis, [coli]: Math.max(0, (l.colis[coli] || 0) + delta) } } : l
+      )
+    );
+    setLastTarget({ key, coli });
+  };
+
+  /** Comandos CMD-QTY aplicados à última linha lida. */
+  useEffect(() => {
+    if (!registerQtyHandler) return;
+    const handler: QtyHandler = ({ delta, set }) => {
+      if (!lastTarget) {
+        toast.error('Leia primeiro um produto');
+        return;
+      }
+      if (typeof set === 'number') setColisQty(lastTarget.key, lastTarget.coli, set);
+      else if (delta) bumpColis(lastTarget.key, lastTarget.coli, delta);
+    };
+    registerQtyHandler(handler);
+    return () => registerQtyHandler(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerQtyHandler, lastTarget]);
 
   const handleScan = async (raw: string) => {
     if (onCommand?.(raw)) return;
@@ -57,25 +95,28 @@ export function EntryModule({ onCommand }: Props) {
     }
     const product = results[0];
     const coli = parsed.colis || 1;
+    const inc = Math.max(1, stepRef.current);
 
     setLines((prev) => {
       const existing = prev.find((l) => l.product.id === product.id);
       if (existing) {
-        return prev.map((l) =>
+        const next = prev.map((l) =>
           l.product.id === product.id
-            ? { ...l, colis: { ...l.colis, [coli]: (l.colis[coli] || 0) + 1 } }
+            ? { ...l, colis: { ...l.colis, [coli]: (l.colis[coli] || 0) + inc } }
             : l
         );
+        const line = next.find((l) => l.product.id === product.id)!;
+        setLastTarget({ key: line.key, coli });
+        toast.success(`${product.name} — coli ${coli}: ${line.colis[coli]} un.`);
+        return next;
       }
-      return [...prev, { key: `${product.id}-${Date.now()}`, product, colis: { [coli]: 1 } }];
+      const key = `${product.id}-${Date.now()}`;
+      setLastTarget({ key, coli });
+      toast.success(`${product.name} — coli ${coli}: ${inc} un.`);
+      return [...prev, { key, product, colis: { [coli]: inc } }];
     });
   };
 
-  const setColisQty = (key: string, coli: number, qty: number) => {
-    setLines((prev) =>
-      prev.map((l) => (l.key === key ? { ...l, colis: { ...l.colis, [coli]: Math.max(0, qty) } } : l))
-    );
-  };
 
   const labels = (): LabelItem[] => {
     const items: LabelItem[] = [];
@@ -171,6 +212,25 @@ export function EntryModule({ onCommand }: Props) {
     <div className="space-y-4">
       <ScanInput onScan={handleScan} label="Ler produto recebido (código ou COD-C1 para coli)" />
 
+      <div className="flex items-center gap-2 rounded-lg border bg-card p-2">
+        <span className="text-xs text-muted-foreground">Cada leitura conta</span>
+        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setStep((s) => Math.max(1, s - 1))}>
+          <Minus className="h-3.5 w-3.5" />
+        </Button>
+        <Input
+          type="number"
+          min={1}
+          className="h-8 w-16 text-center"
+          value={step}
+          onChange={(e) => setStep(Math.max(1, Number(e.target.value) || 1))}
+        />
+        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setStep((s) => s + 1)}>
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+        <span className="text-xs text-muted-foreground">un.</span>
+      </div>
+
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
@@ -222,20 +282,42 @@ export function EntryModule({ onCommand }: Props) {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {Array.from({ length: Math.max(1, l.product.total_colis) }, (_, i) => i + 1).map((coli) => (
                   <div key={coli} className="space-y-1">
                     <span className="text-[10px] text-muted-foreground">Coli {coli}</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="h-9"
-                      value={l.colis[coli] ?? ''}
-                      onChange={(e) => setColisQty(l.key, coli, Number(e.target.value) || 0)}
-                    />
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        onClick={() => bumpColis(l.key, coli, -1)}
+                        aria-label={`Diminuir coli ${coli}`}
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </Button>
+                      <Input
+                        type="number"
+                        min={0}
+                        className="h-9 text-center"
+                        value={l.colis[coli] ?? ''}
+                        onFocus={() => setLastTarget({ key: l.key, coli })}
+                        onChange={(e) => setColisQty(l.key, coli, Number(e.target.value) || 0)}
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        onClick={() => bumpColis(l.key, coli, 1)}
+                        aria-label={`Aumentar coli ${coli}`}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
+
             </div>
           ))}
 

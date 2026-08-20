@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ScanBarcode,
@@ -23,7 +23,7 @@ import { PalletModule } from '@/components/scanner/PalletModule';
 import { PickingModule } from '@/components/scanner/PickingModule';
 import { EntryModule } from '@/components/scanner/EntryModule';
 import { PrintCenterModule } from '@/components/scanner/PrintCenterModule';
-import { parseCommand, SCANNER_MODES, type ScannerMode } from '@/lib/scanner/commands';
+import { parseCommand, SCANNER_MODES, type QtyHandler, type ScannerMode } from '@/lib/scanner/commands';
 import { printCommandSheet } from '@/lib/scanner/labels';
 import { toast } from 'sonner';
 
@@ -92,6 +92,11 @@ const NAV: Array<{ id: View; label: string; icon: typeof Search }> = [
 export default function ScannerApp() {
   const { user, loading } = useAuth();
   const [view, setView] = useState<View>('home');
+  /** O módulo ativo regista aqui o seu handler de quantidade. */
+  const qtyHandlerRef = useRef<QtyHandler | null>(null);
+  const registerQtyHandler = useCallback((h: QtyHandler | null) => {
+    qtyHandlerRef.current = h;
+  }, []);
 
   /** Comandos globais lidos em qualquer módulo. Devolve true se consumiu a leitura. */
   const handleCommand = useCallback((raw: string) => {
@@ -109,6 +114,16 @@ export default function ScannerApp() {
     }
     if (cmd.command === 'BACK') {
       setView('home');
+      return true;
+    }
+    if (cmd.command === 'QTY+' || cmd.command === 'QTY-') {
+      const handler = qtyHandlerRef.current;
+      if (!handler) {
+        toast.info('Comando de quantidade indisponível neste módulo');
+        return true;
+      }
+      if (cmd.value) handler({ set: Number(cmd.value) });
+      else handler({ delta: cmd.command === 'QTY+' ? 1 : -1 });
       return true;
     }
     toast.info(`Comando ${cmd.command}`);
@@ -186,8 +201,8 @@ export default function ScannerApp() {
         {view === 'consulta' && <ProductInquiryModule onCommand={handleCommand} />}
         {view === 'transferencia' && <TransferModule onCommand={handleCommand} />}
         {view === 'palete' && <PalletModule onCommand={handleCommand} />}
-        {view === 'picking' && <PickingModule onCommand={handleCommand} />}
-        {view === 'entradas' && <EntryModule onCommand={handleCommand} />}
+        {view === 'picking' && <PickingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
+        {view === 'entradas' && <EntryModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'impressao' && <PrintCenterModule />}
       </main>
 
