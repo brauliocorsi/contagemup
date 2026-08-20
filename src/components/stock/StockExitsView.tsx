@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   TrendingDown, History, Truck, Search, Package, Layers, Plus, X,
-  MapPin, Box, Star, AlertTriangle, ShoppingCart, Check, ChevronDown, ChevronRight, Minus, FileSpreadsheet,
+  MapPin, Star, AlertTriangle, ShoppingCart, Check, ChevronDown, ChevronRight, Minus, FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +53,6 @@ interface CountLocationRow {
   id: string; // count id
   quantity: number;
   location: string | null;
-  pallet_number: string | null;
   level_number: number | null;
   requires_forklift: boolean;
 }
@@ -566,7 +565,7 @@ function CartItemCard({ item, onChange, onRemove }: CartItemCardProps) {
     queryFn: async (): Promise<LocationsByColi> => {
       const { data: counts, error } = await supabase
         .from('counts')
-        .select('id, colis_number, quantity, location, pallet_number')
+        .select('id, colis_number, quantity, location')
         .eq('product_id', item.product_id)
         .gt('quantity', 0);
       if (error) throw error;
@@ -595,7 +594,6 @@ function CartItemCard({ item, onChange, onRemove }: CartItemCardProps) {
           id: c.id,
           quantity: c.quantity,
           location: c.location,
-          pallet_number: c.pallet_number,
           level_number: meta?.level_number ?? null,
           requires_forklift: meta?.requires_forklift ?? false,
         };
@@ -920,9 +918,6 @@ function ColiLocationBlock({ coliNumber, required, totalSelected, ok, candidates
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
-                  {c.pallet_number ? (
-                    <span className="flex items-center gap-1"><Box className="h-3 w-3" />{c.pallet_number}</span>
-                  ) : <span className="italic">sem palete</span>}
                   {c.level_number !== null && (
                     <span>· nível {c.level_number}{c.requires_forklift ? ' (empilhador)' : ''}</span>
                   )}

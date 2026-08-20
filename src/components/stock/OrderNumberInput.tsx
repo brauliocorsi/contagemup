@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, Check, X, MapPin, Package, AlertTriangle } from 'lucide-react';
+import { Search, Check, X, MapPin, AlertTriangle } from 'lucide-react';
 import { OrderNumberEntry } from '@/types/stock';
 import { cn } from '@/lib/utils';
 
@@ -175,12 +175,6 @@ export function OrderNumberInput({
                     <Badge variant="outline" className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
                       {verificationResult.order.location}
-                    </Badge>
-                  )}
-                  {verificationResult.order.pallet_number && (
-                    <Badge variant="outline" className="flex items-center gap-1">
-                      <Package className="h-3 w-3" />
-                      {verificationResult.order.pallet_number}
                     </Badge>
                   )}
                 </div>

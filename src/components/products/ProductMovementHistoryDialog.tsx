@@ -112,12 +112,6 @@ function MovementRow({
             <p className="flex items-center gap-1">
               <MapPin className="h-3 w-3" />
               {movement.location}
-              {movement.pallet_number && (
-                <span className="flex items-center gap-1 ml-2">
-                  <Box className="h-3 w-3" />
-                  {movement.pallet_number}
-                </span>
-              )}
             </p>
           )}
           {movement.notes && (

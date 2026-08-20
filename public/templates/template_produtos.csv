@@ -1,5 +1,5 @@
-codigo;nome;categoria;colis;descricao;localizacao;palete
-CAMA001;Cama Oslo Queen;Camas;3;Cama de casal;Armazém A;PAL-001
-MESA001;Mesa de Jantar;Mesas;1;Mesa 6 lugares;Armazém B;PAL-002
-ROUP001;Roupeiro Oslo;Roupeiros;4;Roupeiro 3 portas;Armazém A;PAL-003
-SOFA001;Sofá 3 Lugares;Sofás;2;Sofá tecido cinza;Armazém C;PAL-004
+codigo;nome;categoria;colis;descricao;localizacao
+CAMA001;Cama Oslo Queen;Camas;3;Cama de casal;Armazém A
+MESA001;Mesa de Jantar;Mesas;1;Mesa 6 lugares;Armazém B
+ROUP001;Roupeiro Oslo;Roupeiros;4;Roupeiro 3 portas;Armazém A
+SOFA001;Sofá 3 Lugares;Sofás;2;Sofá tecido cinza;Armazém C

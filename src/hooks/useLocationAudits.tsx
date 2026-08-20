@@ -23,7 +23,6 @@ export interface LocationAuditItem {
   product_code: string;
   product_name: string;
   location: string;
-  pallet_number: string | null;
   colis_number: number | null;
   expected_quantity: number;
   counted_quantity: number | null;
@@ -123,7 +122,6 @@ export function useLocationAudits() {
           id,
           product_id,
           location,
-          pallet_number,
           colis_number,
           quantity,
           products (id, code, name)
@@ -141,7 +139,6 @@ export function useLocationAudits() {
           product_code: (count.products as any)?.code || '',
           product_name: (count.products as any)?.name || '',
           location: count.location || '',
-          pallet_number: count.pallet_number,
           colis_number: count.colis_number,
           expected_quantity: count.quantity,
           status: 'pending',

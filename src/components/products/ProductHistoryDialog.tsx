@@ -22,8 +22,7 @@ const FIELD_LABELS: Record<string, string> = {
   category: 'Categoria',
   total_colis: 'Número de Colis',
   description: 'Descrição',
-  location: 'Localização',
-  pallet_number: 'Nº Palete'
+  location: 'Localização'
 };
 
 export function ProductHistoryDialog({ productId, productName, open, onOpenChange }: ProductHistoryDialogProps) {

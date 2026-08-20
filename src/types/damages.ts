@@ -30,7 +30,6 @@ export interface ProductDamage {
   damage_type: string;
   description: string | null;
   location: string | null;
-  pallet_number: string | null;
   reported_by: string | null;
   status: 'active' | 'resolved';
   resolved_at: string | null;

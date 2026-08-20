@@ -31,16 +31,13 @@ export function CountingView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterLocation, setFilterLocation] = useState<string>('all');
-  const [filterPallet, setFilterPallet] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
 
   const { 
     incrementCount, 
     decrementCount, 
     updateLocation, 
-    updatePalletNumber, 
     updateColisLocation, 
-    updateColisPalletNumber, 
     getProductWithCounts, 
     deleteOrphanCounts, 
     splitColisStock,
@@ -125,15 +122,12 @@ export function CountingView() {
     completeProducts,
     categoriesWithCounts,
     locationsWithCounts,
-    palletsWithCounts,
     statusCounts,
     productsWithoutLocation,
-    productsWithoutPallet,
   } = useCountingFilters(sessionFilteredProducts as any, {
     searchTerm,
     filterStatus,
     filterLocation,
-    filterPallet,
     filterCategory,
   });
 
@@ -165,7 +159,6 @@ export function CountingView() {
     filterStatus,
     filterCategory,
     filterLocation,
-    filterPallet,
     searchTerm,
   }, productIdsWithDamages);
 
@@ -200,8 +193,8 @@ export function CountingView() {
     return await splitColisStock(productId, colisNumber, distributions);
   }, [splitColisStock]);
 
-  const handleMergeStock = useCallback(async (productId: string, colisNumber: number, location: string, pallet: string): Promise<boolean> => {
-    return await mergeColisStock(productId, colisNumber, location, pallet);
+  const handleMergeStock = useCallback(async (productId: string, colisNumber: number, location: string): Promise<boolean> => {
+    return await mergeColisStock(productId, colisNumber, location);
   }, [mergeColisStock]);
 
   const handleIncrementAtLocation = useCallback((productId: string, colisNumber: number, countId: string) => {
@@ -219,12 +212,11 @@ export function CountingView() {
   const handleClearFilters = () => {
     setFilterStatus('all');
     setFilterLocation('all');
-    setFilterPallet('all');
     setFilterCategory('all');
     setSearchTerm('');
   };
 
-  const hasActiveFilters = filterStatus !== 'all' || filterLocation !== 'all' || filterPallet !== 'all' || filterCategory !== 'all' || searchTerm !== '';
+  const hasActiveFilters = filterStatus !== 'all' || filterLocation !== 'all' || filterCategory !== 'all' || searchTerm !== '';
 
   // Loading state
   if (productsLoading || sessionsLoading || categoriesLoading) {
@@ -279,15 +271,11 @@ export function CountingView() {
         onFilterCategoryChange={setFilterCategory}
         filterLocation={filterLocation}
         onFilterLocationChange={setFilterLocation}
-        filterPallet={filterPallet}
-        onFilterPalletChange={setFilterPallet}
         totalProducts={sessionFilteredProducts.length}
         statusCounts={statusCounts}
         categoriesWithCounts={categoriesWithCounts}
         locationsWithCounts={locationsWithCounts}
-        palletsWithCounts={palletsWithCounts}
         productsWithoutLocation={productsWithoutLocation}
-        productsWithoutPallet={productsWithoutPallet}
         onClearFilters={handleClearFilters}
         hasActiveFilters={hasActiveFilters}
       >
@@ -323,9 +311,7 @@ export function CountingView() {
         onIncrementAtLocation={handleIncrementAtLocation}
         onDecrementAtLocation={handleDecrementAtLocation}
         onLocationChange={updateLocation}
-        onPalletChange={updatePalletNumber}
         onColisLocationChange={updateColisLocation}
-        onColisPalletChange={updateColisPalletNumber}
         onAddColi={handleAddColi}
         onRemoveColi={handleRemoveColi}
         onCodeChange={handleCodeChange}

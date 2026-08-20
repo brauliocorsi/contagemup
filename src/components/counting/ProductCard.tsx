@@ -4,12 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Box, Hash, Pencil, History, Clock, ChevronDown, ChevronUp, Split, Merge, AlertOctagon, ClipboardList } from 'lucide-react';
+import { Plus, Minus, Package, CheckCircle2, AlertCircle, MapPin, Hash, Pencil, History, Clock, ChevronDown, ChevronUp, Split, Merge, AlertOctagon, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProductHistoryPopover } from './ProductHistoryPopover';
 import { CountHistoryPopover } from './CountHistoryPopover';
 import { SplitStockDialog } from './SplitStockDialog';
-import { PalletSelect } from './PalletSelect';
 import { DamageReportDialog } from '@/components/damages/DamageReportDialog';
 import { LocationSelect } from './LocationSelect';
 import { OrderNumberEntrySelector } from '@/components/stock/OrderNumberSelector';
@@ -32,14 +31,12 @@ interface ProductCardProps {
   onIncrementAtLocation?: (productId: string, colisNumber: number, countId: string) => void;
   onDecrementAtLocation?: (productId: string, colisNumber: number, countId: string) => void;
   onLocationChange?: (productId: string, location: string) => void;
-  onPalletChange?: (productId: string, palletNumber: string) => void;
   onColisLocationChange?: (productId: string, colisNumber: number, location: string) => void;
-  onColisPalletChange?: (productId: string, colisNumber: number, palletNumber: string) => void;
   onAddColi?: (productId: string, newTotalColis: number) => void;
   onRemoveColi?: (productId: string, newTotalColis: number) => void;
   onCodeChange?: (productId: string, newCode: string) => Promise<boolean>;
   onSplitStock?: (productId: string, colisNumber: number, distributions: StockDistribution[]) => Promise<boolean>;
-  onMergeStock?: (productId: string, colisNumber: number, location: string, pallet: string) => Promise<boolean>;
+  onMergeStock?: (productId: string, colisNumber: number, location: string) => Promise<boolean>;
   onReportDamage?: (data: {
     product_id: string;
     quantity: number;
@@ -47,7 +44,6 @@ interface ProductCardProps {
     damage_type: string;
     description?: string;
     location?: string;
-    pallet_number?: string;
   }) => Promise<unknown>;
   damagedStock?: number;
   colisNames?: Record<string, string> | null;
@@ -62,9 +58,7 @@ export function ProductCard({
   onIncrementAtLocation,
   onDecrementAtLocation,
   onLocationChange, 
-  onPalletChange, 
   onColisLocationChange,
-  onColisPalletChange,
   onAddColi,
   onRemoveColi,
   onCodeChange,
@@ -76,14 +70,13 @@ export function ProductCard({
   sessionId,
   requiresOrderNumber = false
 }: ProductCardProps) {
-  // Global location/pallet removed - each coli manages its own
+  // Global location removed - each coli manages its own
   const [localCode, setLocalCode] = useState(product.code);
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [expandedColis, setExpandedColis] = useState<Set<number>>(new Set());
   const [showAllColis, setShowAllColis] = useState(false);
   const [colisLocations, setColisLocations] = useState<Record<number, string>>({});
-  const [colisPallets, setColisPallets] = useState<Record<number, string>>({});
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [selectedColisForSplit, setSelectedColisForSplit] = useState<ColisDetail | null>(null);
   const [damageDialogOpen, setDamageDialogOpen] = useState(false);
@@ -119,10 +112,6 @@ export function ProductCard({
     return detail?.location || null;
   };
 
-  const getColisPallet = (colisNumber: number): string | null => {
-    const detail = getColisDetail(colisNumber);
-    return detail?.pallet_number || null;
-  };
 
   const isColisMissing = (colisNumber: number) => {
     return product.missingForNextComplete.some(c => c.colis_number === colisNumber);
@@ -156,7 +145,7 @@ export function ProductCard({
     return `Falta: ${missingItems}`;
   };
 
-  // Global location/pallet handlers removed - each coli manages its own
+  // Global location handlers removed - each coli manages its own
 
   const handleCodeBlur = async () => {
     setIsEditingCode(false);
@@ -207,7 +196,7 @@ export function ProductCard({
     setShowRemoveConfirm(false);
   };
 
-  // Determine if coli has different location/pallet than primary
+  // Determine if coli has different location than primary
   const hasLocationDifferent = (colisNum: number): boolean => {
     const colisLoc = getColisLocation(colisNum);
     if (!colisLoc && !product.location) return false;
@@ -215,12 +204,6 @@ export function ProductCard({
     return colisLoc !== product.location;
   };
 
-  const hasPalletDifferent = (colisNum: number): boolean => {
-    const colisPal = getColisPallet(colisNum);
-    if (!colisPal && !product.palletNumber) return false;
-    if (!colisPal) return true;
-    return colisPal !== product.palletNumber;
-  };
 
   // Format locations summary
   const getLocationsSummary = (): string => {
@@ -229,11 +212,6 @@ export function ProductCard({
     return `${product.uniqueLocations.length} localizações`;
   };
 
-  const getPalletsSummary = (): string => {
-    if (product.uniquePallets.length === 0) return 'Sem palete';
-    if (product.uniquePallets.length === 1) return product.uniquePallets[0];
-    return `${product.uniquePallets.length} paletes`;
-  };
 
   const openSplitDialog = (colisNumber: number) => {
     const key = `split-${product.id}-${colisNumber}`;
@@ -275,8 +253,8 @@ export function ProductCard({
     setPendingOperations(prev => new Set(prev).add(key));
     
     try {
-      // Use the primary location/pallet for merge
-      await onMergeStock(product.id, colisNumber, detail.location || '', detail.pallet_number || '');
+      // Use the primary location for merge
+      await onMergeStock(product.id, colisNumber, detail.location || '');
     } finally {
       setPendingOperations(prev => {
         const next = new Set(prev);
@@ -348,7 +326,7 @@ export function ProductCard({
                       Nº Encomenda
                     </Badge>
                   )}
-                  {/* Quick location/pallet summary badges */}
+                  {/* Quick location summary badge */}
                   {product.uniqueLocations.length > 0 && (
                     <Badge 
                       variant="outline" 
@@ -365,25 +343,6 @@ export function ProductCard({
                         : product.uniqueLocations.length === 2
                           ? product.uniqueLocations.join(' + ')
                           : `${product.uniqueLocations.length} loc.`
-                      }
-                    </Badge>
-                  )}
-                  {product.uniquePallets.length > 0 && (
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        "text-xs flex items-center gap-0.5",
-                        product.hasMultiplePallets 
-                          ? "bg-purple-50 text-purple-700 border-purple-300" 
-                          : ""
-                      )}
-                    >
-                      <Box className="h-2.5 w-2.5" />
-                      {product.uniquePallets.length === 1 
-                        ? product.uniquePallets[0] 
-                        : product.uniquePallets.length === 2
-                          ? product.uniquePallets.join(' + ')
-                          : `${product.uniquePallets.length} pal.`
                       }
                     </Badge>
                   )}
@@ -486,7 +445,6 @@ export function ProductCard({
               totalColis={product.total_colis}
               currentStock={product.current_stock}
               location={product.uniqueLocations[0] || product.location || undefined}
-              palletNumber={product.uniquePallets[0] || product.palletNumber || undefined}
               colisNames={colisNames}
               onOrderAdded={() => {
                 // The component handles the refetch internally
@@ -511,9 +469,7 @@ export function ProductCard({
                 const colisName = getColisName(colisNum);
                 const isExpanded = expandedColis.has(colisNum);
                 const colisLocation = getColisLocation(colisNum);
-                const colisPallet = getColisPallet(colisNum);
                 const locDiff = hasLocationDifferent(colisNum);
-                const palDiff = hasPalletDifferent(colisNum);
                 const hasMultipleLocationsForColi = colisDetail?.hasMultipleLocations || false;
                 const locationEntries = colisDetail?.locationEntries || [];
                 
@@ -572,7 +528,7 @@ export function ProductCard({
                                 </Tooltip>
                               </TooltipProvider>
                             )}
-                            {(locDiff || palDiff) && !hasMultipleLocationsForColi && !isExpanded && (
+                            {locDiff && !hasMultipleLocationsForColi && !isExpanded && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -582,7 +538,6 @@ export function ProductCard({
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     {locDiff && <p>📍 {colisLocation || 'Sem localização'}</p>}
-                                    {palDiff && <p>📦 {colisPallet || 'Sem palete'}</p>}
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -704,12 +659,6 @@ export function ProductCard({
                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                   <MapPin className="h-3 w-3 text-blue-500 flex-shrink-0" />
                                   <span className="text-xs truncate">{entry.location || 'Sem localização'}</span>
-                                  {entry.pallet_number && (
-                                    <>
-                                      <Box className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                                      <span className="text-xs truncate">{entry.pallet_number}</span>
-                                    </>
-                                  )}
                                 </div>
                                 <div className="flex items-center gap-1">
                                   {onDecrementAtLocation && (
@@ -740,34 +689,8 @@ export function ProductCard({
                           </div>
                         ) : (
                           <>
-                            {/* Per-coli pallet with Select - auto-preenche localização */}
+                            {/* Localização editável */}
                             <div className="flex items-center gap-1.5 pt-1">
-                              <PalletSelect
-                                value={colisPallets[colisNum] ?? colisPallet ?? ''}
-                                onValueChange={(newPal, derivedLocation) => {
-                                  setColisPallets(prev => ({ ...prev, [colisNum]: newPal }));
-                                  // Auto-preencher localização do palete
-                                  if (derivedLocation) {
-                                    setColisLocations(prev => ({ ...prev, [colisNum]: derivedLocation }));
-                                    if (onColisLocationChange) {
-                                      onColisLocationChange(product.id, colisNum, derivedLocation);
-                                    }
-                                  }
-                                  if (onColisPalletChange) {
-                                    onColisPalletChange(product.id, colisNum, newPal);
-                                  }
-                                }}
-                                placeholder="Selecionar palete..."
-                                className={cn(
-                                  "flex-1 h-7 text-xs",
-                                  palDiff && "border-orange-300 bg-orange-50"
-                                )}
-                                sessionId={sessionId}
-                              />
-                            </div>
-                            
-                            {/* Localização editável - auto-preenchida pelo palete mas pode ser alterada */}
-                            <div className="flex items-center gap-1.5">
                               <LocationSelect
                                 value={colisLocations[colisNum] ?? colisLocation ?? ''}
                                 onValueChange={(newLoc) => {

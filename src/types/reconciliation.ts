@@ -23,7 +23,6 @@ export interface ReconciliationItem {
   status: 'match' | 'surplus' | 'shortage' | 'not_found';
   notes: string | null;
   location: string | null;
-  pallet_number: string | null;
   created_at: string;
   updated_at: string;
 }

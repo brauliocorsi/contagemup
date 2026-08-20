@@ -212,8 +212,7 @@ export function ReconciliationView() {
       const matchesSearch = 
         item.product_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.location && item.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (item.pallet_number && item.pallet_number.toLowerCase().includes(searchTerm.toLowerCase()));
+        (item.location && item.location.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
       

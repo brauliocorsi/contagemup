@@ -7,12 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { loadXLSX } from '@/lib/lazyXlsx';
 interface ImportProductsProps {
-  onImport: (products: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string; location?: string; pallet_number?: string }>) => Promise<boolean>;
+  onImport: (products: Array<{ code: string; name: string; category?: string; total_colis: number; description?: string; location?: string }>) => Promise<boolean>;
   existingCategories: string[];
   onCreateCategory: (name: string) => Promise<boolean>;
 }
 
-type ProductRow = { code: string; name: string; category: string; total_colis: number; description?: string; location?: string; pallet_number?: string };
+type ProductRow = { code: string; name: string; category: string; total_colis: number; description?: string; location?: string };
 
 type ColumnMapping = {
   code: string | null;
@@ -21,7 +21,6 @@ type ColumnMapping = {
   total_colis: string | null;
   description: string | null;
   location: string | null;
-  pallet_number: string | null;
 };
 
 // Extended column aliases for better detection
@@ -58,11 +57,6 @@ const COLUMN_ALIASES = {
     'warehouse', 'deposito', 'depósito', 'endereco', 'endereço', 'address',
     'posicao', 'posição', 'position', 'corredor', 'aisle', 'prateleira', 'shelf',
     'estante', 'rack', 'zona', 'zone', 'area', 'área', 'setor', 'sector'
-  ],
-  pallet_number: [
-    'palete', 'pallet', 'pallet_number', 'num_palete', 'número_palete',
-    'numero_palete', 'n_palete', 'pallet_id', 'id_palete', 'codigo_palete',
-    'código_palete', 'lote', 'lot', 'batch', 'contentor', 'container'
   ]
 };
 
@@ -72,11 +66,10 @@ const FIELD_LABELS: Record<keyof ColumnMapping, string> = {
   category: 'Categoria',
   total_colis: 'Colis',
   description: 'Descrição',
-  location: 'Localização',
-  pallet_number: 'Palete'
+  location: 'Localização'
 };
 
-const FIELD_ORDER: Array<keyof ColumnMapping> = ['code', 'name', 'category', 'total_colis', 'description', 'location', 'pallet_number'];
+const FIELD_ORDER: Array<keyof ColumnMapping> = ['code', 'name', 'category', 'total_colis', 'description', 'location'];
 
 export function ImportProducts({ onImport, existingCategories, onCreateCategory }: ImportProductsProps) {
   const [open, setOpen] = useState(false);
@@ -114,8 +107,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
     name: 300,
     category: 100,
     description: 1000,
-    location: 200,
-    pallet_number: 100
+    location: 200
   };
 
   // Security: Sanitize value to prevent CSV injection
@@ -153,8 +145,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
           category: validateFieldValue(getValue(mapping.category), MAX_FIELD_LENGTHS.category) || 'Geral',
           total_colis: Math.max(1, Math.min(10000, parseInt(getValue(mapping.total_colis)) || 1)),
           description: validateFieldValue(getValue(mapping.description), MAX_FIELD_LENGTHS.description) || undefined,
-          location: validateFieldValue(getValue(mapping.location), MAX_FIELD_LENGTHS.location) || undefined,
-          pallet_number: validateFieldValue(getValue(mapping.pallet_number), MAX_FIELD_LENGTHS.pallet_number) || undefined
+          location: validateFieldValue(getValue(mapping.location), MAX_FIELD_LENGTHS.location) || undefined
         });
       }
     }
@@ -176,8 +167,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
       category: findColumn(columns, COLUMN_ALIASES.category) || columns[2] || null,
       total_colis: findColumn(columns, COLUMN_ALIASES.total_colis) || columns[3] || null,
       description: findColumn(columns, COLUMN_ALIASES.description) || columns[4] || null,
-      location: findColumn(columns, COLUMN_ALIASES.location) || columns[5] || null,
-      pallet_number: findColumn(columns, COLUMN_ALIASES.pallet_number) || columns[6] || null
+      location: findColumn(columns, COLUMN_ALIASES.location) || columns[5] || null
     };
 
     // Convert to JSON-like structure
@@ -214,8 +204,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
       category: findColumn(columns, COLUMN_ALIASES.category),
       total_colis: findColumn(columns, COLUMN_ALIASES.total_colis),
       description: findColumn(columns, COLUMN_ALIASES.description),
-      location: findColumn(columns, COLUMN_ALIASES.location),
-      pallet_number: findColumn(columns, COLUMN_ALIASES.pallet_number)
+      location: findColumn(columns, COLUMN_ALIASES.location)
     };
     
     return { data: jsonData, mapping, columns };
@@ -231,7 +220,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
   // Security constants for file uploads
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const MAX_ROWS = 10000;
-  const MAX_FIELD_LENGTH = { code: 100, name: 300, category: 100, description: 1000, location: 200, pallet_number: 100 };
+  const MAX_FIELD_LENGTH = { code: 100, name: 300, category: 100, description: 1000, location: 200 };
 
   // Sanitize string to prevent CSV injection
   const sanitizeCSVValue = (value: string): string => {
@@ -416,7 +405,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
   };
 
   const downloadTemplate = () => {
-    const template = 'codigo;nome;categoria;colis;descricao;localizacao;palete\nCAMA001;Cama Oslo Queen;Camas;3;Cama de casal;Armazém A;PAL-001\nMESA001;Mesa de Jantar;Mesas;1;Mesa 6 lugares;Armazém B;PAL-002\nROUP001;Roupeiro Oslo;Roupeiros;4;Roupeiro 3 portas;Armazém A;PAL-003';
+    const template = 'codigo;nome;categoria;colis;descricao;localizacao\nCAMA001;Cama Oslo Queen;Camas;3;Cama de casal;Armazém A\nMESA001;Mesa de Jantar;Mesas;1;Mesa 6 lugares;Armazém B\nROUP001;Roupeiro Oslo;Roupeiros;4;Roupeiro 3 portas;Armazém A';
     const blob = new Blob(['\ufeff' + template], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -470,7 +459,7 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
               </Button>
             </label>
             <p className="text-sm text-muted-foreground mt-2">
-              Colunas obrigatórias: código e nome. Opcionais: categoria, colis, descrição, localização, palete
+              Colunas obrigatórias: código e nome. Opcionais: categoria, colis, descrição, localização
             </p>
           </div>
 
@@ -616,7 +605,6 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
                     <th className="text-left p-2">Colis</th>
                     <th className="text-left p-2">Descrição</th>
                     <th className="text-left p-2">Localização</th>
-                    <th className="text-left p-2">Palete</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -637,7 +625,6 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
                       <td className="p-2">{product.total_colis}</td>
                       <td className="p-2 text-muted-foreground">{product.description || '-'}</td>
                       <td className="p-2 text-muted-foreground">{product.location || '-'}</td>
-                      <td className="p-2 text-muted-foreground">{product.pallet_number || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
