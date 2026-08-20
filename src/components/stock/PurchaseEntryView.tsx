@@ -480,6 +480,7 @@ export function PurchaseEntryView() {
                         <TableHead>Código</TableHead>
                         <TableHead>Nome</TableHead>
                         <TableHead className="text-right w-24">Comprado</TableHead>
+                        <TableHead className="text-right w-24">Já entrada</TableHead>
                         <TableHead className="w-32">Qtd. entrada</TableHead>
                         <TableHead className="w-40">Estado</TableHead>
                       </TableRow>
@@ -487,18 +488,21 @@ export function PurchaseEntryView() {
                     <TableBody>
                       {rows.map(r => {
                         const exists = !!resolveProduct(r.item);
+                        const ja = enteredSets(r.item);
+                        const completo = exists && ja >= r.item.quantidade;
                         return (
-                          <TableRow key={r.key}>
+                          <TableRow key={r.key} className={completo ? 'opacity-70 bg-muted/40' : ''}>
                             <TableCell>
                               <Checkbox
-                                checked={r.selected}
-                                disabled={!exists}
+                                checked={r.selected && !completo}
+                                disabled={!exists || completo}
                                 onCheckedChange={v => setRow(r.key, { selected: v === true })}
                               />
                             </TableCell>
                             <TableCell className="font-mono text-xs">{r.item.codigo || '—'}</TableCell>
                             <TableCell className="max-w-[380px] truncate">{r.item.nome}</TableCell>
                             <TableCell className="text-right">{r.item.quantidade}</TableCell>
+                            <TableCell className="text-right">{ja}</TableCell>
                             <TableCell>
                               <NumericInput
                                 min={0}
@@ -506,14 +510,11 @@ export function PurchaseEntryView() {
                                 value={r.qtyEntry}
                                 onChange={v => setRow(r.key, { qtyEntry: v })}
                                 className="h-9 text-center"
+                                disabled={completo}
                               />
                             </TableCell>
                             <TableCell>
-                              {exists ? (
-                                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1">
-                                  <CheckCircle2 className="h-3 w-3" /> Registado
-                                </Badge>
-                              ) : (
+                              {!exists ? (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -522,11 +523,20 @@ export function PurchaseEntryView() {
                                 >
                                   <Plus className="h-3 w-3" /> Cadastrar
                                 </Button>
+                              ) : completo ? (
+                                <Badge className="bg-blue-100 text-blue-800 border-blue-300 gap-1">
+                                  <CheckCircle2 className="h-3 w-3" /> Entrada feita
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1">
+                                  <CheckCircle2 className="h-3 w-3" /> Registado
+                                </Badge>
                               )}
                             </TableCell>
                           </TableRow>
                         );
                       })}
+
                     </TableBody>
                   </Table>
               </div>
