@@ -615,6 +615,7 @@ export type Database = {
           location: string | null
           min_stock: number
           name: string
+          supplier_code: string | null
           total_colis: number
           updated_at: string
         }
@@ -631,6 +632,7 @@ export type Database = {
           location?: string | null
           min_stock?: number
           name: string
+          supplier_code?: string | null
           total_colis?: number
           updated_at?: string
         }
@@ -647,6 +649,7 @@ export type Database = {
           location?: string | null
           min_stock?: number
           name?: string
+          supplier_code?: string | null
           total_colis?: number
           updated_at?: string
         }
