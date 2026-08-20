@@ -49,6 +49,8 @@ export function PurchaseEntryView() {
   const [compra, setCompra] = useState<GcCompraHeader | null>(null);
   const [rows, setRows] = useState<RowState[]>([]);
   const [duplicateWarning, setDuplicateWarning] = useState(false);
+  // units already entered for this purchase, per product id
+  const [enteredUnits, setEnteredUnits] = useState<Record<string, number>>({});
 
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickCode, setQuickCode] = useState('');
@@ -59,6 +61,7 @@ export function PurchaseEntryView() {
   const [palletNumber, setPalletNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+
 
   const productByCode = useMemo(() => {
     const m = new Map<string, Product>();
