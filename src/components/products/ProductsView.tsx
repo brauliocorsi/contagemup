@@ -272,6 +272,7 @@ export function ProductsView() {
 
   const productsWithDamagesCount = useMemo(() => filteredProducts.filter(p => (p.damaged_stock || 0) > 0).length, [filteredProducts]);
   const productsWithoutDamagesCount = useMemo(() => filteredProducts.filter(p => (p.damaged_stock || 0) === 0).length, [filteredProducts]);
+  const missingSupplierCodeCount = useMemo(() => products.filter(p => !p.supplier_code).length, [products]);
 
   const exportProductsCSV = useCallback((prods: Product[], filename: string) => {
     if (prods.length === 0) { toast({ title: 'Nenhum produto para exportar' }); return; }
