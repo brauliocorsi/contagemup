@@ -28,7 +28,7 @@ export function PrintCenterModule() {
   const [source, setSource] = useState<Source>('comandos');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [format, setFormat] = useState<LabelFormat>('a4');
+  const [format, setFormat] = useState<LabelFormat>('ql700');
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [perColi, setPerColi] = useState(true);
