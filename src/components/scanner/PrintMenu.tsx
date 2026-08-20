@@ -36,7 +36,7 @@ export function PrintMenu({ getItems, label = 'Imprimir', disabled, className, v
     }
   };
 
-  const doPrint = (format: 'a4' | 'thermal') =>
+  const doPrint = (format: 'a4' | 'ql700' | 'thermal') =>
     run(async () => {
       const items = getItems();
       if (!items.length) {
