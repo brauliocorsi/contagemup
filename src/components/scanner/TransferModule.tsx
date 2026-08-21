@@ -274,7 +274,13 @@ export function TransferModule({ onCommand }: Props) {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {choices.rows.map((r) => (
+            {choices.mismatch && (
+              <p className="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-2 text-xs font-medium text-destructive">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                {choices.mismatch}
+              </p>
+            )}
+
               <div key={r.id} className="flex items-center gap-2 rounded-lg border bg-background p-2 text-xs">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">Coli {r.colis_number}</p>
