@@ -389,9 +389,25 @@ export function TransferModule({ onCommand }: Props) {
               </Button>
             </div>
           ))}
+          {divergentCount > 0 && (
+            <div className="space-y-2 rounded-lg border border-destructive/50 bg-destructive/10 p-2 text-xs">
+              <p className="flex items-center gap-2 font-medium text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                {divergentCount} item(s) não estão na origem {origin}
+              </p>
+              <label className="flex items-center gap-2 text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={allowDivergent}
+                  onChange={(e) => setAllowDivergent(e.target.checked)}
+                />
+                Confirmo a exceção e quero transferir mesmo assim
+              </label>
+            </div>
+          )}
           <Button
             className="w-full"
-            disabled={pending.length === 0 || transferItems.isPending}
+            disabled={pending.length === 0 || transferItems.isPending || (divergentCount > 0 && !allowDivergent)}
             onClick={commit}
           >
             {transferItems.isPending ? (
@@ -401,6 +417,7 @@ export function TransferModule({ onCommand }: Props) {
             )}
             <ArrowRightLeft className="mr-2 h-4 w-4" /> Confirmar transferência
           </Button>
+
         </CardContent>
       </Card>
     </div>
