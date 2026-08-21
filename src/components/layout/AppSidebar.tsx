@@ -45,16 +45,7 @@ const groups: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
-    label: 'ERP & Operações',
-    items: [
-      { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
-      { id: 'purchases', label: 'Compras', icon: ShoppingBag },
-      { id: 'pending-sales', label: 'Vendas Pendentes', icon: FileText },
-      { id: 'cancellations', label: 'Cancelamentos', icon: XCircle },
-      { id: 'routes', label: 'Rotas', icon: MapPin },
-    ],
-  },
-  {
+
     label: 'Análise',
     items: [
       { id: 'reports', label: 'Relatórios', icon: BarChart3 },
