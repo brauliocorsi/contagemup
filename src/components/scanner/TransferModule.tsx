@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRightLeft, MapPin, Trash2, Minus, Plus, CheckCircle2, Loader2, PackageSearch, Boxes, X } from 'lucide-react';
+import { ArrowRightLeft, MapPin, Trash2, Minus, Plus, CheckCircle2, Loader2, PackageSearch, Boxes, X, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
