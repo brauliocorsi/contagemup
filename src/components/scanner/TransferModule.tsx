@@ -354,7 +354,12 @@ export function TransferModule({ onCommand }: Props) {
             </p>
           )}
           {pending.map((p) => (
-            <div key={p.key} className="flex flex-wrap items-center gap-2 rounded-lg border p-2 text-xs">
+            <div
+              key={p.key}
+              className={`flex flex-wrap items-center gap-2 rounded-lg border p-2 text-xs ${
+                isDivergent(p) ? 'border-destructive/60 bg-destructive/5' : ''
+              }`}
+            >
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{p.product_name}</p>
                 <p className="truncate font-mono text-[11px] text-muted-foreground">
@@ -363,7 +368,13 @@ export function TransferModule({ onCommand }: Props) {
                 <p className="truncate text-muted-foreground">
                   Coli {p.colis_number} • {p.from_location || 'S/L'} → {destLocation || 'S/L'}
                 </p>
+                {isDivergent(p) && (
+                  <p className="flex items-center gap-1 font-medium text-destructive">
+                    <AlertTriangle className="h-3 w-3" /> Não está em {origin}
+                  </p>
+                )}
               </div>
+
               <Badge variant="secondary" className="shrink-0">máx {p.available}</Badge>
               <Button
                 variant="outline"
