@@ -306,7 +306,14 @@ export function ProductInquiryModule({ onCommand }: Props) {
                   >
                     <div className="mb-2 flex items-center gap-2">
                       <Boxes className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Coli {coli}</span>
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium">Coli {coli}</span>
+                        <p className="truncate font-mono text-[11px] text-muted-foreground">
+                          {(detail.product.total_colis || 1) > 1
+                            ? colisCode(detail.product.code, coli)
+                            : detail.product.code}
+                        </p>
+                      </div>
                       {focusColis === coli && (
                         <Badge className="text-[10px]">lido</Badge>
                       )}
