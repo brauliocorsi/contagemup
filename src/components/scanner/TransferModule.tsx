@@ -104,14 +104,19 @@ export function TransferModule({ onCommand }: Props) {
     let rows: StockRow[];
     try {
       rows = await fetchRows(true);
-      // Não há stock na origem indicada → mostrar onde o coli realmente está
+      // Não há stock na origem indicada → validar e mostrar onde o coli realmente está
       if (rows.length === 0 && origin) {
         const anywhere = await fetchRows(false);
         if (anywhere.length > 0) {
-          toast.info(
-            `${product.name}${coli ? ` — coli ${coli}` : ''} não está em ${origin}. Escolha o local real.`
+          const locs = Array.from(new Set(anywhere.map((r) => r.location || 'S/L'))).join(', ');
+          toast.error(
+            `${product.name}${coli ? ` — coli ${coli}` : ''} não está em ${origin}. Local real: ${locs}`
           );
-          setChoices({ product, rows: anywhere });
+          setChoices({
+            product,
+            rows: anywhere,
+            mismatch: `Este produto${coli ? ` (coli ${coli})` : ''} não existe em ${origin}. Localização real: ${locs}.`,
+          });
           return;
         }
       }
@@ -119,6 +124,7 @@ export function TransferModule({ onCommand }: Props) {
       toast.error('Erro ao procurar stock: ' + e.message);
       return;
     }
+
 
     if (rows.length === 0) {
       toast.error(
