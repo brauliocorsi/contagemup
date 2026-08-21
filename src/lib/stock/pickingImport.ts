@@ -1,6 +1,30 @@
 import { loadXLSX } from '@/lib/lazyXlsx';
-import { detectColumnMapping } from '@/lib/reconciliation/fileParser';
 import type { Product } from '@/types/stock';
+
+const COLUMN_ALIASES: Record<'code' | 'name' | 'quantity', string[]> = {
+  code: ['codigo', 'code', 'código', 'cod', 'sku', 'ref', 'referencia', 'referência', 'product_code', 'productcode'],
+  name: ['nome', 'name', 'produto', 'product', 'description', 'descricao', 'descrição', 'designacao', 'designação'],
+  quantity: ['quantidade', 'quantity', 'qty', 'qtd', 'stock', 'qtde', 'quant', 'qnt', 'un', 'unidades'],
+};
+
+function detectColumnMapping(headers: string[]) {
+  const mapping: { code: string | null; name: string | null; quantity: string | null } = {
+    code: null,
+    name: null,
+    quantity: null,
+  };
+  const normalized = headers.map((h) => h.toLowerCase().trim());
+  (Object.keys(COLUMN_ALIASES) as (keyof typeof COLUMN_ALIASES)[]).forEach((field) => {
+    for (const alias of COLUMN_ALIASES[field]) {
+      const index = normalized.findIndex((h) => h.includes(alias));
+      if (index !== -1 && mapping[field] === null) {
+        mapping[field] = headers[index];
+        break;
+      }
+    }
+  });
+  return mapping;
+}
 
 export interface RawPickingRow {
   code: string;
