@@ -44,7 +44,7 @@ export function TransferModule({ onCommand }: Props) {
   const [step, setStep] = useState(1);
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [busy, setBusy] = useState(false);
-  const [choices, setChoices] = useState<{ product: Product; rows: StockRow[] } | null>(null);
+  const [choices, setChoices] = useState<{ product: Product; rows: StockRow[]; mismatch?: string } | null>(null);
   const { transferItems } = useScannerTransfers();
 
   const setQty = (key: string, qty: number) =>
