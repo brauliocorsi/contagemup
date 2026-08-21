@@ -1,8 +1,9 @@
 import {
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
-  AlertOctagon, Package, Tags, History, Scale, ArrowLeftRight, ShoppingBag,
-  FileText, XCircle, MapPin, BarChart3, Warehouse, Settings, ChevronsLeft, ScanBarcode,
+  AlertOctagon, Package, Tags, History,
+  BarChart3, Warehouse, Settings, ScanBarcode,
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import {
   Sidebar,
