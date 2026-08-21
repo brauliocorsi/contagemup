@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRightLeft, MapPin, Trash2, Minus, Plus, CheckCircle2, Loader2, PackageSearch, Boxes, X } from 'lucide-react';
+import { ArrowRightLeft, MapPin, Trash2, Minus, Plus, CheckCircle2, Loader2, PackageSearch, Boxes, X, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,8 +44,10 @@ export function TransferModule({ onCommand }: Props) {
   const [step, setStep] = useState(1);
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [busy, setBusy] = useState(false);
-  const [choices, setChoices] = useState<{ product: Product; rows: StockRow[] } | null>(null);
+  const [choices, setChoices] = useState<{ product: Product; rows: StockRow[]; mismatch?: string } | null>(null);
+  const [allowDivergent, setAllowDivergent] = useState(false);
   const { transferItems } = useScannerTransfers();
+
 
   const setQty = (key: string, qty: number) =>
     setPending((prev) =>
@@ -104,14 +106,19 @@ export function TransferModule({ onCommand }: Props) {
     let rows: StockRow[];
     try {
       rows = await fetchRows(true);
-      // Não há stock na origem indicada → mostrar onde o coli realmente está
+      // Não há stock na origem indicada → validar e mostrar onde o coli realmente está
       if (rows.length === 0 && origin) {
         const anywhere = await fetchRows(false);
         if (anywhere.length > 0) {
-          toast.info(
-            `${product.name}${coli ? ` — coli ${coli}` : ''} não está em ${origin}. Escolha o local real.`
+          const locs = Array.from(new Set(anywhere.map((r) => r.location || 'S/L'))).join(', ');
+          toast.error(
+            `${product.name}${coli ? ` — coli ${coli}` : ''} não está em ${origin}. Local real: ${locs}`
           );
-          setChoices({ product, rows: anywhere });
+          setChoices({
+            product,
+            rows: anywhere,
+            mismatch: `Este produto${coli ? ` (coli ${coli})` : ''} não existe em ${origin}. Localização real: ${locs}.`,
+          });
           return;
         }
       }
@@ -119,6 +126,7 @@ export function TransferModule({ onCommand }: Props) {
       toast.error('Erro ao procurar stock: ' + e.message);
       return;
     }
+
 
     if (rows.length === 0) {
       toast.error(
@@ -175,11 +183,25 @@ export function TransferModule({ onCommand }: Props) {
     return items;
   };
 
+  const norm = (v?: string | null) => (v || '').trim().toUpperCase();
+  const isDivergent = (p: PendingItem) => !!origin && norm(p.from_location) !== norm(origin);
+
   const commit = () => {
     const rows = pending.filter((p) => p.quantity > 0);
     if (rows.length === 0) return;
     if (!destLocation) {
       toast.error('Defina a localização de destino');
+      return;
+    }
+    if (norm(destLocation) === norm(origin)) {
+      toast.error('Origem e destino são iguais');
+      return;
+    }
+    const bad = rows.filter(isDivergent);
+    if (bad.length > 0 && !allowDivergent) {
+      toast.error(
+        `${bad.length} item(s) não estão em ${origin} (ex.: ${bad[0].product_code} está em ${bad[0].from_location || 'S/L'}). Corrija a origem ou confirme a exceção.`
+      );
       return;
     }
     transferItems.mutate(
@@ -192,12 +214,16 @@ export function TransferModule({ onCommand }: Props) {
         onSuccess: () => {
           setPending([]);
           setDestLocation('');
+          setAllowDivergent(false);
         },
       }
     );
   };
 
+
   const totalUnits = pending.reduce((s, p) => s + p.quantity, 0);
+  const divergentCount = pending.filter(isDivergent).length;
+
   const stepState = (n: number) =>
     n === 1
       ? !!origin
@@ -248,8 +274,15 @@ export function TransferModule({ onCommand }: Props) {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
+            {choices.mismatch && (
+              <p className="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-2 text-xs font-medium text-destructive">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                {choices.mismatch}
+              </p>
+            )}
             {choices.rows.map((r) => (
               <div key={r.id} className="flex items-center gap-2 rounded-lg border bg-background p-2 text-xs">
+
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">Coli {r.colis_number}</p>
                   <p className="truncate font-mono text-[11px] text-muted-foreground">
@@ -321,7 +354,12 @@ export function TransferModule({ onCommand }: Props) {
             </p>
           )}
           {pending.map((p) => (
-            <div key={p.key} className="flex flex-wrap items-center gap-2 rounded-lg border p-2 text-xs">
+            <div
+              key={p.key}
+              className={`flex flex-wrap items-center gap-2 rounded-lg border p-2 text-xs ${
+                isDivergent(p) ? 'border-destructive/60 bg-destructive/5' : ''
+              }`}
+            >
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{p.product_name}</p>
                 <p className="truncate font-mono text-[11px] text-muted-foreground">
@@ -330,7 +368,13 @@ export function TransferModule({ onCommand }: Props) {
                 <p className="truncate text-muted-foreground">
                   Coli {p.colis_number} • {p.from_location || 'S/L'} → {destLocation || 'S/L'}
                 </p>
+                {isDivergent(p) && (
+                  <p className="flex items-center gap-1 font-medium text-destructive">
+                    <AlertTriangle className="h-3 w-3" /> Não está em {origin}
+                  </p>
+                )}
               </div>
+
               <Badge variant="secondary" className="shrink-0">máx {p.available}</Badge>
               <Button
                 variant="outline"
@@ -365,9 +409,25 @@ export function TransferModule({ onCommand }: Props) {
               </Button>
             </div>
           ))}
+          {divergentCount > 0 && (
+            <div className="space-y-2 rounded-lg border border-destructive/50 bg-destructive/10 p-2 text-xs">
+              <p className="flex items-center gap-2 font-medium text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                {divergentCount} item(s) não estão na origem {origin}
+              </p>
+              <label className="flex items-center gap-2 text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={allowDivergent}
+                  onChange={(e) => setAllowDivergent(e.target.checked)}
+                />
+                Confirmo a exceção e quero transferir mesmo assim
+              </label>
+            </div>
+          )}
           <Button
             className="w-full"
-            disabled={pending.length === 0 || transferItems.isPending}
+            disabled={pending.length === 0 || transferItems.isPending || (divergentCount > 0 && !allowDivergent)}
             onClick={commit}
           >
             {transferItems.isPending ? (
@@ -377,6 +437,7 @@ export function TransferModule({ onCommand }: Props) {
             )}
             <ArrowRightLeft className="mr-2 h-4 w-4" /> Confirmar transferência
           </Button>
+
         </CardContent>
       </Card>
     </div>
