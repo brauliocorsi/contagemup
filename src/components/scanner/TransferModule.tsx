@@ -222,6 +222,8 @@ export function TransferModule({ onCommand }: Props) {
 
 
   const totalUnits = pending.reduce((s, p) => s + p.quantity, 0);
+  const divergentCount = pending.filter(isDivergent).length;
+
   const stepState = (n: number) =>
     n === 1
       ? !!origin
