@@ -158,8 +158,35 @@ export function TransferModule({ onCommand }: Props) {
     );
   };
 
+  const totalUnits = pending.reduce((s, p) => s + p.quantity, 0);
+  const stepState = (n: number) =>
+    n === 1
+      ? !!origin
+      : n === 2
+        ? pending.length > 0
+        : !!destLocation;
+
   return (
     <div className="space-y-4">
+      {/* Passos da operação */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { n: 1, title: 'Origem', value: origin || 'Ler LOC-…' },
+          { n: 2, title: 'Produtos', value: pending.length ? `${pending.length} item(s) • ${totalUnits} un.` : 'Bipar 1 a 1' },
+          { n: 3, title: 'Destino', value: destLocation || 'Ler LOC-…' },
+        ].map((s) => (
+          <div
+            key={s.n}
+            className={`rounded-lg border p-2 text-center ${
+              stepState(s.n) ? 'border-primary bg-primary/10' : 'border-dashed'
+            }`}
+          >
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{s.n}. {s.title}</p>
+            <p className="truncate text-xs font-semibold">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
       <ScanInput
         onScan={handleScan}
         label="1) LOC- origem  •  2) ler produtos (cada leitura soma)  •  3) LOC- destino"
@@ -188,6 +215,7 @@ export function TransferModule({ onCommand }: Props) {
           {busy && <Loader2 className="ml-auto h-4 w-4 animate-spin" />}
         </CardContent>
       </Card>
+
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
