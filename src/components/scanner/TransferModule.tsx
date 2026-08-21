@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRightLeft, MapPin, Trash2, Minus, Plus, CheckCircle2, Loader2, PackageSearch } from 'lucide-react';
+import { ArrowRightLeft, MapPin, Trash2, Minus, Plus, CheckCircle2, Loader2, PackageSearch, Boxes, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useProductResolver, useScannerTransfers } from '@/hooks/useScannerData';
 import { colisCode, locationCode, parseScan } from '@/lib/scanner/commands';
 import type { LabelItem } from '@/lib/scanner/labels';
+import type { Product } from '@/types/stock';
 import { toast } from 'sonner';
 
 interface PendingItem {
@@ -25,6 +26,13 @@ interface PendingItem {
   from_location: string | null;
 }
 
+interface StockRow {
+  id: string;
+  colis_number: number;
+  quantity: number;
+  location: string | null;
+}
+
 interface Props {
   onCommand?: (raw: string) => boolean;
 }
@@ -36,12 +44,41 @@ export function TransferModule({ onCommand }: Props) {
   const [step, setStep] = useState(1);
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [choices, setChoices] = useState<{ product: Product; rows: StockRow[] } | null>(null);
   const { transferItems } = useScannerTransfers();
 
   const setQty = (key: string, qty: number) =>
     setPending((prev) =>
       prev.map((p) => (p.key === key ? { ...p, quantity: Math.max(0, Math.min(p.available, qty)) } : p))
     );
+
+  /** Adiciona (ou incrementa) um registo de stock concreto à lista pendente. */
+  const addRow = (row: StockRow, product: Product, qty?: number) => {
+    setPending((prev) => {
+      const existing = prev.find((p) => p.count_id === row.id);
+      if (existing) {
+        const next = Math.min(existing.available, qty ?? existing.quantity + step);
+        toast.success(`${product.name} — coli ${row.colis_number}: ${next}/${existing.available}`);
+        return prev.map((p) => (p.key === existing.key ? { ...p, quantity: next } : p));
+      }
+      const initial = Math.min(row.quantity, qty ?? step);
+      toast.success(`${product.name} — coli ${row.colis_number}: ${initial}/${row.quantity}`);
+      return [
+        ...prev,
+        {
+          key: `${row.id}-${Date.now()}`,
+          count_id: row.id,
+          quantity: initial,
+          available: row.quantity,
+          location: null,
+          product_code: product.code,
+          product_name: product.name,
+          colis_number: row.colis_number,
+          from_location: row.location,
+        },
+      ];
+    });
+  };
 
   const addScan = async (value: string, coli?: number) => {
     const results = await resolve(value);
@@ -55,7 +92,7 @@ export function TransferModule({ onCommand }: Props) {
       .from('counts')
       .select('id, colis_number, quantity, location')
       .eq('product_id', product.id)
-      .order('quantity', { ascending: false });
+      .order('colis_number', { ascending: true });
     if (origin) query = query.eq('location', origin);
     if (coli) query = query.eq('colis_number', coli);
 
@@ -64,7 +101,7 @@ export function TransferModule({ onCommand }: Props) {
       toast.error('Erro ao procurar stock: ' + error.message);
       return;
     }
-    const rows = (data || []).filter((r: any) => r.quantity > 0);
+    const rows = ((data || []) as StockRow[]).filter((r) => r.quantity > 0);
     if (rows.length === 0) {
       toast.error(
         origin
@@ -73,32 +110,17 @@ export function TransferModule({ onCommand }: Props) {
       );
       return;
     }
-    const row: any = rows[0];
 
-    setPending((prev) => {
-      const existing = prev.find((p) => p.count_id === row.id);
-      if (existing) {
-        const next = Math.min(existing.available, existing.quantity + step);
-        toast.success(`${product.name} — coli ${row.colis_number}: ${next}/${existing.available}`);
-        return prev.map((p) => (p.key === existing.key ? { ...p, quantity: next } : p));
-      }
-      const qty = Math.min(row.quantity, step);
-      toast.success(`${product.name} — coli ${row.colis_number}: ${qty}/${row.quantity}`);
-      return [
-        ...prev,
-        {
-          key: `${row.id}-${Date.now()}`,
-          count_id: row.id,
-          quantity: qty,
-          available: row.quantity,
-          location: null,
-          product_code: product.code,
-          product_name: product.name,
-          colis_number: row.colis_number,
-          from_location: row.location,
-        },
-      ];
-    });
+    // Já está na lista pendente → incrementa direto (sem voltar a perguntar)
+    const already = rows.find((r) => pending.some((p) => p.count_id === r.id));
+    if (rows.length === 1 || already) {
+      setChoices(null);
+      addRow(already ?? rows[0], product);
+      return;
+    }
+
+    // Vários colis/registos → o utilizador escolhe qual mover
+    setChoices({ product, rows });
   };
 
   const handleScan = async (raw: string) => {
@@ -192,6 +214,59 @@ export function TransferModule({ onCommand }: Props) {
         label="1) LOC- origem  •  2) ler produtos (cada leitura soma)  •  3) LOC- destino"
       />
 
+      {/* Escolha de coli quando o produto tem vários registos */}
+      {choices && (
+        <Card className="border-primary/60 bg-primary/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Boxes className="h-4 w-4" /> Escolher coli a transferir
+                </CardTitle>
+                <p className="truncate text-xs text-muted-foreground">{choices.product.name}</p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setChoices(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {choices.rows.map((r) => (
+              <div key={r.id} className="flex items-center gap-2 rounded-lg border bg-background p-2 text-xs">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">Coli {r.colis_number}</p>
+                  <p className="truncate font-mono text-[11px] text-muted-foreground">
+                    {colisCode(choices.product.code, r.colis_number)} • {r.location || 'S/L'}
+                  </p>
+                </div>
+                <Badge variant="secondary" className="shrink-0">{r.quantity} un.</Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 shrink-0"
+                  onClick={() => {
+                    addRow(r, choices.product);
+                    setChoices(null);
+                  }}
+                >
+                  +{step}
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8 shrink-0"
+                  onClick={() => {
+                    addRow(r, choices.product, r.quantity);
+                    setChoices(null);
+                  }}
+                >
+                  Coli completo
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
@@ -229,14 +304,26 @@ export function TransferModule({ onCommand }: Props) {
             </p>
           )}
           {pending.map((p) => (
-            <div key={p.key} className="flex items-center gap-2 rounded-lg border p-2 text-xs">
+            <div key={p.key} className="flex flex-wrap items-center gap-2 rounded-lg border p-2 text-xs">
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{p.product_name}</p>
+                <p className="truncate font-mono text-[11px] text-muted-foreground">
+                  {colisCode(p.product_code, p.colis_number)}
+                </p>
                 <p className="truncate text-muted-foreground">
                   Coli {p.colis_number} • {p.from_location || 'S/L'} → {destLocation || 'S/L'}
                 </p>
               </div>
               <Badge variant="secondary" className="shrink-0">máx {p.available}</Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0"
+                onClick={() => setQty(p.key, p.available)}
+                disabled={p.quantity === p.available}
+              >
+                Coli completo
+              </Button>
               <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setQty(p.key, p.quantity - 1)}>
                 <Minus className="h-3.5 w-3.5" />
               </Button>
