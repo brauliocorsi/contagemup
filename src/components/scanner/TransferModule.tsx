@@ -181,11 +181,25 @@ export function TransferModule({ onCommand }: Props) {
     return items;
   };
 
+  const norm = (v?: string | null) => (v || '').trim().toUpperCase();
+  const isDivergent = (p: PendingItem) => !!origin && norm(p.from_location) !== norm(origin);
+
   const commit = () => {
     const rows = pending.filter((p) => p.quantity > 0);
     if (rows.length === 0) return;
     if (!destLocation) {
       toast.error('Defina a localização de destino');
+      return;
+    }
+    if (norm(destLocation) === norm(origin)) {
+      toast.error('Origem e destino são iguais');
+      return;
+    }
+    const bad = rows.filter(isDivergent);
+    if (bad.length > 0 && !allowDivergent) {
+      toast.error(
+        `${bad.length} item(s) não estão em ${origin} (ex.: ${bad[0].product_code} está em ${bad[0].from_location || 'S/L'}). Corrija a origem ou confirme a exceção.`
+      );
       return;
     }
     transferItems.mutate(
@@ -198,10 +212,12 @@ export function TransferModule({ onCommand }: Props) {
         onSuccess: () => {
           setPending([]);
           setDestLocation('');
+          setAllowDivergent(false);
         },
       }
     );
   };
+
 
   const totalUnits = pending.reduce((s, p) => s + p.quantity, 0);
   const stepState = (n: number) =>
