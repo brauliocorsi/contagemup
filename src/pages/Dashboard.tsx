@@ -21,11 +21,6 @@ const WarehouseMapView = lazy(() => import('@/components/warehouse/WarehouseMapV
 const DamagesView = lazy(() => import('@/components/damages/DamagesView').then(m => ({ default: m.DamagesView })));
 const SettingsView = lazy(() => import('@/components/settings/SettingsView').then(m => ({ default: m.SettingsView })));
 const RecentProductsView = lazy(() => import('@/components/products/RecentProductsView').then(m => ({ default: m.RecentProductsView })));
-const ERPReconciliationView = lazy(() => import('@/components/erp/ERPReconciliationView').then(m => ({ default: m.ERPReconciliationView })));
-const PurchaseOrdersView = lazy(() => import('@/components/purchases/PurchaseOrdersView').then(m => ({ default: m.PurchaseOrdersView })));
-const RoutesView = lazy(() => import('@/components/routes/RoutesView').then(m => ({ default: m.RoutesView })));
-const PendingSalesView = lazy(() => import('@/components/sales/PendingSalesView').then(m => ({ default: m.PendingSalesView })));
-const CancellationsView = lazy(() => import('@/components/cancellations/CancellationsView').then(m => ({ default: m.CancellationsView })));
 
 // Loading skeleton component
 function ViewLoader() {
@@ -103,12 +98,6 @@ export default function Dashboard() {
               {activeTab === 'exits' && <StockExitsView />}
               {activeTab === 'alerts' && <StockAlertsView />}
               {activeTab === 'damages' && <DamagesView />}
-              {activeTab === 'erp' && <ERPReconciliationView />}
-              {activeTab === 'erp' && <ERPReconciliationView />}
-              {activeTab === 'purchases' && <PurchaseOrdersView />}
-              {activeTab === 'routes' && <RoutesView />}
-              {activeTab === 'pending-sales' && <PendingSalesView />}
-              {activeTab === 'cancellations' && <CancellationsView />}
               {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
               {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
               {activeTab === 'recent' && <RecentProductsView />}

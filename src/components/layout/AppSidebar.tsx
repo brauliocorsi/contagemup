@@ -1,8 +1,9 @@
 import {
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
-  AlertOctagon, Package, Tags, History, Scale, ArrowLeftRight, ShoppingBag,
-  FileText, XCircle, MapPin, BarChart3, Warehouse, Settings, ChevronsLeft, ScanBarcode,
+  AlertOctagon, Package, Tags, History,
+  BarChart3, Warehouse, Settings, ScanBarcode,
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import {
   Sidebar,
@@ -45,16 +46,7 @@ const groups: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
-    label: 'ERP & Operações',
-    items: [
-      { id: 'erp', label: 'Conciliação ERP', icon: ArrowLeftRight },
-      { id: 'purchases', label: 'Compras', icon: ShoppingBag },
-      { id: 'pending-sales', label: 'Vendas Pendentes', icon: FileText },
-      { id: 'cancellations', label: 'Cancelamentos', icon: XCircle },
-      { id: 'routes', label: 'Rotas', icon: MapPin },
-    ],
-  },
-  {
+
     label: 'Análise',
     items: [
       { id: 'reports', label: 'Relatórios', icon: BarChart3 },
