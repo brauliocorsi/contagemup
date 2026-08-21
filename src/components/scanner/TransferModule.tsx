@@ -88,25 +88,41 @@ export function TransferModule({ onCommand }: Props) {
     }
     const product = results[0];
 
-    let query = supabase
-      .from('counts')
-      .select('id, colis_number, quantity, location')
-      .eq('product_id', product.id)
-      .order('colis_number', { ascending: true });
-    if (origin) query = query.eq('location', origin);
-    if (coli) query = query.eq('colis_number', coli);
+    const fetchRows = async (withOrigin: boolean) => {
+      let query = supabase
+        .from('counts')
+        .select('id, colis_number, quantity, location')
+        .eq('product_id', product.id)
+        .order('colis_number', { ascending: true });
+      if (withOrigin && origin) query = query.ilike('location', origin.trim());
+      if (coli) query = query.eq('colis_number', coli);
+      const { data, error } = await query;
+      if (error) throw error;
+      return ((data || []) as StockRow[]).filter((r) => r.quantity > 0);
+    };
 
-    const { data, error } = await query;
-    if (error) {
-      toast.error('Erro ao procurar stock: ' + error.message);
+    let rows: StockRow[];
+    try {
+      rows = await fetchRows(true);
+      // Não há stock na origem indicada → mostrar onde o coli realmente está
+      if (rows.length === 0 && origin) {
+        const anywhere = await fetchRows(false);
+        if (anywhere.length > 0) {
+          toast.info(
+            `${product.name}${coli ? ` — coli ${coli}` : ''} não está em ${origin}. Escolha o local real.`
+          );
+          setChoices({ product, rows: anywhere });
+          return;
+        }
+      }
+    } catch (e: any) {
+      toast.error('Erro ao procurar stock: ' + e.message);
       return;
     }
-    const rows = ((data || []) as StockRow[]).filter((r) => r.quantity > 0);
+
     if (rows.length === 0) {
       toast.error(
-        origin
-          ? `${product.name} sem stock em ${origin}${coli ? ` (coli ${coli})` : ''}`
-          : `${product.name} sem stock localizado`
+        `${product.name}${coli ? ` — coli ${coli}` : ''} sem stock disponível`
       );
       return;
     }
@@ -122,6 +138,7 @@ export function TransferModule({ onCommand }: Props) {
     // Vários colis/registos → o utilizador escolhe qual mover
     setChoices({ product, rows });
   };
+
 
   const handleScan = async (raw: string) => {
     if (onCommand?.(raw)) return;
