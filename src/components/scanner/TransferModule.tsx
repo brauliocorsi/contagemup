@@ -280,8 +280,9 @@ export function TransferModule({ onCommand }: Props) {
                 {choices.mismatch}
               </p>
             )}
-
+            {choices.rows.map((r) => (
               <div key={r.id} className="flex items-center gap-2 rounded-lg border bg-background p-2 text-xs">
+
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">Coli {r.colis_number}</p>
                   <p className="truncate font-mono text-[11px] text-muted-foreground">
