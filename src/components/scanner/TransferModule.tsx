@@ -214,6 +214,8 @@ export function TransferModule({ onCommand }: Props) {
         onSuccess: () => {
           setPending([]);
           setDestLocation('');
+          setOrigin('');
+          setChoices(null);
           setAllowDivergent(false);
         },
       }
