@@ -107,6 +107,59 @@ export function useProductStockDetail(productId: string | null) {
   });
 }
 
+export interface LocationStockRow {
+  id: string;
+  product_id: string;
+  product_code: string;
+  product_name: string;
+  colis_number: number;
+  quantity: number;
+}
+
+export interface LocationStockDetail {
+  location: string;
+  rows: LocationStockRow[];
+  totalUnits: number;
+  products: number;
+}
+
+/** Todo o stock existente numa localização. */
+export function useLocationStock(location: string | null) {
+  return useQuery({
+    queryKey: ['scanner-location-stock', location],
+    enabled: !!location,
+    staleTime: 15 * 1000,
+    queryFn: async (): Promise<LocationStockDetail | null> => {
+      if (!location) return null;
+      const { data, error } = await supabase
+        .from('counts')
+        .select('id, product_id, colis_number, quantity, location, products(code, name)')
+        .ilike('location', location)
+        .gt('quantity', 0)
+        .order('colis_number', { ascending: true });
+      if (error) throw error;
+
+      const rows: LocationStockRow[] = (data || []).map((r: any) => ({
+        id: r.id,
+        product_id: r.product_id,
+        product_code: r.products?.code || '—',
+        product_name: r.products?.name || 'Produto desconhecido',
+        colis_number: r.colis_number,
+        quantity: r.quantity,
+      }));
+
+      return {
+        location,
+        rows,
+        totalUnits: rows.reduce((s, r) => s + r.quantity, 0),
+        products: new Set(rows.map((r) => r.product_id)).size,
+      };
+    },
+  });
+}
+
+
+
 export interface TransferItem {
   count_id: string;
   quantity: number;
