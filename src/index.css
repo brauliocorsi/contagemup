@@ -244,9 +244,41 @@
 }
 
 @media print {
+  /* Esconde a navegação da app (sidebar, header, footer, toasts) na folha */
+  [data-sidebar],
+  [data-sidebar="sidebar"],
+  [data-slot="sidebar"],
+  [data-slot="sidebar-gap"],
+  [data-slot="sidebar-container"],
+  [data-sonner-toaster],
+  body > div[role="region"][aria-label*="otific"] {
+    display: none !important;
+  }
+
+  /* O conteúdo ocupa a folha inteira */
+  html,
+  body,
+  #root {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  main,
+  [data-slot="sidebar-inset"] {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
   #a4-sheet {
     display: block;
   }
+
 
   .a4-page {
     box-sizing: border-box;
