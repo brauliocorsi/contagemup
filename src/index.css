@@ -254,6 +254,16 @@
     display: none !important;
   }
 
+  /* Mas mantém os cabeçalhos/rodapés dos próprios documentos A4 */
+  #a4-sheet header {
+    display: flex !important;
+  }
+
+  #a4-sheet footer {
+    display: flex !important;
+  }
+
+
 
   /* O conteúdo ocupa a folha inteira */
   html,
