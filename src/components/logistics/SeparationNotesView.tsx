@@ -28,6 +28,7 @@ import { OrderDocument } from './OrderDocument';
 import { GuidesDocument } from './GuidesDocument';
 import { PickingReport } from './PickingReport';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
+import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
 import {
   buildDeliveryRoute,
   createTransportGuides,
@@ -227,7 +228,7 @@ export function SeparationNotesView() {
     ]);
   }, [picking, byCategory, excluded]);
 
-  function generatePicking() {
+  async function generatePicking() {
     if (chosen.length === 0) {
       toast.error('Selecione pelo menos uma encomenda');
       return;
@@ -236,6 +237,12 @@ export function SeparationNotesView() {
     setPicking(lines);
     setExcluded({});
     toast.success(`${lines.length} artigo(s) no picking`);
+    try {
+      const withLocations = await attachPickingLocations(lines);
+      setPicking(withLocations);
+    } catch {
+      toast.error('Não foi possível carregar as localizações');
+    }
   }
 
   function printPickingReport() {
