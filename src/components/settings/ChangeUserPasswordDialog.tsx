@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { KeyRound, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { PasswordStrengthMeter, evaluatePassword } from './PasswordStrengthMeter';
 
 interface Props {
   open: boolean;
