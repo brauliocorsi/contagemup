@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle } from 'lucide-react';
+import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle, MapPin, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,19 @@ import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import {
+  useOpenPickingTasks,
+  usePickingTaskItems,
+  useSavePickingProgress,
+  useClosePickingTask,
+  type PickingTask,
+} from '@/hooks/useScannerPickingTasks';
 
 interface PickLine extends ResolvedRow {
   picked: number;
+  /** id do artigo da tarefa (quando o picking vem das Notas de Separação) */
+  itemId?: string;
+  locations?: string | null;
 }
 
 interface Props {
@@ -35,14 +45,46 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(1);
   const [lastKey, setLastKey] = useState<string | null>(null);
+  const [task, setTask] = useState<PickingTask | null>(null);
   const stepRef = useRef(step);
   stepRef.current = step;
+
+  const { data: openTasks = [], isLoading: loadingTasks } = useOpenPickingTasks();
+  const { data: taskItems } = usePickingTaskItems(task?.id ?? null);
+  const saveProgress = useSavePickingProgress();
+  const closeTask = useClosePickingTask();
+
+  /** Carrega os artigos da tarefa escolhida (com o progresso já gravado). */
+  useEffect(() => {
+    if (!task || !taskItems) return;
+    setLines(
+      taskItems.map((it) => ({
+        key: it.id,
+        itemId: it.id,
+        code: it.product_code,
+        name: it.product_name,
+        quantity: it.requested_quantity,
+        details: it.details,
+        orders: it.orders,
+        locations: it.locations,
+        lines: [],
+        product: products.find((p) => p.id === it.product_id) ?? null,
+        candidates: [],
+        method: null,
+        status: it.product_id ? 'ready' : 'missing',
+        available: 0,
+        picked: it.picked_quantity,
+      })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, taskItems, products]);
 
   const totals = useMemo(() => {
     const requested = lines.reduce((s, l) => s + l.quantity, 0);
     const picked = lines.reduce((s, l) => s + l.picked, 0);
     return { requested, picked, pct: requested ? Math.round((picked / requested) * 100) : 0 };
   }, [lines]);
+
 
   const handleFile = async (file: File) => {
     setLoading(true);
