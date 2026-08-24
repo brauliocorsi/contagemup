@@ -34,6 +34,7 @@ export function SettingsView() {
   const [newUserName, setNewUserName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [passwordTarget, setPasswordTarget] = useState<{ userId: string; name: string } | null>(null);
   
   const { toast } = useToast();
   const { profile: currentProfile } = useAuth();
