@@ -273,6 +273,18 @@ export function SettingsView() {
                       <TableCell className="text-right text-muted-foreground">
                         {new Date(profile.created_at).toLocaleDateString('pt-PT')}
                       </TableCell>
+                      {currentProfile?.role === 'admin' && (
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPasswordTarget({ userId: profile.user_id, name: profile.name })}
+                          >
+                            <KeyRound className="h-4 w-4 mr-1" />
+                            Alterar senha
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
