@@ -227,9 +227,15 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
           .map((l) => [l.product?.code || l.code, l.name, l.quantity, l.picked]),
       });
 
+      if (task) {
+        await closeTask.mutateAsync({ taskId: task.id, status: 'completed' });
+        setTask(null);
+      }
+
       toast.success(result?.fully_fulfilled ? 'Saída registada' : 'Saída registada parcialmente');
       setLines([]);
       setReference('');
+
     } catch (e: any) {
       console.error(e);
       toast.error('Erro ao registar saída: ' + mapDatabaseError(e));
