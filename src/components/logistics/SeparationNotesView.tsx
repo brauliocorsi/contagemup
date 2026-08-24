@@ -561,9 +561,18 @@ export function SeparationNotesView() {
             <Button variant="outline" onClick={() => void exportPicking()} disabled={pickingKept.length === 0}>
               <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => void sendToScanner()}
+              disabled={pickingKept.length === 0 || createTask.isPending}
+            >
+              <ScanBarcode className="mr-2 h-4 w-4" />
+              {createTask.isPending ? 'A enviar…' : 'Enviar para o Scanner'}
+            </Button>
             <Button onClick={printPickingReport} disabled={pickingKept.length === 0}>
               <Printer className="mr-2 h-4 w-4" /> Imprimir picking
             </Button>
+
           </div>
           {picking === null ? (
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">
