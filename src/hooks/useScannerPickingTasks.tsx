@@ -13,6 +13,8 @@ export interface PickingTask {
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   started_at: string | null;
   completed_at: string | null;
+  cancelled_at?: string | null;
+  created_by?: string | null;
   created_at: string;
 }
 
@@ -27,7 +29,10 @@ export interface PickingTaskItem {
   locations: string | null;
   requested_quantity: number;
   picked_quantity: number;
+  picked_by?: string | null;
+  picked_at?: string | null;
 }
+
 
 export interface NewPickingTaskItem {
   product_code: string;
