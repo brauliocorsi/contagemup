@@ -1,8 +1,9 @@
 import {
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History,
-  BarChart3, Warehouse, Settings, ScanBarcode,
+  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon,
 } from 'lucide-react';
+
 
 import { cn } from '@/lib/utils';
 import {
