@@ -29,6 +29,8 @@ import { GuidesDocument } from './GuidesDocument';
 import { PickingReport } from './PickingReport';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
+import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
+
 import {
   buildDeliveryRoute,
   createTransportGuides,
