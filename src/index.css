@@ -246,14 +246,14 @@
 @media print {
   /* Esconde a navegação da app (sidebar, header, footer, toasts) na folha */
   [data-sidebar],
-  [data-sidebar="sidebar"],
-  [data-slot="sidebar"],
-  [data-slot="sidebar-gap"],
-  [data-slot="sidebar-container"],
+  [data-side][data-variant],
   [data-sonner-toaster],
+  header,
+  footer,
   body > div[role="region"][aria-label*="otific"] {
     display: none !important;
   }
+
 
   /* O conteúdo ocupa a folha inteira */
   html,
