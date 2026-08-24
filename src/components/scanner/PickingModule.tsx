@@ -372,6 +372,12 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                             {l.product?.code || l.code || 'sem código'}
                             {l.details ? ` • ${l.details}` : ''}
                           </p>
+                          {l.locations && (
+                            <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+                              <MapPin className="h-3 w-3" /> {l.locations}
+                            </p>
+                          )}
+
                           {!l.product && (
                             <p className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-600">
                               <AlertTriangle className="h-3 w-3" /> não registado no sistema
