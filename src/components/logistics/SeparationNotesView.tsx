@@ -264,6 +264,28 @@ export function SeparationNotesView() {
     toast.success('Ficheiro Excel gerado');
   }
 
+  async function sendToScanner() {
+    if (pickingKept.length === 0) {
+      toast.error('Nenhum artigo no picking');
+      return;
+    }
+    await createTask.mutateAsync({
+      name: `Picking ${from} a ${to}`,
+      reference: `SEP-${from}`,
+      notes: `${chosen.length} encomenda(s) das Notas de Separação`,
+      items: pickingKept.map((l) => ({
+        product_code: l.codigo,
+        product_name: l.nome,
+        details: l.detalhes || null,
+        orders: l.encomendas.join(', ') || null,
+        locations: l.localizacoes ?? null,
+        requested_quantity: l.quantidade,
+      })),
+    });
+    toast.success('Lista enviada para o Picking do Scanner');
+  }
+
+
   const guidesJob = useMutation({
     mutationFn: () =>
       createTransportGuides({
