@@ -53,7 +53,12 @@ Deno.serve(async (req) => {
     const { error: updateError } = await admin.auth.admin.updateUserById(user_id, {
       password: new_password,
     });
-    if (updateError) return json({ error: updateError.message }, 400);
+    if (updateError) {
+      const msg = /known to be weak|pwned|leaked/i.test(updateError.message)
+        ? 'Esta senha é demasiado comum e aparece em fugas de dados conhecidas. Escolha uma senha diferente (ex.: mistura de letras, números e símbolos).'
+        : updateError.message;
+      return json({ error: msg }, 400);
+    }
 
     return json({ success: true });
   } catch (e) {
