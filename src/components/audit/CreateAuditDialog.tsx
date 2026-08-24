@@ -14,6 +14,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useLocationAudits } from '@/hooks/useLocationAudits';
+import { useProfiles } from '@/hooks/useProfiles';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface CreateAuditDialogProps {
   open: boolean;
@@ -29,8 +37,10 @@ export function CreateAuditDialog({
   onSuccess,
 }: CreateAuditDialogProps) {
   const { createAudit } = useLocationAudits();
+  const { profiles } = useProfiles();
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
+  const [assignedTo, setAssignedTo] = useState<string>('none');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,10 +51,12 @@ export function CreateAuditDialog({
       name: name.trim(),
       locations: selectedLocations,
       notes: notes.trim() || undefined,
+      assignedTo: assignedTo === 'none' ? null : assignedTo,
     });
 
     setName('');
     setNotes('');
+    setAssignedTo('none');
     onOpenChange(false);
     
     if (onSuccess && result) {
@@ -87,6 +99,23 @@ export function CreateAuditDialog({
                   </Badge>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Responsável no scanner (opcional)</Label>
+              <Select value={assignedTo} onValueChange={setAssignedTo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Qualquer utilizador" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Qualquer utilizador</SelectItem>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.user_id} value={p.user_id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

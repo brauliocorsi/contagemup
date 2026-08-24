@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle, MapPin, X } from 'lucide-react';
+import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle, MapPin, X, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,8 +20,20 @@ import {
   usePickingTaskItems,
   useSavePickingProgress,
   useClosePickingTask,
+  useDeletePickingTask,
   type PickingTask,
 } from '@/hooks/useScannerPickingTasks';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface PickLine extends ResolvedRow {
   picked: number;
@@ -53,6 +65,20 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const { data: taskItems } = usePickingTaskItems(task?.id ?? null);
   const saveProgress = useSavePickingProgress();
   const closeTask = useClosePickingTask();
+  const deleteTask = useDeletePickingTask();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+  const [taskToRemove, setTaskToRemove] = useState<PickingTask | null>(null);
+
+  const removeTask = async (t: PickingTask, mode: 'cancel' | 'delete') => {
+    if (mode === 'delete') await deleteTask.mutateAsync(t.id);
+    else await closeTask.mutateAsync({ taskId: t.id, status: 'cancelled' });
+    if (task?.id === t.id) {
+      setTask(null);
+      setLines([]);
+    }
+    setTaskToRemove(null);
+  };
 
   /** Carrega os artigos da tarefa escolhida (com o progresso já gravado). */
   useEffect(() => {
@@ -281,33 +307,46 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
             openTasks.map((t) => {
               const active = task?.id === t.id;
               return (
-                <button
+                <div
                   key={t.id}
-                  onClick={() => {
-                    if (active) {
-                      setTask(null);
-                      setLines([]);
-                      return;
-                    }
-                    setTask(t);
-                    setReference(t.reference || t.name);
-                  }}
-                  className={`flex w-full items-center gap-2 rounded-lg border p-2 text-left text-xs transition-colors ${
+                  className={`flex items-center gap-2 rounded-lg border p-2 text-xs transition-colors ${
                     active ? 'border-primary bg-primary/5' : 'hover:border-primary/40'
                   }`}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{t.name}</p>
-                    <p className="truncate text-[11px] text-muted-foreground">
-                      {new Date(t.created_at).toLocaleString('pt-PT')}
-                      {t.reference ? ` • ${t.reference}` : ''}
-                    </p>
-                  </div>
-                  <Badge variant={t.status === 'in_progress' ? 'default' : 'secondary'}>
-                    {t.status === 'in_progress' ? 'Em curso' : 'Pendente'}
-                  </Badge>
-                  {active && <X className="h-3.5 w-3.5 text-muted-foreground" />}
-                </button>
+                  <button
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    onClick={() => {
+                      if (active) {
+                        setTask(null);
+                        setLines([]);
+                        return;
+                      }
+                      setTask(t);
+                      setReference(t.reference || t.name);
+                    }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{t.name}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {new Date(t.created_at).toLocaleString('pt-PT')}
+                        {t.reference ? ` • ${t.reference}` : ''}
+                      </p>
+                    </div>
+                    <Badge variant={t.status === 'in_progress' ? 'default' : 'secondary'}>
+                      {t.status === 'in_progress' ? 'Em curso' : 'Pendente'}
+                    </Badge>
+                    {active && <X className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-destructive"
+                    aria-label="Remover lista"
+                    onClick={() => setTaskToRemove(t)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               );
             })
           )}
@@ -420,6 +459,37 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!taskToRemove} onOpenChange={(o) => !o && setTaskToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover lista de picking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{taskToRemove?.name}" deixa de aparecer no scanner. Cancelar mantém o histórico;
+              eliminar remove definitivamente (apenas administradores).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => taskToRemove && removeTask(taskToRemove, 'cancel')}
+              disabled={closeTask.isPending}
+            >
+              Cancelar lista
+            </Button>
+            <AlertDialogAction
+              disabled={!isAdmin || deleteTask.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (taskToRemove) removeTask(taskToRemove, 'delete');
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

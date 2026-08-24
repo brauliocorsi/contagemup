@@ -36,6 +36,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocationAudits, LocationAudit } from '@/hooks/useLocationAudits';
 import { AuditResultsDialog } from '@/components/audit/AuditResultsDialog';
+import { useProfiles } from '@/hooks/useProfiles';
 import { loadXLSX } from '@/lib/lazyXlsx';
 interface AuditReportsViewProps {
   onStartAudit?: (auditId: string) => void;
@@ -43,6 +44,7 @@ interface AuditReportsViewProps {
 
 export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
   const { audits, isLoading, deleteAudit, useAuditWithItems } = useLocationAudits();
+  const { nameOf } = useProfiles();
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
   const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
 
@@ -170,6 +172,7 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                   <TableHead>Nome</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Localizações</TableHead>
+                  <TableHead>Responsável</TableHead>
                   <TableHead>Criada em</TableHead>
                   <TableHead>Concluída em</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -206,6 +209,9 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                             <MapPin className="h-3 w-3 text-muted-foreground" />
                             {audit.locations.length} localização(ões)
                           </div>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {audit.assigned_to ? nameOf(audit.assigned_to) : 'Qualquer utilizador'}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {format(new Date(audit.created_at), 'dd/MM/yyyy HH:mm')}

@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History,
-  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon,
+  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck,
 } from 'lucide-react';
 
 
@@ -35,6 +35,7 @@ const groups: { label: string; items: NavItem[] }[] = [
       { id: 'entries', label: 'Entradas', icon: TrendingUp },
       { id: 'exits', label: 'Saídas', icon: TrendingDown },
       { id: 'alerts', label: 'Alertas', icon: AlertTriangle },
+      { id: 'scanner-picking', label: 'Picking Scanner', icon: ClipboardCheck },
     ],
   },
   {
