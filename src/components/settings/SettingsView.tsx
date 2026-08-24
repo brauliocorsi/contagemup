@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Users, UserPlus, Loader2, Trash2, Mail, User, Database, AlertTriangle } from 'lucide-react';
+import { Settings, Users, UserPlus, Loader2, Trash2, Mail, User, Database, AlertTriangle, KeyRound } from 'lucide-react';
 // StockDataRepairDialog removed: underlying RPCs dropped in stock refactor Phase 1.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileSettings } from './ProfileSettings';
 import { Separator } from '@/components/ui/separator';
 import { ResetStockDialog } from './ResetStockDialog';
+import { ChangeUserPasswordDialog } from './ChangeUserPasswordDialog';
 
 
 interface Profile {
@@ -33,6 +34,7 @@ export function SettingsView() {
   const [newUserName, setNewUserName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [passwordTarget, setPasswordTarget] = useState<{ userId: string; name: string } | null>(null);
   
   const { toast } = useToast();
   const { profile: currentProfile } = useAuth();
@@ -243,6 +245,9 @@ export function SettingsView() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Função</TableHead>
                     <TableHead className="text-right">Data de Registo</TableHead>
+                    {currentProfile?.role === 'admin' && (
+                      <TableHead className="text-right">Ações</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -268,6 +273,18 @@ export function SettingsView() {
                       <TableCell className="text-right text-muted-foreground">
                         {new Date(profile.created_at).toLocaleDateString('pt-PT')}
                       </TableCell>
+                      {currentProfile?.role === 'admin' && (
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPasswordTarget({ userId: profile.user_id, name: profile.name })}
+                          >
+                            <KeyRound className="h-4 w-4 mr-1" />
+                            Alterar senha
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -319,6 +336,13 @@ export function SettingsView() {
       <ResetStockDialog 
         open={resetDialogOpen} 
         onOpenChange={setResetDialogOpen} 
+      />
+
+      <ChangeUserPasswordDialog
+        open={!!passwordTarget}
+        onOpenChange={(open) => { if (!open) setPasswordTarget(null); }}
+        userId={passwordTarget?.userId ?? null}
+        userName={passwordTarget?.name ?? null}
       />
     </div>
   );
