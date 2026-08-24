@@ -21,6 +21,9 @@ const WarehouseMapView = lazy(() => import('@/components/warehouse/WarehouseMapV
 const DamagesView = lazy(() => import('@/components/damages/DamagesView').then(m => ({ default: m.DamagesView })));
 const SettingsView = lazy(() => import('@/components/settings/SettingsView').then(m => ({ default: m.SettingsView })));
 const RecentProductsView = lazy(() => import('@/components/products/RecentProductsView').then(m => ({ default: m.RecentProductsView })));
+const SeparationNotesView = lazy(() => import('@/components/logistics/SeparationNotesView').then(m => ({ default: m.SeparationNotesView })));
+const RouteOptimizationView = lazy(() => import('@/components/logistics/RouteOptimizationView').then(m => ({ default: m.RouteOptimizationView })));
+
 
 // Loading skeleton component
 function ViewLoader() {
