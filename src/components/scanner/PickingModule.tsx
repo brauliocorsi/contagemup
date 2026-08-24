@@ -154,8 +154,10 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       (l) =>
         l.code.trim().toLowerCase() === code ||
         l.product?.code.trim().toLowerCase() === code ||
+        (l.product?.supplier_code || '').trim().toLowerCase() === code ||
         l.name.trim().toLowerCase() === code
     );
+
     if (!match) {
       toast.error(`"${parsed.value}" não está nesta lista de picking`);
       return;
