@@ -104,7 +104,12 @@ export default function Dashboard() {
               {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
               {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
               {activeTab === 'recent' && <RecentProductsView />}
+              {activeTab === 'separation-notes' && <SeparationNotesView />}
+              {activeTab === 'route-optimization' && (
+                <RouteOptimizationView onSendToSeparation={() => setActiveTab('separation-notes')} />
+              )}
               {activeTab === 'settings' && <SettingsView />}
+
             </Suspense>
           </main>
           <footer className="border-t border-border-subtle py-3 text-center">
