@@ -267,6 +267,54 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       </div>
 
       <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <ClipboardList className="h-4 w-4" /> Picking pendente (Notas de Separação)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {loadingTasks ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          ) : openTasks.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sem listas enviadas para o scanner.</p>
+          ) : (
+            openTasks.map((t) => {
+              const active = task?.id === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    if (active) {
+                      setTask(null);
+                      setLines([]);
+                      return;
+                    }
+                    setTask(t);
+                    setReference(t.reference || t.name);
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-lg border p-2 text-left text-xs transition-colors ${
+                    active ? 'border-primary bg-primary/5' : 'hover:border-primary/40'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{t.name}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {new Date(t.created_at).toLocaleString('pt-PT')}
+                      {t.reference ? ` • ${t.reference}` : ''}
+                    </p>
+                  </div>
+                  <Badge variant={t.status === 'in_progress' ? 'default' : 'secondary'}>
+                    {t.status === 'in_progress' ? 'Em curso' : 'Pendente'}
+                  </Badge>
+                  {active && <X className="h-3.5 w-3.5 text-muted-foreground" />}
+                </button>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <ClipboardList className="h-4 w-4" /> Lista de picking
@@ -289,9 +337,10 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
         <CardContent className="space-y-3">
           {lines.length === 0 ? (
             <p className="rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
-              Carregue um ficheiro de picking (.xlsx) para começar a conferência.
+              Escolha uma lista pendente acima ou carregue um ficheiro de picking (.xlsx).
             </p>
           ) : (
+
             <>
               <div className="space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
