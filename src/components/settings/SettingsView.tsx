@@ -337,6 +337,13 @@ export function SettingsView() {
         open={resetDialogOpen} 
         onOpenChange={setResetDialogOpen} 
       />
+
+      <ChangeUserPasswordDialog
+        open={!!passwordTarget}
+        onOpenChange={(open) => { if (!open) setPasswordTarget(null); }}
+        userId={passwordTarget?.userId ?? null}
+        userName={passwordTarget?.name ?? null}
+      />
     </div>
   );
 }
