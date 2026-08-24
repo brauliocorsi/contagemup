@@ -98,6 +98,10 @@ export function ChangeUserPasswordDialog({ open, onOpenChange, userId, userName 
               required
             />
           </div>
+          <p className="text-xs text-muted-foreground">
+            Evite senhas comuns (ex.: "123456", "password", nome da empresa). Senhas que aparecem em
+            fugas de dados conhecidas são recusadas. Sugestão: misture letras, números e símbolos.
+          </p>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close} disabled={saving}>
               Cancelar
