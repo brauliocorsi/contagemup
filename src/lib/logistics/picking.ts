@@ -9,6 +9,7 @@ export type PickingLine = {
   categoria: string;
   quantidade: number;
   encomendas: string[];
+  localizacoes?: string;
 };
 
 export type PickingGroup = {
@@ -105,11 +106,20 @@ export async function exportPickingXlsx(
     Codigo: l.codigo,
     Produto: l.nome,
     Detalhes: l.detalhes,
+    Localizacao: l.localizacoes ?? '—',
     Quantidade: l.quantidade,
     Encomendas: l.encomendas.join(', '),
   }));
   const sheet = XLSX.utils.json_to_sheet(rows);
-  sheet['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 46 }, { wch: 30 }, { wch: 12 }, { wch: 40 }];
+  sheet['!cols'] = [
+    { wch: 18 },
+    { wch: 16 },
+    { wch: 46 },
+    { wch: 30 },
+    { wch: 30 },
+    { wch: 12 },
+    { wch: 40 },
+  ];
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, 'Picking');
   XLSX.writeFile(book, `picking-${from}-a-${to}.xlsx`);
