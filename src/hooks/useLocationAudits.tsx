@@ -9,6 +9,7 @@ export interface LocationAudit {
   locations: string[];
   status: 'pending' | 'in_progress' | 'completed';
   created_by: string | null;
+  assigned_to: string | null;
   started_at: string | null;
   completed_at: string | null;
   notes: string | null;
@@ -42,6 +43,7 @@ export interface CreateAuditInput {
   name: string;
   locations: string[];
   notes?: string;
+  assignedTo?: string | null;
 }
 
 export function useLocationAudits() {
@@ -108,6 +110,7 @@ export function useLocationAudits() {
           locations: input.locations,
           notes: input.notes || null,
           created_by: user?.id || null,
+          assigned_to: input.assignedTo || null,
           status: 'pending',
         })
         .select()
@@ -262,9 +265,33 @@ export function useLocationAudits() {
     },
   });
 
+  // Assign audit to a user
+  const assignAudit = useMutation({
+    mutationFn: async ({ auditId, userId }: { auditId: string; userId: string | null }) => {
+      const { error } = await supabase
+        .from('location_audits')
+        .update({ assigned_to: userId })
+        .eq('id', auditId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: 'Responsável atualizado' });
+      queryClient.invalidateQueries({ queryKey: ['location-audits'] });
+      queryClient.invalidateQueries({ queryKey: ['my-location-audits'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro',
+        description: mapDatabaseError(error, 'Não foi possível atribuir a conferência'),
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     audits,
     isLoading,
+    assignAudit,
     useAuditWithItems,
     createAudit,
     startAudit,
