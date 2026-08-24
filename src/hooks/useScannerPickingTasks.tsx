@@ -147,9 +147,14 @@ export function useSavePickingProgress() {
       itemId: string;
       picked: number;
     }) => {
+      const { data: userData } = await supabase.auth.getUser();
       const { error } = await supabase
         .from('scanner_picking_task_items')
-        .update({ picked_quantity: picked })
+        .update({
+          picked_quantity: picked,
+          picked_by: userData.user?.id ?? null,
+          picked_at: new Date().toISOString(),
+        })
         .eq('id', itemId);
       if (error) throw error;
       await supabase
@@ -161,6 +166,7 @@ export function useSavePickingProgress() {
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ['scanner-picking-task-items', vars.taskId] });
       queryClient.invalidateQueries({ queryKey: ['scanner-picking-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['scanner-picking-tasks-all'] });
     },
     onError: (e) => toast.error('Erro ao guardar progresso: ' + mapDatabaseError(e)),
   });
@@ -172,13 +178,99 @@ export function useClosePickingTask() {
     mutationFn: async ({ taskId, status }: { taskId: string; status: 'completed' | 'cancelled' }) => {
       const { error } = await supabase
         .from('scanner_picking_tasks')
-        .update({ status, completed_at: new Date().toISOString() })
+        .update({
+          status,
+          completed_at: status === 'completed' ? new Date().toISOString() : null,
+          cancelled_at: status === 'cancelled' ? new Date().toISOString() : null,
+        })
         .eq('id', taskId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scanner-picking-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['scanner-picking-tasks-all'] });
     },
     onError: (e) => toast.error('Erro ao fechar tarefa: ' + mapDatabaseError(e)),
   });
 }
+
+export interface PickingTaskWithTotals extends PickingTask {
+  items_count: number;
+  items_done: number;
+  requested_units: number;
+  picked_units: number;
+}
+
+/** Todas as tarefas (gestão ADM), com progresso agregado. */
+export function useAllPickingTasks(status: string = 'all') {
+  return useQuery({
+    queryKey: ['scanner-picking-tasks-all', status],
+    queryFn: async (): Promise<PickingTaskWithTotals[]> => {
+      let q = supabase
+        .from('scanner_picking_tasks')
+        .select('*, scanner_picking_task_items(requested_quantity, picked_quantity)')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (status !== 'all') q = q.eq('status', status);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []).map((t: any) => {
+        const items = (t.scanner_picking_task_items ?? []) as {
+          requested_quantity: number;
+          picked_quantity: number;
+        }[];
+        return {
+          ...t,
+          items_count: items.length,
+          items_done: items.filter((i) => i.picked_quantity >= i.requested_quantity).length,
+          requested_units: items.reduce((s, i) => s + i.requested_quantity, 0),
+          picked_units: items.reduce((s, i) => s + i.picked_quantity, 0),
+        } as PickingTaskWithTotals;
+      });
+    },
+    staleTime: 10 * 1000,
+  });
+}
+
+/** Reabre uma tarefa fechada ou cancelada. */
+export function useReopenPickingTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from('scanner_picking_tasks')
+        .update({ status: 'pending', completed_at: null, cancelled_at: null })
+        .eq('id', taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Tarefa reaberta');
+      queryClient.invalidateQueries({ queryKey: ['scanner-picking-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['scanner-picking-tasks-all'] });
+    },
+    onError: (e) => toast.error('Erro ao reabrir tarefa: ' + mapDatabaseError(e)),
+  });
+}
+
+/** Elimina definitivamente uma tarefa (apenas administradores). */
+export function useDeletePickingTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error: itemsError } = await supabase
+        .from('scanner_picking_task_items')
+        .delete()
+        .eq('task_id', taskId);
+      if (itemsError) throw itemsError;
+      const { error } = await supabase.from('scanner_picking_tasks').delete().eq('id', taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Tarefa eliminada');
+      queryClient.invalidateQueries({ queryKey: ['scanner-picking-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['scanner-picking-tasks-all'] });
+    },
+    onError: (e) => toast.error('Erro ao eliminar tarefa: ' + mapDatabaseError(e)),
+  });
+}
+
