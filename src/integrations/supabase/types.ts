@@ -1102,6 +1102,57 @@ export type Database = {
           },
         ]
       }
+      transport_guides: {
+        Row: {
+          address_from: string
+          batch_id: string | null
+          client_name: string
+          created_at: string
+          created_by: string | null
+          guide_id: number | null
+          guide_number: string
+          id: string
+          order_code: string
+          order_id: string
+          permalink: string
+          plate: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          address_from?: string
+          batch_id?: string | null
+          client_name?: string
+          created_at?: string
+          created_by?: string | null
+          guide_id?: number | null
+          guide_number?: string
+          id?: string
+          order_code?: string
+          order_id: string
+          permalink?: string
+          plate?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          address_from?: string
+          batch_id?: string | null
+          client_name?: string
+          created_at?: string
+          created_by?: string | null
+          guide_id?: number | null
+          guide_number?: string
+          id?: string
+          order_code?: string
+          order_id?: string
+          permalink?: string
+          plate?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       warehouse_aisles: {
         Row: {
           color: string | null
@@ -1218,6 +1269,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      week_plans: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date_from: string
+          date_to: string
+          device_id: string
+          id: string
+          name: string
+          plan: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date_from?: string
+          date_to?: string
+          device_id?: string
+          id?: string
+          name?: string
+          plan?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date_from?: string
+          date_to?: string
+          device_id?: string
+          id?: string
+          name?: string
+          plan?: Json
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
