@@ -56,9 +56,17 @@ const groups: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: 'Logística',
+    items: [
+      { id: 'separation-notes', label: 'Notas de Separação', icon: FileText },
+      { id: 'route-optimization', label: 'Otimizar Semana', icon: RouteIcon },
+    ],
+  },
+  {
     label: 'Sistema',
     items: [{ id: 'settings', label: 'Configurações', icon: Settings }],
   },
+
 ];
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
