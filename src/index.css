@@ -244,9 +244,51 @@
 }
 
 @media print {
+  /* Esconde a navegação da app (sidebar, header, footer, toasts) na folha */
+  [data-sidebar],
+  [data-side][data-variant],
+  [data-sonner-toaster],
+  header,
+  footer,
+  body > div[role="region"][aria-label*="otific"] {
+    display: none !important;
+  }
+
+  /* Mas mantém os cabeçalhos/rodapés dos próprios documentos A4 */
+  #a4-sheet header {
+    display: flex !important;
+  }
+
+  #a4-sheet footer {
+    display: flex !important;
+  }
+
+
+
+  /* O conteúdo ocupa a folha inteira */
+  html,
+  body,
+  #root {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  main,
+  [data-slot="sidebar-inset"] {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
   #a4-sheet {
     display: block;
   }
+
 
   .a4-page {
     box-sizing: border-box;
