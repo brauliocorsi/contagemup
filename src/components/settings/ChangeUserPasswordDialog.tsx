@@ -86,6 +86,7 @@ export function ChangeUserPasswordDialog({ open, onOpenChange, userId, userName 
               minLength={6}
               required
             />
+            <PasswordStrengthMeter password={password} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirm-password">Confirmar senha</Label>
