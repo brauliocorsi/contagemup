@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { mapDatabaseError } from '@/lib/errorMessages';
+import { loadProductResolver } from '@/lib/logistics/productResolver';
 
 export interface PickingTask {
   id: string;
@@ -37,24 +38,15 @@ export interface NewPickingTaskItem {
   requested_quantity: number;
 }
 
-function norm(v: string | null | undefined) {
-  return (v ?? '').trim().toUpperCase();
-}
-
-/** Resolve product ids by product code or supplier code. */
-async function resolveProductIds(codes: string[]): Promise<Map<string, string>> {
+/** Resolve product ids by code, supplier code or product name. */
+async function resolveProductIds(
+  items: { product_code: string; product_name: string }[],
+): Promise<Map<string, string>> {
+  const resolver = await loadProductResolver();
   const map = new Map<string, string>();
-  const unique = [...new Set(codes.filter(Boolean))];
-  for (let i = 0; i < unique.length; i += 200) {
-    const chunk = unique.slice(i, i + 200);
-    const { data } = await supabase
-      .from('products')
-      .select('id, code, supplier_code')
-      .or(`code.in.(${chunk.join(',')}),supplier_code.in.(${chunk.join(',')})`);
-    for (const p of (data ?? []) as { id: string; code: string; supplier_code: string | null }[]) {
-      if (p.code) map.set(norm(p.code), p.id);
-      if (p.supplier_code) map.set(norm(p.supplier_code), p.id);
-    }
+  for (const it of items) {
+    const id = resolver.resolve(it.product_code, it.product_name);
+    if (id) map.set(`${it.product_code}||${it.product_name}`, id);
   }
   return map;
 }
@@ -115,10 +107,10 @@ export function useCreatePickingTask() {
         .single();
       if (error) throw error;
 
-      const ids = await resolveProductIds(input.items.map((i) => i.product_code));
+      const ids = await resolveProductIds(input.items);
       const rows = input.items.map((i) => ({
         task_id: task.id,
-        product_id: ids.get(norm(i.product_code)) ?? null,
+        product_id: ids.get(`${i.product_code}||${i.product_name}`) ?? null,
         product_code: i.product_code || '',
         product_name: i.product_name,
         details: i.details ?? null,

@@ -1,38 +1,26 @@
 import { supabase } from '@/integrations/supabase/client';
+import { loadProductResolver } from './productResolver';
 import type { PickingLine } from './picking';
 
 const PAGE = 1000;
-
-function norm(v: string | null | undefined): string {
-  return (v ?? '').trim().toUpperCase();
-}
 
 /**
  * Procura, para cada linha de picking, as localizações no armazém onde o
  * produto tem stock (soma de todos os colis por localização).
  */
 export async function attachPickingLocations(lines: PickingLine[]): Promise<PickingLine[]> {
-  const codes = [...new Set(lines.map((l) => l.codigo).filter(Boolean))];
-  if (codes.length === 0) return lines;
+  if (lines.length === 0) return lines;
 
-  const products: { id: string; code: string; supplier_code: string | null }[] = [];
-  for (let i = 0; i < codes.length; i += 200) {
-    const chunk = codes.slice(i, i + 200);
-    const { data } = await supabase
-      .from('products')
-      .select('id, code, supplier_code')
-      .or(`code.in.(${chunk.join(',')}),supplier_code.in.(${chunk.join(',')})`);
-    products.push(...((data ?? []) as typeof products));
-  }
-  if (products.length === 0) return lines;
-
-  const idByCode = new Map<string, string>();
-  for (const p of products) {
-    if (p.code) idByCode.set(norm(p.code), p.id);
-    if (p.supplier_code) idByCode.set(norm(p.supplier_code), p.id);
+  const resolver = await loadProductResolver();
+  const idByLine = new Map<string, string>();
+  for (const line of lines) {
+    const id = resolver.resolve(line.codigo, line.nome);
+    if (id) idByLine.set(line.key, id);
   }
 
-  const ids = [...new Set(products.map((p) => p.id))];
+  const ids = [...new Set(idByLine.values())];
+  if (ids.length === 0) return lines.map((l) => ({ ...l, localizacoes: '—' }));
+
   const counts: { product_id: string; location: string | null; quantity: number }[] = [];
   for (let i = 0; i < ids.length; i += 200) {
     const chunk = ids.slice(i, i + 200);
@@ -61,7 +49,7 @@ export async function attachPickingLocations(lines: PickingLine[]): Promise<Pick
   }
 
   return lines.map((line) => {
-    const id = idByCode.get(norm(line.codigo));
+    const id = idByLine.get(line.key);
     const map = id ? byProduct.get(id) : undefined;
     if (!map || map.size === 0) return { ...line, localizacoes: '—' };
     const localizacoes = [...map.entries()]
