@@ -920,6 +920,108 @@ export type Database = {
           },
         ]
       }
+      scanner_picking_task_items: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          locations: string | null
+          orders: string | null
+          picked_quantity: number
+          product_code: string
+          product_id: string | null
+          product_name: string
+          requested_quantity: number
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          locations?: string | null
+          orders?: string | null
+          picked_quantity?: number
+          product_code?: string
+          product_id?: string | null
+          product_name: string
+          requested_quantity?: number
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          locations?: string | null
+          orders?: string | null
+          picked_quantity?: number
+          product_code?: string
+          product_id?: string | null
+          product_name?: string
+          requested_quantity?: number
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scanner_picking_task_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scanner_picking_task_items_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "scanner_picking_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scanner_picking_tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          reference: string | null
+          source: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          reference?: string | null
+          source?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          reference?: string | null
+          source?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stock_movement_lines: {
         Row: {
           colis_number: number

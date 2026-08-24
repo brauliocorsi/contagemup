@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle } from 'lucide-react';
+import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle, MapPin, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,19 @@ import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import {
+  useOpenPickingTasks,
+  usePickingTaskItems,
+  useSavePickingProgress,
+  useClosePickingTask,
+  type PickingTask,
+} from '@/hooks/useScannerPickingTasks';
 
 interface PickLine extends ResolvedRow {
   picked: number;
+  /** id do artigo da tarefa (quando o picking vem das Notas de Separação) */
+  itemId?: string;
+  locations?: string | null;
 }
 
 interface Props {
@@ -35,8 +45,39 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(1);
   const [lastKey, setLastKey] = useState<string | null>(null);
+  const [task, setTask] = useState<PickingTask | null>(null);
   const stepRef = useRef(step);
   stepRef.current = step;
+
+  const { data: openTasks = [], isLoading: loadingTasks } = useOpenPickingTasks();
+  const { data: taskItems } = usePickingTaskItems(task?.id ?? null);
+  const saveProgress = useSavePickingProgress();
+  const closeTask = useClosePickingTask();
+
+  /** Carrega os artigos da tarefa escolhida (com o progresso já gravado). */
+  useEffect(() => {
+    if (!task || !taskItems) return;
+    setLines(
+      taskItems.map((it) => ({
+        key: it.id,
+        itemId: it.id,
+        code: it.product_code,
+        name: it.product_name,
+        quantity: it.requested_quantity,
+        details: it.details,
+        orders: it.orders,
+        locations: it.locations,
+        lines: [],
+        product: products.find((p) => p.id === it.product_id) ?? null,
+        candidates: [],
+        method: null,
+        status: it.product_id ? 'ready' : 'missing',
+        available: 0,
+        picked: it.picked_quantity,
+      })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, taskItems, products]);
 
   const totals = useMemo(() => {
     const requested = lines.reduce((s, l) => s + l.quantity, 0);
@@ -44,11 +85,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     return { requested, picked, pct: requested ? Math.round((picked / requested) * 100) : 0 };
   }, [lines]);
 
+
   const handleFile = async (file: File) => {
     setLoading(true);
     try {
       const raw = await parsePickingFile(file);
       const resolved = resolveRows(raw, products);
+      setTask(null);
       setLines(resolved.map((r) => ({ ...r, picked: 0 })));
       toast.success(`${resolved.length} linha(s) carregadas`);
     } catch (e: any) {
@@ -60,21 +103,32 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     }
   };
 
-  const bump = (key: string, delta: number) => {
-    setLines((prev) =>
-      prev.map((l) =>
-        l.key === key ? { ...l, picked: Math.max(0, Math.min(l.quantity, l.picked + delta)) } : l
-      )
-    );
-    setLastKey(key);
+  const linesRef = useRef<PickLine[]>(lines);
+  linesRef.current = lines;
+
+  /** Grava o progresso no servidor quando o picking veio de uma tarefa. */
+
+  const persist = (line: PickLine | undefined, picked: number) => {
+    if (!task || !line?.itemId) return;
+    saveProgress.mutate({ taskId: task.id, itemId: line.itemId, picked });
   };
 
   const setPicked = (key: string, value: number) => {
-    setLines((prev) =>
-      prev.map((l) => (l.key === key ? { ...l, picked: Math.max(0, Math.min(l.quantity, value)) } : l))
-    );
+    const current = linesRef.current.find((l) => l.key === key);
+    if (!current) return;
+    const next = Math.max(0, Math.min(current.quantity, value));
+    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, picked: next } : l)));
     setLastKey(key);
+    persist(current, next);
   };
+
+  const bump = (key: string, delta: number) => {
+    const current = linesRef.current.find((l) => l.key === key);
+    if (!current) return;
+    setPicked(key, current.picked + delta);
+  };
+
+
 
   /** Comandos CMD-QTY sobre a última linha conferida. */
   useEffect(() => {
@@ -100,8 +154,10 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       (l) =>
         l.code.trim().toLowerCase() === code ||
         l.product?.code.trim().toLowerCase() === code ||
+        (l.product?.supplier_code || '').trim().toLowerCase() === code ||
         l.name.trim().toLowerCase() === code
     );
+
     if (!match) {
       toast.error(`"${parsed.value}" não está nesta lista de picking`);
       return;
@@ -171,9 +227,15 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
           .map((l) => [l.product?.code || l.code, l.name, l.quantity, l.picked]),
       });
 
+      if (task) {
+        await closeTask.mutateAsync({ taskId: task.id, status: 'completed' });
+        setTask(null);
+      }
+
       toast.success(result?.fully_fulfilled ? 'Saída registada' : 'Saída registada parcialmente');
       setLines([]);
       setReference('');
+
     } catch (e: any) {
       console.error(e);
       toast.error('Erro ao registar saída: ' + mapDatabaseError(e));
@@ -205,6 +267,54 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       </div>
 
       <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <ClipboardList className="h-4 w-4" /> Picking pendente (Notas de Separação)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {loadingTasks ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          ) : openTasks.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sem listas enviadas para o scanner.</p>
+          ) : (
+            openTasks.map((t) => {
+              const active = task?.id === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    if (active) {
+                      setTask(null);
+                      setLines([]);
+                      return;
+                    }
+                    setTask(t);
+                    setReference(t.reference || t.name);
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-lg border p-2 text-left text-xs transition-colors ${
+                    active ? 'border-primary bg-primary/5' : 'hover:border-primary/40'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{t.name}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {new Date(t.created_at).toLocaleString('pt-PT')}
+                      {t.reference ? ` • ${t.reference}` : ''}
+                    </p>
+                  </div>
+                  <Badge variant={t.status === 'in_progress' ? 'default' : 'secondary'}>
+                    {t.status === 'in_progress' ? 'Em curso' : 'Pendente'}
+                  </Badge>
+                  {active && <X className="h-3.5 w-3.5 text-muted-foreground" />}
+                </button>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <ClipboardList className="h-4 w-4" /> Lista de picking
@@ -227,9 +337,10 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
         <CardContent className="space-y-3">
           {lines.length === 0 ? (
             <p className="rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
-              Carregue um ficheiro de picking (.xlsx) para começar a conferência.
+              Escolha uma lista pendente acima ou carregue um ficheiro de picking (.xlsx).
             </p>
           ) : (
+
             <>
               <div className="space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
@@ -261,6 +372,12 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                             {l.product?.code || l.code || 'sem código'}
                             {l.details ? ` • ${l.details}` : ''}
                           </p>
+                          {l.locations && (
+                            <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+                              <MapPin className="h-3 w-3" /> {l.locations}
+                            </p>
+                          )}
+
                           {!l.product && (
                             <p className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-600">
                               <AlertTriangle className="h-3 w-3" /> não registado no sistema

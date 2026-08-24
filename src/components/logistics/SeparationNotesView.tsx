@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { FileSpreadsheet, ListChecks, MapPin, Printer, Search, Truck } from 'lucide-react';
+import { FileSpreadsheet, ListChecks, MapPin, Printer, ScanBarcode, Search, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,8 @@ import { GuidesDocument } from './GuidesDocument';
 import { PickingReport } from './PickingReport';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
+import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
+
 import {
   buildDeliveryRoute,
   createTransportGuides,
@@ -70,6 +72,8 @@ export function SeparationNotesView() {
   const [history, setHistory] = useState<Record<string, GuideRecord>>({});
   const [confirmReissue, setConfirmReissue] = useState(false);
   const [routeLinks, setRouteLinks] = useState<string[]>([]);
+  const createTask = useCreatePickingTask();
+
 
   async function refreshHistory(ids: string[]) {
     if (ids.length === 0) {
@@ -263,6 +267,28 @@ export function SeparationNotesView() {
     await exportPickingXlsx(pickingKept, from, to, byCategory);
     toast.success('Ficheiro Excel gerado');
   }
+
+  async function sendToScanner() {
+    if (pickingKept.length === 0) {
+      toast.error('Nenhum artigo no picking');
+      return;
+    }
+    await createTask.mutateAsync({
+      name: `Picking ${from} a ${to}`,
+      reference: `SEP-${from}`,
+      notes: `${chosen.length} encomenda(s) das Notas de Separação`,
+      items: pickingKept.map((l) => ({
+        product_code: l.codigo,
+        product_name: l.nome,
+        details: l.detalhes || null,
+        orders: l.encomendas.join(', ') || null,
+        locations: l.localizacoes ?? null,
+        requested_quantity: l.quantidade,
+      })),
+    });
+    toast.success('Lista enviada para o Picking do Scanner');
+  }
+
 
   const guidesJob = useMutation({
     mutationFn: () =>
@@ -561,9 +587,18 @@ export function SeparationNotesView() {
             <Button variant="outline" onClick={() => void exportPicking()} disabled={pickingKept.length === 0}>
               <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => void sendToScanner()}
+              disabled={pickingKept.length === 0 || createTask.isPending}
+            >
+              <ScanBarcode className="mr-2 h-4 w-4" />
+              {createTask.isPending ? 'A enviar…' : 'Enviar para o Scanner'}
+            </Button>
             <Button onClick={printPickingReport} disabled={pickingKept.length === 0}>
               <Printer className="mr-2 h-4 w-4" /> Imprimir picking
             </Button>
+
           </div>
           {picking === null ? (
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">
