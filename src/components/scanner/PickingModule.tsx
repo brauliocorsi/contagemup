@@ -103,7 +103,11 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     }
   };
 
+  const linesRef = useRef<PickLine[]>(lines);
+  linesRef.current = lines;
+
   /** Grava o progresso no servidor quando o picking veio de uma tarefa. */
+
   const persist = (line: PickLine | undefined, picked: number) => {
     if (!task || !line?.itemId) return;
     saveProgress.mutate({ taskId: task.id, itemId: line.itemId, picked });
