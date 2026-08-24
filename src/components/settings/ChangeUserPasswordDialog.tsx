@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { KeyRound, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { PasswordStrengthMeter, evaluatePassword } from './PasswordStrengthMeter';
 
 interface Props {
   open: boolean;
@@ -32,6 +33,14 @@ export function ChangeUserPasswordDialog({ open, onOpenChange, userId, userName 
 
     if (password.length < 6) {
       toast({ title: 'Erro', description: 'A senha deve ter pelo menos 6 caracteres', variant: 'destructive' });
+      return;
+    }
+    if (evaluatePassword(password).score === 0) {
+      toast({
+        title: 'Senha demasiado fraca',
+        description: 'Escolha uma senha mais forte (letras, números e símbolos).',
+        variant: 'destructive',
+      });
       return;
     }
     if (password !== confirm) {
@@ -85,6 +94,7 @@ export function ChangeUserPasswordDialog({ open, onOpenChange, userId, userName 
               minLength={6}
               required
             />
+            <PasswordStrengthMeter password={password} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirm-password">Confirmar senha</Label>
