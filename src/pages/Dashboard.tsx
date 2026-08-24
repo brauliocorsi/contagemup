@@ -16,6 +16,7 @@ const ReportsView = lazy(() => import('@/components/reports/ReportsView').then(m
 
 const StockEntriesView = lazy(() => import('@/components/stock/StockEntriesView').then(m => ({ default: m.StockEntriesView })));
 const StockExitsView = lazy(() => import('@/components/stock/StockExitsView').then(m => ({ default: m.StockExitsView })));
+const ScannerPickingAdminView = lazy(() => import('@/components/stock/ScannerPickingAdminView').then(m => ({ default: m.ScannerPickingAdminView })));
 const StockAlertsView = lazy(() => import('@/components/stock/StockAlertsView').then(m => ({ default: m.StockAlertsView })));
 const WarehouseMapView = lazy(() => import('@/components/warehouse/WarehouseMapView').then(m => ({ default: m.WarehouseMapView })));
 const DamagesView = lazy(() => import('@/components/damages/DamagesView').then(m => ({ default: m.DamagesView })));
@@ -100,6 +101,7 @@ export default function Dashboard() {
               {activeTab === 'entries' && <StockEntriesView />}
               {activeTab === 'exits' && <StockExitsView />}
               {activeTab === 'alerts' && <StockAlertsView />}
+              {activeTab === 'scanner-picking' && <ScannerPickingAdminView />}
               {activeTab === 'damages' && <DamagesView />}
               {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
               {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}

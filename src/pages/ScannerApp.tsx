@@ -12,6 +12,7 @@ import {
   Loader2,
   LayoutGrid,
   Tags,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { LoginForm } from '@/components/auth/LoginForm';
@@ -23,11 +24,12 @@ import { PickingModule } from '@/components/scanner/PickingModule';
 import { EntryModule } from '@/components/scanner/EntryModule';
 import { PrintCenterModule } from '@/components/scanner/PrintCenterModule';
 import { SupplierCodeModule } from '@/components/scanner/SupplierCodeModule';
+import { CountingModule } from '@/components/scanner/CountingModule';
 import { parseCommand, SCANNER_MODES, type QtyHandler, type ScannerMode } from '@/lib/scanner/commands';
 import { printCommandSheet } from '@/lib/scanner/labels';
 import { toast } from 'sonner';
 
-type View = 'home' | ScannerMode | 'impressao' | 'fornecedor';
+type View = 'home' | ScannerMode | 'impressao' | 'fornecedor' | 'contagem';
 
 const OPERATIONS: Array<{
   id: View;
@@ -65,6 +67,13 @@ const OPERATIONS: Array<{
     accent: 'bg-primary-soft text-primary',
   },
   {
+    id: 'contagem',
+    label: 'Contagem',
+    description: 'Conferir localizações atribuídas',
+    icon: ClipboardCheck,
+    accent: 'bg-success-soft text-success',
+  },
+  {
     id: 'fornecedor',
     label: 'Cód. Fornecedor',
     description: 'Associar códigos de barras do fornecedor',
@@ -85,7 +94,7 @@ const NAV: Array<{ id: View; label: string; icon: typeof Search }> = [
   { id: 'consulta', label: 'Consulta', icon: Search },
   { id: 'transferencia', label: 'Transf.', icon: ArrowRightLeft },
   { id: 'picking', label: 'Picking', icon: ClipboardList },
-  { id: 'entradas', label: 'Entradas', icon: PackagePlus },
+  { id: 'contagem', label: 'Contagem', icon: ClipboardCheck },
 ];
 
 export default function ScannerApp() {
@@ -201,6 +210,7 @@ export default function ScannerApp() {
         {view === 'transferencia' && <TransferModule onCommand={handleCommand} />}
         {view === 'picking' && <PickingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'entradas' && <EntryModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
+        {view === 'contagem' && <CountingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'fornecedor' && <SupplierCodeModule onCommand={handleCommand} />}
         {view === 'impressao' && <PrintCenterModule />}
       </main>
