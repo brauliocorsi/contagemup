@@ -555,7 +555,7 @@ export function SeparationNotesView() {
               <Checkbox checked={byCategory} onCheckedChange={(v) => setByCategory(Boolean(v))} />
               Separar por categoria
             </label>
-            <Button variant="outline" onClick={generatePicking}>
+            <Button variant="outline" onClick={() => void generatePicking()}>
               <ListChecks className="mr-2 h-4 w-4" /> Gerar picking
             </Button>
             <Button variant="outline" onClick={() => void exportPicking()} disabled={pickingKept.length === 0}>
@@ -578,6 +578,7 @@ export function SeparationNotesView() {
                     <th className="px-3 py-2">Código</th>
                     <th className="px-3 py-2">Produto</th>
                     <th className="px-3 py-2">Detalhes</th>
+                    <th className="px-3 py-2">Localização</th>
                     <th className="px-3 py-2">Encomendas</th>
                     <th className="px-3 py-2">Qtd. total</th>
                   </tr>
@@ -597,7 +598,7 @@ export function SeparationNotesView() {
                             }
                           />
                         </td>
-                        <td className="px-3 py-2 text-xs font-bold uppercase tracking-wide" colSpan={4}>
+                        <td className="px-3 py-2 text-xs font-bold uppercase tracking-wide" colSpan={5}>
                           {row.categoria}
                         </td>
                         <td className="px-3 py-2 font-semibold">{row.quantidade}</td>
@@ -616,6 +617,7 @@ export function SeparationNotesView() {
                         <td className="px-3 py-2 text-muted-foreground">{row.line.codigo}</td>
                         <td className="px-3 py-2 font-medium">{row.line.nome}</td>
                         <td className="px-3 py-2 text-muted-foreground">{row.line.detalhes}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{row.line.localizacoes ?? '—'}</td>
                         <td className="px-3 py-2 text-muted-foreground">{row.line.encomendas.join(', ')}</td>
                         <td className="px-3 py-2 font-semibold">{row.line.quantidade}</td>
                       </tr>
