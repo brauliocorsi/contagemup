@@ -127,7 +127,7 @@ export function ScannerPickingAdminView() {
       <PageHeader
         title="Picking Scanner"
         description="Histórico e gestão das listas de picking enviadas para o leitor de códigos"
-        icon={ClipboardList}
+        icon={<ClipboardList className="h-5 w-5" />}
       />
 
       <Tabs value={status} onValueChange={setStatus}>
