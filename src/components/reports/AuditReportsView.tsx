@@ -170,6 +170,7 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                   <TableHead>Nome</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Localizações</TableHead>
+                  <TableHead>Responsável</TableHead>
                   <TableHead>Criada em</TableHead>
                   <TableHead>Concluída em</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
