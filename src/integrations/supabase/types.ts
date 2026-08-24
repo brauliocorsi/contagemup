@@ -331,6 +331,7 @@ export type Database = {
       }
       location_audits: {
         Row: {
+          assigned_to: string | null
           completed_at: string | null
           created_at: string
           created_by: string | null
@@ -343,6 +344,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
@@ -355,6 +357,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
@@ -927,6 +930,8 @@ export type Database = {
           id: string
           locations: string | null
           orders: string | null
+          picked_at: string | null
+          picked_by: string | null
           picked_quantity: number
           product_code: string
           product_id: string | null
@@ -941,6 +946,8 @@ export type Database = {
           id?: string
           locations?: string | null
           orders?: string | null
+          picked_at?: string | null
+          picked_by?: string | null
           picked_quantity?: number
           product_code?: string
           product_id?: string | null
@@ -955,6 +962,8 @@ export type Database = {
           id?: string
           locations?: string | null
           orders?: string | null
+          picked_at?: string | null
+          picked_by?: string | null
           picked_quantity?: number
           product_code?: string
           product_id?: string | null
@@ -982,6 +991,7 @@ export type Database = {
       }
       scanner_picking_tasks: {
         Row: {
+          cancelled_at: string | null
           completed_at: string | null
           created_at: string
           created_by: string | null
@@ -995,6 +1005,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancelled_at?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
@@ -1008,6 +1019,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancelled_at?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
