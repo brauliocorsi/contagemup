@@ -91,6 +91,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     try {
       const raw = await parsePickingFile(file);
       const resolved = resolveRows(raw, products);
+      setTask(null);
       setLines(resolved.map((r) => ({ ...r, picked: 0 })));
       toast.success(`${resolved.length} linha(s) carregadas`);
     } catch (e: any) {
@@ -102,21 +103,42 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     }
   };
 
+  /** Grava o progresso no servidor quando o picking veio de uma tarefa. */
+  const persist = (line: PickLine | undefined, picked: number) => {
+    if (!task || !line?.itemId) return;
+    saveProgress.mutate({ taskId: task.id, itemId: line.itemId, picked });
+  };
+
   const bump = (key: string, delta: number) => {
+    let updated: PickLine | undefined;
+    let value = 0;
     setLines((prev) =>
-      prev.map((l) =>
-        l.key === key ? { ...l, picked: Math.max(0, Math.min(l.quantity, l.picked + delta)) } : l
-      )
+      prev.map((l) => {
+        if (l.key !== key) return l;
+        value = Math.max(0, Math.min(l.quantity, l.picked + delta));
+        updated = l;
+        return { ...l, picked: value };
+      })
     );
     setLastKey(key);
+    persist(updated, value);
   };
 
   const setPicked = (key: string, value: number) => {
+    let updated: PickLine | undefined;
+    let next = 0;
     setLines((prev) =>
-      prev.map((l) => (l.key === key ? { ...l, picked: Math.max(0, Math.min(l.quantity, value)) } : l))
+      prev.map((l) => {
+        if (l.key !== key) return l;
+        next = Math.max(0, Math.min(l.quantity, value));
+        updated = l;
+        return { ...l, picked: next };
+      })
     );
     setLastKey(key);
+    persist(updated, next);
   };
+
 
   /** Comandos CMD-QTY sobre a última linha conferida. */
   useEffect(() => {
