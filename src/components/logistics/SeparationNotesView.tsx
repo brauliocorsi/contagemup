@@ -70,6 +70,8 @@ export function SeparationNotesView() {
   const [history, setHistory] = useState<Record<string, GuideRecord>>({});
   const [confirmReissue, setConfirmReissue] = useState(false);
   const [routeLinks, setRouteLinks] = useState<string[]>([]);
+  const createTask = useCreatePickingTask();
+
 
   async function refreshHistory(ids: string[]) {
     if (ids.length === 0) {
