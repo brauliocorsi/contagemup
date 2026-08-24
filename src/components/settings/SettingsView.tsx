@@ -245,6 +245,9 @@ export function SettingsView() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Função</TableHead>
                     <TableHead className="text-right">Data de Registo</TableHead>
+                    {currentProfile?.role === 'admin' && (
+                      <TableHead className="text-right">Ações</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
