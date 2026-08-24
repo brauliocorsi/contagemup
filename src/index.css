@@ -236,3 +236,284 @@
     background-image: var(--gradient-sidebar);
   }
 }
+
+
+/* ===== Logística: impressão A4 (notas de separação, guias, picking) ===== */
+#a4-sheet {
+  display: none;
+}
+
+@media print {
+  #a4-sheet {
+    display: block;
+  }
+
+  .a4-page {
+    box-sizing: border-box;
+    width: 100%;
+    color: #000;
+    background: #fff;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .a4-page:last-child {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}
+
+/* Replica do documento A4 da Gestão Click */
+.gc-doc {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.35;
+}
+
+.gc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 2px solid #000;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+
+.gc-company {
+  font-size: 16pt;
+  font-weight: 700;
+  margin: 0;
+}
+
+.gc-muted {
+  color: #444;
+  font-size: 8.5pt;
+  margin: 0;
+}
+
+.gc-doc-id {
+  text-align: right;
+}
+
+.gc-doc-id h2 {
+  font-size: 12pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.gc-doc-id p {
+  margin: 0;
+  font-size: 9pt;
+}
+
+.gc-code {
+  font-weight: 700;
+}
+
+.gc-block {
+  margin-bottom: 10px;
+  break-inside: avoid;
+}
+
+.gc-section-title {
+  background: #eee;
+  border: 1px solid #999;
+  font-size: 9pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  margin: 0 0 5px;
+}
+
+.gc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px 16px;
+  padding: 0 3px;
+}
+
+.gc-field {
+  margin: 0;
+}
+
+.gc-label {
+  font-weight: 700;
+}
+
+.gc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+
+.gc-table th,
+.gc-table td {
+  border: 1px solid #999;
+  padding: 3px 5px;
+  vertical-align: top;
+}
+
+.gc-table thead th {
+  background: #eee;
+  font-weight: 700;
+}
+
+.gc-left {
+  text-align: left;
+}
+
+.gc-center {
+  text-align: center;
+}
+
+.gc-right {
+  text-align: right;
+}
+
+.gc-w-cod {
+  width: 22mm;
+}
+
+.gc-w-qtd {
+  width: 12mm;
+}
+
+
+.gc-w-un {
+  width: 12mm;
+}
+
+.gc-w-val {
+  width: 25mm;
+}
+
+.gc-detail {
+  font-size: 8pt;
+  color: #444;
+}
+
+.gc-totals-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.gc-totals {
+  border-collapse: collapse;
+  font-size: 9.5pt;
+  min-width: 70mm;
+}
+
+.gc-totals td {
+  border: 1px solid #999;
+  padding: 3px 6px;
+}
+
+.gc-total-row td {
+  font-weight: 700;
+  background: #eee;
+}
+
+.gc-text {
+  white-space: pre-wrap;
+  margin: 0 3px 10px;
+}
+
+.gc-small {
+  font-size: 7.5pt;
+  line-height: 1.25;
+}
+
+.gc-signatures {
+  display: flex;
+  gap: 20mm;
+  justify-content: space-between;
+  margin-top: 10mm;
+  text-align: center;
+  font-size: 8.5pt;
+  break-inside: avoid;
+}
+
+.gc-signatures > div {
+  flex: 1;
+}
+
+.gc-line {
+  display: block;
+  border-top: 1px solid #000;
+  margin-bottom: 3px;
+}
+
+/* Prioridade a uma única página: compacta conforme a quantidade de linhas. */
+.gc-dense {
+  font-size: 8.5pt;
+  line-height: 1.2;
+}
+
+.gc-dense .gc-table {
+  font-size: 8pt;
+}
+
+.gc-dense .gc-table th,
+.gc-dense .gc-table td {
+  padding: 1.5px 4px;
+}
+
+.gc-dense .gc-detail {
+  font-size: 7pt;
+}
+
+.gc-dense .gc-company {
+  font-size: 13pt;
+}
+
+.gc-dense .gc-block {
+  margin-bottom: 6px;
+}
+
+.gc-dense .gc-signatures {
+  margin-top: 6mm;
+}
+
+.gc-xdense {
+  font-size: 7.5pt;
+  line-height: 1.12;
+}
+
+.gc-xdense .gc-table {
+  font-size: 7pt;
+}
+
+.gc-xdense .gc-table th,
+.gc-xdense .gc-table td {
+  padding: 0.5px 3px;
+}
+
+.gc-xdense .gc-detail {
+  font-size: 6pt;
+}
+
+.gc-xdense .gc-company {
+  font-size: 12pt;
+}
+
+.gc-xdense .gc-section-title {
+  font-size: 7.5pt;
+  padding: 1px 4px;
+  margin-bottom: 3px;
+}
+
+.gc-xdense .gc-block {
+  margin-bottom: 4px;
+}
+
+.gc-xdense .gc-signatures {
+  margin-top: 4mm;
+}
+
+
+
+@media print {
+  .no-print { display: none !important; }
+}
