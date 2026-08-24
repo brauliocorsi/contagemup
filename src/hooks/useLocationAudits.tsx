@@ -300,3 +300,24 @@ export function useLocationAudits() {
     deleteAudit,
   };
 }
+
+/** Conferências atribuídas ao utilizador autenticado (ou sem responsável). */
+export function useMyLocationAudits() {
+  return useQuery({
+    queryKey: ['my-location-audits'],
+    queryFn: async (): Promise<LocationAudit[]> => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      let query = supabase
+        .from('location_audits')
+        .select('*')
+        .in('status', ['pending', 'in_progress'])
+        .order('created_at', { ascending: false });
+      if (uid) query = query.or(`assigned_to.eq.${uid},assigned_to.is.null`);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as LocationAudit[];
+    },
+    staleTime: 10 * 1000,
+  });
+}
