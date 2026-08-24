@@ -94,6 +94,7 @@ const NAV: Array<{ id: View; label: string; icon: typeof Search }> = [
   { id: 'consulta', label: 'Consulta', icon: Search },
   { id: 'transferencia', label: 'Transf.', icon: ArrowRightLeft },
   { id: 'picking', label: 'Picking', icon: ClipboardList },
+  { id: 'entradas', label: 'Entradas', icon: PackagePlus },
   { id: 'contagem', label: 'Contagem', icon: ClipboardCheck },
 ];
 
@@ -216,7 +217,7 @@ export default function ScannerApp() {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur">
-        <div className="mx-auto grid max-w-3xl grid-cols-5">
+        <div className="mx-auto grid max-w-3xl grid-cols-6">
           {NAV.map((m) => {
             const Icon = m.icon;
             const active = view === m.id;
