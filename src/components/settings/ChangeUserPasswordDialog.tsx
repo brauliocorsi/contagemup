@@ -35,6 +35,14 @@ export function ChangeUserPasswordDialog({ open, onOpenChange, userId, userName 
       toast({ title: 'Erro', description: 'A senha deve ter pelo menos 6 caracteres', variant: 'destructive' });
       return;
     }
+    if (evaluatePassword(password).score === 0) {
+      toast({
+        title: 'Senha demasiado fraca',
+        description: 'Escolha uma senha mais forte (letras, números e símbolos).',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (password !== confirm) {
       toast({ title: 'Erro', description: 'As senhas não coincidem', variant: 'destructive' });
       return;
