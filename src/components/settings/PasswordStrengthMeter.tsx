@@ -16,12 +16,16 @@ export interface PasswordStrength {
 
 export function evaluatePassword(password: string): PasswordStrength {
   const lower = password.toLowerCase();
+  const hasPredictableSequence = /(?:0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf|a1b2|b2c3|c3d4|d4e5)/i.test(password);
   const checks = [
     { label: 'Mínimo 8 caracteres', ok: password.length >= 8 },
     { label: 'Letras maiúsculas e minúsculas', ok: /[a-z]/.test(password) && /[A-Z]/.test(password) },
     { label: 'Pelo menos um número', ok: /\d/.test(password) },
     { label: 'Pelo menos um símbolo', ok: /[^A-Za-z0-9]/.test(password) },
-    { label: 'Não é uma senha comum', ok: password.length > 0 && !COMMON.some((c) => lower.includes(c)) },
+    {
+      label: 'Sem palavras ou sequências previsíveis',
+      ok: password.length > 0 && !COMMON.some((c) => lower.includes(c)) && !hasPredictableSequence,
+    },
   ];
 
   let score = checks.filter((c) => c.ok).length;
