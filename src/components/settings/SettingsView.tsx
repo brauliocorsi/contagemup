@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Users, UserPlus, Loader2, Trash2, Mail, User, Database, AlertTriangle } from 'lucide-react';
+import { Settings, Users, UserPlus, Loader2, Trash2, Mail, User, Database, AlertTriangle, KeyRound } from 'lucide-react';
 // StockDataRepairDialog removed: underlying RPCs dropped in stock refactor Phase 1.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
