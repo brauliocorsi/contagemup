@@ -459,6 +459,37 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!taskToRemove} onOpenChange={(o) => !o && setTaskToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover lista de picking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{taskToRemove?.name}" deixa de aparecer no scanner. Cancelar mantém o histórico;
+              eliminar remove definitivamente (apenas administradores).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => taskToRemove && removeTask(taskToRemove, 'cancel')}
+              disabled={closeTask.isPending}
+            >
+              Cancelar lista
+            </Button>
+            <AlertDialogAction
+              disabled={!isAdmin || deleteTask.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (taskToRemove) removeTask(taskToRemove, 'delete');
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
