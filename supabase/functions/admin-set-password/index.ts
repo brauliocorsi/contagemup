@@ -1,6 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.90.1';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3.24.2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 const BodySchema = z.object({
   user_id: z.string().uuid(),
