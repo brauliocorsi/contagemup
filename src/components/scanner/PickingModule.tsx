@@ -109,35 +109,21 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     saveProgress.mutate({ taskId: task.id, itemId: line.itemId, picked });
   };
 
-  const bump = (key: string, delta: number) => {
-    let updated: PickLine | undefined;
-    let value = 0;
-    setLines((prev) =>
-      prev.map((l) => {
-        if (l.key !== key) return l;
-        value = Math.max(0, Math.min(l.quantity, l.picked + delta));
-        updated = l;
-        return { ...l, picked: value };
-      })
-    );
+  const setPicked = (key: string, value: number) => {
+    const current = linesRef.current.find((l) => l.key === key);
+    if (!current) return;
+    const next = Math.max(0, Math.min(current.quantity, value));
+    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, picked: next } : l)));
     setLastKey(key);
-    persist(updated, value);
+    persist(current, next);
   };
 
-  const setPicked = (key: string, value: number) => {
-    let updated: PickLine | undefined;
-    let next = 0;
-    setLines((prev) =>
-      prev.map((l) => {
-        if (l.key !== key) return l;
-        next = Math.max(0, Math.min(l.quantity, value));
-        updated = l;
-        return { ...l, picked: next };
-      })
-    );
-    setLastKey(key);
-    persist(updated, next);
+  const bump = (key: string, delta: number) => {
+    const current = linesRef.current.find((l) => l.key === key);
+    if (!current) return;
+    setPicked(key, current.picked + delta);
   };
+
 
 
   /** Comandos CMD-QTY sobre a última linha conferida. */
