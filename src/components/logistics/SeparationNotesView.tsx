@@ -277,14 +277,20 @@ export function SeparationNotesView() {
       name: `Picking ${from} a ${to}`,
       reference: `SEP-${from}`,
       notes: `${chosen.length} encomenda(s) das Notas de Separação`,
-      items: pickingKept.map((l) => ({
-        product_code: l.codigo,
-        product_name: l.nome,
-        details: l.detalhes || null,
-        orders: l.encomendas.join(', ') || null,
-        locations: l.localizacoes ?? null,
-        requested_quantity: l.quantidade,
-      })),
+      items: pickingKept.flatMap((l) => {
+        const base = {
+          product_code: l.codigo,
+          product_name: l.nome,
+          details: l.detalhes || null,
+          locations: l.localizacoes ?? null,
+        };
+        const entries = Object.entries(l.porEncomenda ?? {}).filter(([, q]) => q > 0);
+        if (entries.length === 0) {
+          return [{ ...base, orders: l.encomendas.join(', ') || null, requested_quantity: l.quantidade }];
+        }
+        // uma linha por nota de encomenda, para permitir reserva e entrega por nota
+        return entries.map(([order, qty]) => ({ ...base, orders: order, requested_quantity: qty }));
+      }),
     });
     toast.success('Lista enviada para o Picking do Scanner');
   }
