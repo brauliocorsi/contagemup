@@ -50,12 +50,17 @@ import type { LabelItem } from '@/lib/scanner/labels';
 
 /** Uma etiqueta por unidade de cada item existente na localização */
 function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
-  const items: LabelItem[] = [];
+  const map = new Map<string, LabelItem>();
   location.products.forEach((p) => {
     const code = (p.productCode || '').trim();
     if (!code || p.quantity <= 0) return;
     const coliCode = p.colisNumber > 1 ? `${code}-C${p.colisNumber}` : code;
-    items.push({
+    const existing = map.get(coliCode);
+    if (existing) {
+      existing.copies = (existing.copies || 1) + p.quantity;
+      return;
+    }
+    map.set(coliCode, {
       code: coliCode,
       title: p.productName,
       subtitle: `Código: ${code}`,
@@ -63,7 +68,7 @@ function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
       copies: p.quantity,
     });
   });
-  return items;
+  return Array.from(map.values());
 }
 
 interface DragItem {
