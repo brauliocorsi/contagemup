@@ -781,6 +781,23 @@ export function InteractiveWarehouseMap() {
                 </div>
               </div>
 
+              {/* Impressão de etiquetas unidade a unidade */}
+              {selectedLocation.products.length > 0 && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border p-3">
+                  <div>
+                    <p className="text-sm font-medium">Etiquetas desta localização</p>
+                    <p className="text-xs text-muted-foreground">
+                      Uma etiqueta por unidade ({selectedLocation.totalQuantity} etiquetas)
+                    </p>
+                  </div>
+                  <PrintMenu
+                    label="Imprimir etiquetas"
+                    variant="outline"
+                    getItems={() => buildLocationUnitLabels(selectedLocation)}
+                  />
+                </div>
+              )}
+
               {/* Products list */}
               {selectedLocation.products.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
