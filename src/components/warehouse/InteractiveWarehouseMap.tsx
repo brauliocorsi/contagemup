@@ -238,7 +238,7 @@ export function InteractiveWarehouseMap() {
   const freeStockZones = useMemo(() => {
     return filteredLocations
       .filter(loc =>
-        (loc.location_type ?? 'stock') === 'stock' &&
+        ['stock', 'conferencia'].includes(loc.location_type ?? 'stock') &&
         !loc.is_staging &&
         !loc.aisle_id &&
         !loc.level_id
@@ -774,7 +774,7 @@ export function InteractiveWarehouseMap() {
               <CardTitle className="text-base flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  Zonas de stock livres (sem rua/rack)
+                  Zonas livres e conferência (sem rua/rack)
                 </div>
                 <div className="flex items-center gap-2 text-xs font-normal">
                   <Badge variant="outline" className="text-xs">
@@ -811,7 +811,9 @@ export function InteractiveWarehouseMap() {
                         <Package className="h-2.5 w-2.5" />
                         {location.totalQuantity} un • {location.totalProducts} prod.
                       </div>
-                      <span className="text-[10px] text-muted-foreground">Zona livre</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {location.location_type === 'conferencia' ? 'Conferência' : 'Zona livre'}
+                      </span>
                     </button>
                   );
                 })}
