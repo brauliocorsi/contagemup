@@ -149,7 +149,7 @@ export function LoadingModule({ onCommand }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={vehicle} onValueChange={setVehicle}>
+          <Select value={vehicle} onValueChange={selectVehicle}>
             <SelectTrigger>
               <SelectValue placeholder="Escolher carrinha" />
             </SelectTrigger>
