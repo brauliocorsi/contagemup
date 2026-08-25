@@ -166,10 +166,12 @@ export function LocationsConfig() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-mono font-bold">{location.code}</p>
-                    {(location.location_type ?? 'stock') !== 'stock' && (
+                    {(location.location_type ?? 'stock') !== 'stock' ? (
                       <Badge variant="secondary">
                         {LOCATION_TYPE_LABELS[location.location_type as LocationType] ?? 'Zona livre'}
                       </Badge>
+                    ) : (!location.aisle_id && !location.level_id) && (
+                      <Badge variant="outline">Zona de stock livre</Badge>
                     )}
                     {location.aisle && (
                       <span 
