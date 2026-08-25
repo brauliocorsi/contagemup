@@ -9,6 +9,8 @@ export type PickingLine = {
   categoria: string;
   quantidade: number;
   encomendas: string[];
+  /** Quantidade por nota de encomenda (chave = código da encomenda). */
+  porEncomenda: Record<string, number>;
   localizacoes?: string;
 };
 
@@ -64,9 +66,14 @@ export function buildPicking(orders: SepOrder[]): PickingLine[] {
         categoria: categoryOf(produto.nome),
         quantidade: 0,
         encomendas: [],
+        porEncomenda: {},
       };
-      line.quantidade += toNumber(produto.quantidade);
-      if (order.codigo && !line.encomendas.includes(order.codigo)) line.encomendas.push(order.codigo);
+      const qtd = toNumber(produto.quantidade);
+      line.quantidade += qtd;
+      if (order.codigo) {
+        if (!line.encomendas.includes(order.codigo)) line.encomendas.push(order.codigo);
+        line.porEncomenda[order.codigo] = (line.porEncomenda[order.codigo] ?? 0) + qtd;
+      }
       map.set(key, line);
     }
   }

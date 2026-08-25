@@ -23,6 +23,7 @@ const DamagesView = lazy(() => import('@/components/damages/DamagesView').then(m
 const SettingsView = lazy(() => import('@/components/settings/SettingsView').then(m => ({ default: m.SettingsView })));
 const RecentProductsView = lazy(() => import('@/components/products/RecentProductsView').then(m => ({ default: m.RecentProductsView })));
 const SeparationNotesView = lazy(() => import('@/components/logistics/SeparationNotesView').then(m => ({ default: m.SeparationNotesView })));
+const DeliveriesView = lazy(() => import('@/components/logistics/DeliveriesView').then(m => ({ default: m.DeliveriesView })));
 const RouteOptimizationView = lazy(() => import('@/components/logistics/RouteOptimizationView').then(m => ({ default: m.RouteOptimizationView })));
 
 
@@ -107,6 +108,7 @@ export default function Dashboard() {
               {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
               {activeTab === 'recent' && <RecentProductsView />}
               {activeTab === 'separation-notes' && <SeparationNotesView />}
+              {activeTab === 'deliveries' && <DeliveriesView />}
               {activeTab === 'route-optimization' && (
                 <RouteOptimizationView onSendToSeparation={() => setActiveTab('separation-notes')} />
               )}

@@ -25,6 +25,15 @@ export interface WarehouseLevel {
   updated_at: string;
 }
 
+export type LocationType = 'stock' | 'pre_exit' | 'transport' | 'quarantine';
+
+export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
+  stock: 'Stock (rua/rack)',
+  pre_exit: 'Pré-saída (cais de carga)',
+  transport: 'Transporte (carrinha)',
+  quarantine: 'Quarentena (devoluções)',
+};
+
 export interface WarehouseLocation {
   id: string;
   code: string;
@@ -33,6 +42,7 @@ export interface WarehouseLocation {
   position_in_aisle: number;
   notes: string | null;
   is_staging?: boolean;
+  location_type?: LocationType;
   created_at: string;
   updated_at: string;
   aisle?: WarehouseAisle | null;
