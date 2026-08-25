@@ -45,6 +45,31 @@ import { useActiveSession } from '@/hooks/useActiveSession';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PrintMenu } from '@/components/scanner/PrintMenu';
+import type { LabelItem } from '@/lib/scanner/labels';
+
+/** Uma etiqueta por unidade de cada item existente na localização */
+function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
+  const map: globalThis.Map<string, LabelItem> = new globalThis.Map();
+  location.products.forEach((p) => {
+    const code = (p.productCode || '').trim();
+    if (!code || p.quantity <= 0) return;
+    const coliCode = p.colisNumber > 1 ? `${code}-C${p.colisNumber}` : code;
+    const existing = map.get(coliCode);
+    if (existing) {
+      existing.copies = (existing.copies || 1) + p.quantity;
+      return;
+    }
+    map.set(coliCode, {
+      code: coliCode,
+      title: p.productName,
+      subtitle: `Código: ${code}`,
+      extra: [`Coli ${p.colisNumber}`, `Local: ${location.code}`],
+      copies: p.quantity,
+    });
+  });
+  return Array.from(map.values());
+}
 
 interface DragItem {
   countId: string;
@@ -780,6 +805,23 @@ export function InteractiveWarehouseMap() {
                   <p className="text-xs text-muted-foreground">Unidades</p>
                 </div>
               </div>
+
+              {/* Impressão de etiquetas unidade a unidade */}
+              {selectedLocation.products.length > 0 && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border p-3">
+                  <div>
+                    <p className="text-sm font-medium">Etiquetas desta localização</p>
+                    <p className="text-xs text-muted-foreground">
+                      Uma etiqueta por unidade ({selectedLocation.totalQuantity} etiquetas)
+                    </p>
+                  </div>
+                  <PrintMenu
+                    label="Imprimir etiquetas"
+                    variant="outline"
+                    getItems={() => buildLocationUnitLabels(selectedLocation)}
+                  />
+                </div>
+              )}
 
               {/* Products list */}
               {selectedLocation.products.length === 0 ? (
