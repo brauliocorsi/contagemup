@@ -39,7 +39,7 @@ import {
 } from '@/hooks/useWarehouseConfig';
 
 const LOCATION_TYPE_HINTS: Record<LocationType, string> = {
-  stock: 'Localização normal de armazém (rua/rack).',
+  stock: 'Localização de armazém. Pode ter rua/rack ou ser uma zona livre (ex: área de sofás) escolhendo "Sem rua" e "Sem nível".',
   pre_exit: 'Cais de carga: destino do picking antes do carregamento.',
   transport: 'Viatura (Carrinha X, Y...): stock carregado e a caminho do cliente.',
   quarantine: 'Zona de devoluções/quarentena.',
