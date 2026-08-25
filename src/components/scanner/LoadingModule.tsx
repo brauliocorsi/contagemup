@@ -288,6 +288,7 @@ export function LoadingModule({ onCommand }: Props) {
                         size="sm"
                         variant="outline"
                         className="h-7 px-2 text-[11px]"
+                        disabled={!ready}
                         onClick={() =>
                           setChecked((p) => ({ ...p, [i.id]: Math.max(0, (p[i.id] ?? 0) - 1) }))
                         }
@@ -298,6 +299,7 @@ export function LoadingModule({ onCommand }: Props) {
                         size="sm"
                         variant="outline"
                         className="h-7 px-2 text-[11px]"
+                        disabled={!ready}
                         onClick={() =>
                           setChecked((p) => ({ ...p, [i.id]: Math.min(max, (p[i.id] ?? 0) + 1) }))
                         }
@@ -313,7 +315,7 @@ export function LoadingModule({ onCommand }: Props) {
             <div className="grid gap-2">
               <Button
                 className="w-full"
-                disabled={loadNotes.isPending || !vehicle || totals.done === 0}
+                disabled={loadNotes.isPending || !ready || totals.done === 0}
                 onClick={() => void confirm('scanned')}
               >
                 {loadNotes.isPending ? (
@@ -326,12 +328,13 @@ export function LoadingModule({ onCommand }: Props) {
               <Button
                 variant="outline"
                 className="w-full"
-                disabled={loadNotes.isPending || !vehicle}
+                disabled={loadNotes.isPending || !ready}
                 onClick={() => void confirm('full')}
               >
-                Confirmar nota completa
+                Carregar nota completa
               </Button>
             </div>
+
           </CardContent>
         </Card>
       )}
