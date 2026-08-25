@@ -234,6 +234,18 @@ export function InteractiveWarehouseMap() {
     });
   }, [locations, filterLevel]);
 
+  // Stock locations without aisle/level (free zones, e.g. área de sofás)
+  const freeStockZones = useMemo(() => {
+    return filteredLocations
+      .filter(loc =>
+        (loc.location_type ?? 'stock') === 'stock' &&
+        !loc.is_staging &&
+        !loc.aisle_id &&
+        !loc.level_id
+      )
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [filteredLocations]);
+
   // Get stats per aisle
   const getAisleStats = (aisleId: string): AisleStats => {
     const aisleLocations = filteredLocations.filter(l => l.aisle_id === aisleId);
