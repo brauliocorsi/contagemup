@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import {
   ClipboardList,
   Loader2,
@@ -61,9 +61,19 @@ function fmt(d: string | null | undefined) {
   return d ? new Date(d).toLocaleString('pt-PT') : '—';
 }
 
-function TaskItems({ taskId }: { taskId: string }) {
-  const { data: items = [], isLoading } = usePickingTaskItems(taskId);
+function duration(start?: string | null, end?: string | null) {
+  if (!start || !end) return '—';
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const min = Math.round(ms / 60000);
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)}h ${min % 60}min`;
+}
+
+function TaskItems({ task }: { task: PickingTaskWithTotals }) {
+  const { data: items = [], isLoading } = usePickingTaskItems(task.id);
   const { nameOf } = useProfiles();
+  const [view, setView] = useState<'produto' | 'nota'>('produto');
 
   if (isLoading) {
     return (
@@ -77,37 +87,115 @@ function TaskItems({ taskId }: { taskId: string }) {
     return <p className="p-4 text-xs text-muted-foreground">Sem artigos nesta tarefa.</p>;
   }
 
+  const pickers = [...new Set(items.filter((i) => i.picked_by).map((i) => nameOf(i.picked_by)))];
+  const stamps = items.map((i) => i.picked_at).filter(Boolean) as string[];
+  const firstScan = stamps.length ? stamps.slice().sort()[0] : null;
+  const lastScan = stamps.length ? stamps.slice().sort().at(-1)! : null;
+
+  const groups =
+    view === 'produto'
+      ? [{ title: '', items }]
+      : [
+          ...new Map(
+            items.flatMap((it) => {
+              const orders = (it.orders || '')
+                .split(/[,;]/)
+                .map((o) => o.trim())
+                .filter(Boolean);
+              return (orders.length ? orders : ['Sem nota']).map(
+                (o) => [o, [] as typeof items] as const,
+              );
+            }),
+          ).keys(),
+        ]
+          .sort((a, b) => a.localeCompare(b, 'pt', { numeric: true }))
+          .map((title) => ({
+            title,
+            items: items.filter((it) => {
+              const orders = (it.orders || '')
+                .split(/[,;]/)
+                .map((o) => o.trim())
+                .filter(Boolean);
+              return orders.length ? orders.includes(title) : title === 'Sem nota';
+            }),
+          }));
+
   return (
-    <div className="overflow-x-auto rounded-md border bg-muted/30">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Produto</TableHead>
-            <TableHead>Código</TableHead>
-            <TableHead className="text-right">Pedido</TableHead>
-            <TableHead className="text-right">Conferido</TableHead>
-            <TableHead>Conferido por</TableHead>
-            <TableHead>Quando</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((it) => (
-            <TableRow key={it.id}>
-              <TableCell className="max-w-[280px] truncate">{it.product_name}</TableCell>
-              <TableCell className="font-mono text-xs">{it.product_code || '—'}</TableCell>
-              <TableCell className="text-right">{it.requested_quantity}</TableCell>
-              <TableCell className="text-right font-medium">
-                {it.picked_quantity}
-              </TableCell>
-              <TableCell className="text-xs">{it.picked_at ? nameOf(it.picked_by) : '—'}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{fmt(it.picked_at)}</TableCell>
+    <div className="space-y-3">
+      <div className="grid gap-2 rounded-md border bg-muted/30 p-3 text-xs sm:grid-cols-4">
+        <div>
+          <p className="text-muted-foreground">Responsável(eis)</p>
+          <p className="font-medium">{pickers.length ? pickers.join(', ') : '—'}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Início</p>
+          <p className="font-medium">{fmt(task.started_at ?? firstScan)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Fim</p>
+          <p className="font-medium">{fmt(task.completed_at ?? lastScan)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Duração</p>
+          <p className="font-medium">
+            {duration(task.started_at ?? firstScan, task.completed_at ?? lastScan)}
+          </p>
+        </div>
+      </div>
+
+      <Tabs value={view} onValueChange={(v) => setView(v as 'produto' | 'nota')}>
+        <TabsList>
+          <TabsTrigger value="produto">Por produto</TabsTrigger>
+          <TabsTrigger value="nota">Por entrega</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="overflow-x-auto rounded-md border bg-muted/30">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Produto</TableHead>
+              <TableHead>Código</TableHead>
+              <TableHead>Entrega</TableHead>
+              <TableHead className="text-right">Pedido</TableHead>
+              <TableHead className="text-right">Conferido</TableHead>
+              <TableHead>Conferido por</TableHead>
+              <TableHead>Quando</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {groups.map((g) => (
+              <Fragment key={g.title || 'all'}>
+                {view === 'nota' && (
+                  <TableRow className="bg-muted/60">
+                    <TableCell colSpan={7} className="text-xs font-semibold">
+                      Entrega {g.title} · {g.items.reduce((s, i) => s + i.picked_quantity, 0)}/
+                      {g.items.reduce((s, i) => s + i.requested_quantity, 0)} un.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {g.items.map((it) => (
+                  <TableRow key={`${g.title}-${it.id}`}>
+                    <TableCell className="max-w-[280px] truncate">{it.product_name}</TableCell>
+                    <TableCell className="font-mono text-xs">{it.product_code || '—'}</TableCell>
+                    <TableCell className="text-xs">{it.orders || '—'}</TableCell>
+                    <TableCell className="text-right">{it.requested_quantity}</TableCell>
+                    <TableCell className="text-right font-medium">{it.picked_quantity}</TableCell>
+                    <TableCell className="text-xs">
+                      {it.picked_at ? nameOf(it.picked_by) : '—'}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{fmt(it.picked_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
+
 
 export function ScannerPickingAdminView() {
   const { profile } = useAuth();
@@ -243,7 +331,7 @@ export function ScannerPickingAdminView() {
 
                   {open && (
                     <div className="p-3 pt-0">
-                      <TaskItems taskId={t.id} />
+                      <TaskItems task={t} />
                     </div>
                   )}
                 </div>
