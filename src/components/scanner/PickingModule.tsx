@@ -111,6 +111,31 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     return { requested, picked, pct: requested ? Math.round((picked / requested) * 100) : 0 };
   }, [lines]);
 
+  /** Agrupamento da lista: por produto (agregado) ou por entrega/nota. */
+  const groups = useMemo(() => {
+    if (groupMode === 'produto') {
+      return [{ title: 'all', lines, requested: totals.requested, picked: totals.picked }];
+    }
+    const map = new Map<string, PickLine[]>();
+    for (const l of lines) {
+      const orders = (l.orders || '')
+        .split(/[,;]/)
+        .map((o) => o.trim())
+        .filter(Boolean);
+      const keys = orders.length ? orders : ['Sem nota'];
+      for (const k of keys) map.set(k, [...(map.get(k) ?? []), l]);
+    }
+    return [...map.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], 'pt', { numeric: true }))
+      .map(([title, ls]) => ({
+        title,
+        lines: ls,
+        requested: ls.reduce((s, l) => s + l.quantity, 0),
+        picked: ls.reduce((s, l) => s + l.picked, 0),
+      }));
+  }, [lines, groupMode, totals]);
+
+
 
   const handleFile = async (file: File) => {
     setLoading(true);
