@@ -169,13 +169,18 @@ export function LoadingModule({ onCommand }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={!vehicle ? 'opacity-60' : undefined}>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <FileText className="h-4 w-4" /> Notas no cais
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
+          {!vehicle && (
+            <p className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+              Escolha a viatura de destino para poder selecionar uma nota.
+            </p>
+          )}
           {isLoading ? (
             <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
           ) : notes.length === 0 ? (
@@ -186,11 +191,13 @@ export function LoadingModule({ onCommand }: Props) {
             notes.map((n) => (
               <button
                 key={n.id}
+                disabled={!vehicle}
                 onClick={() => {
                   setNoteId(n.id === noteId ? null : n.id);
                   setChecked({});
+                  setNoteConfirmed(false);
                 }}
-                className={`flex w-full items-center gap-2 rounded-lg border p-2 text-left ${
+                className={`flex w-full items-center gap-2 rounded-lg border p-2 text-left disabled:cursor-not-allowed disabled:opacity-60 ${
                   n.id === noteId ? 'border-primary bg-primary/5' : ''
                 }`}
               >
@@ -206,6 +213,7 @@ export function LoadingModule({ onCommand }: Props) {
           )}
         </CardContent>
       </Card>
+
 
       {note && (
         <Card>
