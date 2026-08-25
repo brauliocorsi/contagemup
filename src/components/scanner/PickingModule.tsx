@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle, MapPin, X, Trash2, Package, FileText } from 'lucide-react';
+import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle, Ban, MapPin, X, Trash2, Package, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import {
 } from '@/hooks/useScannerPickingTasks';
 import { useAuth } from '@/hooks/useAuth';
 import { useTypedLocations } from '@/hooks/useDeliveryNotes';
+import { usePickingStockLocations } from '@/hooks/usePickingStockLocations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
@@ -111,6 +112,21 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, taskItems, products]);
 
+  /** Bloqueio: produtos cujo stock está apenas em localizações não-stock (cais, quarentena, viaturas). */
+  const productIds = useMemo(
+    () => lines.map((l) => l.product?.id).filter((id): id is string => !!id),
+    [lines],
+  );
+  const { data: placements = {} } = usePickingStockLocations(productIds);
+
+  const blockedFor = (l: PickLine): string | null => {
+    const p = l.product?.id ? placements[l.product.id] : undefined;
+    if (!p?.blocked) return null;
+    return p.nonStockLocations.join(', ');
+  };
+  const blockedForRef = useRef(blockedFor);
+  blockedForRef.current = blockedFor;
+
   const totals = useMemo(() => {
     const requested = lines.reduce((s, l) => s + l.quantity, 0);
     const picked = lines.reduce((s, l) => s + l.picked, 0);
@@ -173,6 +189,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const setPicked = (key: string, value: number) => {
     const current = linesRef.current.find((l) => l.key === key);
     if (!current) return;
+    const blocked = blockedForRef.current(current);
+    if (blocked && value > current.picked) {
+      toast.error(
+        `${current.name}: stock apenas em ${blocked}. Transfira para uma localização de stock antes de fazer picking.`,
+      );
+      return;
+    }
     const next = Math.max(0, Math.min(current.quantity, value));
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, picked: next } : l)));
     setLastKey(key);
@@ -223,6 +246,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       toast.warning(`${match.name} já está completo (${match.picked}/${match.quantity})`);
       return;
     }
+    const blocked = blockedFor(match);
+    if (blocked) {
+      toast.error(
+        `${match.product?.code || match.code}: stock apenas em ${blocked}. Transfira para uma localização de stock antes de fazer picking.`,
+      );
+      return;
+    }
     const inc = Math.max(1, stepRef.current);
     const next = Math.min(match.quantity, match.picked + inc);
     setPicked(match.key, next);
@@ -240,7 +270,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
 
   const finalize = async () => {
     const lineItems = lines
-      .filter((l) => l.picked > 0)
+      .filter((l) => l.picked > 0 && !blockedFor(l))
       .map((l) => ({
         product_id: l.product?.id ?? null,
         product_code: l.product?.code || l.code || '',
@@ -251,7 +281,11 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       }));
 
     if (lineItems.length === 0) {
-      toast.error('Nenhuma linha conferida');
+      toast.error(
+        lines.some((l) => blockedFor(l))
+          ? 'Todos os artigos conferidos têm stock apenas fora de localizações de stock. Faça a transferência primeiro.'
+          : 'Nenhuma linha conferida',
+      );
       return;
     }
     if (!dock) {
@@ -304,10 +338,17 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
 
   const renderLine = (l: PickLine) => {
     const done = l.picked >= l.quantity;
+    const blocked = blockedFor(l);
     return (
       <div
         key={l.key}
-        className={`rounded-lg border p-2 ${done ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20' : ''}`}
+        className={`rounded-lg border p-2 ${
+          blocked
+            ? 'border-destructive/50 bg-destructive/5'
+            : done
+              ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20'
+              : ''
+        }`}
       >
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
@@ -326,6 +367,11 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 <MapPin className="h-3 w-3" /> {l.locations}
               </p>
             )}
+            {blocked && (
+              <Badge variant="destructive" className="mt-1 max-w-full gap-1 whitespace-normal text-left text-[10px]">
+                <Ban className="h-3 w-3 shrink-0" /> Bloqueado — stock só em {blocked}
+              </Badge>
+            )}
             {!l.product && (
               <p className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-600">
                 <AlertTriangle className="h-3 w-3" /> não registado no sistema
@@ -333,7 +379,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
             )}
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => bump(l.key, -1)}>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={!!blocked}
+              onClick={() => bump(l.key, -1)}
+            >
               <Minus className="h-3.5 w-3.5" />
             </Button>
             <div className="flex items-center gap-1">
@@ -343,6 +395,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 max={l.quantity}
                 className="h-8 w-16 text-center"
                 value={l.picked}
+                disabled={!!blocked}
                 onFocus={() => setLastKey(l.key)}
                 onChange={(e) => setPicked(l.key, Number(e.target.value) || 0)}
               />
@@ -350,7 +403,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 /{l.quantity}
               </Badge>
             </div>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => bump(l.key, 1)}>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={!!blocked}
+              onClick={() => bump(l.key, 1)}
+            >
               <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
