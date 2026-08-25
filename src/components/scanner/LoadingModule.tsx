@@ -71,12 +71,20 @@ export function LoadingModule({ onCommand }: Props) {
     // leitura de viatura
     const veh = vehicles.find((v) => v.code.trim().toLowerCase() === value);
     if (veh) {
-      setVehicle(veh.code);
+      selectVehicle(veh.code);
       toast.success(`Viatura: ${veh.code}`);
+      return;
+    }
+    if (!vehicle) {
+      toast.error('Escolha ou leia primeiro a viatura de destino');
       return;
     }
     if (!note) {
       toast.error('Escolha primeiro a nota de encomenda');
+      return;
+    }
+    if (!noteConfirmed) {
+      toast.error(`Confirme a nota ${note.order_number} antes de carregar`);
       return;
     }
     const base = value.split('-c')[0];
@@ -101,9 +109,16 @@ export function LoadingModule({ onCommand }: Props) {
   };
 
   const confirm = async (mode: 'scanned' | 'full') => {
-    if (!note) return;
     if (!vehicle) {
       toast.error('Escolha a viatura de destino');
+      return;
+    }
+    if (!note) {
+      toast.error('Escolha a nota de encomenda');
+      return;
+    }
+    if (!noteConfirmed) {
+      toast.error(`Confirme a nota ${note.order_number} antes de carregar`);
       return;
     }
     const payload =
@@ -119,7 +134,9 @@ export function LoadingModule({ onCommand }: Props) {
     await loadNotes.mutateAsync({ noteIds: [note.id], vehicleLocation: vehicle, items: payload });
     setChecked({});
     setNoteId(null);
+    setNoteConfirmed(false);
   };
+
 
   return (
     <div className="space-y-4">
