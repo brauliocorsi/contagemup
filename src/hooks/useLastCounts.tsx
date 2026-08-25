@@ -162,12 +162,14 @@ const processLastCounts = (counts: CountRow[], sessions: SessionRow[]): Record<s
         totalQuantity: entries.reduce((sum, e) => sum + e.quantity, 0)
       }));
 
-    // Collect all unique locations from ALL entries
+    // Only locations with stock (quantity > 0); zero rows are transfer leftovers
     const uniqueLocations = [...new Set(
       info.allEntries
+        .filter(e => e.quantity > 0)
         .map(e => e.location)
         .filter((loc): loc is string => loc !== null && loc.trim() !== '')
     )].sort();
+
 
     result[productId] = {
       productId,
