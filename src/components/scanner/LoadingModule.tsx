@@ -223,6 +223,39 @@ export function LoadingModule({ onCommand }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {!noteConfirmed ? (
+              <div className="space-y-2 rounded-lg border border-dashed p-3">
+                <p className="text-xs text-muted-foreground">
+                  Confirme que esta é a nota a carregar para <strong>{vehicle || 'a viatura'}</strong>.
+                  Só depois é possível conferir artigos e mover do cais para a carrinha.
+                </p>
+                <Button
+                  className="w-full"
+                  disabled={!vehicle}
+                  onClick={() => {
+                    setNoteConfirmed(true);
+                    toast.success(`Nota ${note.order_number} confirmada`);
+                  }}
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> Confirmar nota de encomenda
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between rounded-md bg-muted px-2 py-1">
+                <span className="text-[11px] text-muted-foreground">
+                  Nota confirmada para {vehicle}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => setNoteConfirmed(false)}
+                >
+                  Alterar
+                </Button>
+              </div>
+            )}
+
             <div className="space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Conferido</span>
@@ -232,6 +265,7 @@ export function LoadingModule({ onCommand }: Props) {
               </div>
               <Progress value={totals.pct} />
             </div>
+
 
             {noteItems.map((i) => {
               const max = Math.max(i.staged_quantity - i.loaded_quantity, 0);
