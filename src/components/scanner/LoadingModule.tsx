@@ -36,6 +36,8 @@ export function LoadingModule({ onCommand }: Props) {
 
   const [vehicle, setVehicle] = useState('');
   const [noteId, setNoteId] = useState<string | null>(null);
+  /** Nota de encomenda confirmada pelo operador antes de carregar. */
+  const [noteConfirmed, setNoteConfirmed] = useState(false);
   /** Conferência local (por artigo) antes de confirmar. */
   const [checked, setChecked] = useState<Record<string, number>>({});
 
@@ -44,6 +46,14 @@ export function LoadingModule({ onCommand }: Props) {
     () => items.filter((i) => i.note_id === noteId),
     [items, noteId],
   );
+
+  const ready = !!vehicle && !!note && noteConfirmed;
+
+  const selectVehicle = (code: string) => {
+    setVehicle(code);
+    setNoteConfirmed(false);
+  };
+
 
   const totals = useMemo(() => {
     const requested = noteItems.reduce(
