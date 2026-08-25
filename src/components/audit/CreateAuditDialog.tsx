@@ -121,6 +121,21 @@ export function CreateAuditDialog({
               </Select>
             </div>
 
+            <div className="flex items-start justify-between gap-3 rounded-md border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="blind-mode" className="flex items-center gap-2">
+                  <EyeOff className="h-4 w-4" />
+                  Conferência cega
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  O operador não vê as unidades em sistema durante a contagem.
+                </p>
+              </div>
+              <Switch id="blind-mode" checked={blindMode} onCheckedChange={setBlindMode} />
+            </div>
+
+
+
             <div className="space-y-2">
               <Label htmlFor="notes">Notas (opcional)</Label>
               <Textarea
