@@ -24,6 +24,8 @@ import {
   type PickingTask,
 } from '@/hooks/useScannerPickingTasks';
 import { useAuth } from '@/hooks/useAuth';
+import { useTypedLocations } from '@/hooks/useDeliveryNotes';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,6 +61,8 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const [lastKey, setLastKey] = useState<string | null>(null);
   const [task, setTask] = useState<PickingTask | null>(null);
   const [groupMode, setGroupMode] = useState<'produto' | 'nota'>('produto');
+  const [dock, setDock] = useState('');
+  const { data: docks = [] } = useTypedLocations('pre_exit');
 
   const stepRef = useRef(step);
   stepRef.current = step;
@@ -235,49 +239,51 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     }));
 
   const finalize = async () => {
-    const items = lines
-      .filter((l) => l.picked > 0 && l.product)
+    const lineItems = lines
+      .filter((l) => l.picked > 0)
       .map((l) => ({
-        product_id: l.product!.id,
-        is_complete_set: true,
-        set_quantity: l.picked,
-        colis_quantities: {},
-        location_selections: [],
+        product_id: l.product?.id ?? null,
+        product_code: l.product?.code || l.code || '',
+        product_name: l.name,
+        details: l.details ?? null,
+        order_number: (l.orders || '').split(',')[0]?.trim() || null,
+        quantity: l.picked,
       }));
 
-    if (items.length === 0) {
-      toast.error('Nenhuma linha conferida com produto registado');
+    if (lineItems.length === 0) {
+      toast.error('Nenhuma linha conferida');
+      return;
+    }
+    if (!dock) {
+      toast.error('Escolha a localização de pré-saída (cais)');
       return;
     }
 
     setSaving(true);
     try {
-      const { data, error } = await supabase.rpc('commit_exit_cart', {
-        p_items: items as unknown as never,
-        p_reason: 'Venda',
-        p_reference: reference || null,
-        p_notes: 'Picking via scanner',
+      const { error } = await supabase.rpc('stage_picking_to_dock', {
+        p_task_id: task?.id ?? null,
+        p_dock_location: dock,
+        p_lines: lineItems as unknown as never,
       });
       if (error) throw error;
-      const result = data as unknown as { fully_fulfilled: boolean };
 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['counts'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['delivery-notes'] });
 
       await printOperationReceipt({
-        title: 'Picking de Saída',
+        title: 'Picking para o cais',
         operationCode: `PICK-${Date.now().toString().slice(-8)}`,
         meta: [
           ['Referência', reference || '—'],
+          ['Cais', dock],
           ['Data', new Date().toLocaleString('pt-PT')],
-          ['Linhas', String(items.length)],
+          ['Linhas', String(lineItems.length)],
           ['Unidades', String(totals.picked)],
         ],
-        columns: ['Código', 'Produto', 'Pedido', 'Conferido'],
-        rows: lines
-          .filter((l) => l.picked > 0)
-          .map((l) => [l.product?.code || l.code, l.name, l.quantity, l.picked]),
+        columns: ['Código', 'Produto', 'Nota', 'Conferido'],
+        rows: lineItems.map((l) => [l.product_code, l.product_name, l.order_number || '—', l.quantity]),
       });
 
       if (task) {
@@ -285,13 +291,12 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
         setTask(null);
       }
 
-      toast.success(result?.fully_fulfilled ? 'Saída registada' : 'Saída registada parcialmente');
+      toast.success(`Artigos movidos para ${dock}. A saída só acontece na confirmação de entrega.`);
       setLines([]);
       setReference('');
-
     } catch (e: any) {
       console.error(e);
-      toast.error('Erro ao registar saída: ' + mapDatabaseError(e));
+      toast.error('Erro ao enviar para o cais: ' + mapDatabaseError(e));
     } finally {
       setSaving(false);
     }
@@ -474,8 +479,21 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 <Progress value={totals.pct} />
               </div>
 
+              <Select value={dock} onValueChange={setDock}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Localização de pré-saída (cais)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {docks.map((d) => (
+                    <SelectItem key={d.id} value={d.code}>
+                      {d.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Input
-                placeholder="Referência da saída (opcional)"
+                placeholder="Referência do picking (opcional)"
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
                 maxLength={80}
@@ -517,10 +535,15 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
               </div>
 
 
-              <Button className="w-full" disabled={saving || totals.picked === 0} onClick={finalize}>
+              <Button className="w-full" disabled={saving || totals.picked === 0 || !dock} onClick={finalize}>
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                Concluir picking e dar saída
+                Concluir picking e enviar para o cais
               </Button>
+              {docks.length === 0 && (
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Nenhuma localização de pré-saída configurada (Armazém › Configurar › Localizações).
+                </p>
+              )}
             </>
           )}
         </CardContent>
