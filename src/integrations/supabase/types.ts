@@ -176,6 +176,137 @@ export type Database = {
           },
         ]
       }
+      delivery_note_items: {
+        Row: {
+          created_at: string
+          delivered_quantity: number
+          details: string | null
+          id: string
+          loaded_quantity: number
+          location: string | null
+          note_id: string
+          product_code: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          returned_quantity: number
+          staged_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_quantity?: number
+          details?: string | null
+          id?: string
+          loaded_quantity?: number
+          location?: string | null
+          note_id: string
+          product_code?: string
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          returned_quantity?: number
+          staged_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivered_quantity?: number
+          details?: string | null
+          id?: string
+          loaded_quantity?: number
+          location?: string | null
+          note_id?: string
+          product_code?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          returned_quantity?: number
+          staged_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_note_items_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_note_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_notes: {
+        Row: {
+          client_name: string | null
+          created_at: string
+          created_by: string | null
+          delivered_at: string | null
+          delivered_by: string | null
+          dock_location: string | null
+          id: string
+          loaded_at: string | null
+          notes: string | null
+          order_number: string
+          returned_at: string | null
+          staged_at: string | null
+          status: string
+          task_id: string | null
+          updated_at: string
+          vehicle_location: string | null
+        }
+        Insert: {
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivered_at?: string | null
+          delivered_by?: string | null
+          dock_location?: string | null
+          id?: string
+          loaded_at?: string | null
+          notes?: string | null
+          order_number: string
+          returned_at?: string | null
+          staged_at?: string | null
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+          vehicle_location?: string | null
+        }
+        Update: {
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivered_at?: string | null
+          delivered_by?: string | null
+          dock_location?: string | null
+          id?: string
+          loaded_at?: string | null
+          notes?: string | null
+          order_number?: string
+          returned_at?: string | null
+          staged_at?: string | null
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+          vehicle_location?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_notes_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "scanner_picking_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_regions: {
         Row: {
           color: string | null
@@ -1341,6 +1472,7 @@ export type Database = {
           id: string
           is_staging: boolean
           level_id: string | null
+          location_type: string
           notes: string | null
           position_in_aisle: number
           updated_at: string
@@ -1352,6 +1484,7 @@ export type Database = {
           id?: string
           is_staging?: boolean
           level_id?: string | null
+          location_type?: string
           notes?: string | null
           position_in_aisle?: number
           updated_at?: string
@@ -1363,6 +1496,7 @@ export type Database = {
           id?: string
           is_staging?: boolean
           level_id?: string | null
+          location_type?: string
           notes?: string | null
           position_in_aisle?: number
           updated_at?: string
@@ -1467,13 +1601,33 @@ export type Database = {
         Returns: boolean
       }
       dedupe_counts_same_place: { Args: never; Returns: number }
+      deliver_note: { Args: { p_note_id: string }; Returns: Json }
+      effective_total_colis: { Args: { p_product_id: string }; Returns: number }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
+      load_notes_to_vehicle: {
+        Args: {
+          p_items?: Json
+          p_note_ids: string[]
+          p_vehicle_location: string
+        }
+        Returns: Json
+      }
       merge_colis_counts: {
         Args: {
           p_colis_number: number
           p_location: string
           p_product_id: string
           p_session_id: string
+        }
+        Returns: number
+      }
+      move_stock_qty: {
+        Args: {
+          p_coli: number
+          p_from: string
+          p_product_id: string
+          p_qty: number
+          p_to: string
         }
         Returns: number
       }
@@ -1552,6 +1706,14 @@ export type Database = {
         }
         Returns: Json
       }
+      return_note_items: {
+        Args: {
+          p_items?: Json
+          p_note_id: string
+          p_quarantine_location: string
+        }
+        Returns: Json
+      }
       reverse_stock_movement: { Args: { p_movement_id: string }; Returns: Json }
       split_colis_counts: {
         Args: {
@@ -1561,6 +1723,10 @@ export type Database = {
           p_session_id: string
         }
         Returns: number
+      }
+      stage_picking_to_dock: {
+        Args: { p_dock_location: string; p_lines: Json; p_task_id: string }
+        Returns: Json
       }
       transfer_stock_location: { Args: { p_items: Json }; Returns: Json }
     }
