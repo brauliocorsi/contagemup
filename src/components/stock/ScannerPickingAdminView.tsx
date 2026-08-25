@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import {
   ClipboardList,
   Loader2,
@@ -331,7 +331,7 @@ export function ScannerPickingAdminView() {
 
                   {open && (
                     <div className="p-3 pt-0">
-                      <TaskItems taskId={t.id} />
+                      <TaskItems task={t} />
                     </div>
                   )}
                 </div>
