@@ -8,6 +8,7 @@ import {
   Minus,
   Plus,
   Check,
+  EyeOff,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
   const { data: audit, isLoading: loadingAudit } = useAuditWithItems(auditId);
 
   const items = useMemo(() => audit?.items ?? [], [audit]);
+  const blind = !!audit?.blind_mode;
 
   const locations = useMemo(() => {
     const set = new Set<string>();
@@ -135,6 +137,10 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
       delete n[item.id];
       return n;
     });
+    if (blind) {
+      toast.success(`Registado: ${counted} un.`);
+      return;
+    }
     const diff = counted - item.expected_quantity;
     if (diff === 0) toast.success('Confirmado — sem divergência');
     else toast.warning(`Divergência de ${diff > 0 ? '+' : ''}${diff} un.`);
@@ -265,7 +271,14 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
       {auditId && location && (
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Artigos em {location}</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              Artigos em {location}
+              {blind && (
+                <Badge variant="outline" className="gap-1">
+                  <EyeOff className="h-3 w-3" /> Cega
+                </Badge>
+              )}
+            </CardTitle>
             <Button size="sm" onClick={confirmLocation} disabled={updateAuditItem.isPending}>
               <Check className="mr-1 h-3.5 w-3.5" /> Confirmar tudo
             </Button>
@@ -285,8 +298,9 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
                     key={item.id}
                     className={cn(
                       'rounded-lg border p-2',
-                      confirmed && diff === 0 && 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20',
-                      confirmed && diff !== 0 && 'border-amber-300 bg-amber-50/60 dark:bg-amber-950/20',
+                      confirmed && blind && 'border-primary/40 bg-primary/5',
+                      confirmed && !blind && diff === 0 && 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20',
+                      confirmed && !blind && diff !== 0 && 'border-amber-300 bg-amber-50/60 dark:bg-amber-950/20',
                     )}
                   >
                     <div className="flex items-start gap-2">
@@ -297,11 +311,17 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
                           {item.colis_number ? `-C${item.colis_number}` : ''}
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          Sistema: {item.expected_quantity} un.
-                          {(confirmed || draft[item.id] !== undefined) && (
-                            <span className={cn('ml-2 font-medium', diff === 0 ? 'text-emerald-600' : 'text-amber-600')}>
-                              {diff === 0 ? 'sem divergência' : `${diff > 0 ? '+' : ''}${diff}`}
-                            </span>
+                          {blind ? (
+                            confirmed ? 'Contagem registada' : 'Contagem cega'
+                          ) : (
+                            <>
+                              Sistema: {item.expected_quantity} un.
+                              {(confirmed || draft[item.id] !== undefined) && (
+                                <span className={cn('ml-2 font-medium', diff === 0 ? 'text-emerald-600' : 'text-amber-600')}>
+                                  {diff === 0 ? 'sem divergência' : `${diff > 0 ? '+' : ''}${diff}`}
+                                </span>
+                              )}
+                            </>
                           )}
                         </p>
                       </div>
@@ -346,7 +366,7 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
               })
             )}
             <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <AlertTriangle className="h-3 w-3" /> As divergências ficam registadas no relatório de
+              <AlertTriangle className="h-3 w-3" /> {blind ? 'Modo cego: as quantidades em sistema só são comparadas no relatório. ' : ''}As divergências ficam registadas no relatório de
               conferências, sem alterar o stock.
             </p>
           </CardContent>
