@@ -1,4 +1,5 @@
 import {
+  Truck,
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History,
   BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck,
@@ -60,6 +61,7 @@ const groups: { label: string; items: NavItem[] }[] = [
     label: 'Logística',
     items: [
       { id: 'separation-notes', label: 'Notas de Separação', icon: FileText },
+      { id: 'deliveries', label: 'Entregas', icon: Truck },
       { id: 'route-optimization', label: 'Otimizar Semana', icon: RouteIcon },
     ],
   },
