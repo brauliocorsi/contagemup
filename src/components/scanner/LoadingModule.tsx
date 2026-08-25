@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Truck, CheckCircle2, Loader2, FileText, PackageCheck } from 'lucide-react';
+import { Truck, CheckCircle2, Loader2, FileText, PackageCheck, AlertCircle, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import {
   useLoadNotesToVehicle,
   useTypedLocations,
 } from '@/hooks/useDeliveryNotes';
+
 
 interface Props {
   onCommand?: (raw: string) => boolean;
@@ -52,8 +53,10 @@ export function LoadingModule({ onCommand }: Props) {
   const selectVehicle = (code: string) => {
     setVehicle(code);
     setNoteConfirmed(false);
+    toast.info(`Viatura ${code} selecionada. Agora escolha a nota de encomenda.`, {
+      duration: 3000,
+    });
   };
-
 
   const totals = useMemo(() => {
     const requested = noteItems.reduce(
@@ -72,19 +75,27 @@ export function LoadingModule({ onCommand }: Props) {
     const veh = vehicles.find((v) => v.code.trim().toLowerCase() === value);
     if (veh) {
       selectVehicle(veh.code);
-      toast.success(`Viatura: ${veh.code}`);
       return;
     }
     if (!vehicle) {
-      toast.error('Escolha ou leia primeiro a viatura de destino');
+      toast.error('Carregamento bloqueado', {
+        description: 'Escolha ou leia primeiro a viatura de destino.',
+        duration: 5000,
+      });
       return;
     }
     if (!note) {
-      toast.error('Escolha primeiro a nota de encomenda');
+      toast.error('Carregamento bloqueado', {
+        description: 'Escolha a nota de encomenda que está no cais.',
+        duration: 5000,
+      });
       return;
     }
     if (!noteConfirmed) {
-      toast.error(`Confirme a nota ${note.order_number} antes de carregar`);
+      toast.error(`Confirme a nota ${note.order_number}`, {
+        description: 'Prima "Confirmar nota de encomenda" antes de conferir artigos.',
+        duration: 5000,
+      });
       return;
     }
     const base = value.split('-c')[0];
@@ -110,15 +121,21 @@ export function LoadingModule({ onCommand }: Props) {
 
   const confirm = async (mode: 'scanned' | 'full') => {
     if (!vehicle) {
-      toast.error('Escolha a viatura de destino');
+      toast.error('Carregamento bloqueado', {
+        description: 'Selecione a viatura de destino.',
+      });
       return;
     }
     if (!note) {
-      toast.error('Escolha a nota de encomenda');
+      toast.error('Carregamento bloqueado', {
+        description: 'Selecione a nota de encomenda.',
+      });
       return;
     }
     if (!noteConfirmed) {
-      toast.error(`Confirme a nota ${note.order_number} antes de carregar`);
+      toast.error(`Confirme a nota ${note.order_number}`, {
+        description: 'A nota tem de ser confirmada antes de carregar.',
+      });
       return;
     }
     const payload =
@@ -135,16 +152,32 @@ export function LoadingModule({ onCommand }: Props) {
     setChecked({});
     setNoteId(null);
     setNoteConfirmed(false);
+    toast.success('Nota carregada', {
+      description: `Stock movido do cais para ${vehicle}.`,
+    });
   };
-
 
   return (
     <div className="space-y-4">
       <ScanInput onScan={handleScan} placeholder="Ler viatura ou artigo…" />
 
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+        <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            O carregamento só é permitido nesta ordem:{' '}
+            <strong>1. Viatura</strong> → <strong>2. Nota</strong> →{' '}
+            <strong>3. Confirmar nota</strong>.
+          </span>
+        </p>
+      </div>
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+              1
+            </span>
             <Truck className="h-4 w-4" /> Viatura de destino
           </CardTitle>
         </CardHeader>
@@ -172,13 +205,17 @@ export function LoadingModule({ onCommand }: Props) {
       <Card className={!vehicle ? 'opacity-60' : undefined}>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+              2
+            </span>
             <FileText className="h-4 w-4" /> Notas no cais
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {!vehicle && (
-            <p className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">
-              Escolha a viatura de destino para poder selecionar uma nota.
+            <p className="flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+              <Lock className="h-3 w-3" />
+              <span>Escolha primeiro a viatura para ver as notas disponíveis.</span>
             </p>
           )}
           {isLoading ? (
@@ -196,6 +233,11 @@ export function LoadingModule({ onCommand }: Props) {
                   setNoteId(n.id === noteId ? null : n.id);
                   setChecked({});
                   setNoteConfirmed(false);
+                  if (n.id !== noteId) {
+                    toast.info(`Nota ${n.order_number} selecionada. Confirme-a no passo 3.`, {
+                      duration: 3000,
+                    });
+                  }
                 }}
                 className={`flex w-full items-center gap-2 rounded-lg border p-2 text-left disabled:cursor-not-allowed disabled:opacity-60 ${
                   n.id === noteId ? 'border-primary bg-primary/5' : ''
@@ -214,11 +256,13 @@ export function LoadingModule({ onCommand }: Props) {
         </CardContent>
       </Card>
 
-
       {note && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                3
+              </span>
               <PackageCheck className="h-4 w-4" /> Nota {note.order_number}
             </CardTitle>
           </CardHeader>
@@ -226,15 +270,24 @@ export function LoadingModule({ onCommand }: Props) {
             {!noteConfirmed ? (
               <div className="space-y-2 rounded-lg border border-dashed p-3">
                 <p className="text-xs text-muted-foreground">
-                  Confirme que esta é a nota a carregar para <strong>{vehicle || 'a viatura'}</strong>.
-                  Só depois é possível conferir artigos e mover do cais para a carrinha.
+                  Confirme que esta é a nota a carregar para{' '}
+                  <strong>{vehicle || 'a viatura'}</strong>. Só depois é possível conferir artigos e
+                  mover do cais para a carrinha.
                 </p>
+                {!vehicle && (
+                  <p className="text-[11px] text-destructive">
+                    <Lock className="mr-1 inline h-3 w-3" />
+                    Confirmação bloqueada enquanto não escolher a viatura.
+                  </p>
+                )}
                 <Button
                   className="w-full"
                   disabled={!vehicle}
                   onClick={() => {
                     setNoteConfirmed(true);
-                    toast.success(`Nota ${note.order_number} confirmada`);
+                    toast.success(`Nota ${note.order_number} confirmada`, {
+                      description: 'Já pode conferir artigos e carregar.',
+                    });
                   }}
                 >
                   <CheckCircle2 className="mr-2 h-4 w-4" /> Confirmar nota de encomenda
@@ -256,6 +309,19 @@ export function LoadingModule({ onCommand }: Props) {
               </div>
             )}
 
+            {!ready && note && (
+              <p className="flex items-center gap-2 rounded-md bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
+                <Lock className="h-3 w-3" />
+                <span>
+                  {!vehicle
+                    ? 'Carregamento bloqueado: escolha a viatura.'
+                    : !noteConfirmed
+                      ? 'Carregamento bloqueado: confirme a nota.'
+                      : 'Carregamento bloqueado.'}
+                </span>
+              </p>
+            )}
+
             <div className="space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Conferido</span>
@@ -265,7 +331,6 @@ export function LoadingModule({ onCommand }: Props) {
               </div>
               <Progress value={totals.pct} />
             </div>
-
 
             {noteItems.map((i) => {
               const max = Math.max(i.staged_quantity - i.loaded_quantity, 0);
@@ -334,10 +399,10 @@ export function LoadingModule({ onCommand }: Props) {
                 Carregar nota completa
               </Button>
             </div>
-
           </CardContent>
         </Card>
       )}
     </div>
   );
 }
+
