@@ -13,6 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { useReceivingLocations } from '@/hooks/useReceivingLocations';
 import { LocationSelect } from '@/components/counting/LocationSelect';
 import { ProductForm } from '@/components/products/ProductForm';
 import { useProducts } from '@/hooks/useProducts';
@@ -56,6 +57,7 @@ export function PurchaseEntryView() {
   const [quickName, setQuickName] = useState('');
 
   const [locOpen, setLocOpen] = useState(false);
+  const { defaultCode: receivingLocation } = useReceivingLocations();
   const [location, setLocation] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -261,7 +263,7 @@ export function PurchaseEntryView() {
         const { error } = await supabase.rpc('register_entry', {
           p_product_id: product.id,
           p_colis_quantities: colisQty,
-          p_location: location || null,
+          p_location: location || receivingLocation || null,
           p_reason: 'Compra',
           p_reference: refText,
           p_notes: `Item Gestão Click: ${r.item.nome}`,
@@ -582,7 +584,7 @@ export function PurchaseEntryView() {
             <LocationSelect
               value={location}
               onValueChange={setLocation}
-              placeholder="Localização (opcional)…"
+              placeholder="Localização (conferência por defeito)…"
             />
           </div>
           <DialogFooter>

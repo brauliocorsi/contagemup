@@ -14,6 +14,7 @@ import {
   Tags,
   ClipboardCheck,
   Truck,
+  Boxes,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { LoginForm } from '@/components/auth/LoginForm';
@@ -27,11 +28,12 @@ import { PrintCenterModule } from '@/components/scanner/PrintCenterModule';
 import { SupplierCodeModule } from '@/components/scanner/SupplierCodeModule';
 import { CountingModule } from '@/components/scanner/CountingModule';
 import { LoadingModule } from '@/components/scanner/LoadingModule';
+import { PutawayModule } from '@/components/scanner/PutawayModule';
 import { parseCommand, SCANNER_MODES, type QtyHandler, type ScannerMode } from '@/lib/scanner/commands';
 import { printCommandSheet } from '@/lib/scanner/labels';
 import { toast } from 'sonner';
 
-type View = 'home' | ScannerMode | 'impressao' | 'fornecedor' | 'contagem' | 'carregamento';
+type View = 'home' | ScannerMode | 'impressao' | 'fornecedor' | 'contagem' | 'carregamento' | 'arrumacao';
 
 const OPERATIONS: Array<{
   id: View;
@@ -67,6 +69,13 @@ const OPERATIONS: Array<{
     description: 'Conferência de entradas e fornecedor',
     icon: PackagePlus,
     accent: 'bg-primary-soft text-primary',
+  },
+  {
+    id: 'arrumacao',
+    label: 'Arrumação',
+    description: 'Conferência → localização final',
+    icon: Boxes,
+    accent: 'bg-warning-soft text-warning',
   },
   {
     id: 'carregamento',
@@ -105,6 +114,7 @@ const NAV: Array<{ id: View; label: string; icon: typeof Search }> = [
   { id: 'picking', label: 'Picking', icon: ClipboardList },
   { id: 'carregamento', label: 'Carga', icon: Truck },
   { id: 'entradas', label: 'Entradas', icon: PackagePlus },
+  { id: 'arrumacao', label: 'Arrumação', icon: Boxes },
   { id: 'contagem', label: 'Contagem', icon: ClipboardCheck },
 ];
 
@@ -221,6 +231,7 @@ export default function ScannerApp() {
         {view === 'transferencia' && <TransferModule onCommand={handleCommand} />}
         {view === 'picking' && <PickingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'entradas' && <EntryModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
+        {view === 'arrumacao' && <PutawayModule onCommand={handleCommand} />}
         {view === 'carregamento' && <LoadingModule onCommand={handleCommand} />}
         {view === 'contagem' && <CountingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'fornecedor' && <SupplierCodeModule onCommand={handleCommand} />}

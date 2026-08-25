@@ -169,7 +169,7 @@ export function useDeleteDeliveryNote() {
 }
 
 /** Localizações por tipo (cais, viaturas, quarentena). */
-export function useTypedLocations(type: 'pre_exit' | 'transport' | 'quarantine') {
+export function useTypedLocations(type: 'pre_exit' | 'transport' | 'quarantine' | 'conferencia') {
   return useQuery({
     queryKey: ['warehouse-locations-typed', type],
     queryFn: async (): Promise<{ id: string; code: string }[]> => {

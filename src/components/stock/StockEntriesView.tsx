@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil, History, ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
+import { useReceivingLocations } from '@/hooks/useReceivingLocations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -112,6 +113,10 @@ export function StockEntriesView() {
       .slice(0, 50);
   }, [products, search]);
 
+  const { defaultCode: receivingLocation } = useReceivingLocations();
+  const receivingLocationRef = useRef(receivingLocation);
+  receivingLocationRef.current = receivingLocation;
+
   // ------- Load suggested locations once product is picked ------------------
   useEffect(() => {
     if (!selected) {
@@ -139,7 +144,7 @@ export function StockEntriesView() {
       const initial: ColiRow[] = Array.from({ length: effectiveTotalColis }, (_, i) => {
         const n = i + 1;
         const suggestion = byColi.get(n);
-        const loc = suggestion?.location ?? selected.location ?? '';
+        const loc = receivingLocationRef.current || suggestion?.location || selected.location || '';
         return {
           colis_number: n,
           quantity: mode === 'set' ? setQuantity : 0,
