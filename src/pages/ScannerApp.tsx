@@ -14,6 +14,7 @@ import {
   Tags,
   ClipboardCheck,
   Truck,
+  Boxes,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { LoginForm } from '@/components/auth/LoginForm';
