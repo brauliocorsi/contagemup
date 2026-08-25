@@ -32,6 +32,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ManualPickingTaskDialog } from '@/components/stock/ManualPickingTaskDialog';
+
 import { useAuth } from '@/hooks/useAuth';
 import { useProfiles } from '@/hooks/useProfiles';
 import {
