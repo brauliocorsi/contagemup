@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Truck, CheckCircle2, Loader2, FileText, PackageCheck } from 'lucide-react';
+import { Truck, CheckCircle2, Loader2, FileText, PackageCheck, AlertCircle, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import {
   useLoadNotesToVehicle,
   useTypedLocations,
 } from '@/hooks/useDeliveryNotes';
+
 
 interface Props {
   onCommand?: (raw: string) => boolean;
