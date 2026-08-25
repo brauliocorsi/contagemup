@@ -338,10 +338,17 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
 
   const renderLine = (l: PickLine) => {
     const done = l.picked >= l.quantity;
+    const blocked = blockedFor(l);
     return (
       <div
         key={l.key}
-        className={`rounded-lg border p-2 ${done ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20' : ''}`}
+        className={`rounded-lg border p-2 ${
+          blocked
+            ? 'border-destructive/50 bg-destructive/5'
+            : done
+              ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20'
+              : ''
+        }`}
       >
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
@@ -360,6 +367,11 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 <MapPin className="h-3 w-3" /> {l.locations}
               </p>
             )}
+            {blocked && (
+              <Badge variant="destructive" className="mt-1 max-w-full gap-1 whitespace-normal text-left text-[10px]">
+                <Ban className="h-3 w-3 shrink-0" /> Bloqueado — stock só em {blocked}
+              </Badge>
+            )}
             {!l.product && (
               <p className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-600">
                 <AlertTriangle className="h-3 w-3" /> não registado no sistema
@@ -367,7 +379,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
             )}
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => bump(l.key, -1)}>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={!!blocked}
+              onClick={() => bump(l.key, -1)}
+            >
               <Minus className="h-3.5 w-3.5" />
             </Button>
             <div className="flex items-center gap-1">
@@ -377,6 +395,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 max={l.quantity}
                 className="h-8 w-16 text-center"
                 value={l.picked}
+                disabled={!!blocked}
                 onFocus={() => setLastKey(l.key)}
                 onChange={(e) => setPicked(l.key, Number(e.target.value) || 0)}
               />
@@ -384,10 +403,20 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 /{l.quantity}
               </Badge>
             </div>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => bump(l.key, 1)}>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={!!blocked}
+              onClick={() => bump(l.key, 1)}
+            >
               <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
+        </div>
+      </div>
+    );
+  };
         </div>
       </div>
     );
