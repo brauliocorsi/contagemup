@@ -26,6 +26,8 @@ export function UnlocatedStockPanel() {
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState<Record<string, { location: string }>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [bulkLocation, setBulkLocation] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const productMap = useMemo(() => {
     const m = new Map<string, Product>();
@@ -39,9 +41,11 @@ export function UnlocatedStockPanel() {
       // Zonas livres (ex: conferência) contam como stock pendente de localização
       const { data: stagingLocs } = await supabase
         .from('warehouse_locations')
-        .select('code')
-        .eq('is_staging', true);
-      const stagingCodes = (stagingLocs || []).map(l => l.code).filter(Boolean);
+        .select('code, is_staging, location_type');
+      const stagingCodes = (stagingLocs || [])
+        .filter(l => l.is_staging || l.location_type === 'conferencia')
+        .map(l => l.code)
+        .filter(Boolean);
 
       const orFilter = [
         'location.is.null',
@@ -86,6 +90,37 @@ export function UnlocatedStockPanel() {
 
   const totalUnits = rows.reduce((s, r) => s + r.quantity, 0);
 
+  const assign = async (countId: string, location: string) => {
+    const { error } = await supabase.rpc('assign_count_location', {
+      p_count_id: countId,
+      p_location: location,
+    });
+    if (error) throw error;
+  };
+
+  const applyBulk = async () => {
+    if (!bulkLocation) {
+      toast.error('Indique a localização de destino');
+      return;
+    }
+    setBulkSaving(true);
+    try {
+      for (const { row } of filtered) {
+        await assign(row.id, bulkLocation);
+      }
+      toast.success(`${filtered.length} linhas arrumadas em ${bulkLocation}`);
+      setDraft({});
+      setBulkLocation('');
+      queryClient.invalidateQueries({ queryKey: ['unlocated-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['counts'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao arrumar em lote');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const save = async (row: UnlocatedRow) => {
     const d = draft[row.id];
     if (!d?.location) {
@@ -94,11 +129,7 @@ export function UnlocatedStockPanel() {
     }
     setSavingId(row.id);
     try {
-      const { error } = await supabase.rpc('assign_count_location', {
-        p_count_id: row.id,
-        p_location: d.location || '',
-      });
-      if (error) throw error;
+      await assign(row.id, d.location || '');
       toast.success('Localização atribuída');
       setDraft(prev => {
         const next = { ...prev };
@@ -122,7 +153,7 @@ export function UnlocatedStockPanel() {
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
-          Stock sem localização
+          Pendente de arrumação
           <Badge variant="outline" className="ml-auto border-amber-400 text-amber-700">
             {rows.length} linhas · {totalUnits} un.
           </Badge>
@@ -130,8 +161,25 @@ export function UnlocatedStockPanel() {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Estas unidades existem em stock mas não têm sítio definido, por isso não aparecem nas vistas de armazém.
+          Unidades em conferência/receção ou sem sítio definido. Escolha a localização final para as arrumar.
         </p>
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+          <LocationSelect
+            value={bulkLocation}
+            onValueChange={setBulkLocation}
+            placeholder="Destino para todas as linhas listadas…"
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            className="gap-1"
+            onClick={applyBulk}
+            disabled={bulkSaving || filtered.length === 0}
+          >
+            <Check className="h-3.5 w-3.5" />
+            {bulkSaving ? 'A arrumar…' : `Arrumar ${filtered.length} linhas`}
+          </Button>
+        </div>
         <Input
           placeholder="Filtrar por código ou nome…"
           value={search}
