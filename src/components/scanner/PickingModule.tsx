@@ -270,7 +270,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
 
   const finalize = async () => {
     const lineItems = lines
-      .filter((l) => l.picked > 0)
+      .filter((l) => l.picked > 0 && !blockedFor(l))
       .map((l) => ({
         product_id: l.product?.id ?? null,
         product_code: l.product?.code || l.code || '',
@@ -281,7 +281,11 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       }));
 
     if (lineItems.length === 0) {
-      toast.error('Nenhuma linha conferida');
+      toast.error(
+        lines.some((l) => blockedFor(l))
+          ? 'Todos os artigos conferidos têm stock apenas fora de localizações de stock. Faça a transferência primeiro.'
+          : 'Nenhuma linha conferida',
+      );
       return;
     }
     if (!dock) {
