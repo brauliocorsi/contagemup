@@ -396,60 +396,41 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 maxLength={80}
               />
 
-              <div className="space-y-2">
-                {lines.map((l) => {
-                  const done = l.picked >= l.quantity;
-                  return (
-                    <div
-                      key={l.key}
-                      className={`rounded-lg border p-2 ${done ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20' : ''}`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium">{l.name}</p>
-                          <p className="truncate font-mono text-[11px] text-muted-foreground">
-                            {l.product?.code || l.code || 'sem código'}
-                            {l.details ? ` • ${l.details}` : ''}
-                          </p>
-                          {l.locations && (
-                            <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-                              <MapPin className="h-3 w-3" /> {l.locations}
-                            </p>
-                          )}
-
-                          {!l.product && (
-                            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-600">
-                              <AlertTriangle className="h-3 w-3" /> não registado no sistema
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => bump(l.key, -1)}>
-                            <Minus className="h-3.5 w-3.5" />
-                          </Button>
-                          <div className="flex items-center gap-1">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={l.quantity}
-                              className="h-8 w-16 text-center"
-                              value={l.picked}
-                              onFocus={() => setLastKey(l.key)}
-                              onChange={(e) => setPicked(l.key, Number(e.target.value) || 0)}
-                            />
-                            <Badge variant={done ? 'default' : 'secondary'} className="min-w-10 justify-center">
-                              /{l.quantity}
-                            </Badge>
-                          </div>
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => bump(l.key, 1)}>
-                            <Plus className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
+                <Button
+                  variant={groupMode === 'produto' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-8 flex-1 text-xs"
+                  onClick={() => setGroupMode('produto')}
+                >
+                  <Package className="mr-1 h-3.5 w-3.5" /> Por produto
+                </Button>
+                <Button
+                  variant={groupMode === 'nota' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-8 flex-1 text-xs"
+                  onClick={() => setGroupMode('nota')}
+                >
+                  <FileText className="mr-1 h-3.5 w-3.5" /> Por entrega
+                </Button>
               </div>
+
+              <div className="space-y-3">
+                {groups.map((g) => (
+                  <div key={g.title} className="space-y-2">
+                    {groupMode === 'nota' && (
+                      <div className="flex items-center justify-between rounded-md bg-muted px-2 py-1">
+                        <p className="truncate text-xs font-semibold">Entrega {g.title}</p>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {g.picked}/{g.requested} un.
+                        </Badge>
+                      </div>
+                    )}
+                    {g.lines.map((l) => renderLine(l))}
+                  </div>
+                ))}
+              </div>
+
 
               <Button className="w-full" disabled={saving || totals.picked === 0} onClick={finalize}>
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
