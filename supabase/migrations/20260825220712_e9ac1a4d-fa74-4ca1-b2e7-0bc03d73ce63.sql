@@ -1,0 +1,1 @@
+ALTER TABLE public.location_audits ADD COLUMN IF NOT EXISTS blind_mode boolean NOT NULL DEFAULT false;

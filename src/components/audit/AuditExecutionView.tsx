@@ -7,6 +7,7 @@ import {
   Package,
   AlertTriangle,
   Check,
+  EyeOff,
   X
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,7 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
   const [currentIndex, setCurrentIndex] = useState(0);
   const [countedQuantities, setCountedQuantities] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const blind = !!audit?.blind_mode;
 
   // Start audit if pending
   useEffect(() => {
@@ -186,6 +188,11 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary" />
               <span className="font-mono font-medium">{currentItem.location}</span>
+              {blind && (
+                <Badge variant="outline" className="gap-1">
+                  <EyeOff className="h-3 w-3" /> Cega
+                </Badge>
+              )}
             </div>
             <Badge variant="outline">
               {currentIndex + 1} / {allItems.length}
@@ -211,9 +218,15 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
 
           {/* Expected vs Counted */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+            <div className="text-center p-4 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground">Esperado</p>
-              <p className="text-3xl font-bold text-blue-600">{currentItem.expected_quantity}</p>
+              {blind ? (
+                <p className="flex items-center justify-center gap-1 pt-2 text-sm font-medium text-muted-foreground">
+                  <EyeOff className="h-4 w-4" /> Oculto
+                </p>
+              ) : (
+                <p className="text-3xl font-bold text-blue-600">{currentItem.expected_quantity}</p>
+              )}
             </div>
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground text-center">Contado</p>
@@ -235,7 +248,7 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
           </div>
 
           {/* Difference indicator */}
-          {currentItem.status === 'counted' && currentItem.difference !== null && currentItem.difference !== 0 && (
+          {!blind && currentItem.status === 'counted' && currentItem.difference !== null && currentItem.difference !== 0 && (
             <div className={cn(
               "flex items-center justify-center gap-2 p-2 rounded-md",
               currentItem.difference > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"

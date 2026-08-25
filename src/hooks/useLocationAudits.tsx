@@ -10,6 +10,7 @@ export interface LocationAudit {
   status: 'pending' | 'in_progress' | 'completed';
   created_by: string | null;
   assigned_to: string | null;
+  blind_mode: boolean;
   started_at: string | null;
   completed_at: string | null;
   notes: string | null;
@@ -44,6 +45,7 @@ export interface CreateAuditInput {
   locations: string[];
   notes?: string;
   assignedTo?: string | null;
+  blindMode?: boolean;
 }
 
 export function useLocationAudits() {
@@ -111,6 +113,7 @@ export function useLocationAudits() {
           notes: input.notes || null,
           created_by: user?.id || null,
           assigned_to: input.assignedTo || null,
+          blind_mode: input.blindMode ?? false,
           status: 'pending',
         })
         .select()

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { MapPin, Plus } from 'lucide-react';
+import { MapPin, Plus, EyeOff } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +42,7 @@ export function CreateAuditDialog({
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [assignedTo, setAssignedTo] = useState<string>('none');
+  const [blindMode, setBlindMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,11 +54,13 @@ export function CreateAuditDialog({
       locations: selectedLocations,
       notes: notes.trim() || undefined,
       assignedTo: assignedTo === 'none' ? null : assignedTo,
+      blindMode,
     });
 
     setName('');
     setNotes('');
     setAssignedTo('none');
+    setBlindMode(false);
     onOpenChange(false);
     
     if (onSuccess && result) {
@@ -117,6 +121,21 @@ export function CreateAuditDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex items-start justify-between gap-3 rounded-md border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="blind-mode" className="flex items-center gap-2">
+                  <EyeOff className="h-4 w-4" />
+                  Conferência cega
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  O operador não vê as unidades em sistema durante a contagem.
+                </p>
+              </div>
+              <Switch id="blind-mode" checked={blindMode} onCheckedChange={setBlindMode} />
+            </div>
+
+
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notas (opcional)</Label>
