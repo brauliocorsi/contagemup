@@ -112,6 +112,21 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, taskItems, products]);
 
+  /** Bloqueio: produtos cujo stock está apenas em localizações não-stock (cais, quarentena, viaturas). */
+  const productIds = useMemo(
+    () => lines.map((l) => l.product?.id).filter((id): id is string => !!id),
+    [lines],
+  );
+  const { data: placements = {} } = usePickingStockLocations(productIds);
+
+  const blockedFor = (l: PickLine): string | null => {
+    const p = l.product?.id ? placements[l.product.id] : undefined;
+    if (!p?.blocked) return null;
+    return p.nonStockLocations.join(', ');
+  };
+  const blockedForRef = useRef(blockedFor);
+  blockedForRef.current = blockedFor;
+
   const totals = useMemo(() => {
     const requested = lines.reduce((s, l) => s + l.quantity, 0);
     const picked = lines.reduce((s, l) => s + l.picked, 0);
