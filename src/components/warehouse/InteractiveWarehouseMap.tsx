@@ -754,6 +754,59 @@ export function InteractiveWarehouseMap() {
             );
           })}
         </div>
+
+        {/* Free stock zones (no aisle / no level) */}
+        {freeStockZones.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2" style={{ borderLeft: '4px solid hsl(var(--primary))' }}>
+              <CardTitle className="text-base flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Zonas de stock livres (sem rua/rack)
+                </div>
+                <div className="flex items-center gap-2 text-xs font-normal">
+                  <Badge variant="outline" className="text-xs">
+                    {freeStockZones.filter(l => l.totalColis > 0).length}/{freeStockZones.length}
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    <Package className="h-3 w-3 mr-1" />
+                    {freeStockZones.reduce((s, l) => s + l.totalQuantity, 0)} un
+                  </Badge>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="flex gap-2 flex-wrap">
+                {freeStockZones.map(location => {
+                  const isHighlighted = highlightedLocationId === location.id;
+                  return (
+                    <button
+                      key={location.id}
+                      onClick={() => handleLocationClick(location)}
+                      onDragOver={(e) => handleDragOver(e, location.code)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, location.code)}
+                      className={cn(
+                        "min-w-[110px] h-16 rounded border-2 transition-all",
+                        "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
+                        "flex flex-col items-center justify-center p-1",
+                        getLocationColor(location, isHighlighted),
+                        dropTargetCode === location.code && "ring-2 ring-primary ring-offset-2 scale-105"
+                      )}
+                    >
+                      <span className="font-bold text-xs">{location.code}</span>
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <Package className="h-2.5 w-2.5" />
+                        {location.totalQuantity} un • {location.totalProducts} prod.
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">Zona livre</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Location Details Dialog */}
