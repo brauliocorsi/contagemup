@@ -830,18 +830,24 @@ export function InteractiveWarehouseMap() {
               {selectedLocation?.code}
               {selectedLocation && (
                 <>
-                  <Badge variant="outline">
-                    Rua {selectedLocation.aisleName}
-                  </Badge>
-                  <Badge 
-                    variant="outline"
-                    style={{ 
-                      backgroundColor: `${selectedLocation.levelColor}20`,
-                      borderColor: selectedLocation.levelColor 
-                    }}
-                  >
-                    {selectedLocation.levelName}
-                  </Badge>
+                  {selectedLocation.aisleName ? (
+                    <Badge variant="outline">
+                      Rua {selectedLocation.aisleName}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Zona livre</Badge>
+                  )}
+                  {selectedLocation.levelName && (
+                    <Badge 
+                      variant="outline"
+                      style={{ 
+                        backgroundColor: `${selectedLocation.levelColor}20`,
+                        borderColor: selectedLocation.levelColor 
+                      }}
+                    >
+                      {selectedLocation.levelName}
+                    </Badge>
+                  )}
                   {selectedLocation.requiresForklift && (
                     <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
                       <Forklift className="h-3 w-3 mr-1" />
