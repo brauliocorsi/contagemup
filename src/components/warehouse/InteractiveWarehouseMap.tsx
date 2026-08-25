@@ -45,6 +45,26 @@ import { useActiveSession } from '@/hooks/useActiveSession';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PrintMenu } from '@/components/scanner/PrintMenu';
+import type { LabelItem } from '@/lib/scanner/labels';
+
+/** Uma etiqueta por unidade de cada item existente na localização */
+function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
+  const items: LabelItem[] = [];
+  location.products.forEach((p) => {
+    const code = (p.productCode || '').trim();
+    if (!code || p.quantity <= 0) return;
+    const coliCode = p.colisNumber > 1 ? `${code}-C${p.colisNumber}` : code;
+    items.push({
+      code: coliCode,
+      title: p.productName,
+      subtitle: `Código: ${code}`,
+      extra: [`Coli ${p.colisNumber}`, `Local: ${location.code}`],
+      copies: p.quantity,
+    });
+  });
+  return items;
+}
 
 interface DragItem {
   countId: string;
