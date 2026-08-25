@@ -417,10 +417,6 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       </div>
     );
   };
-        </div>
-      </div>
-    );
-  };
 
 
   return (
