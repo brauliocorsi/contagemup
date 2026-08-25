@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { MapPin, Plus } from 'lucide-react';
+import { MapPin, Plus, EyeOff } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
