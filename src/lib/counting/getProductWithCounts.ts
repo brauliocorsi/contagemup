@@ -42,10 +42,16 @@ export function getProductWithCounts(
     });
   }
 
+  // Only locations that actually hold stock (quantity > 0) count as "onde está o produto".
+  // Zero-quantity rows are leftovers of transfers and must not appear in the badge.
   const allLocations = colisDetails.flatMap((c) =>
-    c.locationEntries.map((e) => e.location).filter((loc): loc is string => loc !== null && loc.trim() !== ''),
+    c.locationEntries
+      .filter((e) => e.quantity > 0)
+      .map((e) => e.location)
+      .filter((loc): loc is string => loc !== null && loc.trim() !== ''),
   );
   const uniqueLocations = [...new Set(allLocations)].sort();
+
 
   const hasMultipleLocations = uniqueLocations.length > 1 || colisDetails.some((c) => c.hasMultipleLocations);
 
