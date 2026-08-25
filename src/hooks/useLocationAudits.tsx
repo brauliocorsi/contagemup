@@ -10,6 +10,7 @@ export interface LocationAudit {
   status: 'pending' | 'in_progress' | 'completed';
   created_by: string | null;
   assigned_to: string | null;
+  blind_mode: boolean;
   started_at: string | null;
   completed_at: string | null;
   notes: string | null;
