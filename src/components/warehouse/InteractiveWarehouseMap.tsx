@@ -50,7 +50,7 @@ import type { LabelItem } from '@/lib/scanner/labels';
 
 /** Uma etiqueta por unidade de cada item existente na localização */
 function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
-  const map = new Map<string, LabelItem>();
+  const map: globalThis.Map<string, LabelItem> = new globalThis.Map();
   location.products.forEach((p) => {
     const code = (p.productCode || '').trim();
     if (!code || p.quantity <= 0) return;
