@@ -41,6 +41,7 @@ export function CreateAuditDialog({
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [assignedTo, setAssignedTo] = useState<string>('none');
+  const [blindMode, setBlindMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,11 +53,13 @@ export function CreateAuditDialog({
       locations: selectedLocations,
       notes: notes.trim() || undefined,
       assignedTo: assignedTo === 'none' ? null : assignedTo,
+      blindMode,
     });
 
     setName('');
     setNotes('');
     setAssignedTo('none');
+    setBlindMode(false);
     onOpenChange(false);
     
     if (onSuccess && result) {
