@@ -39,7 +39,7 @@ import {
 } from '@/hooks/useWarehouseConfig';
 
 const LOCATION_TYPE_HINTS: Record<LocationType, string> = {
-  stock: 'Localização normal de armazém (rua/rack).',
+  stock: 'Localização de armazém. Pode ter rua/rack ou ser uma zona livre (ex: área de sofás) escolhendo "Sem rua" e "Sem nível".',
   pre_exit: 'Cais de carga: destino do picking antes do carregamento.',
   transport: 'Viatura (Carrinha X, Y...): stock carregado e a caminho do cliente.',
   quarantine: 'Zona de devoluções/quarentena.',
@@ -166,10 +166,12 @@ export function LocationsConfig() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-mono font-bold">{location.code}</p>
-                    {(location.location_type ?? 'stock') !== 'stock' && (
+                    {(location.location_type ?? 'stock') !== 'stock' ? (
                       <Badge variant="secondary">
                         {LOCATION_TYPE_LABELS[location.location_type as LocationType] ?? 'Zona livre'}
                       </Badge>
+                    ) : (!location.aisle_id && !location.level_id) && (
+                      <Badge variant="outline">Zona de stock livre</Badge>
                     )}
                     {location.aisle && (
                       <span 
