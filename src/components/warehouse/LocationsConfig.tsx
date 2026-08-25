@@ -28,14 +28,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { 
   useWarehouseLocations, 
   useWarehouseAisles, 
   useWarehouseLevels,
-  WarehouseLocation 
+  WarehouseLocation,
+  type LocationType,
+  LOCATION_TYPE_LABELS,
 } from '@/hooks/useWarehouseConfig';
+
+const LOCATION_TYPE_HINTS: Record<LocationType, string> = {
+  stock: 'Localização normal de armazém (rua/rack).',
+  pre_exit: 'Cais de carga: destino do picking antes do carregamento.',
+  transport: 'Viatura (Carrinha X, Y...): stock carregado e a caminho do cliente.',
+  quarantine: 'Zona de devoluções/quarentena.',
+};
 
 export function LocationsConfig() {
   const { locations, isLoading, createLocation, updateLocation, deleteLocation } = useWarehouseLocations();
@@ -53,7 +61,7 @@ export function LocationsConfig() {
     level_id: '',
     position_in_aisle: 1,
     notes: '',
-    is_staging: false,
+    location_type: 'stock' as LocationType,
   });
 
   const openCreateDialog = () => {
@@ -64,7 +72,7 @@ export function LocationsConfig() {
       level_id: levels[0]?.id || '',
       position_in_aisle: 1,
       notes: '',
-      is_staging: false,
+      location_type: 'stock',
     });
     setIsDialogOpen(true);
   };
@@ -77,7 +85,7 @@ export function LocationsConfig() {
       level_id: location.level_id || '',
       position_in_aisle: location.position_in_aisle,
       notes: location.notes || '',
-      is_staging: !!location.is_staging,
+      location_type: (location.location_type ?? (location.is_staging ? 'pre_exit' : 'stock')) as LocationType,
     });
     setIsDialogOpen(true);
   };
@@ -85,13 +93,15 @@ export function LocationsConfig() {
   const handleSubmit = async () => {
     if (!formData.code.trim()) return;
 
+    const isFree = formData.location_type !== 'stock';
     const payload = {
       code: formData.code,
-      aisle_id: formData.is_staging ? null : (formData.aisle_id || null),
-      level_id: formData.is_staging ? null : (formData.level_id || null),
-      position_in_aisle: formData.is_staging ? 1 : formData.position_in_aisle,
+      aisle_id: isFree ? null : (formData.aisle_id || null),
+      level_id: isFree ? null : (formData.level_id || null),
+      position_in_aisle: isFree ? 1 : formData.position_in_aisle,
       notes: formData.notes || null,
-      is_staging: formData.is_staging,
+      is_staging: formData.location_type === 'pre_exit',
+      location_type: formData.location_type,
     };
 
     if (editingLocation) {
@@ -156,8 +166,10 @@ export function LocationsConfig() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-mono font-bold">{location.code}</p>
-                    {location.is_staging && (
-                      <Badge variant="secondary">Zona livre / conferência</Badge>
+                    {(location.location_type ?? 'stock') !== 'stock' && (
+                      <Badge variant="secondary">
+                        {LOCATION_TYPE_LABELS[location.location_type as LocationType] ?? 'Zona livre'}
+                      </Badge>
                     )}
                     {location.aisle && (
                       <span 
@@ -229,20 +241,30 @@ export function LocationsConfig() {
                 className="font-mono"
               />
             </div>
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div className="space-y-0.5 pr-4">
-                <Label htmlFor="staging">Zona livre (sem rua/rack)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Ex: zona de conferência. O stock aqui fica pendente de localização.
-                </p>
-              </div>
-              <Switch
-                id="staging"
-                checked={formData.is_staging}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_staging: checked }))}
-              />
+            <div className="space-y-2">
+              <Label>Tipo de localização</Label>
+              <Select
+                value={formData.location_type}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, location_type: value as LocationType }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(LOCATION_TYPE_LABELS) as LocationType[]).map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {LOCATION_TYPE_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {LOCATION_TYPE_HINTS[formData.location_type]}
+              </p>
             </div>
-            {!formData.is_staging && (
+            {formData.location_type === 'stock' && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
