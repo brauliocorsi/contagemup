@@ -246,6 +246,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       toast.warning(`${match.name} já está completo (${match.picked}/${match.quantity})`);
       return;
     }
+    const blocked = blockedFor(match);
+    if (blocked) {
+      toast.error(
+        `${match.product?.code || match.code}: stock apenas em ${blocked}. Transfira para uma localização de stock antes de fazer picking.`,
+      );
+      return;
+    }
     const inc = Math.max(1, stepRef.current);
     const next = Math.min(match.quantity, match.picked + inc);
     setPicked(match.key, next);
