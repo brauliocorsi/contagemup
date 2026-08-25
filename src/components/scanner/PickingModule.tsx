@@ -58,6 +58,8 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const [step, setStep] = useState(1);
   const [lastKey, setLastKey] = useState<string | null>(null);
   const [task, setTask] = useState<PickingTask | null>(null);
+  const [groupMode, setGroupMode] = useState<'produto' | 'nota'>('produto');
+
   const stepRef = useRef(step);
   stepRef.current = step;
 
