@@ -189,6 +189,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const setPicked = (key: string, value: number) => {
     const current = linesRef.current.find((l) => l.key === key);
     if (!current) return;
+    const blocked = blockedForRef.current(current);
+    if (blocked && value > current.picked) {
+      toast.error(
+        `${current.name}: stock apenas em ${blocked}. Transfira para uma localização de stock antes de fazer picking.`,
+      );
+      return;
+    }
     const next = Math.max(0, Math.min(current.quantity, value));
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, picked: next } : l)));
     setLastKey(key);
