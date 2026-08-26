@@ -128,24 +128,18 @@ export function PrintCenterModule() {
     []
   );
 
-  const loading =
-    (source === 'localizacoes' && locations.isLoading) ||
-    (source === 'produtos' && products.isFetching);
+  const loading = source === 'produtos' && products.isFetching;
 
   const rows: Row[] = useMemo(() => {
-    const base =
-      source === 'comandos'
-        ? commandRows
-        : source === 'localizacoes'
-          ? locations.data || []
-          : products.data || [];
+    const base = source === 'comandos' ? commandRows : products.data || [];
     if (source === 'produtos') return base;
     const term = search.trim().toLowerCase();
     if (!term) return base;
     return base.filter(
       (r) => r.title.toLowerCase().includes(term) || r.code.toLowerCase().includes(term)
     );
-  }, [source, search, commandRows, locations.data, products.data]);
+  }, [source, search, commandRows, products.data]);
+
 
   const selectedRows = rows.filter((r) => selected[r.id]);
   const toPrint = selectedRows.length ? selectedRows : rows;
