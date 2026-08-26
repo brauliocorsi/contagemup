@@ -445,6 +445,47 @@ export function RouteOptimizationView({ onSendToSeparation }: RouteOptimizationV
           )}
         </div>
       )}
+
+      <Dialog open={simOpen} onOpenChange={setSimOpen}>
+        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Simulação da rota</DialogTitle>
+            <DialogDescription>
+              {plan
+                ? `${plan.days.length} volta(s) · ${plan.totalKm} km · ${plan.totalCost.toFixed(2)} € de gasóleo`
+                : 'Sem plano otimizado'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {dayGroups.map(([day, runs]) => (
+              <div key={`sim-${day}`} className="rounded-md border p-3">
+                <p className="mb-2 font-medium capitalize">{dayLabel(day)}</p>
+                <div className="space-y-2">
+                  {runs.map((run) => (
+                    <div key={`sim-${day}-${run.run}`} className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="font-medium">Volta {run.run}</span>
+                      <span className="text-muted-foreground">
+                        {run.stops.length} paragem(ns) · {run.km} km · {run.cost.toFixed(2)} €
+                      </span>
+                      <div className="ml-auto flex gap-2">
+                        {run.mapsUrls.map((url, i) => (
+                          <Button key={url} size="sm" variant="outline" asChild>
+                            <a href={url} target="_blank" rel="noreferrer">
+                              <MapPin className="mr-1 h-3.5 w-3.5" />
+                              Simular {run.mapsUrls.length > 1 ? i + 1 : ''}
+                            </a>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
