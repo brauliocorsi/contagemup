@@ -81,7 +81,8 @@ export function BulkLabelPrintButton({
     setBusy(true);
     try {
       const products = getProducts();
-      const items = buildBulkLabels(products, byColi);
+      const dates = await fetchLastEntryDatesByCode(products.map((p) => p.code));
+      const items = buildBulkLabels(products, byColi, dates);
       if (!items.length) {
         toast.info('Nenhum produto com código para imprimir');
         return;
