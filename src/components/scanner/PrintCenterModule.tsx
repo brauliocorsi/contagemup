@@ -217,9 +217,11 @@ export function PrintCenterModule() {
           setPreviewUrl(null);
         }}
       >
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="comandos" className="text-[11px]">Comandos</TabsTrigger>
+          <TabsTrigger value="localizacoes" className="text-[11px]">Locais</TabsTrigger>
           <TabsTrigger value="produtos" className="text-[11px]">Produtos</TabsTrigger>
+
         </TabsList>
         <TabsContent value={source} className="mt-3 space-y-3">
           <Input
