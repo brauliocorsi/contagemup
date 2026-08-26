@@ -169,18 +169,6 @@ export function ProductForm({
                 rows={2}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="location" className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                Localização
-              </Label>
-              <Input
-                id="location"
-                placeholder="Ex: Armazém A - C3"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
