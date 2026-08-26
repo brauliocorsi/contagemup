@@ -1,12 +1,19 @@
 import { useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { ClipboardCopy, ClipboardPaste, MapPin, Save, Send, Sparkles, Trash2 } from 'lucide-react';
+import { ClipboardCopy, ClipboardPaste, MapPin, Route, Save, Send, Trash2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   applyExternalPlan,
   fetchSeparationOrders,
@@ -16,6 +23,7 @@ import {
 import { buildAiPrompt, parseAiPlan } from '@/lib/logistics/ai-route-plan';
 import { DEFAULT_ADDRESS_FROM, type DayRoute, type SepOrder, type WeekPlan } from '@/lib/logistics/types';
 import { useWeekPlans } from './useWeekPlans';
+
 
 function today(offset = 0): string {
   const d = new Date();
@@ -71,6 +79,8 @@ export function RouteOptimizationView({ onSendToSeparation }: RouteOptimizationV
   const [plan, setPlan] = useState<WeekPlan | null>(null);
   const [planName, setPlanName] = useState('');
   const [aiText, setAiText] = useState('');
+  const [simOpen, setSimOpen] = useState(false);
+
 
   const { plans: saved, save, remove } = useWeekPlans();
   const days = useMemo(() => workingDays(from, to), [from, to]);
@@ -231,10 +241,24 @@ export function RouteOptimizationView({ onSendToSeparation }: RouteOptimizationV
           <Sparkles className="mr-2 h-4 w-4" />
           {job.isPending ? 'A otimizar…' : 'Otimizar a semana'}
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (!plan || plan.days.length === 0) {
+              toast.error('Otimize a semana (ou importe um plano) antes de simular a rota');
+              return;
+            }
+            setSimOpen(true);
+          }}
+        >
+          <Route className="mr-2 h-4 w-4" />
+          Simular rota
+        </Button>
         <Button variant="outline" onClick={() => copyPrompt.mutate()} disabled={copyPrompt.isPending}>
           <ClipboardCopy className="mr-2 h-4 w-4" />
           {copyPrompt.isPending ? 'A preparar…' : 'Copiar lista para IA'}
         </Button>
+
         {plan && (
           <>
             <Input className="w-56" placeholder="Nome da otimização" value={planName} onChange={(e) => setPlanName(e.target.value)} />
@@ -421,6 +445,47 @@ export function RouteOptimizationView({ onSendToSeparation }: RouteOptimizationV
           )}
         </div>
       )}
+
+      <Dialog open={simOpen} onOpenChange={setSimOpen}>
+        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Simulação da rota</DialogTitle>
+            <DialogDescription>
+              {plan
+                ? `${plan.days.length} volta(s) · ${plan.totalKm} km · ${plan.totalCost.toFixed(2)} € de gasóleo`
+                : 'Sem plano otimizado'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {dayGroups.map(([day, runs]) => (
+              <div key={`sim-${day}`} className="rounded-md border p-3">
+                <p className="mb-2 font-medium capitalize">{dayLabel(day)}</p>
+                <div className="space-y-2">
+                  {runs.map((run) => (
+                    <div key={`sim-${day}-${run.run}`} className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="font-medium">Volta {run.run}</span>
+                      <span className="text-muted-foreground">
+                        {run.stops.length} paragem(ns) · {run.km} km · {run.cost.toFixed(2)} €
+                      </span>
+                      <div className="ml-auto flex gap-2">
+                        {run.mapsUrls.map((url, i) => (
+                          <Button key={url} size="sm" variant="outline" asChild>
+                            <a href={url} target="_blank" rel="noreferrer">
+                              <MapPin className="mr-1 h-3.5 w-3.5" />
+                              Simular {run.mapsUrls.length > 1 ? i + 1 : ''}
+                            </a>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
