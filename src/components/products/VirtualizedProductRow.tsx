@@ -337,10 +337,10 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
       {/* Location */}
       {isColumnVisible('location') && (
         <div className="p-2 truncate" style={getColWidth('location')}>
-          {product.location ? (
+          {lastCount && lastCount.uniqueLocations.length > 0 ? (
             <span className="flex items-center gap-1 text-muted-foreground text-sm">
               <MapPin className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{product.location}</span>
+              <span className="truncate">{lastCount.uniqueLocations.join(', ')}</span>
             </span>
           ) : '-'}
         </div>

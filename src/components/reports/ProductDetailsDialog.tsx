@@ -170,13 +170,6 @@ export function ProductDetailsDialog({ product, open, onOpenChange }: ProductDet
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Localização</p>
-                      <p className="font-medium">{product.location || '-'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                     <div>
                       <p className="text-xs text-muted-foreground">Sets Completos</p>

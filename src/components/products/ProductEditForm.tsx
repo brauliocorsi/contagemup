@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, MapPin, AlertTriangle, ScanBarcode } from 'lucide-react';
+import { Loader2, AlertTriangle, ScanBarcode } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import { useActiveProductCounts, ActiveCountInfo } from '@/hooks/useActiveProductCounts';
 import { Product } from '@/types/stock';
@@ -28,7 +28,6 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
   const [category, setCategory] = useState(product.category);
   const [totalColis, setTotalColis] = useState(product.total_colis);
   const [description, setDescription] = useState(product.description || '');
-  const [location, setLocation] = useState(product.location || '');
   const [supplierCode, setSupplierCode] = useState(product.supplier_code || '');
   const [minStock, setMinStock] = useState(product.min_stock ?? 5);
   const [activeCounts, setActiveCounts] = useState<ActiveCountInfo[]>([]);
@@ -41,7 +40,6 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
     setCategory(product.category);
     setTotalColis(product.total_colis);
     setDescription(product.description || '');
-    setLocation(product.location || '');
     setSupplierCode(product.supplier_code || '');
     setMinStock(product.min_stock ?? 5);
     setShowColisWarning(false);
@@ -78,7 +76,6 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
       category,
       total_colis: totalColis,
       description: description || null,
-      location: location || null,
       supplier_code: supplierCode.trim() || null,
       min_stock: minStock
     });
@@ -220,18 +217,6 @@ export function ProductEditForm({ product, open, onOpenChange, onSubmit }: Produ
                   Igual ao interno
                 </Button>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-location" className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                Localização
-              </Label>
-              <Input
-                id="edit-location"
-                placeholder="Ex: Armazém A - C3"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
             </div>
           </div>
           <DialogFooter>

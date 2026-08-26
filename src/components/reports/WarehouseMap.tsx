@@ -55,7 +55,7 @@ export function WarehouseMap({ productsWithCounts, categoryColisNamesMap, onProd
       
       // Process each coli's location
       product.colisDetails.forEach(coli => {
-        const location = coli.location || product.location || 'Sem localização';
+        const location = coli.location || 'Sem localização';
         
         if (!locationMap[location]) {
           locationMap[location] = { products: new Set(), colis: [] };
@@ -76,7 +76,7 @@ export function WarehouseMap({ productsWithCounts, categoryColisNamesMap, onProd
 
       // If product has no colis details, add to default location
       if (product.colisDetails.length === 0) {
-        const location = product.location || 'Sem localização';
+        const location = 'Sem localização';
         if (!locationMap[location]) {
           locationMap[location] = { products: new Set(), colis: [] };
         }
