@@ -11,7 +11,7 @@ import { SupplierSelect } from '@/components/stock/SupplierSelect';
 import { useProductResolver, CONFERENCE_LOCATION } from '@/hooks/useScannerData';
 import { useReceivingLocations } from '@/hooks/useReceivingLocations';
 import { supabase } from '@/integrations/supabase/client';
-import { colisCode, locationCode, parseScan, type QtyHandler } from '@/lib/scanner/commands';
+import { colisCode, parseScan, type QtyHandler } from '@/lib/scanner/commands';
 import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
@@ -130,14 +130,17 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
           items.push({
             code: colisCode(l.product.code, Number(coli)),
             title: l.product.name,
-            subtitle: `Coli ${coli} • ${l.product.code}`,
-            extra: [location || 'S/L', supplier ? `Fornecedor: ${supplier}` : ''].filter(Boolean),
+            subtitle: `Código: ${l.product.code}`,
+            extra: [
+              `Coli ${coli}/${Math.max(l.product.total_colis || 1, Number(coli))}`,
+              supplier ? `Fornecedor: ${supplier}` : '',
+            ].filter(Boolean),
+            entryDate: new Date().toISOString(),
             copies: qty,
           });
         }
       });
     });
-    if (location) items.push({ code: locationCode(location), title: `Localização ${location}`, subtitle: 'Armazém' });
     return items;
   };
 

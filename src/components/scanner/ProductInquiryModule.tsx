@@ -12,8 +12,9 @@ import {
   useLocationStock,
 } from '@/hooks/useScannerData';
 import { useProductSales } from '@/hooks/useProductSales';
-import { colisCode, locationCode, parseScan } from '@/lib/scanner/commands';
+import { colisCode, parseScan } from '@/lib/scanner/commands';
 import type { LabelItem } from '@/lib/scanner/labels';
+import { useLastEntryDates } from '@/lib/scanner/entryDates';
 import type { Product } from '@/types/stock';
 import { toast } from 'sonner';
 

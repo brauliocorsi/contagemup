@@ -175,11 +175,9 @@ export function TransferModule({ onCommand }: Props) {
     const items: LabelItem[] = pending.map((p) => ({
       code: colisCode(p.product_code, p.colis_number),
       title: p.product_name,
-      subtitle: `Coli ${p.colis_number} • ${p.quantity} un.`,
-      extra: [destLocation || 'S/L'],
+      subtitle: `Código: ${p.product_code}`,
+      extra: [`Coli ${p.colis_number}`, `${p.quantity} un.`],
     }));
-    if (origin) items.push({ code: locationCode(origin), title: `Localização ${origin}`, subtitle: 'Origem' });
-    if (destLocation) items.push({ code: locationCode(destLocation), title: `Localização ${destLocation}`, subtitle: 'Destino' });
     return items;
   };
 
