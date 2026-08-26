@@ -69,7 +69,7 @@ const FIELD_LABELS: Record<keyof ColumnMapping, string> = {
   location: 'Localização'
 };
 
-const FIELD_ORDER: Array<keyof ColumnMapping> = ['code', 'name', 'category', 'total_colis', 'description', 'location'];
+const FIELD_ORDER: Array<keyof ColumnMapping> = ['code', 'name', 'category', 'total_colis', 'description'];
 
 export function ImportProducts({ onImport, existingCategories, onCreateCategory }: ImportProductsProps) {
   const [open, setOpen] = useState(false);
@@ -145,7 +145,6 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
           category: validateFieldValue(getValue(mapping.category), MAX_FIELD_LENGTHS.category) || 'Geral',
           total_colis: Math.max(1, Math.min(10000, parseInt(getValue(mapping.total_colis)) || 1)),
           description: validateFieldValue(getValue(mapping.description), MAX_FIELD_LENGTHS.description) || undefined,
-          location: validateFieldValue(getValue(mapping.location), MAX_FIELD_LENGTHS.location) || undefined
         });
       }
     }
@@ -604,7 +603,6 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
                     <th className="text-left p-2">Categoria</th>
                     <th className="text-left p-2">Colis</th>
                     <th className="text-left p-2">Descrição</th>
-                    <th className="text-left p-2">Localização</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -624,7 +622,6 @@ export function ImportProducts({ onImport, existingCategories, onCreateCategory 
                       </td>
                       <td className="p-2">{product.total_colis}</td>
                       <td className="p-2 text-muted-foreground">{product.description || '-'}</td>
-                      <td className="p-2 text-muted-foreground">{product.location || '-'}</td>
                     </tr>
                   ))}
                 </tbody>

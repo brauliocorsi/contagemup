@@ -16,7 +16,6 @@ import {
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
-import { LocationSelect } from '@/components/counting/LocationSelect';
 import { SupplierSelect } from '@/components/stock/SupplierSelect';
 import { PurchaseEntryView } from '@/components/stock/PurchaseEntryView';
 import { PurchaseEntryHistory } from '@/components/stock/PurchaseEntryHistory';
@@ -144,7 +143,7 @@ export function StockEntriesView() {
       const initial: ColiRow[] = Array.from({ length: effectiveTotalColis }, (_, i) => {
         const n = i + 1;
         const suggestion = byColi.get(n);
-        const loc = receivingLocationRef.current || suggestion?.location || selected.location || '';
+        const loc = receivingLocationRef.current || '';
         return {
           colis_number: n,
           quantity: mode === 'set' ? setQuantity : 0,
@@ -592,8 +591,6 @@ export function StockEntriesView() {
                 {/* Coli rows */}
                 <div className="border rounded-md divide-y">
                   {rows.map(r => {
-                    const isSuggested =
-                      r.suggested_location && r.location === r.suggested_location;
                     return (
                       <div
                         key={r.colis_number}
@@ -610,20 +607,12 @@ export function StockEntriesView() {
                           onChange={(v) => updateRow(r.colis_number, { quantity: v })}
                           className="h-9 text-center"
                         />
-                        <LocationSelect
-                          value={r.location}
-                          onValueChange={(v) => updateRow(r.colis_number, { location: v })}
-                          placeholder="Localização…"
-                        />
-                        <div className="text-xs">
-                          {isSuggested ? (
-                            <span className="text-green-700 flex items-center gap-1">
-                              <Check className="h-3 w-3" /> sugerido
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <MapPin className="h-3 w-3" />
+                          <span className="font-mono">{r.location || '—'}</span>
+                          <span>(conferência)</span>
                         </div>
+                        <div className="text-xs text-muted-foreground">—</div>
                       </div>
                     );
                   })}
