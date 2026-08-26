@@ -363,12 +363,17 @@ export async function printCommandSheet(format: LabelFormat = 'a4', mode: Output
   );
 }
 
-export function productLabel(product: { code: string; name: string }, colisCodeValue?: string, colis?: number): LabelItem {
+export function productLabel(
+  product: { code: string; name: string },
+  options?: { code?: string; coli?: number; totalColis?: number; entryDate?: string | null }
+): LabelItem {
+  const total = Math.max(1, options?.totalColis || 1);
   return {
-    code: colisCodeValue || product.code,
+    code: options?.code || product.code,
     title: product.name,
     subtitle: `Código: ${product.code}`,
-    extra: colis ? [`Coli ${colis}`] : undefined,
+    extra: options?.coli ? [`Coli ${options.coli}/${total}`] : undefined,
+    entryDate: options?.entryDate ?? null,
   };
 }
 
@@ -378,12 +383,12 @@ export function productLabel(product: { code: string; name: string }, colisCodeV
  */
 export function productColiLabels(
   product: { code: string; name: string; total_colis?: number | null },
-  options?: { copies?: number; colisNames?: Record<string, string> | null }
+  options?: { copies?: number; colisNames?: Record<string, string> | null; entryDate?: string | null }
 ): LabelItem[] {
   const total = Math.max(1, product.total_colis || 1);
   const copies = Math.max(1, options?.copies || 1);
   if (total <= 1) {
-    return [{ ...productLabel(product), copies }];
+    return [{ ...productLabel(product, { entryDate: options?.entryDate }), copies }];
   }
   return Array.from({ length: total }, (_, idx) => {
     const n = idx + 1;
@@ -393,6 +398,7 @@ export function productColiLabels(
       title: product.name,
       subtitle: `Código: ${product.code}`,
       extra: [name ? `Coli ${n}/${total} - ${name}` : `Coli ${n}/${total}`],
+      entryDate: options?.entryDate ?? null,
       copies,
     };
   });
