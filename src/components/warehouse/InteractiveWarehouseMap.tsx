@@ -121,6 +121,31 @@ export function InteractiveWarehouseMap() {
   
   const [selectedLocation, setSelectedLocation] = useState<LocationWithProducts | null>(null);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+
+  // Metadados para as etiquetas da localidade selecionada (total de colis + data de entrada)
+  const labelProductIds = useMemo(
+    () => Array.from(new Set((selectedLocation?.products || []).map((p) => p.productId))).sort(),
+    [selectedLocation]
+  );
+  const { data: labelMeta } = useQuery<LabelMeta>({
+    queryKey: ['location-label-meta', labelProductIds],
+    enabled: locationDialogOpen && labelProductIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, total_colis')
+        .in('id', labelProductIds);
+      if (error) throw error;
+      const totals: Record<string, number> = {};
+      (data || []).forEach((p) => {
+        totals[p.id] = Math.max(1, p.total_colis || 1);
+      });
+      const entryDates = await fetchLastEntryDates(labelProductIds);
+      return { totals, entryDates };
+    },
+  });
+
   const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
   const [dropTargetCode, setDropTargetCode] = useState<string | null>(null);
   const [filterLevel, setFilterLevel] = useState<string>('all');
