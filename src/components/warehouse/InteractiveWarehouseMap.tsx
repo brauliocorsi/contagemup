@@ -929,7 +929,7 @@ export function InteractiveWarehouseMap() {
                   <PrintMenu
                     label="Imprimir etiquetas"
                     variant="outline"
-                    getItems={() => buildLocationUnitLabels(selectedLocation)}
+                    getItems={() => buildLocationUnitLabels(selectedLocation, labelMeta)}
                   />
                 </div>
               )}
