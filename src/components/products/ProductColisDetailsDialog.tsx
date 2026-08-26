@@ -191,15 +191,6 @@ export function ProductColisDetailsDialog({ product, lastCount, open, onOpenChan
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-3 flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Localização Base</p>
-                    <p className="font-medium text-sm truncate">{product.location || '-'}</p>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Colis Details Tabs */}

@@ -108,7 +108,6 @@ export function ProductDetailPopup({ productId, onClose }: ProductDetailPopupPro
             <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
               <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{product.code}</span>
               <Badge variant="outline" className="text-xs">{product.category}</Badge>
-              {product.location && <span className="flex items-center gap-1 text-xs"><MapPin className="h-3 w-3" />{product.location}</span>}
               <span className="flex items-center gap-1 text-xs"><Package className="h-3 w-3" />{product.total_colis} coli(s)</span>
             </DialogDescription>
           </DialogHeader>
