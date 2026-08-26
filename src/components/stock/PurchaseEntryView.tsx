@@ -14,7 +14,6 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { useReceivingLocations } from '@/hooks/useReceivingLocations';
-import { LocationSelect } from '@/components/counting/LocationSelect';
 import { ProductForm } from '@/components/products/ProductForm';
 import { useProducts } from '@/hooks/useProducts';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,7 +57,6 @@ export function PurchaseEntryView() {
 
   const [locOpen, setLocOpen] = useState(false);
   const { defaultCode: receivingLocation } = useReceivingLocations();
-  const [location, setLocation] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
@@ -263,7 +261,7 @@ export function PurchaseEntryView() {
         const { error } = await supabase.rpc('register_entry', {
           p_product_id: product.id,
           p_colis_quantities: colisQty,
-          p_location: location || receivingLocation || null,
+          p_location: receivingLocation || null,
           p_reason: 'Compra',
           p_reference: refText,
           p_notes: `Item Gestão Click: ${r.item.nome}`,
@@ -577,15 +575,16 @@ export function PurchaseEntryView() {
           <DialogHeader>
             <DialogTitle>Localização da entrada</DialogTitle>
             <DialogDescription>
-              Escolha a localização a aplicar a todos os itens selecionados.
+              Os itens entram na zona de conferência e são arrumados depois por transferência.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <LocationSelect
-              value={location}
-              onValueChange={setLocation}
-              placeholder="Localização (conferência por defeito)…"
-            />
+            <div className="rounded-md border bg-muted/40 p-3 text-sm">
+              <p className="font-medium">Localização: {receivingLocation || 'conferência'}</p>
+              <p className="text-xs text-muted-foreground">
+                A entrada vai sempre para a zona de conferência. A arrumação faz-se depois por transferência no scanner.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLocOpen(false)}>Cancelar</Button>

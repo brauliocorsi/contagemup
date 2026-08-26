@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil, History, ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
+import { TrendingUp, Search, Package, Layers, AlertTriangle, ClipboardList, X, Check, ShoppingCart, Pencil, History, ChevronDown, ChevronRight, Minus, Plus, MapPin } from 'lucide-react';
 import { useReceivingLocations } from '@/hooks/useReceivingLocations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
