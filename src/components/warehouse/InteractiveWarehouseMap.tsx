@@ -54,7 +54,7 @@ function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
   location.products.forEach((p) => {
     const code = (p.productCode || '').trim();
     if (!code || p.quantity <= 0) return;
-    const coliCode = p.colisNumber > 1 ? `${code}-C${p.colisNumber}` : code;
+    const coliCode = `${code}-C${Math.max(1, p.colisNumber || 1)}`;
     const existing = map.get(coliCode);
     if (existing) {
       existing.copies = (existing.copies || 1) + p.quantity;
