@@ -79,6 +79,8 @@ export function RouteOptimizationView({ onSendToSeparation }: RouteOptimizationV
   const [plan, setPlan] = useState<WeekPlan | null>(null);
   const [planName, setPlanName] = useState('');
   const [aiText, setAiText] = useState('');
+  const [simOpen, setSimOpen] = useState(false);
+
 
   const { plans: saved, save, remove } = useWeekPlans();
   const days = useMemo(() => workingDays(from, to), [from, to]);
