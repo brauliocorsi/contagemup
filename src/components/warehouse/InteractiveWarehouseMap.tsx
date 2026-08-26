@@ -47,14 +47,25 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PrintMenu } from '@/components/scanner/PrintMenu';
 import type { LabelItem } from '@/lib/scanner/labels';
+import { useQuery } from '@tanstack/react-query';
+import { fetchLastEntryDates } from '@/lib/scanner/entryDates';
+
+interface LabelMeta {
+  /** total de colis por produto */
+  totals: Record<string, number>;
+  /** data da última entrada por produto */
+  entryDates: Record<string, string>;
+}
 
 /** Uma etiqueta por unidade de cada item existente na localização */
-function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
+function buildLocationUnitLabels(location: LocationWithProducts, meta?: LabelMeta): LabelItem[] {
   const map: globalThis.Map<string, LabelItem> = new globalThis.Map();
   location.products.forEach((p) => {
     const code = (p.productCode || '').trim();
     if (!code || p.quantity <= 0) return;
-    const coliCode = `${code}-C${Math.max(1, p.colisNumber || 1)}`;
+    const coli = Math.max(1, p.colisNumber || 1);
+    const total = Math.max(meta?.totals[p.productId] || 1, coli);
+    const coliCode = `${code}-C${coli}`;
     const existing = map.get(coliCode);
     if (existing) {
       existing.copies = (existing.copies || 1) + p.quantity;
@@ -64,12 +75,14 @@ function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
       code: coliCode,
       title: p.productName,
       subtitle: `Código: ${code}`,
-      extra: [`Coli ${p.colisNumber}`, `Local: ${location.code}`],
+      extra: [`Coli ${coli}/${total}`],
+      entryDate: meta?.entryDates[p.productId] ?? null,
       copies: p.quantity,
     });
   });
   return Array.from(map.values());
 }
+
 
 interface DragItem {
   countId: string;
@@ -108,6 +121,31 @@ export function InteractiveWarehouseMap() {
   
   const [selectedLocation, setSelectedLocation] = useState<LocationWithProducts | null>(null);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+
+  // Metadados para as etiquetas da localidade selecionada (total de colis + data de entrada)
+  const labelProductIds = useMemo(
+    () => Array.from(new Set((selectedLocation?.products || []).map((p) => p.productId))).sort(),
+    [selectedLocation]
+  );
+  const { data: labelMeta } = useQuery<LabelMeta>({
+    queryKey: ['location-label-meta', labelProductIds],
+    enabled: locationDialogOpen && labelProductIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, total_colis')
+        .in('id', labelProductIds);
+      if (error) throw error;
+      const totals: Record<string, number> = {};
+      (data || []).forEach((p) => {
+        totals[p.id] = Math.max(1, p.total_colis || 1);
+      });
+      const entryDates = await fetchLastEntryDates(labelProductIds);
+      return { totals, entryDates };
+    },
+  });
+
   const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
   const [dropTargetCode, setDropTargetCode] = useState<string | null>(null);
   const [filterLevel, setFilterLevel] = useState<string>('all');
@@ -891,7 +929,7 @@ export function InteractiveWarehouseMap() {
                   <PrintMenu
                     label="Imprimir etiquetas"
                     variant="outline"
-                    getItems={() => buildLocationUnitLabels(selectedLocation)}
+                    getItems={() => buildLocationUnitLabels(selectedLocation, labelMeta)}
                   />
                 </div>
               )}

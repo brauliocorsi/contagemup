@@ -15,7 +15,25 @@ export interface LabelItem {
   subtitle?: string;
   extra?: string[];
   copies?: number;
+  /** Data da última entrada de stock do produto (ISO). `null` imprime "Entrada: —" */
+  entryDate?: string | null;
 }
+
+/** Formata a data de entrada para a etiqueta (dd/mm/aaaa) */
+export function formatEntryDate(value?: string | null): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pt-PT');
+}
+
+/** Linhas informativas da etiqueta (sem o título), incluindo a data de entrada quando aplicável */
+function detailLines(item: LabelItem): string[] {
+  const lines = (item.extra || []).filter(Boolean);
+  if ('entryDate' in item) lines.push(`Entrada: ${formatEntryDate(item.entryDate)}`);
+  return lines;
+}
+
 
 function sanitize(value: string): string {
   // CODE128 só suporta ASCII (0-127). Remove acentos e caracteres inválidos.
@@ -186,7 +204,7 @@ async function printA4(items: LabelItem[], filename: string, mode: OutputMode = 
       doc.text(truncate(doc, item.subtitle, w - 8), x + 4, ty);
       ty += 3.5;
     }
-    (item.extra || []).slice(0, 2).forEach((line) => {
+    detailLines(item).slice(0, 3).forEach((line) => {
       doc.text(truncate(doc, line, w - 8), x + 4, ty);
       ty += 3.5;
     });
@@ -219,7 +237,7 @@ async function printThermal(items: LabelItem[], filename: string, mode: OutputMo
       doc.text(truncate(doc, item.subtitle, 92), 4, ty);
       ty += 4.5;
     }
-    (item.extra || []).slice(0, 2).forEach((line) => {
+    detailLines(item).slice(0, 3).forEach((line) => {
       doc.text(truncate(doc, line, 92), 4, ty);
       ty += 4.5;
     });
@@ -258,7 +276,7 @@ async function printQL700(items: LabelItem[], filename: string, mode: OutputMode
     });
 
     // Linha de contexto (código interno / coli)
-    const info = [item.subtitle, ...(item.extra || [])].filter(Boolean).join('  •  ');
+    const info = [item.subtitle, ...detailLines(item)].filter(Boolean).join('  •  ');
     if (info) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
@@ -345,12 +363,17 @@ export async function printCommandSheet(format: LabelFormat = 'a4', mode: Output
   );
 }
 
-export function productLabel(product: { code: string; name: string }, colisCodeValue?: string, colis?: number): LabelItem {
+export function productLabel(
+  product: { code: string; name: string },
+  options?: { code?: string; coli?: number; totalColis?: number; entryDate?: string | null }
+): LabelItem {
+  const total = Math.max(1, options?.totalColis || 1);
   return {
-    code: colisCodeValue || product.code,
+    code: options?.code || product.code,
     title: product.name,
     subtitle: `Código: ${product.code}`,
-    extra: colis ? [`Coli ${colis}`] : undefined,
+    extra: options?.coli ? [`Coli ${options.coli}/${total}`] : undefined,
+    entryDate: options?.entryDate ?? null,
   };
 }
 
@@ -360,12 +383,12 @@ export function productLabel(product: { code: string; name: string }, colisCodeV
  */
 export function productColiLabels(
   product: { code: string; name: string; total_colis?: number | null },
-  options?: { copies?: number; colisNames?: Record<string, string> | null }
+  options?: { copies?: number; colisNames?: Record<string, string> | null; entryDate?: string | null }
 ): LabelItem[] {
   const total = Math.max(1, product.total_colis || 1);
   const copies = Math.max(1, options?.copies || 1);
   if (total <= 1) {
-    return [{ ...productLabel(product), copies }];
+    return [{ ...productLabel(product, { entryDate: options?.entryDate }), copies }];
   }
   return Array.from({ length: total }, (_, idx) => {
     const n = idx + 1;
@@ -375,6 +398,7 @@ export function productColiLabels(
       title: product.name,
       subtitle: `Código: ${product.code}`,
       extra: [name ? `Coli ${n}/${total} - ${name}` : `Coli ${n}/${total}`],
+      entryDate: options?.entryDate ?? null,
       copies,
     };
   });

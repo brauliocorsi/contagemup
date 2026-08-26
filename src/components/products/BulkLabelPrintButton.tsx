@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { printLabels, type LabelFormat, type LabelItem } from '@/lib/scanner/labels';
+import { fetchLastEntryDatesByCode } from '@/lib/scanner/entryDates';
 
 export interface BulkLabelProduct {
   code: string;
@@ -20,7 +21,11 @@ export interface BulkLabelProduct {
 }
 
 /** Constrói etiquetas de vários produtos, respeitando colis e mostrando a quantidade em stock */
-export function buildBulkLabels(products: BulkLabelProduct[], byColi: boolean): LabelItem[] {
+export function buildBulkLabels(
+  products: BulkLabelProduct[],
+  byColi: boolean,
+  entryDates: Record<string, string> = {}
+): LabelItem[] {
   const items: LabelItem[] = [];
   products.forEach((p) => {
     const code = (p.code || '').trim();
@@ -28,6 +33,7 @@ export function buildBulkLabels(products: BulkLabelProduct[], byColi: boolean): 
     const total = Math.max(1, p.total_colis || 1);
     const qty = p.current_stock ?? 0;
     const qtyLine = `Stock: ${qty}`;
+    const entryDate = entryDates[code] ?? null;
     if (byColi && total > 1) {
       for (let n = 1; n <= total; n++) {
         items.push({
@@ -35,6 +41,7 @@ export function buildBulkLabels(products: BulkLabelProduct[], byColi: boolean): 
           title: p.name,
           subtitle: `Código: ${code}`,
           extra: [`Coli ${n}/${total}`, qtyLine],
+          entryDate,
         });
       }
     } else {
@@ -43,11 +50,13 @@ export function buildBulkLabels(products: BulkLabelProduct[], byColi: boolean): 
         title: p.name,
         subtitle: `Código: ${code}`,
         extra: [qtyLine],
+        entryDate,
       });
     }
   });
   return items;
 }
+
 
 interface BulkLabelPrintButtonProps {
   /** Produtos a imprimir (avaliados no clique) */
@@ -72,7 +81,8 @@ export function BulkLabelPrintButton({
     setBusy(true);
     try {
       const products = getProducts();
-      const items = buildBulkLabels(products, byColi);
+      const dates = await fetchLastEntryDatesByCode(products.map((p) => p.code));
+      const items = buildBulkLabels(products, byColi, dates);
       if (!items.length) {
         toast.info('Nenhum produto com código para imprimir');
         return;

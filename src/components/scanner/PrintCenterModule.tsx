@@ -13,15 +13,18 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2, Printer, Download, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { printLabels, type LabelItem, type LabelFormat } from '@/lib/scanner/labels';
-import { COMMAND_SHEET, locationCode, colisCode } from '@/lib/scanner/commands';
+import { fetchLastEntryDates } from '@/lib/scanner/entryDates';
+import { COMMAND_SHEET, colisCode } from '@/lib/scanner/commands';
 
-type Source = 'comandos' | 'localizacoes' | 'produtos';
+type Source = 'comandos' | 'produtos';
 
 interface Row {
   id: string;
   code: string;
   title: string;
   subtitle?: string;
+  extra?: string[];
+  entryDate?: string | null;
 }
 
 export function PrintCenterModule() {
@@ -33,24 +36,6 @@ export function PrintCenterModule() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [perColi, setPerColi] = useState(true);
 
-
-  const locations = useQuery({
-    queryKey: ['print-locations'],
-    enabled: source === 'localizacoes',
-    queryFn: async (): Promise<Row[]> => {
-      const { data, error } = await supabase
-        .from('warehouse_locations')
-        .select('id, code, notes')
-        .order('code');
-      if (error) throw error;
-      return (data || []).map((l) => ({
-        id: `loc-${l.id}`,
-        code: locationCode(l.code),
-        title: l.code,
-        subtitle: l.notes || 'Localização',
-      }));
-    },
-  });
 
   const products = useQuery({
     queryKey: ['print-products', search, perColi],
@@ -80,9 +65,11 @@ export function PrintCenterModule() {
         );
       });
 
+      const entryDates = await fetchLastEntryDates((data || []).map((p) => p.id));
+
       const out: Row[] = [];
       (data || []).forEach((p) => {
-        const base = p.location || '';
+        const entryDate = entryDates[p.id] ?? null;
 
         if (!perColi) {
           const code = (p.barcode || p.code || '').trim();
@@ -91,7 +78,8 @@ export function PrintCenterModule() {
             id: `prod-${p.id}`,
             code,
             title: p.name,
-            subtitle: [p.code, base].filter(Boolean).join(' • '),
+            subtitle: `Código: ${p.code}`,
+            entryDate,
           });
           return;
         }
@@ -106,7 +94,9 @@ export function PrintCenterModule() {
             id: `prod-${p.id}`,
             code: productCode,
             title: p.name,
-            subtitle: [productCode, names[0], base].filter(Boolean).join(' • '),
+            subtitle: `Código: ${productCode}`,
+            extra: [names[0] || ''].filter(Boolean),
+            entryDate,
           });
           return;
         }
@@ -116,9 +106,9 @@ export function PrintCenterModule() {
             id: `prod-${p.id}-c${n}`,
             code: colisCode(productCode, n),
             title: p.name,
-            subtitle: [productCode, names[n - 1], `Coli ${n}/${total}`, base]
-              .filter(Boolean)
-              .join(' • '),
+            subtitle: `Código: ${productCode}`,
+            extra: [names[n - 1] ? `Coli ${n}/${total} - ${names[n - 1]}` : `Coli ${n}/${total}`],
+            entryDate,
           });
         }
       });
@@ -138,24 +128,18 @@ export function PrintCenterModule() {
     []
   );
 
-  const loading =
-    (source === 'localizacoes' && locations.isLoading) ||
-    (source === 'produtos' && products.isFetching);
+  const loading = source === 'produtos' && products.isFetching;
 
   const rows: Row[] = useMemo(() => {
-    const base =
-      source === 'comandos'
-        ? commandRows
-        : source === 'localizacoes'
-          ? locations.data || []
-          : products.data || [];
+    const base = source === 'comandos' ? commandRows : products.data || [];
     if (source === 'produtos') return base;
     const term = search.trim().toLowerCase();
     if (!term) return base;
     return base.filter(
       (r) => r.title.toLowerCase().includes(term) || r.code.toLowerCase().includes(term)
     );
-  }, [source, search, commandRows, locations.data, products.data]);
+  }, [source, search, commandRows, products.data]);
+
 
   const selectedRows = rows.filter((r) => selected[r.id]);
   const toPrint = selectedRows.length ? selectedRows : rows;
@@ -169,7 +153,11 @@ export function PrintCenterModule() {
   };
 
   const items = (): LabelItem[] =>
-    toPrint.map((r) => ({ code: r.code, title: r.title, subtitle: r.subtitle }));
+    toPrint.map((r) =>
+      r.entryDate !== undefined
+        ? { code: r.code, title: r.title, subtitle: r.subtitle, extra: r.extra, entryDate: r.entryDate }
+        : { code: r.code, title: r.title, subtitle: r.subtitle, extra: r.extra }
+    );
 
   const run = async (mode: 'print' | 'download' | 'preview') => {
     const list = items();
@@ -202,9 +190,8 @@ export function PrintCenterModule() {
           setPreviewUrl(null);
         }}
       >
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="comandos" className="text-[11px]">Comandos</TabsTrigger>
-          <TabsTrigger value="localizacoes" className="text-[11px]">Locais</TabsTrigger>
           <TabsTrigger value="produtos" className="text-[11px]">Produtos</TabsTrigger>
         </TabsList>
         <TabsContent value={source} className="mt-3 space-y-3">
