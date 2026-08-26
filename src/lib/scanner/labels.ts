@@ -15,7 +15,25 @@ export interface LabelItem {
   subtitle?: string;
   extra?: string[];
   copies?: number;
+  /** Data da última entrada de stock do produto (ISO). `null` imprime "Entrada: —" */
+  entryDate?: string | null;
 }
+
+/** Formata a data de entrada para a etiqueta (dd/mm/aaaa) */
+export function formatEntryDate(value?: string | null): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pt-PT');
+}
+
+/** Linhas informativas da etiqueta (sem o título), incluindo a data de entrada quando aplicável */
+function detailLines(item: LabelItem): string[] {
+  const lines = (item.extra || []).filter(Boolean);
+  if ('entryDate' in item) lines.push(`Entrada: ${formatEntryDate(item.entryDate)}`);
+  return lines;
+}
+
 
 function sanitize(value: string): string {
   // CODE128 só suporta ASCII (0-127). Remove acentos e caracteres inválidos.
