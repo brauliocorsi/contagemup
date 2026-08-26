@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScanInput } from './ScanInput';
 import { PrintMenu } from './PrintMenu';
-import { LocationSelect } from '@/components/counting/LocationSelect';
 import { SupplierSelect } from '@/components/stock/SupplierSelect';
 import { useProductResolver, CONFERENCE_LOCATION } from '@/hooks/useScannerData';
 import { useReceivingLocations } from '@/hooks/useReceivingLocations';
@@ -36,13 +35,7 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
   const [supplier, setSupplier] = useState('');
   const [reference, setReference] = useState('');
   const { defaultCode: receivingLocation } = useReceivingLocations();
-  const [location, setLocation] = useState('');
-  const [locationTouched, setLocationTouched] = useState(false);
-
-  // Pré-preenche com a zona de conferência configurada
-  useEffect(() => {
-    if (!locationTouched && !location && receivingLocation) setLocation(receivingLocation);
-  }, [receivingLocation, locationTouched, location]);
+  const location = receivingLocation || CONFERENCE_LOCATION;
   const [saving, setSaving] = useState(false);
   /** Cada leitura conta N unidades. */
   const [step, setStep] = useState(1);
@@ -87,8 +80,7 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
     const parsed = parseScan(raw);
 
     if (parsed.kind === 'location') {
-      setLocationTouched(true);
-      setLocation(parsed.value);
+      toast.info('A entrada vai sempre para a zona de conferência. Arrume depois em Arrumação.');
       return;
     }
 
@@ -164,7 +156,7 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
         const { error } = await supabase.rpc('register_entry', {
           p_product_id: line.product.id,
           p_colis_quantities: colis_quantities as unknown as never,
-          p_location: location || receivingLocation || CONFERENCE_LOCATION,
+          p_location: location,
           p_reason: 'Conferência de entrada',
           p_reference: reference || null,
           p_notes: supplier ? `Fornecedor: ${supplier}` : null,
@@ -187,7 +179,7 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
         meta: [
           ['Fornecedor', supplier || '—'],
           ['Referência', reference || '—'],
-          ['Localização', location || receivingLocation || CONFERENCE_LOCATION],
+          ['Localização', location],
           ['Data', new Date().toLocaleString('pt-PT')],
         ],
         columns: ['Código', 'Produto', 'Coli', 'Quantidade'],
@@ -205,8 +197,6 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
       toast.success(`Entrada registada: ${ok} produto(s)`);
       setLines([]);
       setReference('');
-      setLocation(receivingLocation || '');
-      setLocationTouched(false);
     }
     if (failed.length) toast.error(`Falha em: ${failed.join(', ')}`);
     setSaving(false);
@@ -244,11 +234,12 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
         <CardContent className="grid gap-2 sm:grid-cols-2">
           <SupplierSelect value={supplier} onValueChange={setSupplier} placeholder="Fornecedor (GestãoClick)" />
           <Input placeholder="Referência / guia" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={80} />
-          <LocationSelect
-            value={location}
-            onValueChange={(v) => { setLocationTouched(true); setLocation(v); }}
-            placeholder="Localização (conferência por defeito)"
-          />
+          <div className="rounded-md border bg-muted/40 p-2 text-xs sm:col-span-2">
+            <span className="font-medium">Entrada em conferência: {location}</span>
+            <span className="block text-muted-foreground">
+              Arrume depois no módulo Arrumação ou Transferência.
+            </span>
+          </div>
         </CardContent>
       </Card>
 
@@ -262,7 +253,7 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
         <CardContent className="space-y-2">
           {lines.length === 0 && (
             <p className="rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
-              Leia os produtos recebidos. Sem localização definida ficam em {receivingLocation || CONFERENCE_LOCATION}.
+              Leia os produtos recebidos. Ficam em {location} até serem arrumados.
             </p>
           )}
           {lines.map((l) => (
