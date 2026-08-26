@@ -118,6 +118,24 @@ export function PrintCenterModule() {
   });
 
 
+  const locations = useQuery({
+    queryKey: ['print-locations'],
+    enabled: source === 'localizacoes',
+    queryFn: async (): Promise<Row[]> => {
+      const { data, error } = await supabase
+        .from('warehouse_locations')
+        .select('id, code, location_type, notes')
+        .order('code');
+      if (error) throw error;
+      return (data || []).map((l) => ({
+        id: `loc-${l.id}`,
+        code: locationCode(l.code),
+        title: l.code,
+        subtitle: l.notes || l.location_type || 'Localização',
+      }));
+    },
+  });
+
   const commandRows: Row[] = useMemo(
     () =>
       COMMAND_SHEET.map((c) => ({
@@ -129,17 +147,25 @@ export function PrintCenterModule() {
     []
   );
 
-  const loading = source === 'produtos' && products.isFetching;
+  const loading =
+    (source === 'produtos' && products.isFetching) ||
+    (source === 'localizacoes' && locations.isFetching);
 
   const rows: Row[] = useMemo(() => {
-    const base = source === 'comandos' ? commandRows : products.data || [];
+    const base =
+      source === 'comandos'
+        ? commandRows
+        : source === 'localizacoes'
+          ? locations.data || []
+          : products.data || [];
     if (source === 'produtos') return base;
     const term = search.trim().toLowerCase();
     if (!term) return base;
     return base.filter(
       (r) => r.title.toLowerCase().includes(term) || r.code.toLowerCase().includes(term)
     );
-  }, [source, search, commandRows, products.data]);
+  }, [source, search, commandRows, products.data, locations.data]);
+
 
 
   const selectedRows = rows.filter((r) => selected[r.id]);
