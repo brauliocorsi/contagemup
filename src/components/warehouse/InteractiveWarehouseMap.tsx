@@ -47,14 +47,25 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PrintMenu } from '@/components/scanner/PrintMenu';
 import type { LabelItem } from '@/lib/scanner/labels';
+import { useQuery } from '@tanstack/react-query';
+import { fetchLastEntryDates } from '@/lib/scanner/entryDates';
+
+interface LabelMeta {
+  /** total de colis por produto */
+  totals: Record<string, number>;
+  /** data da última entrada por produto */
+  entryDates: Record<string, string>;
+}
 
 /** Uma etiqueta por unidade de cada item existente na localização */
-function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
+function buildLocationUnitLabels(location: LocationWithProducts, meta?: LabelMeta): LabelItem[] {
   const map: globalThis.Map<string, LabelItem> = new globalThis.Map();
   location.products.forEach((p) => {
     const code = (p.productCode || '').trim();
     if (!code || p.quantity <= 0) return;
-    const coliCode = `${code}-C${Math.max(1, p.colisNumber || 1)}`;
+    const coli = Math.max(1, p.colisNumber || 1);
+    const total = Math.max(meta?.totals[p.productId] || 1, coli);
+    const coliCode = `${code}-C${coli}`;
     const existing = map.get(coliCode);
     if (existing) {
       existing.copies = (existing.copies || 1) + p.quantity;
@@ -64,12 +75,14 @@ function buildLocationUnitLabels(location: LocationWithProducts): LabelItem[] {
       code: coliCode,
       title: p.productName,
       subtitle: `Código: ${code}`,
-      extra: [`Coli ${p.colisNumber}`, `Local: ${location.code}`],
+      extra: [`Coli ${coli}/${total}`],
+      entryDate: meta?.entryDates[p.productId] ?? null,
       copies: p.quantity,
     });
   });
   return Array.from(map.values());
 }
+
 
 interface DragItem {
   countId: string;
