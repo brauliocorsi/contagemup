@@ -9,7 +9,7 @@ import { PrintMenu } from './PrintMenu';
 import { LocationSelect } from '@/components/counting/LocationSelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useProductResolver, useScannerTransfers } from '@/hooks/useScannerData';
-import { colisCode, locationCode, parseScan } from '@/lib/scanner/commands';
+import { colisCode, parseScan } from '@/lib/scanner/commands';
 import type { LabelItem } from '@/lib/scanner/labels';
 import type { Product } from '@/types/stock';
 import { toast } from 'sonner';
