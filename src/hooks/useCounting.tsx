@@ -343,19 +343,25 @@ export function useCounting(sessionId: string | null) {
         return false;
       }
     } else {
-      const results = await Promise.all(productCounts.map((count) =>
-        supabase.rpc('assign_count_location', {
+      let failedError: unknown = null;
+      // Sequential calls avoid two rows of the same coli trying to merge into
+      // the destination at the same time.
+      for (const count of productCounts) {
+        const { error } = await supabase.rpc('assign_count_location', {
           p_count_id: count.id,
           p_location: location,
-        })
-      ));
-      const failed = results.find(result => result.error);
+        });
+        if (error) {
+          failedError = error;
+          break;
+        }
+      }
 
-      if (failed?.error) {
-        console.error('Erro ao atualizar localização:', failed.error);
+      if (failedError) {
+        console.error('Erro ao atualizar localização:', failedError);
         toast({
           title: 'Erro',
-          description: mapDatabaseError(failed.error, 'Não foi possível atualizar a localização'),
+          description: mapDatabaseError(failedError, 'Não foi possível atualizar a localização'),
           variant: 'destructive'
         });
         return false;
