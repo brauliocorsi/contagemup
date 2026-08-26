@@ -6,11 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Loader2, MapPin } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 
 interface ProductFormProps {
-  onSubmit: (product: { code: string; name: string; category: string; total_colis: number; description: string | null; location: string | null; min_stock?: number }) => Promise<boolean>;
+  onSubmit: (product: { code: string; name: string; category: string; total_colis: number; description: string | null; min_stock?: number }) => Promise<boolean>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   initialCode?: string;
@@ -43,7 +43,6 @@ export function ProductForm({
   const [category, setCategory] = useState('Geral');
   const [totalColis, setTotalColis] = useState(1);
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
   const [minStock, setMinStock] = useState(5);
 
   // Sync initial values when dialog opens (e.g. pre-fill from external caller)
@@ -64,7 +63,6 @@ export function ProductForm({
       category,
       total_colis: totalColis,
       description: description || null,
-      location: location || null,
       min_stock: minStock
     });
 
@@ -74,7 +72,6 @@ export function ProductForm({
       setCategory('Geral');
       setTotalColis(1);
       setDescription('');
-      setLocation('');
       setMinStock(5);
       setOpen(false);
       onCreated?.();
