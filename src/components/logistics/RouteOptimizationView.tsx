@@ -1,12 +1,19 @@
 import { useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { ClipboardCopy, ClipboardPaste, MapPin, Save, Send, Sparkles, Trash2 } from 'lucide-react';
+import { ClipboardCopy, ClipboardPaste, MapPin, Route, Save, Send, Trash2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   applyExternalPlan,
   fetchSeparationOrders,
@@ -16,6 +23,7 @@ import {
 import { buildAiPrompt, parseAiPlan } from '@/lib/logistics/ai-route-plan';
 import { DEFAULT_ADDRESS_FROM, type DayRoute, type SepOrder, type WeekPlan } from '@/lib/logistics/types';
 import { useWeekPlans } from './useWeekPlans';
+
 
 function today(offset = 0): string {
   const d = new Date();
