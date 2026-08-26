@@ -95,8 +95,11 @@ export function ProductInquiryModule({ onCommand }: Props) {
       .sort((a, b) => b.quantity - a.quantity);
   }, [detail]);
 
+  const entryDates = useLastEntryDates(detail ? [detail.product.id] : []);
+
   const labels = (): LabelItem[] => {
     if (!detail) return [];
+    const entryDate = entryDates.data?.[detail.product.id] ?? null;
     const colis = Object.keys(detail.byColis)
       .map(Number)
       .sort((a, b) => a - b);
@@ -105,26 +108,23 @@ export function ProductInquiryModule({ onCommand }: Props) {
     // 1 coli → apenas a etiqueta do produto (sem sufixo -C1)
     if (totalColis <= 1) {
       return [
-        { code: detail.product.code, title: detail.product.name, subtitle: `Código: ${detail.product.code}` },
+        {
+          code: detail.product.code,
+          title: detail.product.name,
+          subtitle: `Código: ${detail.product.code}`,
+          extra: ['Coli 1/1'],
+          entryDate,
+        },
       ];
     }
 
-    return colis.map((coli) => {
-      const rows = detail.byColis[coli];
-      return {
-        code: colisCode(detail.product.code, coli),
-        title: detail.product.name,
-        subtitle: `Coli ${coli} • ${detail.product.code}`,
-        extra: [rows.map((r) => r.location || 'S/L').join(', ')],
-      };
-    });
-  };
-
-  const locationLabels = (): LabelItem[] => {
-    if (!locStock) return [];
-    return [
-      { code: locationCode(locStock.location), title: `Localização ${locStock.location}`, subtitle: `${locStock.totalUnits} un.` },
-    ];
+    return colis.map((coli) => ({
+      code: colisCode(detail.product.code, coli),
+      title: detail.product.name,
+      subtitle: `Código: ${detail.product.code}`,
+      extra: [`Coli ${coli}/${totalColis}`],
+      entryDate,
+    }));
   };
 
   return (
@@ -148,7 +148,6 @@ export function ProductInquiryModule({ onCommand }: Props) {
                 </CardTitle>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <PrintMenu getItems={locationLabels} label="Etiqueta" />
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLocation(null)}>
                   <X className="h-4 w-4" />
                 </Button>
