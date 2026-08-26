@@ -204,7 +204,7 @@ async function printA4(items: LabelItem[], filename: string, mode: OutputMode = 
       doc.text(truncate(doc, item.subtitle, w - 8), x + 4, ty);
       ty += 3.5;
     }
-    (item.extra || []).slice(0, 2).forEach((line) => {
+    detailLines(item).slice(0, 3).forEach((line) => {
       doc.text(truncate(doc, line, w - 8), x + 4, ty);
       ty += 3.5;
     });
@@ -237,7 +237,7 @@ async function printThermal(items: LabelItem[], filename: string, mode: OutputMo
       doc.text(truncate(doc, item.subtitle, 92), 4, ty);
       ty += 4.5;
     }
-    (item.extra || []).slice(0, 2).forEach((line) => {
+    detailLines(item).slice(0, 3).forEach((line) => {
       doc.text(truncate(doc, line, 92), 4, ty);
       ty += 4.5;
     });
@@ -276,7 +276,7 @@ async function printQL700(items: LabelItem[], filename: string, mode: OutputMode
     });
 
     // Linha de contexto (código interno / coli)
-    const info = [item.subtitle, ...(item.extra || [])].filter(Boolean).join('  •  ');
+    const info = [item.subtitle, ...detailLines(item)].filter(Boolean).join('  •  ');
     if (info) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
