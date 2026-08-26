@@ -210,9 +210,10 @@ async function printA4(items: LabelItem[], filename: string, mode: OutputMode = 
     });
 
     const img = barcodeDataUrl(item.code);
-    if (img) doc.addImage(img, 'PNG', x + 5, y + h - 20, w - 10, 12);
+    if (img) doc.addImage(img, 'PNG', x + 5, y + h - 22, w - 10, 11.5);
     doc.setFontSize(8);
-    doc.text(item.code, x + w / 2, y + h - 4.5, { align: 'center' });
+    doc.text(item.code, x + w / 2, y + h - 6, { align: 'center' });
+
   });
 
   return output(doc, filename, mode);
@@ -243,9 +244,10 @@ async function printThermal(items: LabelItem[], filename: string, mode: OutputMo
     });
 
     const img = barcodeDataUrl(item.code, 2, 80);
-    if (img) doc.addImage(img, 'PNG', 8, 27, 84, 15);
+    if (img) doc.addImage(img, 'PNG', 8, 25.5, 84, 14);
     doc.setFontSize(10);
-    doc.text(item.code, 50, 47, { align: 'center' });
+    doc.text(item.code, 50, 44.5, { align: 'center' });
+
   });
 
   return output(doc, filename, mode);
@@ -283,15 +285,18 @@ async function printQL700(items: LabelItem[], filename: string, mode: OutputMode
       doc.text(truncate(doc, info, innerW), M, ty);
     }
 
-    // Código de barras ocupa a largura útil, alinhado ao fundo
-    const barH = 9.5;
-    const barY = H - M - 4.2 - barH;
+    // Código de barras ocupa a largura útil, com margem inferior segura para os números
+    const bottomMargin = 3.6; // área não imprimível + folga para não cortar o texto
+    const codeBaseline = H - bottomMargin;
+    const barH = 8.5;
+    const barY = codeBaseline - 3.2 - barH;
     const img = barcodeDataUrl(item.code, 2, 120);
     if (img) doc.addImage(img, 'PNG', M, barY, innerW, barH);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.text(truncate(doc, item.code, innerW), W / 2, H - M - 0.4, { align: 'center' });
+    doc.setFontSize(7);
+    doc.text(truncate(doc, item.code, innerW), W / 2, codeBaseline, { align: 'center' });
+
   });
 
   return output(doc, filename, mode);
