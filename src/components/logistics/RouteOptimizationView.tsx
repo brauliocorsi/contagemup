@@ -241,10 +241,24 @@ export function RouteOptimizationView({ onSendToSeparation }: RouteOptimizationV
           <Sparkles className="mr-2 h-4 w-4" />
           {job.isPending ? 'A otimizar…' : 'Otimizar a semana'}
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (!plan || plan.days.length === 0) {
+              toast.error('Otimize a semana (ou importe um plano) antes de simular a rota');
+              return;
+            }
+            setSimOpen(true);
+          }}
+        >
+          <Route className="mr-2 h-4 w-4" />
+          Simular rota
+        </Button>
         <Button variant="outline" onClick={() => copyPrompt.mutate()} disabled={copyPrompt.isPending}>
           <ClipboardCopy className="mr-2 h-4 w-4" />
           {copyPrompt.isPending ? 'A preparar…' : 'Copiar lista para IA'}
         </Button>
+
         {plan && (
           <>
             <Input className="w-56" placeholder="Nome da otimização" value={planName} onChange={(e) => setPlanName(e.target.value)} />
