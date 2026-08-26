@@ -95,6 +95,7 @@ export function useCounting(sessionId: string | null) {
     queryClient.invalidateQueries({ queryKey: ['counts', sessionId] });
     queryClient.invalidateQueries({ queryKey: ['products'] });
     queryClient.invalidateQueries({ queryKey: ['last-counts'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-map-counts'] });
   }, [queryClient, sessionId]);
 
   // Função auxiliar para buscar count fresco da BD (evita race condition)
