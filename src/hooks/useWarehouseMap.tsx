@@ -50,24 +50,38 @@ export function useWarehouseMap(sessionId?: string) {
   const { levels, isLoading: levelsLoading } = useWarehouseLevels();
   const { locations, isLoading: locationsLoading } = useWarehouseLocations();
 
-  // Fetch counts for the current session (or all counts if no session)
+  // Fetch inventory rows from the active session and administrative stock.
+  // Colis of the same product can legitimately live in either scope, so the
+  // warehouse map must combine both or it may show/print only some colis.
   const { data: counts = [], isLoading: countsLoading } = useQuery({
     queryKey: ['warehouse-map-counts', sessionId],
     queryFn: async () => {
-      let query = supabase
-        .from('counts')
-        .select(`
-          *,
-          product:products(id, name, code, category)
-        `);
-      
-      if (sessionId) {
-        query = query.eq('session_id', sessionId);
+      const allCounts: any[] = [];
+      const pageSize = 1000;
+      let from = 0;
+
+      for (;;) {
+        let query = supabase
+          .from('counts')
+          .select(`
+            *,
+            product:products(id, name, code, category)
+          `)
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1);
+
+        if (sessionId) {
+          query = query.or(`session_id.eq.${sessionId},session_id.is.null`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        allCounts.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
       }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+
+      return allCounts;
     },
   });
 
@@ -98,6 +112,7 @@ export function useWarehouseMap(sessionId?: string) {
     // Group counts by product+coli to detect split entries
     const coliCountsMap = new Map<string, number>();
     counts.forEach(count => {
+      if (count.quantity <= 0) return;
       const key = `${count.product_id}-${count.colis_number}`;
       coliCountsMap.set(key, (coliCountsMap.get(key) || 0) + 1);
     });
@@ -105,6 +120,7 @@ export function useWarehouseMap(sessionId?: string) {
     // Calculate total quantity per product+coli across all locations
     const coliTotalQuantityMap = new Map<string, number>();
     counts.forEach(count => {
+      if (count.quantity <= 0) return;
       const key = `${count.product_id}-${count.colis_number}`;
       coliTotalQuantityMap.set(key, (coliTotalQuantityMap.get(key) || 0) + count.quantity);
     });

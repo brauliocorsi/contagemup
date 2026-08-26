@@ -317,8 +317,9 @@ export function useCounting(sessionId: string | null) {
   const updateLocation = async (productId: string, location: string) => {
     if (!sessionId || !user) return false;
 
-    // Update location for all colis of this product in this session
-    const productCounts = counts.filter(c => c.product_id === productId);
+    // Move every positive coli row through the merge-safe RPC. This includes
+    // administrative rows (session_id NULL), which are part of current stock.
+    const productCounts = counts.filter(c => c.product_id === productId && c.quantity > 0);
     
     if (productCounts.length === 0) {
       // Create a count entry for colis 1 with quantity 0 just to store location
@@ -342,17 +343,19 @@ export function useCounting(sessionId: string | null) {
         return false;
       }
     } else {
-      // Update all existing counts for this product with the location
-      const { error } = await supabase
-        .from('counts')
-        .update({ location })
-        .eq('session_id', sessionId)
-        .eq('product_id', productId);
+      const results = await Promise.all(productCounts.map((count) =>
+        supabase.rpc('assign_count_location', {
+          p_count_id: count.id,
+          p_location: location,
+        })
+      ));
+      const failed = results.find(result => result.error);
 
-      if (error) {
+      if (failed?.error) {
+        console.error('Erro ao atualizar localização:', failed.error);
         toast({
           title: 'Erro',
-          description: 'Não foi possível atualizar a localização',
+          description: mapDatabaseError(failed.error, 'Não foi possível atualizar a localização'),
           variant: 'destructive'
         });
         return false;
@@ -367,20 +370,23 @@ export function useCounting(sessionId: string | null) {
   const updateColisLocation = async (productId: string, colisNumber: number, location: string) => {
     if (!sessionId || !user) return false;
 
-    const existingCount = counts.find(
-      c => c.product_id === productId && c.colis_number === colisNumber
-    );
+    // Prefer the row that actually carries stock. A zero row may already exist
+    // at the destination and must not hide an unlocated positive row.
+    const existingCount = counts
+      .filter(c => c.product_id === productId && c.colis_number === colisNumber)
+      .sort((a, b) => b.quantity - a.quantity)[0];
 
     if (existingCount) {
-      const { error } = await supabase
-        .from('counts')
-        .update({ location })
-        .eq('id', existingCount.id);
+      const { error } = await supabase.rpc('assign_count_location', {
+        p_count_id: existingCount.id,
+        p_location: location,
+      });
 
       if (error) {
+        console.error('Erro ao atualizar localização do coli:', error);
         toast({
           title: 'Erro',
-          description: 'Não foi possível atualizar a localização',
+          description: mapDatabaseError(error, 'Não foi possível atualizar a localização'),
           variant: 'destructive'
         });
         return false;
