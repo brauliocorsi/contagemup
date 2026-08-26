@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { printLabels, productColiLabels, productLabel, type LabelFormat } from '@/lib/scanner/labels';
+import { fetchLastEntryDatesByCode } from '@/lib/scanner/entryDates';
 
 interface ProductLabelPrintButtonProps {
   product: { code: string; name: string; total_colis?: number | null };
@@ -29,7 +30,11 @@ export function ProductLabelPrintButton({ product, className }: ProductLabelPrin
     }
     setBusy(true);
     try {
-      const items = byColi ? productColiLabels(product) : [productLabel(product)];
+      const dates = await fetchLastEntryDatesByCode([product.code]);
+      const entryDate = dates[product.code.trim()] ?? null;
+      const items = byColi
+        ? productColiLabels(product, { entryDate })
+        : [productLabel(product, { entryDate })];
       await printLabels(items, format, `etiquetas-${product.code}.pdf`);
     } catch (e) {
       console.error(e);
@@ -38,6 +43,7 @@ export function ProductLabelPrintButton({ product, className }: ProductLabelPrin
       setBusy(false);
     }
   };
+
 
   return (
     <DropdownMenu>
