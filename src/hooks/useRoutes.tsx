@@ -176,6 +176,47 @@ export function useCreateRoute() {
   });
 }
 
+export function useAddRouteStops() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      routeId: string;
+      stops: {
+        venda_id: string;
+        venda_codigo: string;
+        client_name: string;
+        address: string | null;
+        venda_data: string | null;
+        venda_status: string | null;
+      }[];
+    }) => {
+      if (input.stops.length === 0) return 0;
+      const { data: existing, error: exErr } = await supabase
+        .from('route_stops')
+        .select('order_number')
+        .eq('route_id', input.routeId)
+        .order('order_number', { ascending: false })
+        .limit(1);
+      if (exErr) throw exErr;
+      const start = existing?.[0]?.order_number ?? 0;
+      const rows = input.stops.map((s, i) => ({
+        ...s,
+        route_id: input.routeId,
+        order_number: start + i + 1,
+      }));
+      const { error } = await supabase.from('route_stops').insert(rows);
+      if (error) throw error;
+      return rows.length;
+    },
+    onSuccess: (n, v) => {
+      qc.invalidateQueries({ queryKey: ['route', v.routeId] });
+      qc.invalidateQueries({ queryKey: ['routes'] });
+      if (n) toast.success(`${n} nota(s) adicionada(s) à rota`);
+    },
+    onError: (e) => toast.error('Erro ao adicionar nota: ' + mapDatabaseError(e)),
+  });
+}
+
 export function useUpdateRoute() {
   const qc = useQueryClient();
   return useMutation({
