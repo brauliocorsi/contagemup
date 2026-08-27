@@ -25,6 +25,7 @@ const RecentProductsView = lazy(() => import('@/components/products/RecentProduc
 const SeparationNotesView = lazy(() => import('@/components/logistics/SeparationNotesView').then(m => ({ default: m.SeparationNotesView })));
 const DeliveriesView = lazy(() => import('@/components/logistics/DeliveriesView').then(m => ({ default: m.DeliveriesView })));
 const RouteOptimizationView = lazy(() => import('@/components/logistics/RouteOptimizationView').then(m => ({ default: m.RouteOptimizationView })));
+const RoutesView = lazy(() => import('@/components/logistics/RoutesView').then(m => ({ default: m.RoutesView })));
 
 
 // Loading skeleton component
