@@ -34,6 +34,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { X, Filter } from 'lucide-react';
 import { useLocationAudits, LocationAudit } from '@/hooks/useLocationAudits';
 import { AuditResultsDialog } from '@/components/audit/AuditResultsDialog';
 import { useProfiles } from '@/hooks/useProfiles';
@@ -48,7 +52,56 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
   const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
 
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [locationFilter, setLocationFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const locationOptions = useMemo(() => {
+    const set = new Set<string>();
+    audits.forEach((a) => (a.locations ?? []).forEach((l) => l && set.add(l)));
+    return Array.from(set).sort();
+  }, [audits]);
+
+  const assigneeOptions = useMemo(() => {
+    const set = new Set<string>();
+    audits.forEach((a) => a.assigned_to && set.add(a.assigned_to));
+    return Array.from(set).map((id) => ({ id, name: nameOf(id) })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [audits, nameOf]);
+
+  const filteredAudits = useMemo(() => {
+    const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+    const to = dateTo ? new Date(`${dateTo}T23:59:59`) : null;
+    return audits.filter((a) => {
+      if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+      if (locationFilter !== 'all' && !(a.locations ?? []).includes(locationFilter)) return false;
+      if (assigneeFilter === 'unassigned' && a.assigned_to) return false;
+      if (assigneeFilter !== 'all' && assigneeFilter !== 'unassigned' && a.assigned_to !== assigneeFilter) return false;
+      const ref = new Date(a.completed_at ?? a.created_at);
+      if (from && ref < from) return false;
+      if (to && ref > to) return false;
+      return true;
+    });
+  }, [audits, search, statusFilter, locationFilter, assigneeFilter, dateFrom, dateTo]);
+
+  const hasFilters =
+    !!search || !!dateFrom || !!dateTo || locationFilter !== 'all' || assigneeFilter !== 'all' || statusFilter !== 'all';
+
+  const clearFilters = () => {
+    setSearch('');
+    setDateFrom('');
+    setDateTo('');
+    setLocationFilter('all');
+    setAssigneeFilter('all');
+    setStatusFilter('all');
+  };
+
   const { data: selectedAudit } = useAuditWithItems(selectedAuditId);
+
 
   const getStatusConfig = (status: LocationAudit['status']) => {
     switch (status) {
@@ -72,24 +125,26 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
 
   // Stats
   const stats = useMemo(() => {
-    const pending = audits.filter(a => a.status === 'pending').length;
-    const inProgress = audits.filter(a => a.status === 'in_progress').length;
-    const completed = audits.filter(a => a.status === 'completed').length;
-    return { pending, inProgress, completed, total: audits.length };
-  }, [audits]);
+    const pending = filteredAudits.filter(a => a.status === 'pending').length;
+    const inProgress = filteredAudits.filter(a => a.status === 'in_progress').length;
+    const completed = filteredAudits.filter(a => a.status === 'completed').length;
+    return { pending, inProgress, completed, total: filteredAudits.length };
+  }, [filteredAudits]);
 
   // Export all audits summary
   const exportSummary = async () => {
       const XLSX = await loadXLSX();
-    const data = audits.map(a => ({
+    const data = filteredAudits.map(a => ({
       'Nome': a.name,
       'Status': getStatusConfig(a.status).label,
       'Localizações': a.locations.join(', '),
+      'Responsável': a.assigned_to ? nameOf(a.assigned_to) : 'Qualquer utilizador',
       'Criada em': format(new Date(a.created_at), 'dd/MM/yyyy HH:mm'),
       'Iniciada em': a.started_at ? format(new Date(a.started_at), 'dd/MM/yyyy HH:mm') : '-',
       'Concluída em': a.completed_at ? format(new Date(a.completed_at), 'dd/MM/yyyy HH:mm') : '-',
       'Notas': a.notes || '',
     }));
+
 
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
@@ -148,13 +203,86 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
         </Card>
       </div>
 
+      {/* Filtros */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            Filtros do histórico
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Pesquisar</Label>
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nome da conferência" className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">De</Label>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Até</Label>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Localização</Label>
+              <Select value={locationFilter} onValueChange={setLocationFilter}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="all">Todas</SelectItem>
+                  {locationOptions.map((l) => (
+                    <SelectItem key={l} value={l}>{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Responsável</Label>
+              <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="unassigned">Sem responsável</SelectItem>
+                  {assigneeOptions.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Estado</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="in_progress">Em Progresso</SelectItem>
+                  <SelectItem value="completed">Concluída</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {filteredAudits.length} de {audits.length} conferências
+            </p>
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                <X className="h-4 w-4 mr-1" />
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Actions */}
       <div className="flex justify-end">
-        <Button onClick={exportSummary} variant="outline" disabled={audits.length === 0}>
+        <Button onClick={exportSummary} variant="outline" disabled={filteredAudits.length === 0}>
           <FileDown className="h-4 w-4 mr-2" />
           Exportar Resumo
         </Button>
       </div>
+
 
       {/* Audits Table */}
       <Card>
@@ -179,17 +307,17 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {audits.length === 0 ? (
+                {filteredAudits.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       <ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      Nenhuma conferência registada.
+                      {hasFilters ? 'Nenhuma conferência encontrada com estes filtros.' : 'Nenhuma conferência registada.'}
                       <br />
                       <span className="text-sm">Crie uma conferência no mapa do armazém.</span>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  audits.map(audit => {
+                  filteredAudits.map(audit => {
                     const statusConfig = getStatusConfig(audit.status);
                     const StatusIcon = statusConfig.icon;
 
