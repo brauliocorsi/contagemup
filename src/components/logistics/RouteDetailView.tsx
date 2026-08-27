@@ -411,6 +411,8 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
           </Select>
         </div>
 
+        {route.status === 'pending' && <AddRouteStops routeId={routeId} stops={stops} />}
+
         <section className="rounded-lg border border-border bg-card">
           <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
             <Checkbox
