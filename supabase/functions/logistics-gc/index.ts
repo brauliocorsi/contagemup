@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchDocument, listOrders } from "../_shared/gc-logistics.ts";
+import { fetchDocument, findOrdersByCode, listOrders } from "../_shared/gc-logistics.ts";
 import { createTransportGuides } from "../_shared/invoicexpress.ts";
 
 const corsHeaders = {
