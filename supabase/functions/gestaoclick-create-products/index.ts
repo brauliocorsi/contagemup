@@ -41,6 +41,29 @@ async function findProductByCode(headers: Record<string, string>, code: string) 
   return list.find((p) => norm(p.codigo_interno) === norm(code) || norm(p.codigo) === norm(code)) || null;
 }
 
+async function findProductByName(headers: Record<string, string>, name: string) {
+  const url = new URL('https://api.gestaoclick.com/api/produtos');
+  url.searchParams.set('nome', name);
+  url.searchParams.set('pagina', '1');
+  const resp = await fetchWithRetry(url.toString(), { method: 'GET', headers });
+  if (!resp.ok) return null;
+  const data = await resp.json();
+  const list: any[] = data?.data || [];
+  const norm = (v: unknown) => String(v ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return list.find((p) => norm(p.nome) === norm(name)) || list[0] || null;
+}
+
+async function updateProductCode(headers: Record<string, string>, id: string, code: string, name: string) {
+  const resp = await fetchWithRetry(`https://api.gestaoclick.com/api/produtos/${id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ nome: name, codigo_interno: code }),
+  });
+  const text = await resp.text();
+  let json: any; try { json = JSON.parse(text); } catch { json = { raw: text }; }
+  return { ok: resp.ok && json?.code !== 400 && json?.code !== 404, status: resp.status, body: json };
+}
+
 async function createProduct(headers: Record<string, string>, code: string, name: string, groupName?: string) {
   const body: Record<string, unknown> = {
     nome: name,
@@ -111,8 +134,21 @@ Deno.serve(async (req) => {
         created++;
         results.push({ code, status: 'criado', erp_id: res.body?.data?.id ?? null });
       } else {
-        failed++;
-        results.push({ code, status: 'erro', http: res.status, body: res.body });
+        // Nome já usado no ERP: o produto existe com outro código -> apenas atualiza o código.
+        const byName = await findProductByName(headers, name);
+        if (byName?.id) {
+          const upd = await updateProductCode(headers, String(byName.id), code, name);
+          if (upd.ok) {
+            created++;
+            results.push({ code, status: 'criado', erp_id: byName.id, via: 'codigo atualizado por nome' });
+          } else {
+            failed++;
+            results.push({ code, status: 'erro', http: upd.status, body: upd.body });
+          }
+        } else {
+          failed++;
+          results.push({ code, status: 'erro', http: res.status, body: res.body });
+        }
       }
       await new Promise((r) => setTimeout(r, 150));
     }
