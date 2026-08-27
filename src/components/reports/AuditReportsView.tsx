@@ -203,13 +203,86 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
         </Card>
       </div>
 
+      {/* Filtros */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            Filtros do histórico
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Pesquisar</Label>
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nome da conferência" className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">De</Label>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Até</Label>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Localização</Label>
+              <Select value={locationFilter} onValueChange={setLocationFilter}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="all">Todas</SelectItem>
+                  {locationOptions.map((l) => (
+                    <SelectItem key={l} value={l}>{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Responsável</Label>
+              <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="unassigned">Sem responsável</SelectItem>
+                  {assigneeOptions.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Estado</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="in_progress">Em Progresso</SelectItem>
+                  <SelectItem value="completed">Concluída</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {filteredAudits.length} de {audits.length} conferências
+            </p>
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                <X className="h-4 w-4 mr-1" />
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Actions */}
       <div className="flex justify-end">
-        <Button onClick={exportSummary} variant="outline" disabled={audits.length === 0}>
+        <Button onClick={exportSummary} variant="outline" disabled={filteredAudits.length === 0}>
           <FileDown className="h-4 w-4 mr-2" />
           Exportar Resumo
         </Button>
       </div>
+
 
       {/* Audits Table */}
       <Card>
