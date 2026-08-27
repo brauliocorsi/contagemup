@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchDocument, listOrders } from "../_shared/gc-logistics.ts";
+import { fetchDocument, findOrdersByCode, listOrders } from "../_shared/gc-logistics.ts";
 import { createTransportGuides } from "../_shared/invoicexpress.ts";
 
 const corsHeaders = {
@@ -48,6 +48,15 @@ Deno.serve(async (req) => {
       if (from > to) throw new Error("A data inicial tem de ser anterior à final");
       const lookbackDays = Number(body.lookbackDays ?? 180);
       return json(await listOrders(from, to, lookbackDays));
+    }
+
+    if (action === "orders-by-code") {
+      const codes = Array.isArray(body.codes)
+        ? body.codes.map((v) => String(v).trim()).filter(Boolean)
+        : [];
+      if (codes.length === 0) throw new Error("Indique o número de encomenda");
+      if (codes.length > 10) throw new Error("Procure no máximo 10 encomendas de cada vez");
+      return json(await findOrdersByCode(codes));
     }
 
     if (action === "document") {
