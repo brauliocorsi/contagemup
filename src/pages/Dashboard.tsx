@@ -48,6 +48,7 @@ function ViewLoader() {
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('home');
   const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
+  const [openRouteId, setOpenRouteId] = useState<string | null>(null);
 
   const handleNavigateToProducts = () => {
     setActiveTab('products');
