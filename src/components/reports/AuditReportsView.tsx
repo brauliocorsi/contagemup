@@ -125,24 +125,26 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
 
   // Stats
   const stats = useMemo(() => {
-    const pending = audits.filter(a => a.status === 'pending').length;
-    const inProgress = audits.filter(a => a.status === 'in_progress').length;
-    const completed = audits.filter(a => a.status === 'completed').length;
-    return { pending, inProgress, completed, total: audits.length };
-  }, [audits]);
+    const pending = filteredAudits.filter(a => a.status === 'pending').length;
+    const inProgress = filteredAudits.filter(a => a.status === 'in_progress').length;
+    const completed = filteredAudits.filter(a => a.status === 'completed').length;
+    return { pending, inProgress, completed, total: filteredAudits.length };
+  }, [filteredAudits]);
 
   // Export all audits summary
   const exportSummary = async () => {
       const XLSX = await loadXLSX();
-    const data = audits.map(a => ({
+    const data = filteredAudits.map(a => ({
       'Nome': a.name,
       'Status': getStatusConfig(a.status).label,
       'Localizações': a.locations.join(', '),
+      'Responsável': a.assigned_to ? nameOf(a.assigned_to) : 'Qualquer utilizador',
       'Criada em': format(new Date(a.created_at), 'dd/MM/yyyy HH:mm'),
       'Iniciada em': a.started_at ? format(new Date(a.started_at), 'dd/MM/yyyy HH:mm') : '-',
       'Concluída em': a.completed_at ? format(new Date(a.completed_at), 'dd/MM/yyyy HH:mm') : '-',
       'Notas': a.notes || '',
     }));
+
 
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
