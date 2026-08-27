@@ -328,6 +328,78 @@ export async function listOrders(
   return { orders, scanned: raw.length, truncated: totalPages > pages };
 }
 
+/** Procura encomendas pelo código público (nº de encomenda), percorrendo páginas de /vendas. */
+export async function findOrdersByCode(
+  codes: string[],
+): Promise<{ orders: SepOrder[]; notFound: string[] }> {
+  const wanted = new Set(codes.map((c) => c.trim()).filter(Boolean));
+  if (wanted.size === 0) return { orders: [], notFound: [] };
+
+  const found: (SepOrder & { clienteId?: string })[] = [];
+  const MAX_SEARCH_PAGES = 50;
+
+  for (let page = 1; page <= MAX_SEARCH_PAGES && wanted.size > 0; page++) {
+    const res = await api<{ meta?: { total_paginas?: number | null }; data?: unknown[] }>(
+      `/vendas?limite=${PAGE_SIZE}&pagina=${page}`,
+    ).catch(() => ({ data: [] as unknown[] }));
+    const rows = (Array.isArray(res.data) ? res.data : []) as Dict[];
+    if (rows.length === 0) break;
+
+    for (const item of rows) {
+      const codigo = str(item["codigo"]);
+      if (!wanted.has(codigo)) continue;
+      wanted.delete(codigo);
+
+      const produtos = unwrap(item["produtos"], "produto")
+        .map((p) => ({
+          codigo: codeOf(p),
+          produtoId: str(p["produto_id"]),
+          variacaoId: str(p["variacao_id"]),
+          nome: str(p["nome_produto"]),
+          quantidade: str(p["quantidade"]) || "1",
+          detalhes: str(p["detalhes"]),
+        }))
+        .filter((p) => p.nome.length > 0) as (SepProduct & {
+        produtoId: string;
+        variacaoId: string;
+      })[];
+
+      found.push({
+        id: str(item["id"]),
+        codigo,
+        cliente: str(item["nome_cliente"]),
+        vendedor: str(item["nome_vendedor"]),
+        data: str(item["data"]),
+        entrega: str(item["prazo_entrega"]),
+        situacao: str(item["nome_situacao"]),
+        transportadora: str(item["nome_transportadora"]),
+        observacoes: str(item["observacoes_interna"]),
+        morada: addressOf(item),
+        total: str(item["valor_total"]),
+        produtos,
+        ...serviceTotals(item),
+        clienteId: str(item["cliente_id"]),
+      });
+    }
+
+    const totalPages = Math.max(1, Number(res.meta?.total_paginas ?? 1));
+    if (page >= totalPages) break;
+  }
+
+  await fillAddresses(found);
+  for (const o of found) delete (o as { clienteId?: string }).clienteId;
+
+  const resolved = await resolveCodes(
+    found.flatMap((o) => o.produtos as (SepProduct & { produtoId: string; variacaoId: string })[]),
+  );
+  let cursor = 0;
+  for (const o of found) o.produtos = resolved.slice(cursor, (cursor += o.produtos.length));
+
+  return { orders: found, notFound: [...wanted] };
+}
+
+
+
 function lineItems(list: unknown, key: string, nameField: string) {
   return unwrap(list, key).map((p) => ({
     codigo: codeOf(p),
