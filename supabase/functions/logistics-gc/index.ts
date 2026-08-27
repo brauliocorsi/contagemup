@@ -50,6 +50,15 @@ Deno.serve(async (req) => {
       return json(await listOrders(from, to, lookbackDays));
     }
 
+    if (action === "orders-by-code") {
+      const codes = Array.isArray(body.codes)
+        ? body.codes.map((v) => String(v).trim()).filter(Boolean)
+        : [];
+      if (codes.length === 0) throw new Error("Indique o número de encomenda");
+      if (codes.length > 10) throw new Error("Procure no máximo 10 encomendas de cada vez");
+      return json(await findOrdersByCode(codes));
+    }
+
     if (action === "document") {
       const id = String(body.id ?? "").trim();
       if (!id) throw new Error("Encomenda inválida");
