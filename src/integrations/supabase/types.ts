@@ -1624,6 +1624,10 @@ export type Database = {
         }
         Returns: number
       }
+      merge_duplicate_products: {
+        Args: { p_keep: string; p_remove: string }
+        Returns: Json
+      }
       move_stock_qty: {
         Args: {
           p_coli: number
