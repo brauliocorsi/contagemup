@@ -54,7 +54,8 @@ function today(offset = 0): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function SeparationNotesView() {
+export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: string) => void } = {}) {
+  const [routeDialog, setRouteDialog] = useState(false);
   const [from, setFrom] = useState(today());
   const [to, setTo] = useState(today(7));
   const [orders, setOrders] = useState<SepOrder[]>([]);
