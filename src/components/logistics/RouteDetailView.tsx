@@ -1,12 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { FileSpreadsheet, ListChecks, MapPin, Printer, Route as RouteIcon, ScanBarcode, Search, Truck } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import {
+  ArrowLeft,
+  ArrowDown,
+  ArrowUp,
+  FileSpreadsheet,
+  ListChecks,
+  MapPin,
+  Printer,
+  ScanBarcode,
+  Trash2,
+  Truck,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -24,20 +36,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
 import { OrderDocument } from './OrderDocument';
 import { GuidesDocument } from './GuidesDocument';
 import { PickingReport } from './PickingReport';
-import { CreateRouteDialog } from './CreateRouteDialog';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
-
 import {
   buildDeliveryRoute,
   createTransportGuides,
   fetchGuideHistory,
   fetchOrderDocuments,
-  fetchSeparationOrders,
 } from '@/lib/logistics/api';
 import {
   DEFAULT_ADDRESS_FROM,
@@ -47,150 +57,116 @@ import {
   type GuideResult,
   type SepOrder,
 } from '@/lib/logistics/types';
+import {
+  plateFromNotes,
+  ROUTE_STATUS_LABELS,
+  useRemoveRouteStop,
+  useReorderRouteStops,
+  useRoute,
+  useUpdateRoute,
+  type RouteStatus,
+} from '@/hooks/useRoutes';
 
-function today(offset = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return d.toISOString().slice(0, 10);
+function docsToOrders(docs: GcDocument[]): SepOrder[] {
+  return docs.map(
+    (d) =>
+      ({
+        id: d.id,
+        codigo: d.codigo,
+        cliente: d.cliente?.nome ?? '',
+        produtos: d.produtos.map((p) => ({
+          codigo: p.codigo,
+          nome: p.nome,
+          detalhes: p.detalhes,
+          quantidade: p.quantidade,
+        })),
+      }) as unknown as SepOrder,
+  );
 }
 
-export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: string) => void } = {}) {
-  const [routeDialog, setRouteDialog] = useState(false);
-  const [from, setFrom] = useState(today());
-  const [to, setTo] = useState(today(7));
-  const [orders, setOrders] = useState<SepOrder[]>([]);
+export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: () => void }) {
+  const { data, isLoading } = useRoute(routeId);
+  const route = data?.route;
+  const stops = useMemo(() => data?.stops ?? [], [data]);
+
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [copies, setCopies] = useState<Record<string, number>>({});
-  const [docs, setDocs] = useState<GcDocument[]>([]);
+  const [printMode, setPrintMode] = useState<'docs' | 'picking' | 'guides'>('docs');
+  const [printDocs, setPrintDocs] = useState<GcDocument[]>([]);
   const [picking, setPicking] = useState<PickingLine[] | null>(null);
   const [excluded, setExcluded] = useState<Record<string, boolean>>({});
-  const [printMode, setPrintMode] = useState<'docs' | 'picking' | 'guides'>('docs');
   const [byCategory, setByCategory] = useState(false);
-  const [addressFrom, setAddressFrom] = useState(DEFAULT_ADDRESS_FROM);
-  const [plate, setPlate] = useState<string>(PLATES[0]);
-  const [loadDate, setLoadDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [loadTime, setLoadTime] = useState('08:00');
   const [guides, setGuides] = useState<GuideResult[]>([]);
   const [history, setHistory] = useState<Record<string, GuideRecord>>({});
   const [confirmReissue, setConfirmReissue] = useState(false);
   const [routeLinks, setRouteLinks] = useState<string[]>([]);
+  const [addressFrom, setAddressFrom] = useState(DEFAULT_ADDRESS_FROM);
+  const [plate, setPlate] = useState<string>(PLATES[0]);
+  const [loadDate, setLoadDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [loadTime, setLoadTime] = useState('08:00');
+
   const createTask = useCreatePickingTask();
+  const updateRoute = useUpdateRoute();
+  const removeStop = useRemoveRouteStop();
+  const reorder = useReorderRouteStops();
 
+  useEffect(() => {
+    if (!route) return;
+    setAddressFrom(route.departure_address || DEFAULT_ADDRESS_FROM);
+    const p = plateFromNotes(route.notes);
+    if (p) setPlate(p);
+    if (route.scheduled_date) setLoadDate(route.scheduled_date);
+  }, [route]);
 
-  async function refreshHistory(ids: string[]) {
-    if (ids.length === 0) {
-      setHistory({});
-      return;
-    }
-    try {
-      const res = await fetchGuideHistory(ids);
-      const map: Record<string, GuideRecord> = {};
-      for (const g of res.history) {
-        const current = map[g.order_id];
-        if (!current || g.version > current.version) map[g.order_id] = g;
-      }
-      setHistory(map);
-    } catch {
-      /* histórico é informativo */
-    }
-  }
+  useEffect(() => {
+    setSelected((prev) =>
+      Object.fromEntries(stops.map((s) => [s.id, prev[s.id] ?? true])),
+    );
+  }, [stops]);
 
-  const query = useMutation({
-    mutationFn: () => fetchSeparationOrders(from, to),
-    onSuccess: (res) => {
-      setOrders(res.orders);
-      setSelected(Object.fromEntries(res.orders.map((o) => [o.id, true])));
-      setCopies({});
-      setDocs([]);
-      setPicking(null);
-      setExcluded({});
-      setGuides([]);
-      void refreshHistory(res.orders.map((o) => o.id));
-      toast.success(`${res.orders.length} encomenda(s) com entrega neste período`);
-      if (res.truncated) toast.warning('Muitos registos: alguns podem faltar. Reduza o período.');
-    },
-    onError: (e: Error) => toast.error(e.message),
+  const vendaIds = useMemo(
+    () => stops.map((s) => s.venda_id).filter((v): v is string => Boolean(v)),
+    [stops],
+  );
+
+  const docsQuery = useQuery({
+    queryKey: ['route-documents', routeId, vendaIds.join(',')],
+    enabled: vendaIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => (await fetchOrderDocuments(vendaIds)).documents,
   });
 
   useEffect(() => {
-    const raw = localStorage.getItem('separacao:preselect');
-    if (!raw) return;
-    localStorage.removeItem('separacao:preselect');
-    try {
-      const data = JSON.parse(raw) as { from: string; to: string; ids: string[] };
-      if (data.from) setFrom(data.from);
-      if (data.to) setTo(data.to);
-      void (async () => {
-        const res = await fetchSeparationOrders(data.from, data.to);
-        setOrders(res.orders);
-        const ids = new Set(data.ids ?? []);
-        setSelected(Object.fromEntries(res.orders.map((o) => [o.id, ids.has(o.id)])));
-        void refreshHistory(res.orders.map((o) => o.id));
-        toast.success(`${ids.size} nota(s) recebidas da otimização da semana`);
-      })();
-    } catch {
-      /* pré-seleção inválida */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (vendaIds.length === 0) return;
+    fetchGuideHistory(vendaIds)
+      .then((res) => {
+        const map: Record<string, GuideRecord> = {};
+        for (const g of res.history) {
+          const current = map[g.order_id];
+          if (!current || g.version > current.version) map[g.order_id] = g;
+        }
+        setHistory(map);
+      })
+      .catch(() => undefined);
+  }, [vendaIds]);
 
-  const chosen = useMemo(() => orders.filter((o) => selected[o.id]), [orders, selected]);
-  const totalPages = useMemo(
-    () => chosen.reduce((sum, o) => sum + Math.max(1, copies[o.id] ?? 1), 0),
-    [chosen, copies],
+  const chosenStops = useMemo(() => stops.filter((s) => selected[s.id]), [stops, selected]);
+  const chosenIds = useMemo(
+    () => chosenStops.map((s) => s.venda_id).filter((v): v is string => Boolean(v)),
+    [chosenStops],
   );
-  const allChecked = orders.length > 0 && orders.every((o) => selected[o.id]);
-
-  const routeJob = useMutation({
-    mutationFn: () =>
-      buildDeliveryRoute({
-        origin: addressFrom || DEFAULT_ADDRESS_FROM,
-        stops: chosen.map((o) => ({ id: o.id, label: `${o.codigo} · ${o.cliente}`, address: o.morada })),
-      }),
-    onSuccess: (plan) => {
-      if (plan.ungeocoded.length > 0)
-        toast.warning(`Moradas não localizadas: ${plan.ungeocoded.join(', ')}`);
-      if (plan.legs.length === 0) {
-        toast.error('Nenhuma morada encontrada nas encomendas selecionadas');
-        return;
-      }
-      const links = plan.legs.map((leg) => {
-        const origin = leg[0]!;
-        const rest = leg.slice(1);
-        const destination = rest[rest.length - 1] ?? origin;
-        const waypoints = rest.slice(0, -1);
-        const params = new URLSearchParams({ api: '1', travelmode: 'driving', origin, destination });
-        if (waypoints.length > 0) params.set('waypoints', waypoints.join('|'));
-        return `https://maps.google.com/maps/dir/?${params.toString()}`;
-      });
-      setRouteLinks(links);
-      if (links.length > 1) toast.info(`Rota dividida em ${links.length} troços (limite do Google Maps).`);
-      else toast.success('Rota pronta — abre no Google Maps');
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const printJob = useMutation({
-    mutationFn: async () => {
-      const res = await fetchOrderDocuments(chosen.map((o) => o.id));
-      const byId = new Map(res.documents.map((d) => [d.id, d]));
-      return chosen.flatMap((o) => {
-        const doc = byId.get(o.id);
-        if (!doc) return [];
-        return Array.from({ length: Math.max(1, copies[o.id] ?? 1) }, () => doc);
-      });
-    },
-    onSuccess: (pages) => {
-      if (pages.length === 0) {
-        toast.error('Não foi possível obter as notas na Gestão Click');
-        return;
-      }
-      setPrintMode('docs');
-      setDocs(pages);
-      runPrint();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const chosenDocs = useMemo(
+    () => (docsQuery.data ?? []).filter((d) => chosenIds.includes(d.id)),
+    [docsQuery.data, chosenIds],
+  );
+  const totalPages = useMemo(
+    () => chosenStops.reduce((sum, s) => sum + Math.max(1, copies[s.id] ?? 1), 0),
+    [chosenStops, copies],
+  );
+  const totalItems = useMemo(
+    () => chosenDocs.reduce((sum, d) => sum + d.produtos.length, 0),
+    [chosenDocs],
+  );
 
   function runPrint() {
     const style = document.createElement('style');
@@ -203,12 +179,19 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
     }, 150);
   }
 
-  function handlePrint() {
-    if (chosen.length === 0) {
-      toast.error('Selecione pelo menos uma encomenda');
+  function printDocuments() {
+    if (chosenDocs.length === 0) {
+      toast.error('Selecione pelo menos uma nota');
       return;
     }
-    printJob.mutate();
+    const pages = chosenStops.flatMap((s) => {
+      const doc = chosenDocs.find((d) => d.id === s.venda_id);
+      if (!doc) return [];
+      return Array.from({ length: Math.max(1, copies[s.id] ?? 1) }, () => doc);
+    });
+    setPrintMode('docs');
+    setPrintDocs(pages);
+    runPrint();
   }
 
   const pickingKept = useMemo(
@@ -235,17 +218,16 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
   }, [picking, byCategory, excluded]);
 
   async function generatePicking() {
-    if (chosen.length === 0) {
-      toast.error('Selecione pelo menos uma encomenda');
+    if (chosenDocs.length === 0) {
+      toast.error('Selecione pelo menos uma nota');
       return;
     }
-    const lines = buildPicking(chosen);
+    const lines = buildPicking(docsToOrders(chosenDocs));
     setPicking(lines);
     setExcluded({});
     toast.success(`${lines.length} artigo(s) no picking`);
     try {
-      const withLocations = await attachPickingLocations(lines);
-      setPicking(withLocations);
+      setPicking(await attachPickingLocations(lines));
     } catch {
       toast.error('Não foi possível carregar as localizações');
     }
@@ -256,7 +238,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
       toast.error('Nenhum artigo no picking');
       return;
     }
-    setDocs([]);
+    setPrintDocs([]);
     setPrintMode('picking');
     runPrint();
   }
@@ -266,7 +248,8 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
       toast.error('Nenhum artigo no picking');
       return;
     }
-    await exportPickingXlsx(pickingKept, from, to, byCategory);
+    const day = route?.scheduled_date ?? new Date().toISOString().slice(0, 10);
+    await exportPickingXlsx(pickingKept, day, day, byCategory);
     toast.success('Ficheiro Excel gerado');
   }
 
@@ -276,9 +259,9 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
       return;
     }
     await createTask.mutateAsync({
-      name: `Picking ${from} a ${to}`,
-      reference: `SEP-${from}`,
-      notes: `${chosen.length} encomenda(s) das Notas de Separação`,
+      name: `Picking ${route?.name ?? 'rota'}`,
+      reference: `ROTA-${route?.scheduled_date ?? ''}`,
+      notes: `${chosenStops.length} nota(s) da rota ${route?.name ?? ''}`,
       items: pickingKept.flatMap((l) => {
         const base = {
           product_code: l.codigo,
@@ -290,25 +273,30 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
         if (entries.length === 0) {
           return [{ ...base, orders: l.encomendas.join(', ') || null, requested_quantity: l.quantidade }];
         }
-        // uma linha por nota de encomenda, para permitir reserva e entrega por nota
         return entries.map(([order, qty]) => ({ ...base, orders: order, requested_quantity: qty }));
       }),
     });
     toast.success('Lista enviada para o Picking do Scanner');
   }
 
-
   const guidesJob = useMutation({
     mutationFn: () =>
       createTransportGuides({
-        ids: chosen.map((o) => o.id),
+        ids: chosenIds,
         addressFrom,
         plate,
         loadedAt: `${loadDate}T${loadTime}`,
       }),
     onSuccess: (res) => {
       setGuides(res.results);
-      void refreshHistory(orders.map((o) => o.id));
+      void fetchGuideHistory(vendaIds).then((r) => {
+        const map: Record<string, GuideRecord> = {};
+        for (const g of r.history) {
+          const current = map[g.order_id];
+          if (!current || g.version > current.version) map[g.order_id] = g;
+        }
+        setHistory(map);
+      });
       const ok = res.results.filter((r) => r.ok).length;
       const fail = res.results.length - ok;
       if (ok > 0) toast.success(`${ok} guia(s) de transporte criada(s) em rascunho`);
@@ -317,11 +305,14 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const alreadyIssued = useMemo(() => chosen.filter((o) => history[o.id]), [chosen, history]);
+  const alreadyIssued = useMemo(
+    () => chosenStops.filter((s) => s.venda_id && history[s.venda_id]),
+    [chosenStops, history],
+  );
 
   function handleGuides() {
-    if (chosen.length === 0) {
-      toast.error('Selecione pelo menos uma encomenda');
+    if (chosenIds.length === 0) {
+      toast.error('Selecione pelo menos uma nota');
       return;
     }
     if (new Date(`${loadDate}T${loadTime}`).getTime() < Date.now()) {
@@ -339,175 +330,217 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
       toast.error('Nenhuma guia emitida para imprimir');
       return;
     }
-    setDocs([]);
+    setPrintDocs([]);
     setPrintMode('guides');
     runPrint();
+  }
+
+  const routeJob = useMutation({
+    mutationFn: () =>
+      buildDeliveryRoute({
+        origin: addressFrom || DEFAULT_ADDRESS_FROM,
+        stops: chosenStops.map((s) => ({
+          id: s.id,
+          label: `${s.venda_codigo ?? ''} · ${s.client_name}`,
+          address: s.address ?? undefined,
+        })),
+      }),
+    onSuccess: (plan) => {
+      if (plan.ungeocoded.length > 0)
+        toast.warning(`Moradas não localizadas: ${plan.ungeocoded.join(', ')}`);
+      if (plan.legs.length === 0) {
+        toast.error('Nenhuma morada encontrada nas notas selecionadas');
+        return;
+      }
+      const links = plan.legs.map((leg) => {
+        const origin = leg[0]!;
+        const rest = leg.slice(1);
+        const destination = rest[rest.length - 1] ?? origin;
+        const waypoints = rest.slice(0, -1);
+        const params = new URLSearchParams({ api: '1', travelmode: 'driving', origin, destination });
+        if (waypoints.length > 0) params.set('waypoints', waypoints.join('|'));
+        return `https://maps.google.com/maps/dir/?${params.toString()}`;
+      });
+      setRouteLinks(links);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function move(stopId: string, dir: -1 | 1) {
+    const ids = stops.map((s) => s.id);
+    const i = ids.indexOf(stopId);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    reorder.mutate({ routeId, orderedIds: ids });
+  }
+
+  if (isLoading || !route) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">A carregar rota…</p>;
   }
 
   return (
     <div>
       <div className="no-print space-y-6">
         <div className="flex flex-wrap items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Rotas
+          </Button>
           <div className="mr-auto">
-            <h1 className="font-heading text-xl font-bold tracking-tight">Notas de Separação</h1>
+            <h1 className="font-heading text-xl font-bold tracking-tight">{route.name}</h1>
             <p className="text-sm text-muted-foreground">
-              Gestão Click · impressão A4 por data de entrega
+              {route.scheduled_date} · {stops.length} nota(s) · {totalItems} artigo(s) selecionados ·{' '}
+              {plate || '—'}
             </p>
           </div>
-          <Button onClick={handlePrint} disabled={printJob.isPending}>
-            <Printer className="mr-2 h-4 w-4" />
-            {printJob.isPending ? 'A obter notas…' : `Imprimir ${totalPages > 0 ? `(${totalPages})` : ''}`}
-          </Button>
+          <Badge variant="secondary">{ROUTE_STATUS_LABELS[route.status] ?? route.status}</Badge>
+          <Select
+            value={route.status}
+            onValueChange={(v) => updateRoute.mutate({ id: routeId, status: v as RouteStatus })}
+          >
+            <SelectTrigger className="h-9 w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(ROUTE_STATUS_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <section className="rounded-lg border border-border bg-card p-5">
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="de">Entrega de</Label>
-              <Input id="de" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="ate">Entrega até</Label>
-              <Input id="ate" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
-            <Button onClick={() => query.mutate()} disabled={query.isPending}>
-              <Search className="mr-2 h-4 w-4" />
-              {query.isPending ? 'A carregar…' : 'Carregar encomendas'}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => routeJob.mutate()}
-              disabled={routeJob.isPending || chosen.length === 0}
-            >
-              <MapPin className="mr-2 h-4 w-4" />
-              {routeJob.isPending ? 'A calcular rota…' : `Rota no Google Maps (${chosen.length})`}
-            </Button>
-            <Button onClick={() => setRouteDialog(true)} disabled={chosen.length === 0}>
-              <RouteIcon className="mr-2 h-4 w-4" />
-              Criar rota ({chosen.length})
-            </Button>
-          </div>
-          {routeLinks.length > 0 && (
-            <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/40 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                {routeLinks.map((url, i) => (
-                  <div key={url} className="flex items-center gap-1">
-                    <Button asChild variant="secondary" size="sm">
-                      <a href={url} target="_blank" rel="noreferrer">
-                        <MapPin className="mr-2 h-4 w-4" />
-                        {routeLinks.length > 1 ? `Abrir troço ${i + 1}` : 'Abrir rota'}
-                      </a>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        void navigator.clipboard.writeText(url);
-                        toast.success('Link copiado');
-                      }}
-                    >
-                      Copiar link
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-
         <section className="rounded-lg border border-border bg-card">
-          <div className="flex items-center gap-3 border-b border-border px-5 py-3">
+          <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
             <Checkbox
-              checked={allChecked}
+              checked={stops.length > 0 && stops.every((s) => selected[s.id])}
               onCheckedChange={(v) =>
-                setSelected(Object.fromEntries(orders.map((o) => [o.id, Boolean(v)])))
+                setSelected(Object.fromEntries(stops.map((s) => [s.id, Boolean(v)])))
               }
             />
-            <span className="text-sm text-muted-foreground">
-              {orders.length} encomenda(s) · {totalPages} nota(s) para imprimir
+            <span className="mr-auto text-sm text-muted-foreground">
+              {chosenStops.length} de {stops.length} nota(s) · {totalPages} página(s) para imprimir
             </span>
+            <Button onClick={printDocuments} disabled={docsQuery.isLoading}>
+              <Printer className="mr-2 h-4 w-4" />
+              {docsQuery.isLoading ? 'A obter notas…' : 'Imprimir documentos'}
+            </Button>
+            <Button variant="outline" onClick={() => routeJob.mutate()} disabled={routeJob.isPending}>
+              <MapPin className="mr-2 h-4 w-4" />
+              {routeJob.isPending ? 'A calcular…' : 'Abrir no Google Maps'}
+            </Button>
           </div>
-          {orders.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-              Escolha um período de entrega e carregue as encomendas.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="w-10 px-5 py-2" />
-                    <th className="px-3 py-2">Nº</th>
-                    <th className="px-3 py-2">Entrega</th>
-                    <th className="px-3 py-2">Cliente</th>
-                    <th className="px-3 py-2">Situação</th>
-                    <th className="px-3 py-2">Artigos</th>
-                    <th className="px-3 py-2">Guia</th>
-                    <th className="px-3 py-2">Cópias</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((o) => (
-                    <tr key={o.id} className="border-t border-border">
-                      <td className="px-5 py-2">
-                        <Checkbox
-                          checked={Boolean(selected[o.id])}
-                          onCheckedChange={(v) => setSelected((prev) => ({ ...prev, [o.id]: Boolean(v) }))}
-                        />
-                      </td>
-                      <td className="px-3 py-2 font-semibold">{o.codigo}</td>
-                      <td className="px-3 py-2">{o.entrega}</td>
-                      <td className="px-3 py-2">{o.cliente}</td>
-                      <td className="px-3 py-2">{o.situacao}</td>
-                      <td className="px-3 py-2">{o.produtos.length}</td>
-                      <td className="px-3 py-2">
-                        {history[o.id] ? (
-                          <span className="text-amber-600">
-                            Guia {history[o.id]?.guide_number || '—'} ({history[o.id]?.version}.ª via)
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">Sem guia</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Input
-                          type="number"
-                          min={1}
-                          className="h-8 w-20"
-                          value={copies[o.id] ?? 1}
-                          onChange={(e) =>
-                            setCopies((prev) => ({
-                              ...prev,
-                              [o.id]: Math.max(1, Number(e.target.value) || 1),
-                            }))
-                          }
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+          {routeLinks.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-5 py-3">
+              {routeLinks.map((url, i) => (
+                <Button key={url} asChild variant="secondary" size="sm">
+                  <a href={url} target="_blank" rel="noreferrer">
+                    <MapPin className="mr-2 h-4 w-4" />
+                    {routeLinks.length > 1 ? `Abrir troço ${i + 1}` : 'Abrir rota'}
+                  </a>
+                </Button>
+              ))}
             </div>
           )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="w-10 px-5 py-2" />
+                  <th className="px-3 py-2">#</th>
+                  <th className="px-3 py-2">Nº</th>
+                  <th className="px-3 py-2">Cliente</th>
+                  <th className="px-3 py-2">Morada</th>
+                  <th className="px-3 py-2">Situação</th>
+                  <th className="px-3 py-2">Guia</th>
+                  <th className="px-3 py-2">Cópias</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {stops.map((s, index) => (
+                  <tr key={s.id} className="border-t border-border">
+                    <td className="px-5 py-2">
+                      <Checkbox
+                        checked={Boolean(selected[s.id])}
+                        onCheckedChange={(v) => setSelected((p) => ({ ...p, [s.id]: Boolean(v) }))}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{index + 1}</td>
+                    <td className="px-3 py-2 font-semibold">{s.venda_codigo || '—'}</td>
+                    <td className="px-3 py-2">{s.client_name}</td>
+                    <td className="max-w-[24rem] truncate px-3 py-2 text-muted-foreground">
+                      {s.address || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{s.venda_status || '—'}</td>
+                    <td className="px-3 py-2">
+                      {s.venda_id && history[s.venda_id] ? (
+                        <span className="text-amber-600">
+                          Guia {history[s.venda_id]?.guide_number || '—'} ({history[s.venda_id]?.version}.ª via)
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Sem guia</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        className="h-8 w-20"
+                        value={copies[s.id] ?? 1}
+                        onChange={(e) =>
+                          setCopies((p) => ({ ...p, [s.id]: Math.max(1, Number(e.target.value) || 1) }))
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => move(s.id, -1)} disabled={index === 0}>
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => move(s.id, 1)}
+                          disabled={index === stops.length - 1}
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeStop.mutate({ routeId, stopId: s.id })}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="rounded-lg border border-border bg-card">
           <div className="flex flex-wrap items-end gap-4 border-b border-border px-5 py-3">
             <h2 className="mr-auto text-sm font-semibold">Guias de Transporte (InvoiceXpress)</h2>
             <div className="grid gap-1.5">
-              <Label htmlFor="origem">Local de carga</Label>
+              <Label htmlFor="rota-origem-guia">Local de carga</Label>
               <Input
-                id="origem"
+                id="rota-origem-guia"
                 className="h-9 w-80"
-                placeholder={DEFAULT_ADDRESS_FROM}
                 value={addressFrom}
                 onChange={(e) => setAddressFrom(e.target.value)}
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="matricula">Matrícula</Label>
+              <Label htmlFor="rota-matricula-guia">Matrícula</Label>
               <Select value={plate} onValueChange={setPlate}>
-                <SelectTrigger id="matricula" className="h-9 w-36">
+                <SelectTrigger id="rota-matricula-guia" className="h-9 w-36">
                   <SelectValue placeholder="Matrícula" />
                 </SelectTrigger>
                 <SelectContent>
@@ -520,9 +553,9 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="carga-data">Data de carga</Label>
+              <Label htmlFor="rota-carga-data">Data de carga</Label>
               <Input
-                id="carga-data"
+                id="rota-carga-data"
                 type="date"
                 className="h-9 w-40"
                 value={loadDate}
@@ -530,9 +563,9 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="carga-hora">Hora</Label>
+              <Label htmlFor="rota-carga-hora">Hora</Label>
               <Input
-                id="carga-hora"
+                id="rota-carga-hora"
                 type="time"
                 className="h-9 w-28"
                 value={loadTime}
@@ -541,7 +574,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
             </div>
             <Button onClick={handleGuides} disabled={guidesJob.isPending}>
               <Truck className="mr-2 h-4 w-4" />
-              {guidesJob.isPending ? 'A emitir…' : `Emitir guias (${chosen.length})`}
+              {guidesJob.isPending ? 'A emitir…' : `Emitir guias (${chosenIds.length})`}
             </Button>
             <Button
               variant="outline"
@@ -553,7 +586,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
           </div>
           {guides.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-              Seleciona as encomendas acima e emite as guias de transporte em rascunho na InvoiceXpress.
+              Emita as guias de transporte das notas selecionadas nesta rota.
             </p>
           ) : (
             <ul className="divide-y divide-border text-sm">
@@ -567,9 +600,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                       </span>
                       <span className="text-muted-foreground">
                         Rascunho ·{' '}
-                        {(g.version ?? 1) > 1
-                          ? `${g.version}.ª via por falta de entrega${g.previousGuideNumber ? ` (anterior ${g.previousGuideNumber})` : ''}`
-                          : '1.ª via'}
+                        {(g.version ?? 1) > 1 ? `${g.version}.ª via` : '1.ª via'}
                       </span>
                       {g.permalink ? (
                         <a className="ml-auto text-primary underline" href={g.permalink} target="_blank" rel="noreferrer">
@@ -593,7 +624,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               <Checkbox checked={byCategory} onCheckedChange={(v) => setByCategory(Boolean(v))} />
               Separar por categoria
             </label>
-            <Button variant="outline" onClick={() => void generatePicking()}>
+            <Button variant="outline" onClick={() => void generatePicking()} disabled={docsQuery.isLoading}>
               <ListChecks className="mr-2 h-4 w-4" /> Gerar picking
             </Button>
             <Button variant="outline" onClick={() => void exportPicking()} disabled={pickingKept.length === 0}>
@@ -610,11 +641,10 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
             <Button onClick={printPickingReport} disabled={pickingKept.length === 0}>
               <Printer className="mr-2 h-4 w-4" /> Imprimir picking
             </Button>
-
           </div>
           {picking === null ? (
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-              Selecione as encomendas e clique em "Gerar picking" para agrupar os artigos.
+              Clique em "Gerar picking" para agrupar os artigos das notas selecionadas.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -673,29 +703,23 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                 </tbody>
               </table>
               <p className="border-t border-border px-5 py-3 text-sm text-muted-foreground">
-                {pickingKept.length} artigo(s) · {pickingKept.reduce((s, l) => s + l.quantidade, 0)} unidade(s) no
-                picking
+                {pickingKept.length} artigo(s) ·{' '}
+                {pickingKept.reduce((s, l) => s + l.quantidade, 0)} unidade(s) no picking
               </p>
             </div>
           )}
         </section>
       </div>
 
-      <CreateRouteDialog
-        open={routeDialog}
-        onOpenChange={setRouteDialog}
-        orders={chosen}
-        defaultAddress={addressFrom}
-        onCreated={(id) => onOpenRoute?.(id)}
-      />
-
       <AlertDialog open={confirmReissue} onOpenChange={setConfirmReissue}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Já existem guias para estas encomendas</AlertDialogTitle>
+            <AlertDialogTitle>Já existem guias para estas notas</AlertDialogTitle>
             <AlertDialogDescription>
-              {alreadyIssued.map((o) => `${o.codigo} (guia ${history[o.id]?.guide_number || '—'})`).join(', ')}. Ao
-              continuar, serão emitidas como nova via por falta de entrega da via anterior.
+              {alreadyIssued
+                .map((s) => `${s.venda_codigo} (guia ${history[s.venda_id!]?.guide_number || '—'})`)
+                .join(', ')}
+              . Ao continuar, serão emitidas como nova via por falta de entrega da via anterior.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -707,11 +731,17 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
 
       <div id="a4-sheet">
         {printMode === 'picking' ? (
-          <PickingReport lines={pickingKept} from={from} to={to} orders={chosen.length} byCategory={byCategory} />
+          <PickingReport
+            lines={pickingKept}
+            from={route.scheduled_date}
+            to={route.scheduled_date}
+            orders={chosenStops.length}
+            byCategory={byCategory}
+          />
         ) : printMode === 'guides' ? (
           <GuidesDocument results={guides} plate={plate} addressFrom={addressFrom} />
         ) : (
-          docs.map((doc, i) => <OrderDocument key={`${doc.id}-${i}`} doc={doc} />)
+          printDocs.map((doc, i) => <OrderDocument key={`${doc.id}-${i}`} doc={doc} />)
         )}
       </div>
     </div>

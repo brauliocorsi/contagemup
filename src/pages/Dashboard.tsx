@@ -25,6 +25,7 @@ const RecentProductsView = lazy(() => import('@/components/products/RecentProduc
 const SeparationNotesView = lazy(() => import('@/components/logistics/SeparationNotesView').then(m => ({ default: m.SeparationNotesView })));
 const DeliveriesView = lazy(() => import('@/components/logistics/DeliveriesView').then(m => ({ default: m.DeliveriesView })));
 const RouteOptimizationView = lazy(() => import('@/components/logistics/RouteOptimizationView').then(m => ({ default: m.RouteOptimizationView })));
+const RoutesView = lazy(() => import('@/components/logistics/RoutesView').then(m => ({ default: m.RoutesView })));
 
 
 // Loading skeleton component
@@ -48,6 +49,7 @@ function ViewLoader() {
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('home');
   const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
+  const [openRouteId, setOpenRouteId] = useState<string | null>(null);
 
   const handleNavigateToProducts = () => {
     setActiveTab('products');
@@ -107,7 +109,17 @@ export default function Dashboard() {
               {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
               {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
               {activeTab === 'recent' && <RecentProductsView />}
-              {activeTab === 'separation-notes' && <SeparationNotesView />}
+              {activeTab === 'separation-notes' && (
+                <SeparationNotesView
+                  onOpenRoute={(id) => {
+                    setOpenRouteId(id);
+                    setActiveTab('routes');
+                  }}
+                />
+              )}
+              {activeTab === 'routes' && (
+                <RoutesView key={openRouteId ?? 'list'} initialRouteId={openRouteId} />
+              )}
               {activeTab === 'deliveries' && <DeliveriesView />}
               {activeTab === 'route-optimization' && (
                 <RouteOptimizationView onSendToSeparation={() => setActiveTab('separation-notes')} />
