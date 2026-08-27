@@ -307,17 +307,17 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {audits.length === 0 ? (
+                {filteredAudits.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       <ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      Nenhuma conferência registada.
+                      {hasFilters ? 'Nenhuma conferência encontrada com estes filtros.' : 'Nenhuma conferência registada.'}
                       <br />
                       <span className="text-sm">Crie uma conferência no mapa do armazém.</span>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  audits.map(audit => {
+                  filteredAudits.map(audit => {
                     const statusConfig = getStatusConfig(audit.status);
                     const StatusIcon = statusConfig.icon;
 
