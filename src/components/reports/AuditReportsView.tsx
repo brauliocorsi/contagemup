@@ -34,6 +34,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { X, Filter } from 'lucide-react';
 import { useLocationAudits, LocationAudit } from '@/hooks/useLocationAudits';
 import { AuditResultsDialog } from '@/components/audit/AuditResultsDialog';
 import { useProfiles } from '@/hooks/useProfiles';
@@ -48,7 +52,56 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
   const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
 
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [locationFilter, setLocationFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const locationOptions = useMemo(() => {
+    const set = new Set<string>();
+    audits.forEach((a) => (a.locations ?? []).forEach((l) => l && set.add(l)));
+    return Array.from(set).sort();
+  }, [audits]);
+
+  const assigneeOptions = useMemo(() => {
+    const set = new Set<string>();
+    audits.forEach((a) => a.assigned_to && set.add(a.assigned_to));
+    return Array.from(set).map((id) => ({ id, name: nameOf(id) })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [audits, nameOf]);
+
+  const filteredAudits = useMemo(() => {
+    const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+    const to = dateTo ? new Date(`${dateTo}T23:59:59`) : null;
+    return audits.filter((a) => {
+      if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+      if (locationFilter !== 'all' && !(a.locations ?? []).includes(locationFilter)) return false;
+      if (assigneeFilter === 'unassigned' && a.assigned_to) return false;
+      if (assigneeFilter !== 'all' && assigneeFilter !== 'unassigned' && a.assigned_to !== assigneeFilter) return false;
+      const ref = new Date(a.completed_at ?? a.created_at);
+      if (from && ref < from) return false;
+      if (to && ref > to) return false;
+      return true;
+    });
+  }, [audits, search, statusFilter, locationFilter, assigneeFilter, dateFrom, dateTo]);
+
+  const hasFilters =
+    !!search || !!dateFrom || !!dateTo || locationFilter !== 'all' || assigneeFilter !== 'all' || statusFilter !== 'all';
+
+  const clearFilters = () => {
+    setSearch('');
+    setDateFrom('');
+    setDateTo('');
+    setLocationFilter('all');
+    setAssigneeFilter('all');
+    setStatusFilter('all');
+  };
+
   const { data: selectedAudit } = useAuditWithItems(selectedAuditId);
+
 
   const getStatusConfig = (status: LocationAudit['status']) => {
     switch (status) {
