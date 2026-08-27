@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { FileSpreadsheet, ListChecks, MapPin, Printer, ScanBarcode, Search, Truck } from 'lucide-react';
+import { FileSpreadsheet, ListChecks, MapPin, Printer, Route as RouteIcon, ScanBarcode, Search, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
