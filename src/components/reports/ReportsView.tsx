@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Activity, Package, ClipboardCheck, BarChart3 } from 'lucide-react';
+import { Activity, Package, ClipboardCheck, BarChart3, Copy } from 'lucide-react';
 import { UnifiedMovementsReport } from './UnifiedMovementsReport';
 import { StockStatusReport } from './StockStatusReport';
 import { AuditReportsView } from './AuditReportsView';
+import { DuplicateProductsReport } from './DuplicateProductsReport';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 
