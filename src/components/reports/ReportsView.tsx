@@ -24,7 +24,7 @@ export function ReportsView({ onStartAudit }: ReportsViewProps) {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-4 max-w-xl">
           <TabsTrigger value="movements" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             <span className="hidden sm:inline">Movimentos</span>
@@ -36,6 +36,10 @@ export function ReportsView({ onStartAudit }: ReportsViewProps) {
           <TabsTrigger value="audits" className="flex items-center gap-2">
             <ClipboardCheck className="h-4 w-4" />
             <span className="hidden sm:inline">Conferência</span>
+          </TabsTrigger>
+          <TabsTrigger value="duplicates" className="flex items-center gap-2">
+            <Copy className="h-4 w-4" />
+            <span className="hidden sm:inline">Duplicados</span>
           </TabsTrigger>
         </TabsList>
 
@@ -49,6 +53,10 @@ export function ReportsView({ onStartAudit }: ReportsViewProps) {
 
         <TabsContent value="audits" className="space-y-4">
           <AuditReportsView onStartAudit={onStartAudit} />
+        </TabsContent>
+
+        <TabsContent value="duplicates" className="space-y-4">
+          <DuplicateProductsReport />
         </TabsContent>
       </Tabs>
     </PageContainer>
