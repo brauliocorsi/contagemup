@@ -104,10 +104,10 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
       return;
     }
 
-    // Suporta códigos por coli: CODIGO-C2
+    // Suporta códigos por coli: CODIGO-C2 (parseScan já separa base + coli)
     const coliMatch = code.match(/^(.*)-c(\d+)$/);
     const baseCode = coliMatch ? coliMatch[1] : code;
-    const coli = coliMatch ? Number(coliMatch[2]) : null;
+    const coli = parsed.colis ?? (coliMatch ? Number(coliMatch[2]) : null);
 
     const candidates = locationItems.filter(
       (i) =>
@@ -115,13 +115,20 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
         norm(i.product_name) === baseCode ||
         norm(i.product_code) === code,
     );
-    const match =
-      (coli != null ? candidates.find((i) => i.colis_number === coli) : undefined) ?? candidates[0];
 
-    if (!match) {
+    if (candidates.length === 0) {
       toast.error(`"${parsed.value}" não pertence a ${location}`);
       return;
     }
+
+    const match = coli != null ? candidates.find((i) => i.colis_number === coli) : candidates[0];
+
+    if (!match) {
+      toast.error(`Coli ${coli} de ${baseCode.toUpperCase()} não está em ${location}`);
+      return;
+    }
+
+
 
     const next = valueOf(match) + 1;
     setValue(match.id, next);
