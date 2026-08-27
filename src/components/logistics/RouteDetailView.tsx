@@ -40,6 +40,7 @@ import {
 import { OrderDocument } from './OrderDocument';
 import { GuidesDocument } from './GuidesDocument';
 import { PickingReport } from './PickingReport';
+import { AddRouteStops } from './AddRouteStops';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
