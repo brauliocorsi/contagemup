@@ -62,6 +62,7 @@ const groups: { label: string; items: NavItem[] }[] = [
     items: [
       { id: 'separation-notes', label: 'Notas de Separação', icon: FileText },
       { id: 'deliveries', label: 'Entregas', icon: Truck },
+      { id: 'routes', label: 'Rotas', icon: RouteIcon },
       { id: 'route-optimization', label: 'Otimizar Semana', icon: RouteIcon },
     ],
   },
