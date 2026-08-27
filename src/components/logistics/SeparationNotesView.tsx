@@ -681,6 +681,14 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
         </section>
       </div>
 
+      <CreateRouteDialog
+        open={routeDialog}
+        onOpenChange={setRouteDialog}
+        orders={chosen}
+        defaultAddress={addressFrom}
+        onCreated={(id) => onOpenRoute?.(id)}
+      />
+
       <AlertDialog open={confirmReissue} onOpenChange={setConfirmReissue}>
         <AlertDialogContent>
           <AlertDialogHeader>
