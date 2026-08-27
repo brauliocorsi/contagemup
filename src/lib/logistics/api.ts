@@ -34,9 +34,17 @@ export function fetchSeparationOrders(from: string, to: string) {
   });
 }
 
+export function fetchOrdersByCode(codes: string[]) {
+  return invoke<{ orders: SepOrder[]; notFound: string[] }>('logistics-gc', {
+    action: 'orders-by-code',
+    codes,
+  });
+}
+
 export function fetchOrderDocuments(ids: string[]) {
   return invoke<{ documents: GcDocument[] }>('logistics-gc', { action: 'documents', ids });
 }
+
 
 export function fetchGuideHistory(ids: string[]) {
   return invoke<{ history: GuideRecord[] }>('logistics-gc', { action: 'guide-history', ids });
