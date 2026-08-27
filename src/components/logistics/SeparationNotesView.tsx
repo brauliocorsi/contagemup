@@ -382,6 +382,10 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               <MapPin className="mr-2 h-4 w-4" />
               {routeJob.isPending ? 'A calcular rota…' : `Rota no Google Maps (${chosen.length})`}
             </Button>
+            <Button onClick={() => setRouteDialog(true)} disabled={chosen.length === 0}>
+              <RouteIcon className="mr-2 h-4 w-4" />
+              Criar rota ({chosen.length})
+            </Button>
           </div>
           {routeLinks.length > 0 && (
             <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/40 p-4">
