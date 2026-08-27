@@ -109,7 +109,17 @@ export default function Dashboard() {
               {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
               {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
               {activeTab === 'recent' && <RecentProductsView />}
-              {activeTab === 'separation-notes' && <SeparationNotesView />}
+              {activeTab === 'separation-notes' && (
+                <SeparationNotesView
+                  onOpenRoute={(id) => {
+                    setOpenRouteId(id);
+                    setActiveTab('routes');
+                  }}
+                />
+              )}
+              {activeTab === 'routes' && (
+                <RoutesView key={openRouteId ?? 'list'} initialRouteId={openRouteId} />
+              )}
               {activeTab === 'deliveries' && <DeliveriesView />}
               {activeTab === 'route-optimization' && (
                 <RouteOptimizationView onSendToSeparation={() => setActiveTab('separation-notes')} />
