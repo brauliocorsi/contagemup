@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Edit, Package, MapPin, Box, History, ClipboardList, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft, ShoppingBag, FileText, FileSpreadsheet, ShieldCheck, ScanBarcode } from 'lucide-react';
+import { Search, Trash2, Edit, Package, MapPin, Box, History, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings2, Columns3, Eye, Warehouse, Split, AlertTriangle, CheckCircle, ArrowRightLeft, ShoppingBag, FileText, FileSpreadsheet, ShieldCheck } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -77,6 +77,7 @@ export function ProductsView() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
   const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock' | 'negative_stock'>('all');
   const [filterOrderStatus, setFilterOrderStatus] = useState<'all' | 'with_orders' | 'without_orders'>('all');
@@ -170,8 +171,10 @@ export function ProductsView() {
         (filterOrderStatus === 'without_orders' && !hasOrders);
 
       const matchesSupplierCode = !onlyMissingSupplierCode || !product.supplier_code;
-      
-      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus && matchesSupplierCode;
+
+      const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
+
+      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus && matchesSupplierCode && matchesCategory;
     });
 
 
@@ -205,7 +208,7 @@ export function ProductsView() {
     }
     
     return result;
-  }, [products, searchTerm, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
+  }, [products, searchTerm, filterCategory, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
 
   // Virtualizer for products table
   const rowVirtualizer = useVirtualizer({
@@ -237,6 +240,25 @@ export function ProductsView() {
     const withoutOrders = products.length - withOrders;
     return { withOrders, withoutOrders };
   }, [products, productIdsWithOrders]);
+
+  // Active filter count / reset
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (filterCategory !== 'all') n++;
+    if (filterCountStatus !== 'all') n++;
+    if (filterStockStatus !== 'all') n++;
+    if (filterOrderStatus !== 'all') n++;
+    if (onlyMissingSupplierCode) n++;
+    return n;
+  }, [filterCategory, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode]);
+
+  const clearAllFilters = useCallback(() => {
+    setFilterCategory('all');
+    setFilterCountStatus('all');
+    setFilterStockStatus('all');
+    setFilterOrderStatus('all');
+    setOnlyMissingSupplierCode(false);
+  }, []);
 
   // Export helpers
   const exportToExcel = useCallback(async (data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
@@ -439,60 +461,136 @@ export function ProductsView() {
       </div>
 
       {/* Search and filters */}
-      <div className="flex flex-col lg:flex-row gap-2">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col lg:flex-row gap-2 lg:items-center">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Pesquisar por nome, código ou localização..."
+            placeholder="Pesquisar por nome, código, código de fornecedor ou localização..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-11 text-base"
           />
         </div>
-        <Select value={filterCountStatus} onValueChange={(v) => setFilterCountStatus(v as typeof filterCountStatus)}>
-          <SelectTrigger className={`w-full sm:w-52 transition-colors ${filterCountStatus !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Contagem" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas contagens</SelectItem>
-            <SelectItem value="with_count">Com contagem ({countStats.withCount})</SelectItem>
-            <SelectItem value="without_count">Sem contagem ({countStats.withoutCount})</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterStockStatus} onValueChange={(v) => setFilterStockStatus(v as typeof filterStockStatus)}>
-          <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterStockStatus !== 'all' ? 'border-primary bg-primary/10 text-primary' : ''}`}>
-            <Package className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Stock" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todo stock</SelectItem>
-            <SelectItem value="in_stock">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                Em stock ({stockStats.inStock})
-              </span>
-            </SelectItem>
-            <SelectItem value="low_stock">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-yellow-500" />
-                Stock baixo ({stockStats.lowStock})
-              </span>
-            </SelectItem>
-            <SelectItem value="out_of_stock">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                Esgotado ({stockStats.outOfStock})
-              </span>
-            </SelectItem>
-            <SelectItem value="negative_stock">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                Stock negativo ({stockStats.negativeStock})
-              </span>
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={`whitespace-nowrap gap-2 ${activeFilterCount > 0 ? 'border-primary bg-primary/10 text-primary' : ''}`}
+            >
+              <Filter className="h-4 w-4" />
+              Filtros
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-primary/20 text-primary hover:bg-primary/20">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 bg-background border shadow-lg z-50" align="start">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Filtros</p>
+                {activeFilterCount > 0 && (
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearAllFilters}>
+                    Limpar tudo
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                  <SelectTrigger className={filterCategory !== 'all' ? 'border-primary bg-primary/10' : ''}>
+                    <SelectValue placeholder="Categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas categorias ({products.length})</SelectItem>
+                    {categories.map(c => (
+                      <SelectItem key={c.id} value={c.name}>
+                        {c.name} ({products.filter(p => p.category === c.name).length})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Contagem</label>
+                <Select value={filterCountStatus} onValueChange={(v) => setFilterCountStatus(v as typeof filterCountStatus)}>
+                  <SelectTrigger className={filterCountStatus !== 'all' ? 'border-primary bg-primary/10' : ''}>
+                    <SelectValue placeholder="Contagem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas contagens</SelectItem>
+                    <SelectItem value="with_count">Com contagem ({countStats.withCount})</SelectItem>
+                    <SelectItem value="without_count">Sem contagem ({countStats.withoutCount})</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Stock</label>
+                <Select value={filterStockStatus} onValueChange={(v) => setFilterStockStatus(v as typeof filterStockStatus)}>
+                  <SelectTrigger className={filterStockStatus !== 'all' ? 'border-primary bg-primary/10' : ''}>
+                    <SelectValue placeholder="Stock" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todo stock</SelectItem>
+                    <SelectItem value="in_stock">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                        Em stock ({stockStats.inStock})
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="low_stock">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                        Stock baixo ({stockStats.lowStock})
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="out_of_stock">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
+                        Esgotado ({stockStats.outOfStock})
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="negative_stock">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        Stock negativo ({stockStats.negativeStock})
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Encomendas</label>
+                <Select value={filterOrderStatus} onValueChange={(v) => setFilterOrderStatus(v as typeof filterOrderStatus)}>
+                  <SelectTrigger className={filterOrderStatus !== 'all' ? 'border-primary bg-primary/10' : ''}>
+                    <SelectValue placeholder="Encomendas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="with_orders">Com encomendas ({orderStats.withOrders})</SelectItem>
+                    <SelectItem value="without_orders">Sem encomendas ({orderStats.withoutOrders})</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-1">
+                <Checkbox
+                  id="missing-supplier-code"
+                  checked={onlyMissingSupplierCode}
+                  onCheckedChange={(v) => setOnlyMissingSupplierCode(!!v)}
+                />
+                <label htmlFor="missing-supplier-code" className="text-sm cursor-pointer">
+                  Sem cód. fornecedor ({missingSupplierCodeCount})
+                </label>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
         <Button
           variant={filterStockStatus === 'negative_stock' ? 'default' : 'outline'}
           size="sm"
@@ -511,39 +609,6 @@ export function ProductsView() {
             </Badge>
           )}
         </Button>
-        <Button
-          variant={onlyMissingSupplierCode ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setOnlyMissingSupplierCode(v => !v)}
-          className="whitespace-nowrap gap-2"
-        >
-          <ScanBarcode className="h-4 w-4" />
-          Sem cód. fornecedor
-          {missingSupplierCodeCount > 0 && (
-            <Badge variant="secondary" className="ml-1">{missingSupplierCodeCount}</Badge>
-          )}
-        </Button>
-        <Select value={filterOrderStatus} onValueChange={(v) => setFilterOrderStatus(v as typeof filterOrderStatus)}>
-          <SelectTrigger className={`w-full sm:w-48 transition-colors ${filterOrderStatus !== 'all' ? 'border-amber-500 bg-amber-50 text-amber-700' : ''}`}>
-            <ShoppingBag className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Encomendas" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            <SelectItem value="with_orders">
-              <span className="flex items-center gap-2">
-                <ClipboardList className="h-3 w-3 text-amber-600" />
-                Com encomendas ({orderStats.withOrders})
-              </span>
-            </SelectItem>
-            <SelectItem value="without_orders">
-              <span className="flex items-center gap-2">
-                <Package className="h-3 w-3 text-muted-foreground" />
-                Sem encomendas ({orderStats.withoutOrders})
-              </span>
-            </SelectItem>
-          </SelectContent>
-        </Select>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="whitespace-nowrap">
