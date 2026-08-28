@@ -39,6 +39,16 @@ interface DuplicateGroup {
   items: Product[];
 }
 
+// Código "novo" = COL.../CAM... (formato novo). Estes têm sempre prioridade para ficar.
+function isNewCode(code: string) {
+  return /^(COL|CAM)\d/i.test((code || '').trim());
+}
+
+// Grupos multi-peça (mesmo nome, códigos de componentes distintos) não são duplicados reais.
+function isMultiPartGroup(items: Product[]) {
+  return items.length > 2 && !items.some((i) => isNewCode(i.code));
+}
+
 export function DuplicateProductsReport() {
   const { products, loading } = useProducts();
   const { toast } = useToast();
@@ -48,6 +58,8 @@ export function DuplicateProductsReport() {
   const [keepChoice, setKeepChoice] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<DuplicateGroup | null>(null);
   const [merging, setMerging] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+
 
   const groups = useMemo<DuplicateGroup[]>(() => {
     const scope = onlyMattresses ? products.filter(isMattress) : products;
@@ -66,6 +78,7 @@ export function DuplicateProductsReport() {
         name: items[0].name,
         items: [...items].sort((a, b) => a.code.localeCompare(b.code)),
       }))
+      .filter((g) => !isMultiPartGroup(g.items))
       .filter((g) =>
         !search.trim() ||
         g.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -75,27 +88,40 @@ export function DuplicateProductsReport() {
   }, [products, onlyMattresses, search]);
 
   const defaultKeep = (g: DuplicateGroup) => {
-    const withStock = [...g.items].sort((a, b) => (b.current_stock || 0) - (a.current_stock || 0));
-    const newCode = g.items.find((i) => /^COL\d/i.test(i.code));
-    return keepChoice[g.key] || newCode?.id || withStock[0].id;
+    if (keepChoice[g.key]) return keepChoice[g.key];
+    // 1) código novo (COL/CAM), 2) código não numérico, 3) maior stock
+    const newCode = g.items.find((i) => isNewCode(i.code));
+    if (newCode) return newCode.id;
+    const alpha = g.items.find((i) => /[A-Za-z]/.test(i.code));
+    if (alpha) return alpha.id;
+    return [...g.items].sort((a, b) => (b.current_stock || 0) - (a.current_stock || 0))[0].id;
+  };
+
+  const mergeGroup = async (g: DuplicateGroup) => {
+    const keepId = defaultKeep(g);
+    for (const item of g.items) {
+      if (item.id === keepId) continue;
+      const { error } = await supabase.rpc('merge_duplicate_products', {
+        p_keep: keepId,
+        p_remove: item.id,
+      });
+      if (error) throw error;
+    }
+  };
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({ queryKey: ['counts'] });
+    queryClient.invalidateQueries({ queryKey: ['last-counts'] });
   };
 
   const handleMerge = async () => {
     if (!pending) return;
-    const keepId = defaultKeep(pending);
     setMerging(true);
     try {
-      for (const item of pending.items) {
-        if (item.id === keepId) continue;
-        const { error } = await supabase.rpc('merge_duplicate_products', {
-          p_keep: keepId,
-          p_remove: item.id,
-        });
-        if (error) throw error;
-      }
-      toast({ title: 'Unificado', description: `${pending.name} — ${pending.items.length - 1} duplicado(s) removido(s)` });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['counts'] });
+      await mergeGroup(pending);
+      toast({ title: 'Unificado', description: `${pending.name} — ${pending.items.length - 1} duplicado(s) removido(s); stock somado no registo mantido` });
+      refresh();
       setPending(null);
     } catch (e) {
       toast({
@@ -108,6 +134,29 @@ export function DuplicateProductsReport() {
     }
   };
 
+  const handleMergeAll = async () => {
+    setMerging(true);
+    let ok = 0;
+    let fail = 0;
+    for (const g of groups) {
+      try {
+        await mergeGroup(g);
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    refresh();
+    setMerging(false);
+    setBulkOpen(false);
+    toast({
+      title: 'Unificação concluída',
+      description: `${ok} grupo(s) unificado(s)${fail ? `, ${fail} com erro` : ''} — stock preservado`,
+      variant: fail ? 'destructive' : 'default',
+    });
+  };
+
+
   return (
     <Card>
       <CardHeader className="space-y-4">
@@ -117,14 +166,21 @@ export function DuplicateProductsReport() {
             Produtos duplicados
             <Badge variant="secondary">{groups.length}</Badge>
           </CardTitle>
-          <Button
-            variant={onlyMattresses ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setOnlyMattresses((v) => !v)}
-          >
-            {onlyMattresses ? 'Apenas colchões' : 'Todos os produtos'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={onlyMattresses ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setOnlyMattresses((v) => !v)}
+            >
+              {onlyMattresses ? 'Apenas colchões' : 'Todos os produtos'}
+            </Button>
+            <Button size="sm" variant="secondary" disabled={merging || groups.length === 0} onClick={() => setBulkOpen(true)}>
+              <Merge className="mr-2 h-4 w-4" />
+              Unificar todos ({groups.length})
+            </Button>
+          </div>
         </div>
+
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -176,8 +232,9 @@ export function DuplicateProductsReport() {
                 ))}
               </RadioGroup>
               <p className="text-xs text-muted-foreground">
-                Selecione o registo a manter. Os restantes são fundidos nele (stock, contagens e histórico transferidos).
+                Por defeito mantém-se o código novo (COL/CAM). O stock é somado no registo mantido — nada é perdido.
               </p>
+
             </div>
           );
         })}
@@ -209,6 +266,26 @@ export function DuplicateProductsReport() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={bulkOpen} onOpenChange={(o) => !o && setBulkOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unificar todos os duplicados?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {groups.length} grupo(s) serão unificados mantendo sempre o código novo (COL/CAM). Stock,
+              contagens, movimentos e histórico são transferidos e somados no registo mantido. Esta ação não pode ser revertida.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={merging}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleMergeAll(); }} disabled={merging}>
+              {merging && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Unificar todos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </Card>
   );
 }
