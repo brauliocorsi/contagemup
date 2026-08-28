@@ -241,6 +241,25 @@ export function ProductsView() {
     return { withOrders, withoutOrders };
   }, [products, productIdsWithOrders]);
 
+  // Active filter count / reset
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (filterCategory !== 'all') n++;
+    if (filterCountStatus !== 'all') n++;
+    if (filterStockStatus !== 'all') n++;
+    if (filterOrderStatus !== 'all') n++;
+    if (onlyMissingSupplierCode) n++;
+    return n;
+  }, [filterCategory, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode]);
+
+  const clearAllFilters = useCallback(() => {
+    setFilterCategory('all');
+    setFilterCountStatus('all');
+    setFilterStockStatus('all');
+    setFilterOrderStatus('all');
+    setOnlyMissingSupplierCode(false);
+  }, []);
+
   // Export helpers
   const exportToExcel = useCallback(async (data: (string | number)[][], filename: string, sheetName: string = 'Relatório') => {
       const XLSX = await loadXLSX();
