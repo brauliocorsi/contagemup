@@ -34,6 +34,8 @@ import { useDamages } from '@/hooks/useDamages';
 import { useCounting } from '@/hooks/useCounting';
 import { useActiveSession } from '@/hooks/useActiveSession';
 import { loadXLSX } from '@/lib/lazyXlsx';
+import { BulkLabelPrintButton } from '@/components/products/BulkLabelPrintButton';
+
 export function StockStatusReport() {
   const { products, loading: productsLoading } = useProducts();
   const { categories, loading: categoriesLoading } = useCategories();
@@ -222,10 +224,24 @@ export function StockStatusReport() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={exportToExcel}>
-          <FileDown className="h-4 w-4 mr-2" />
-          Exportar Excel
-        </Button>
+        <div className="flex items-center gap-2">
+          <BulkLabelPrintButton
+            label={filterCategory === 'all' ? 'Etiquetas (todos)' : `Etiquetas (${filterCategory})`}
+            getProducts={() =>
+              filteredProducts.map((p) => ({
+                code: p.code,
+                name: p.name,
+                total_colis: p.total_colis,
+                current_stock: p.current_stock,
+              }))
+            }
+          />
+          <Button onClick={exportToExcel}>
+            <FileDown className="h-4 w-4 mr-2" />
+            Exportar Excel
+          </Button>
+        </div>
+
       </div>
 
       {/* Tabs */}
