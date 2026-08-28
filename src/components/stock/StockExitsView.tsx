@@ -337,10 +337,18 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
           if (it.mode === 'set') {
             return { ...it, setQuantity: missing, selections: {} };
           }
-          // individual: shrink each coli quantity proportionally is complex; simplest: reset selections, keep quantities
-          return { ...it, selections: {} };
+          // Individual mode: keep only the missing units, distributed over the colis
+          let left = missing;
+          const nextQuantities: Record<number, number> = {};
+          Object.entries(it.colisQuantities).forEach(([coli, qty]) => {
+            const take = Math.max(0, Math.min(Number(qty) || 0, left));
+            nextQuantities[Number(coli)] = take;
+            left -= take;
+          });
+          return { ...it, colisQuantities: nextQuantities, selections: {} };
         })
         .filter((x): x is CartItem => x !== null));
+
     } catch (e) {
       console.error(e);
       const msg = e instanceof Error ? e.message : 'Erro desconhecido';
