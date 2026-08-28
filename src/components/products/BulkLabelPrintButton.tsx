@@ -20,7 +20,7 @@ export interface BulkLabelProduct {
   current_stock?: number | null;
 }
 
-/** Constrói etiquetas de vários produtos, respeitando colis e mostrando a quantidade em stock */
+/** Constrói etiquetas de vários produtos: uma etiqueta por unidade em stock, identificando o coli */
 export function buildBulkLabels(
   products: BulkLabelProduct[],
   byColi: boolean,
@@ -31,17 +31,17 @@ export function buildBulkLabels(
     const code = (p.code || '').trim();
     if (!code) return;
     const total = Math.max(1, p.total_colis || 1);
-    const qty = p.current_stock ?? 0;
-    const qtyLine = `Stock: ${qty}`;
+    const copies = Math.max(1, p.current_stock ?? 0);
     const entryDate = entryDates[code] ?? null;
-    if (byColi && total > 1) {
+    if (byColi) {
       for (let n = 1; n <= total; n++) {
         items.push({
           code: `${code}-C${n}`,
           title: p.name,
           subtitle: `Código: ${code}`,
-          extra: [`Coli ${n}/${total}`, qtyLine],
+          extra: [`Coli ${n}/${total}`],
           entryDate,
+          copies,
         });
       }
     } else {
@@ -49,13 +49,14 @@ export function buildBulkLabels(
         code,
         title: p.name,
         subtitle: `Código: ${code}`,
-        extra: [qtyLine],
         entryDate,
+        copies,
       });
     }
   });
   return items;
 }
+
 
 
 interface BulkLabelPrintButtonProps {
