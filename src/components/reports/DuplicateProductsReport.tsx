@@ -78,6 +78,7 @@ export function DuplicateProductsReport() {
         name: items[0].name,
         items: [...items].sort((a, b) => a.code.localeCompare(b.code)),
       }))
+      .filter((g) => !isMultiPartGroup(g.items))
       .filter((g) =>
         !search.trim() ||
         g.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -87,27 +88,40 @@ export function DuplicateProductsReport() {
   }, [products, onlyMattresses, search]);
 
   const defaultKeep = (g: DuplicateGroup) => {
-    const withStock = [...g.items].sort((a, b) => (b.current_stock || 0) - (a.current_stock || 0));
-    const newCode = g.items.find((i) => /^COL\d/i.test(i.code));
-    return keepChoice[g.key] || newCode?.id || withStock[0].id;
+    if (keepChoice[g.key]) return keepChoice[g.key];
+    // 1) código novo (COL/CAM), 2) código não numérico, 3) maior stock
+    const newCode = g.items.find((i) => isNewCode(i.code));
+    if (newCode) return newCode.id;
+    const alpha = g.items.find((i) => /[A-Za-z]/.test(i.code));
+    if (alpha) return alpha.id;
+    return [...g.items].sort((a, b) => (b.current_stock || 0) - (a.current_stock || 0))[0].id;
+  };
+
+  const mergeGroup = async (g: DuplicateGroup) => {
+    const keepId = defaultKeep(g);
+    for (const item of g.items) {
+      if (item.id === keepId) continue;
+      const { error } = await supabase.rpc('merge_duplicate_products', {
+        p_keep: keepId,
+        p_remove: item.id,
+      });
+      if (error) throw error;
+    }
+  };
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({ queryKey: ['counts'] });
+    queryClient.invalidateQueries({ queryKey: ['last-counts'] });
   };
 
   const handleMerge = async () => {
     if (!pending) return;
-    const keepId = defaultKeep(pending);
     setMerging(true);
     try {
-      for (const item of pending.items) {
-        if (item.id === keepId) continue;
-        const { error } = await supabase.rpc('merge_duplicate_products', {
-          p_keep: keepId,
-          p_remove: item.id,
-        });
-        if (error) throw error;
-      }
-      toast({ title: 'Unificado', description: `${pending.name} — ${pending.items.length - 1} duplicado(s) removido(s)` });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['counts'] });
+      await mergeGroup(pending);
+      toast({ title: 'Unificado', description: `${pending.name} — ${pending.items.length - 1} duplicado(s) removido(s); stock somado no registo mantido` });
+      refresh();
       setPending(null);
     } catch (e) {
       toast({
@@ -119,6 +133,29 @@ export function DuplicateProductsReport() {
       setMerging(false);
     }
   };
+
+  const handleMergeAll = async () => {
+    setMerging(true);
+    let ok = 0;
+    let fail = 0;
+    for (const g of groups) {
+      try {
+        await mergeGroup(g);
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    refresh();
+    setMerging(false);
+    setBulkOpen(false);
+    toast({
+      title: 'Unificação concluída',
+      description: `${ok} grupo(s) unificado(s)${fail ? `, ${fail} com erro` : ''} — stock preservado`,
+      variant: fail ? 'destructive' : 'default',
+    });
+  };
+
 
   return (
     <Card>
