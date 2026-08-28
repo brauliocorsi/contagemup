@@ -266,6 +266,26 @@ export function DuplicateProductsReport() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={bulkOpen} onOpenChange={(o) => !o && setBulkOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unificar todos os duplicados?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {groups.length} grupo(s) serão unificados mantendo sempre o código novo (COL/CAM). Stock,
+              contagens, movimentos e histórico são transferidos e somados no registo mantido. Esta ação não pode ser revertida.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={merging}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleMergeAll(); }} disabled={merging}>
+              {merging && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Unificar todos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </Card>
   );
 }
