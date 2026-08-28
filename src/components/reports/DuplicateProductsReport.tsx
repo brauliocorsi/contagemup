@@ -232,8 +232,9 @@ export function DuplicateProductsReport() {
                 ))}
               </RadioGroup>
               <p className="text-xs text-muted-foreground">
-                Selecione o registo a manter. Os restantes são fundidos nele (stock, contagens e histórico transferidos).
+                Por defeito mantém-se o código novo (COL/CAM). O stock é somado no registo mantido — nada é perdido.
               </p>
+
             </div>
           );
         })}
