@@ -166,14 +166,21 @@ export function DuplicateProductsReport() {
             Produtos duplicados
             <Badge variant="secondary">{groups.length}</Badge>
           </CardTitle>
-          <Button
-            variant={onlyMattresses ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setOnlyMattresses((v) => !v)}
-          >
-            {onlyMattresses ? 'Apenas colchões' : 'Todos os produtos'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={onlyMattresses ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setOnlyMattresses((v) => !v)}
+            >
+              {onlyMattresses ? 'Apenas colchões' : 'Todos os produtos'}
+            </Button>
+            <Button size="sm" variant="secondary" disabled={merging || groups.length === 0} onClick={() => setBulkOpen(true)}>
+              <Merge className="mr-2 h-4 w-4" />
+              Unificar todos ({groups.length})
+            </Button>
+          </div>
         </div>
+
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
