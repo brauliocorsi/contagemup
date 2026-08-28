@@ -108,8 +108,9 @@ export function BulkLabelPrintButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="z-50 bg-popover w-64">
         <DropdownMenuLabel>Brother QL-700 (62x29mm)</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => run(true, 'ql700')}>Uma etiqueta por coli</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => run(false, 'ql700')}>Uma etiqueta por produto</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => run(true, 'ql700')}>Por coli (1 por unidade)</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => run(false, 'ql700')}>Por produto (1 por unidade)</DropdownMenuItem>
+
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Outros formatos</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => run(true, 'a4')}>Folha A4 (3x8)</DropdownMenuItem>
