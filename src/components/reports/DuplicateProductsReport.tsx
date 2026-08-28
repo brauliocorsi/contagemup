@@ -39,6 +39,16 @@ interface DuplicateGroup {
   items: Product[];
 }
 
+// Código "novo" = COL.../CAM... (formato novo). Estes têm sempre prioridade para ficar.
+function isNewCode(code: string) {
+  return /^(COL|CAM)\d/i.test((code || '').trim());
+}
+
+// Grupos multi-peça (mesmo nome, códigos de componentes distintos) não são duplicados reais.
+function isMultiPartGroup(items: Product[]) {
+  return items.length > 2 && !items.some((i) => isNewCode(i.code));
+}
+
 export function DuplicateProductsReport() {
   const { products, loading } = useProducts();
   const { toast } = useToast();
@@ -48,6 +58,8 @@ export function DuplicateProductsReport() {
   const [keepChoice, setKeepChoice] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<DuplicateGroup | null>(null);
   const [merging, setMerging] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+
 
   const groups = useMemo<DuplicateGroup[]>(() => {
     const scope = onlyMattresses ? products.filter(isMattress) : products;
