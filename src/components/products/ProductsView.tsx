@@ -77,6 +77,7 @@ export function ProductsView() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
   const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock' | 'negative_stock'>('all');
   const [filterOrderStatus, setFilterOrderStatus] = useState<'all' | 'with_orders' | 'without_orders'>('all');
@@ -170,8 +171,10 @@ export function ProductsView() {
         (filterOrderStatus === 'without_orders' && !hasOrders);
 
       const matchesSupplierCode = !onlyMissingSupplierCode || !product.supplier_code;
-      
-      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus && matchesSupplierCode;
+
+      const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
+
+      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus && matchesSupplierCode && matchesCategory;
     });
 
 
@@ -205,7 +208,7 @@ export function ProductsView() {
     }
     
     return result;
-  }, [products, searchTerm, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
+  }, [products, searchTerm, filterCategory, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
 
   // Virtualizer for products table
   const rowVirtualizer = useVirtualizer({
