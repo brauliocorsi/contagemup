@@ -46,6 +46,7 @@ export function PickingReport({
             <th className="gc-left">Detalhes</th>
             <th className="gc-left">Localização</th>
             <th className="gc-left">Encomendas</th>
+            <th className="gc-left">Saída</th>
             <th className="gc-center gc-w-qtd">Qtd.</th>
           </tr>
         </thead>
@@ -54,7 +55,7 @@ export function PickingReport({
             <Fragment key={g.categoria || "all"}>
               {byCategory && (
                 <tr>
-                  <td className="gc-left" colSpan={5}>
+                  <td className="gc-left" colSpan={6}>
                     <strong>{g.categoria.toUpperCase()}</strong>
                   </td>
                   <td className="gc-center">
@@ -69,13 +70,14 @@ export function PickingReport({
                   <td className="gc-left">{l.detalhes}</td>
                   <td className="gc-left">{l.localizacoes ?? "—"}</td>
                   <td className="gc-left">{l.encomendas.join(", ")}</td>
+                  <td className="gc-left">{l.saidas.join(", ") || "—"}</td>
                   <td className="gc-center">{l.quantidade}</td>
                 </tr>
               ))}
             </Fragment>
           ))}
           <tr>
-            <td className="gc-left" colSpan={5}>
+            <td className="gc-left" colSpan={6}>
               <strong>Total de artigos</strong>
             </td>
             <td className="gc-center">

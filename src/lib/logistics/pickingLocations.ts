@@ -19,7 +19,7 @@ export async function attachPickingLocations(lines: PickingLine[]): Promise<Pick
   }
 
   const ids = [...new Set(idByLine.values())];
-  if (ids.length === 0) return lines.map((l) => ({ ...l, localizacoes: '—' }));
+  if (ids.length === 0) return lines.map((l) => ({ ...l, localizacoes: '—', stock: undefined }));
 
   const counts: { product_id: string; location: string | null; quantity: number }[] = [];
   for (let i = 0; i < ids.length; i += 200) {
@@ -51,11 +51,12 @@ export async function attachPickingLocations(lines: PickingLine[]): Promise<Pick
   return lines.map((line) => {
     const id = idByLine.get(line.key);
     const map = id ? byProduct.get(id) : undefined;
-    if (!map || map.size === 0) return { ...line, localizacoes: '—' };
+    if (!map || map.size === 0) return { ...line, localizacoes: '—', stock: id ? 0 : undefined };
+    const stock = [...map.values()].reduce((s, q) => s + q, 0);
     const localizacoes = [...map.entries()]
       .sort((a, b) => a[0].localeCompare(b[0], 'pt', { numeric: true }))
       .map(([loc, qty]) => `${loc} (${qty})`)
       .join(', ');
-    return { ...line, localizacoes };
+    return { ...line, localizacoes, stock };
   });
 }
