@@ -11,7 +11,11 @@ export type PickingLine = {
   encomendas: string[];
   /** Quantidade por nota de encomenda (chave = código da encomenda). */
   porEncomenda: Record<string, number>;
+  /** Datas de saída (entrega) das vendas associadas, ordenadas. */
+  saidas: string[];
   localizacoes?: string;
+  /** Stock positivo disponível no Contagem (undefined = ainda não calculado). */
+  stock?: number;
 };
 
 export type PickingGroup = {
@@ -67,9 +71,14 @@ export function buildPicking(orders: SepOrder[]): PickingLine[] {
         quantidade: 0,
         encomendas: [],
         porEncomenda: {},
+        saidas: [],
       };
       const qtd = toNumber(produto.quantidade);
       line.quantidade += qtd;
+      if (order.entrega && !line.saidas.includes(order.entrega)) {
+        line.saidas.push(order.entrega);
+        line.saidas.sort();
+      }
       if (order.codigo) {
         if (!line.encomendas.includes(order.codigo)) line.encomendas.push(order.codigo);
         line.porEncomenda[order.codigo] = (line.porEncomenda[order.codigo] ?? 0) + qtd;
@@ -114,6 +123,8 @@ export async function exportPickingXlsx(
     Produto: l.nome,
     Detalhes: l.detalhes,
     Localizacao: l.localizacoes ?? '—',
+    Saida: l.saidas.join(', '),
+    Stock: l.stock ?? '',
     Quantidade: l.quantidade,
     Encomendas: l.encomendas.join(', '),
   }));
@@ -124,6 +135,8 @@ export async function exportPickingXlsx(
     { wch: 46 },
     { wch: 30 },
     { wch: 30 },
+    { wch: 22 },
+    { wch: 10 },
     { wch: 12 },
     { wch: 40 },
   ];

@@ -627,6 +627,8 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                     <th className="px-3 py-2">Detalhes</th>
                     <th className="px-3 py-2">Localização</th>
                     <th className="px-3 py-2">Encomendas</th>
+                    <th className="px-3 py-2">Saída</th>
+                    <th className="px-3 py-2">Stock</th>
                     <th className="px-3 py-2">Qtd. total</th>
                   </tr>
                 </thead>
@@ -645,7 +647,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                             }
                           />
                         </td>
-                        <td className="px-3 py-2 text-xs font-bold uppercase tracking-wide" colSpan={5}>
+                        <td className="px-3 py-2 text-xs font-bold uppercase tracking-wide" colSpan={7}>
                           {row.categoria}
                         </td>
                         <td className="px-3 py-2 font-semibold">{row.quantidade}</td>
@@ -666,6 +668,26 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                         <td className="px-3 py-2 text-muted-foreground">{row.line.detalhes}</td>
                         <td className="px-3 py-2 text-muted-foreground">{row.line.localizacoes ?? '—'}</td>
                         <td className="px-3 py-2 text-muted-foreground">{row.line.encomendas.join(', ')}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                          {row.line.saidas.join(', ') || '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          {row.line.stock === undefined ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span
+                              className={
+                                row.line.stock >= row.line.quantidade
+                                  ? 'font-semibold text-emerald-600'
+                                  : row.line.stock > 0
+                                    ? 'font-semibold text-amber-600'
+                                    : 'font-semibold text-destructive'
+                              }
+                            >
+                              {row.line.stock}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-3 py-2 font-semibold">{row.line.quantidade}</td>
                       </tr>
                     ),
