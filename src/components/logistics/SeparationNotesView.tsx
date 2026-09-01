@@ -618,6 +618,16 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
             <Button onClick={printPickingReport} disabled={pickingKept.length === 0}>
               <Printer className="mr-2 h-4 w-4" /> Imprimir picking
             </Button>
+            <BulkLabelPrintButton
+              getProducts={() =>
+                pickingKept
+                  .map((l) => labelProducts.get(l.key))
+                  .filter((p): p is BulkLabelProduct => Boolean(p))
+              }
+              label="Etiquetas"
+              variant="outline"
+            />
+
 
           </div>
           {picking === null ? (
