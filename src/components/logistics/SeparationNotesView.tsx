@@ -29,7 +29,8 @@ import { GuidesDocument } from './GuidesDocument';
 import { PickingReport } from './PickingReport';
 import { CreateRouteDialog } from './CreateRouteDialog';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
-import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
+import { attachPickingLocations, resolvePickingLabelProducts } from '@/lib/logistics/pickingLocations';
+import { BulkLabelPrintButton, type BulkLabelProduct } from '@/components/products/BulkLabelPrintButton';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
 
 import {
@@ -64,6 +65,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
   const [docs, setDocs] = useState<GcDocument[]>([]);
   const [picking, setPicking] = useState<PickingLine[] | null>(null);
   const [excluded, setExcluded] = useState<Record<string, boolean>>({});
+  const [labelProducts, setLabelProducts] = useState<Map<string, BulkLabelProduct>>(new Map());
   const [printMode, setPrintMode] = useState<'docs' | 'picking' | 'guides'>('docs');
   const [byCategory, setByCategory] = useState(false);
   const [addressFrom, setAddressFrom] = useState(DEFAULT_ADDRESS_FROM);
@@ -242,12 +244,18 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
     const lines = buildPicking(chosen);
     setPicking(lines);
     setExcluded({});
+    setLabelProducts(new Map());
     toast.success(`${lines.length} artigo(s) no picking`);
     try {
       const withLocations = await attachPickingLocations(lines);
       setPicking(withLocations);
     } catch {
       toast.error('Não foi possível carregar as localizações');
+    }
+    try {
+      setLabelProducts(await resolvePickingLabelProducts(lines));
+    } catch {
+      /* etiquetas são opcionais */
     }
   }
 
