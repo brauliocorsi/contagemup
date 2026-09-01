@@ -31,6 +31,7 @@ import { CreateRouteDialog } from './CreateRouteDialog';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations, resolvePickingLabelProducts } from '@/lib/logistics/pickingLocations';
 import { BulkLabelPrintButton, type BulkLabelProduct } from '@/components/products/BulkLabelPrintButton';
+import { PrintMenu } from '@/components/scanner/PrintMenu';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
 
 import {
@@ -627,6 +628,20 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               label="Etiquetas"
               variant="outline"
             />
+            <PrintMenu
+              label="Etiquetas encomendas"
+              variant="outline"
+              disabled={chosen.length === 0}
+              getItems={() =>
+                chosen.map((o) => ({
+                  code: o.codigo,
+                  title: o.cliente,
+                  subtitle: `Encomenda: ${o.codigo}`,
+                  extra: [o.entrega ? `Saída: ${o.entrega}` : ''].filter(Boolean),
+                }))
+              }
+            />
+
 
 
           </div>
