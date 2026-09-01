@@ -1,8 +1,47 @@
 import { supabase } from '@/integrations/supabase/client';
 import { loadProductResolver } from './productResolver';
 import type { PickingLine } from './picking';
+import type { BulkLabelProduct } from '@/components/products/BulkLabelPrintButton';
 
 const PAGE = 1000;
+
+/**
+ * Resolve cada linha de picking ao produto do Contagem e devolve, por chave de
+ * linha, os dados necessários para imprimir etiquetas (código, nome, colis, stock).
+ */
+export async function resolvePickingLabelProducts(
+  lines: PickingLine[],
+): Promise<Map<string, BulkLabelProduct>> {
+  const result = new Map<string, BulkLabelProduct>();
+  if (lines.length === 0) return result;
+
+  const resolver = await loadProductResolver();
+  const idByLine = new Map<string, string>();
+  for (const line of lines) {
+    const id = resolver.resolve(line.codigo, line.nome);
+    if (id) idByLine.set(line.key, id);
+  }
+  const ids = [...new Set(idByLine.values())];
+  if (ids.length === 0) return result;
+
+  const byId = new Map<string, BulkLabelProduct>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const { data } = await supabase
+      .from('products')
+      .select('id, code, name, total_colis, current_stock')
+      .in('id', chunk);
+    for (const p of (data ?? []) as (BulkLabelProduct & { id: string })[]) {
+      byId.set(p.id, { code: p.code, name: p.name, total_colis: p.total_colis, current_stock: p.current_stock });
+    }
+  }
+
+  for (const [key, id] of idByLine) {
+    const prod = byId.get(id);
+    if (prod) result.set(key, prod);
+  }
+  return result;
+}
 
 /**
  * Procura, para cada linha de picking, as localizações no armazém onde o
