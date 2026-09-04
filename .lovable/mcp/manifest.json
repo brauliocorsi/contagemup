@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "sdk_version": "2.0.2",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://pwpfvawxyqfvvguddxoh.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "contagem-stock-up",
+      "version": "0.1.0",
+      "title": "Contagem Stock UP"
+    },
+    "tools": [
+      {
+        "name": "search_products",
+        "title": "Procurar produtos",
+        "description": "Procura produtos por código, nome ou categoria e devolve stock atual, stock avariado e número de colis.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Código, nome ou parte do nome do produto."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "description": "Número máximo de resultados."
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "product_stock_by_location",
+        "title": "Stock por localização",
+        "description": "Devolve o stock de um produto (por código exato) detalhado por localização e número de coli.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Código exato do produto."
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_low_stock",
+        "title": "Produtos em rutura ou negativos",
+        "description": "Lista produtos com stock abaixo de zero ou abaixo de um limite indicado, para reposição e correções.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "threshold": {
+              "type": "integer",
+              "default": 0,
+              "description": "Mostrar produtos com stock igual ou inferior a este valor."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "description": "Número máximo de resultados."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "recent_stock_movements",
+        "title": "Movimentos de stock recentes",
+        "description": "Lista os movimentos de stock mais recentes (entradas, saídas, ajustes), opcionalmente filtrados por código de produto.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Código exato do produto (opcional)."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "description": "Número máximo de movimentos."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
