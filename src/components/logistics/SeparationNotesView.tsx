@@ -1,3 +1,4 @@
+import { useVehicles, vehiclePlate } from '@/hooks/useVehicles';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { FileSpreadsheet, ListChecks, MapPin, Printer, Route as RouteIcon, ScanBarcode, Search, Truck } from 'lucide-react';
@@ -43,7 +44,6 @@ import {
 } from '@/lib/logistics/api';
 import {
   DEFAULT_ADDRESS_FROM,
-  PLATES,
   type GcDocument,
   type GuideRecord,
   type GuideResult,
@@ -70,7 +70,9 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
   const [printMode, setPrintMode] = useState<'docs' | 'picking' | 'guides'>('docs');
   const [byCategory, setByCategory] = useState(false);
   const [addressFrom, setAddressFrom] = useState(DEFAULT_ADDRESS_FROM);
-  const [plate, setPlate] = useState<string>(PLATES[0]);
+  const { data: vehicles = [] } = useVehicles();
+  const [vehicleId, setVehicleId] = useState<string>('');
+  const plate = vehiclePlate(vehicles.find((v) => v.id === vehicleId));
   const [loadDate, setLoadDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loadTime, setLoadTime] = useState('08:00');
   const [guides, setGuides] = useState<GuideResult[]>([]);

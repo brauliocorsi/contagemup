@@ -1,3 +1,4 @@
+import { useVehicles, vehiclePlate } from '@/hooks/useVehicles';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
@@ -52,7 +53,6 @@ import {
 } from '@/lib/logistics/api';
 import {
   DEFAULT_ADDRESS_FROM,
-  PLATES,
   type GcDocument,
   type GuideRecord,
   type GuideResult,
@@ -102,7 +102,9 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
   const [confirmReissue, setConfirmReissue] = useState(false);
   const [routeLinks, setRouteLinks] = useState<string[]>([]);
   const [addressFrom, setAddressFrom] = useState(DEFAULT_ADDRESS_FROM);
-  const [plate, setPlate] = useState<string>(PLATES[0]);
+  const { data: vehicles = [] } = useVehicles();
+  const [vehicleId, setVehicleId] = useState<string>('');
+  const [plate, setPlate] = useState<string>('');
   const [loadDate, setLoadDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loadTime, setLoadTime] = useState('08:00');
 
@@ -114,10 +116,12 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
   useEffect(() => {
     if (!route) return;
     setAddressFrom(route.departure_address || DEFAULT_ADDRESS_FROM);
-    const p = plateFromNotes(route.notes);
+    const fromVehicle = vehicles.find((v) => v.id === route.vehicle_location_id);
+    const p = fromVehicle ? vehiclePlate(fromVehicle) : plateFromNotes(route.notes);
     if (p) setPlate(p);
+    setVehicleId(route.vehicle_location_id ?? fromVehicle?.id ?? '');
     if (route.scheduled_date) setLoadDate(route.scheduled_date);
-  }, [route]);
+  }, [route, vehicles]);
 
   useEffect(() => {
     setSelected((prev) =>
@@ -541,15 +545,25 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="rota-matricula-guia">Matrícula</Label>
-              <Select value={plate} onValueChange={setPlate}>
-                <SelectTrigger id="rota-matricula-guia" className="h-9 w-36">
-                  <SelectValue placeholder="Matrícula" />
+              <Label htmlFor="rota-matricula-guia">Carrinha</Label>
+              <Select
+                value={vehicleId}
+                onValueChange={(id) => {
+                  setVehicleId(id);
+                  const v = vehicles.find((x) => x.id === id);
+                  setPlate(vehiclePlate(v));
+                  if (route) {
+                    updateRoute.mutate({ id: route.id, vehicle_location_id: id });
+                  }
+                }}
+              >
+                <SelectTrigger id="rota-matricula-guia" className="h-9 w-48">
+                  <SelectValue placeholder="Escolher carrinha" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PLATES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {vehiclePlate(v)} — {v.code}
                     </SelectItem>
                   ))}
                 </SelectContent>
