@@ -19,7 +19,10 @@ interface ResolveDamageInput {
   id: string;
   resolution_type: string;
   resolution_notes?: string;
+  destination_location?: string;
+  supplier_reference?: string;
 }
+
 
 export function useDamages() {
   const { toast } = useToast();
