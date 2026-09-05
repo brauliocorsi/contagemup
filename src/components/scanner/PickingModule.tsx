@@ -128,7 +128,11 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
         status: it.product_id ? 'ready' : 'missing',
         available: 0,
         picked: it.picked_quantity,
+        from: (it as any).picked_location || firstSuggested(it.locations),
+        reason: (it as any).shortage_reason || '',
+        note: (it as any).shortage_notes || '',
       })),
+
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, taskItems, products]);
