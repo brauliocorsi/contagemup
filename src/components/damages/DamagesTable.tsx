@@ -25,13 +25,17 @@ import {
 
 interface DamagesTableProps {
   damages: ProductDamageWithProduct[];
-  onResolve: (data: { id: string; resolution_type: string; resolution_notes?: string }) => Promise<unknown>;
+  onResolve: (data: { id: string; resolution_type: string; resolution_notes?: string; destination_location?: string; supplier_reference?: string }) => Promise<unknown>;
   onUpdate: (data: { id: string; damage_type?: string; description?: string | null; quantity?: number; location?: string | null; colis_number?: number | null }) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
   isResolving?: boolean;
   isUpdating?: boolean;
   showResolved?: boolean;
 }
+
+const ageInDays = (iso: string) =>
+  Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
+
 
 export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolving, isUpdating, showResolved = false }: DamagesTableProps) {
   const [search, setSearch] = useState('');
