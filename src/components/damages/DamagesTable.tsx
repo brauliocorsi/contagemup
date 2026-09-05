@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CheckCircle, Trash2, Search, Package, MapPin, Box, Calendar, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { DAMAGE_TYPES } from '@/types/damages';
+import { DAMAGE_TYPES, RESOLUTION_LABELS } from '@/types/damages';
 import { DamageResolutionDialog } from './DamageResolutionDialog';
 import { DamageEditDialog } from './DamageEditDialog';
 import { DamageDetailDialog } from './DamageDetailDialog';
@@ -25,13 +25,17 @@ import {
 
 interface DamagesTableProps {
   damages: ProductDamageWithProduct[];
-  onResolve: (data: { id: string; resolution_type: string; resolution_notes?: string }) => Promise<unknown>;
+  onResolve: (data: { id: string; resolution_type: string; resolution_notes?: string; destination_location?: string; supplier_reference?: string }) => Promise<unknown>;
   onUpdate: (data: { id: string; damage_type?: string; description?: string | null; quantity?: number; location?: string | null; colis_number?: number | null }) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
   isResolving?: boolean;
   isUpdating?: boolean;
   showResolved?: boolean;
 }
+
+const ageInDays = (iso: string) =>
+  Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
+
 
 export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolving, isUpdating, showResolved = false }: DamagesTableProps) {
   const [search, setSearch] = useState('');
@@ -124,6 +128,8 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
               <TableHead className="text-center">Qtd</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead>Localização</TableHead>
+              <TableHead>Origem</TableHead>
+              <TableHead>Antiguidade</TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -132,13 +138,14 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
           <TableBody>
             {filteredDamages.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+
                   Nenhuma avaria encontrada
                 </TableCell>
               </TableRow>
             ) : (
               filteredDamages.map((damage) => (
-                <TableRow key={damage.id} className={`cursor-pointer hover:bg-muted/50 ${damage.status === 'resolved' ? 'opacity-60' : ''}`} onClick={() => setDetailDamage(damage)}>
+                <TableRow key={damage.id} className={`cursor-pointer hover:bg-muted/50 ${damage.status === 'resolved' ? 'opacity-60' : ''} ${damage.status === 'active' && ageInDays(damage.created_at) > 30 ? 'bg-destructive/5' : ''}`} onClick={() => setDetailDamage(damage)}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-muted-foreground" />
@@ -183,11 +190,24 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
                       )}
                     </div>
                   </TableCell>
+                  <TableCell className="text-sm">
+                    {damage.source_location || <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    {damage.status === 'active' ? (
+                      <Badge variant={ageInDays(damage.created_at) > 30 ? 'destructive' : 'secondary'}>
+                        {ageInDays(damage.created_at)} dia(s)
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm">
                       <Calendar className="h-3 w-3 text-muted-foreground" />
                       {format(new Date(damage.created_at), 'dd/MM/yyyy', { locale: pt })}
                     </div>
+
                     {damage.resolved_at && (
                       <p className="text-xs text-muted-foreground">
                         Resolvido: {format(new Date(damage.resolved_at), 'dd/MM/yyyy', { locale: pt })}
@@ -199,7 +219,7 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
                       <Badge variant="destructive">Ativo</Badge>
                     ) : (
                       <Badge variant="secondary" className="bg-green-100 text-green-800">
-                        {damage.resolution_type || 'Resolvido'}
+                        {damage.resolution_type ? (RESOLUTION_LABELS[damage.resolution_type] || damage.resolution_type) : 'Resolvido'}
                       </Badge>
                     )}
                   </TableCell>

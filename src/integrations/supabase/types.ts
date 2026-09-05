@@ -1607,6 +1607,7 @@ export type Database = {
       deliver_note: { Args: { p_note_id: string }; Returns: Json }
       effective_total_colis: { Args: { p_product_id: string }; Returns: number }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
+      is_quarantine_location: { Args: { p_location: string }; Returns: boolean }
       load_notes_to_vehicle: {
         Args: {
           p_items?: Json
@@ -1705,19 +1706,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      resolve_damage: {
-        Args: {
-          p_damage_id: string
-          p_resolution_notes: string
-          p_resolution_type: string
-        }
-        Returns: Json
-      }
+      resolve_damage:
+        | {
+            Args: {
+              p_damage_id: string
+              p_resolution_notes: string
+              p_resolution_type: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_damage_id: string
+              p_destination_location: string
+              p_resolution_notes: string
+              p_resolution_type: string
+              p_supplier_reference: string
+            }
+            Returns: Json
+          }
       return_note_items: {
         Args: {
           p_items?: Json
           p_note_id: string
-          p_quarantine_location: string
+          p_quarantine_location?: string
         }
         Returns: Json
       }

@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useDamages } from '@/hooks/useDamages';
+import { RETURNS_QUARANTINE_LOCATION } from '@/types/damages';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -114,6 +116,14 @@ export function DamagesView() {
 
   const activeDamages = filteredDamages.filter(d => d.status === 'active');
   const resolvedDamages = filteredDamages.filter(d => d.status === 'resolved');
+  const isReturn = (loc?: string | null) =>
+    (loc || '').trim().toUpperCase() === RETURNS_QUARANTINE_LOCATION;
+  const quarantineDamages = activeDamages.filter(d => !isReturn(d.location));
+  const returnDamages = activeDamages.filter(d => isReturn(d.location));
+  const agedCount = activeDamages.filter(
+    d => (Date.now() - new Date(d.created_at).getTime()) / 86_400_000 > 30
+  ).length;
+
 
   // Get top damaged products
   const topDamagedProducts = Object.entries(stats.byProduct)
@@ -167,19 +177,20 @@ export function DamagesView() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={agedCount > 0 ? 'border-destructive' : undefined}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Produtos Afetados</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Há mais de 30 dias</CardTitle>
+            <AlertOctagon className={`h-4 w-4 ${agedCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Object.keys(stats.byProduct).length}</div>
+            <div className={`text-2xl font-bold ${agedCount > 0 ? 'text-destructive' : ''}`}>{agedCount}</div>
             <p className="text-xs text-muted-foreground">
-              produtos diferentes
+              itens parados em quarentena
             </p>
           </CardContent>
         </Card>
       </div>
+
 
       {/* Quick Stats */}
       {(topDamagedProducts.length > 0 || damageTypeEntries.length > 0) && (
@@ -226,7 +237,7 @@ export function DamagesView() {
       <Card>
         <CardHeader className="space-y-3">
           <div className="flex flex-row items-center justify-between">
-            <CardTitle>Lista de Avarias</CardTitle>
+            <CardTitle>Avarias e Quarentena</CardTitle>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredDamages.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
@@ -244,10 +255,18 @@ export function DamagesView() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="active">
-                Ativas
-                {activeDamages.length > 0 && (
+                Em quarentena
+                {quarantineDamages.length > 0 && (
                   <Badge variant="destructive" className="ml-2">
-                    {activeDamages.length}
+                    {quarantineDamages.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="returns">
+                Devoluções por triar
+                {returnDamages.length > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {returnDamages.length}
                   </Badge>
                 )}
               </TabsTrigger>
@@ -264,7 +283,7 @@ export function DamagesView() {
 
             <TabsContent value="active">
               <DamagesTable
-                damages={activeDamages}
+                damages={quarantineDamages}
                 onResolve={resolveDamage}
                 onUpdate={updateDamage}
                 onDelete={deleteDamage}
@@ -272,6 +291,18 @@ export function DamagesView() {
                 isUpdating={isUpdating}
               />
             </TabsContent>
+
+            <TabsContent value="returns">
+              <DamagesTable
+                damages={returnDamages}
+                onResolve={resolveDamage}
+                onUpdate={updateDamage}
+                onDelete={deleteDamage}
+                isResolving={isResolving}
+                isUpdating={isUpdating}
+              />
+            </TabsContent>
+
 
             <TabsContent value="resolved">
               <DamagesTable
