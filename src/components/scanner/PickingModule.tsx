@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle, Ban, MapPin, X, Trash2, Package, FileText } from 'lucide-react';
+import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle, Ban, MapPin, X, Trash2, Package, FileText, Forklift, Route } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,9 @@ import {
 } from '@/hooks/useScannerPickingTasks';
 import { useAuth } from '@/hooks/useAuth';
 import { useTypedLocations } from '@/hooks/useDeliveryNotes';
+import { useWarehouseLocations } from '@/hooks/useWarehouseConfig';
 import { usePickingStockLocations } from '@/hooks/usePickingStockLocations';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
@@ -43,7 +45,28 @@ interface PickLine extends ResolvedRow {
   /** id do artigo da tarefa (quando o picking vem das Notas de Separação) */
   itemId?: string;
   locations?: string | null;
+  /** localização de onde o operador tirou fisicamente a peça */
+  from: string;
+  /** motivo de falta, quando conferiu menos do que o pedido */
+  reason: string;
+  note: string;
 }
+
+const SHORTAGE_REASONS: Array<{ id: string; label: string }> = [
+  { id: 'nao_estava_la', label: 'Não estava lá' },
+  { id: 'avariado', label: 'Avariado' },
+  { id: 'quantidade_insuficiente', label: 'Quantidade insuficiente' },
+  { id: 'localizacao_errada', label: 'Localização errada' },
+  { id: 'outro', label: 'Outro' },
+];
+
+/** Primeira localização sugerida do texto "A1, B2". */
+const firstSuggested = (s?: string | null) =>
+  (s || '')
+    .split(/[,;/|]/)
+    .map((x) => x.trim())
+    .filter(Boolean)[0] ?? '';
+
 
 interface Props {
   onCommand?: (raw: string) => boolean;
@@ -61,7 +84,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const [step, setStep] = useState(1);
   const [lastKey, setLastKey] = useState<string | null>(null);
   const [task, setTask] = useState<PickingTask | null>(null);
-  const [groupMode, setGroupMode] = useState<'produto' | 'nota'>('produto');
+  const [groupMode, setGroupMode] = useState<'rota' | 'produto' | 'nota'>('rota');
   const [dock, setDock] = useState('');
   const { data: docks = [] } = useTypedLocations('pre_exit');
 
@@ -107,7 +130,11 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
         status: it.product_id ? 'ready' : 'missing',
         available: 0,
         picked: it.picked_quantity,
+        from: (it as any).picked_location || firstSuggested(it.locations),
+        reason: (it as any).shortage_reason || '',
+        note: (it as any).shortage_notes || '',
       })),
+
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, taskItems, products]);
@@ -133,10 +160,65 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     return { requested, picked, pct: requested ? Math.round((picked / requested) * 100) : 0 };
   }, [lines]);
 
-  /** Agrupamento da lista: por produto (agregado) ou por entrega/nota. */
+  /** Metadados das localizações para ordenar pela rota física do armazém. */
+
+  const { locations: whLocations } = useWarehouseLocations();
+  const locMeta = useMemo(() => {
+    const m = new Map<
+      string,
+      { aisle: string; aisleOrder: number; levelOrder: number; pos: number; forklift: boolean }
+    >();
+    for (const l of whLocations) {
+      m.set(l.code.trim().toUpperCase(), {
+        aisle: l.aisle?.name ?? 'Sem corredor',
+        aisleOrder: l.aisle?.display_order ?? 9999,
+        levelOrder: l.level?.display_order ?? l.level?.level_number ?? 9999,
+        pos: l.position_in_aisle ?? 0,
+        forklift: !!l.level?.requires_forklift,
+      });
+    }
+    return m;
+  }, [whLocations]);
+
+  const locationCodes = useMemo(
+    () => whLocations.map((l) => l.code).sort((a, b) => a.localeCompare(b, 'pt', { numeric: true })),
+    [whLocations],
+  );
+
+  const metaFor = (l: PickLine) => locMeta.get((l.from || firstSuggested(l.locations)).trim().toUpperCase());
+  const forkliftCount = useMemo(
+    () => lines.filter((l) => metaFor(l)?.forklift).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lines, locMeta],
+  );
+
+  /** Agrupamento da lista: por rota física, por produto (agregado) ou por entrega/nota. */
   const groups = useMemo(() => {
     if (groupMode === 'produto') {
       return [{ title: 'all', lines, requested: totals.requested, picked: totals.picked }];
+    }
+    if (groupMode === 'rota') {
+      const sorted = [...lines].sort((a, b) => {
+        const ma = metaFor(a);
+        const mb = metaFor(b);
+        return (
+          (ma?.aisleOrder ?? 9999) - (mb?.aisleOrder ?? 9999) ||
+          (ma?.levelOrder ?? 9999) - (mb?.levelOrder ?? 9999) ||
+          (ma?.pos ?? 0) - (mb?.pos ?? 0) ||
+          a.name.localeCompare(b.name, 'pt')
+        );
+      });
+      const map = new Map<string, PickLine[]>();
+      for (const l of sorted) {
+        const k = metaFor(l)?.aisle ?? 'Sem localização';
+        map.set(k, [...(map.get(k) ?? []), l]);
+      }
+      return [...map.entries()].map(([title, ls]) => ({
+        title,
+        lines: ls,
+        requested: ls.reduce((s, l) => s + l.quantity, 0),
+        picked: ls.reduce((s, l) => s + l.picked, 0),
+      }));
     }
     const map = new Map<string, PickLine[]>();
     for (const l of lines) {
@@ -155,7 +237,9 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
         requested: ls.reduce((s, l) => s + l.quantity, 0),
         picked: ls.reduce((s, l) => s + l.picked, 0),
       }));
-  }, [lines, groupMode, totals]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, groupMode, totals, locMeta]);
+
 
 
 
@@ -165,7 +249,16 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       const raw = await parsePickingFile(file);
       const resolved = resolveRows(raw, products);
       setTask(null);
-      setLines(resolved.map((r) => ({ ...r, picked: 0 })));
+      setLines(
+        resolved.map((r) => ({
+          ...r,
+          picked: 0,
+          from: firstSuggested((r as any).locations),
+          reason: '',
+          note: '',
+        })),
+      );
+
       toast.success(`${resolved.length} linha(s) carregadas`);
     } catch (e: any) {
       console.error(e);
@@ -269,16 +362,24 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     }));
 
   const finalize = async () => {
-    const lineItems = lines
-      .filter((l) => l.picked > 0 && !blockedFor(l))
-      .map((l) => ({
-        product_id: l.product?.id ?? null,
-        product_code: l.product?.code || l.code || '',
-        product_name: l.name,
-        details: l.details ?? null,
-        order_number: (l.orders || '').split(',')[0]?.trim() || null,
-        quantity: l.picked,
-      }));
+    const picking = lines.filter((l) => l.picked > 0 && !blockedFor(l));
+    const missingReason = picking.find((l) => l.picked < l.quantity && !l.reason);
+    if (missingReason) {
+      toast.error(`Indique o motivo da falta em "${missingReason.name}"`);
+      return;
+    }
+    const lineItems = picking.map((l) => ({
+      product_id: l.product?.id ?? null,
+      product_code: l.product?.code || l.code || '',
+      product_name: l.name,
+      details: l.details ?? null,
+      order_number: (l.orders || '').split(',')[0]?.trim() || null,
+      quantity: l.picked,
+      from_location: l.from.trim() || null,
+      item_id: l.itemId ?? null,
+      shortage_reason: l.picked < l.quantity ? l.reason || null : null,
+      shortage_notes: l.picked < l.quantity ? l.note || null : null,
+    }));
 
     if (lineItems.length === 0) {
       toast.error(
@@ -295,12 +396,25 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
 
     setSaving(true);
     try {
-      const { error } = await supabase.rpc('stage_picking_to_dock', {
+      const { data: result, error } = await supabase.rpc('stage_picking_to_dock', {
         p_task_id: task?.id ?? null,
         p_dock_location: dock,
         p_lines: lineItems as unknown as never,
       });
       if (error) throw error;
+
+      const res = (result ?? {}) as { lines?: any[]; partial_lines?: number };
+      const shortLines = (res.lines ?? []).filter((l) => (l.missing ?? 0) > 0);
+      if (shortLines.length > 0) {
+        toast.warning(
+          `Picking parcial em ${shortLines.length} artigo(s): ` +
+            shortLines
+              .map((l) => `${l.product_code || l.product_name} faltam ${l.missing}`)
+              .slice(0, 4)
+              .join('; '),
+        );
+      }
+
 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['counts'] });
@@ -316,8 +430,15 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
           ['Linhas', String(lineItems.length)],
           ['Unidades', String(totals.picked)],
         ],
-        columns: ['Código', 'Produto', 'Nota', 'Conferido'],
-        rows: lineItems.map((l) => [l.product_code, l.product_name, l.order_number || '—', l.quantity]),
+        columns: ['Código', 'Produto', 'Origem', 'Nota', 'Conferido'],
+        rows: lineItems.map((l) => [
+          l.product_code,
+          l.product_name,
+          l.from_location || '—',
+          l.order_number || '—',
+          l.quantity,
+        ]),
+
       });
 
       if (task) {
@@ -339,6 +460,10 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const renderLine = (l: PickLine) => {
     const done = l.picked >= l.quantity;
     const blocked = blockedFor(l);
+    const meta = metaFor(l);
+    const short = l.picked > 0 && l.picked < l.quantity;
+    const update = (patch: Partial<PickLine>) =>
+      setLines((prev) => prev.map((x) => (x.key === l.key ? { ...x, ...patch } : x)));
     return (
       <div
         key={l.key}
@@ -350,6 +475,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
               : ''
         }`}
       >
+
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium">{l.name}</p>
@@ -364,9 +490,15 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
             )}
             {l.locations && (
               <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-                <MapPin className="h-3 w-3" /> {l.locations}
+                <MapPin className="h-3 w-3" /> Sugerido: {l.locations}
               </p>
             )}
+            {meta?.forklift && (
+              <Badge variant="outline" className="mt-1 gap-1 border-amber-400 text-[10px] text-amber-700">
+                <Forklift className="h-3 w-3" /> Empilhador
+              </Badge>
+            )}
+
             {blocked && (
               <Badge variant="destructive" className="mt-1 max-w-full gap-1 whitespace-normal text-left text-[10px]">
                 <Ban className="h-3 w-3 shrink-0" /> Bloqueado — stock só em {blocked}
@@ -414,12 +546,52 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
             </Button>
           </div>
         </div>
+
+        {!blocked && (
+          <div className="mt-2 space-y-2 border-t pt-2">
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-[11px] text-muted-foreground">Tirado de</span>
+              <Input
+                list="picking-locations"
+                className="h-8 flex-1 text-xs"
+                placeholder="localização de origem"
+                value={l.from}
+                onChange={(e) => update({ from: e.target.value.toUpperCase() })}
+              />
+            </div>
+            {short && (
+              <div className="space-y-1">
+                <Select value={l.reason} onValueChange={(v) => update({ reason: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Motivo da falta (obrigatório)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SHORTAGE_REASONS.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {l.reason === 'outro' && (
+                  <Input
+                    className="h-8 text-xs"
+                    placeholder="Notas (opcional)"
+                    value={l.note}
+                    onChange={(e) => update({ note: e.target.value })}
+                    maxLength={200}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
 
-
   return (
+
     <div className="space-y-4">
       <ScanInput onScan={handleScan} label="Conferir produto da lista" />
 
@@ -558,14 +730,29 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 maxLength={80}
               />
 
+              {forkliftCount > 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-800 dark:bg-amber-950/20">
+                  <Forklift className="h-4 w-4 shrink-0" />
+                  {forkliftCount} artigo(s) em localizações que exigem empilhador — leve-o já consigo.
+                </div>
+              )}
+
               <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
+                <Button
+                  variant={groupMode === 'rota' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-8 flex-1 text-xs"
+                  onClick={() => setGroupMode('rota')}
+                >
+                  <Route className="mr-1 h-3.5 w-3.5" /> Por rota
+                </Button>
                 <Button
                   variant={groupMode === 'produto' ? 'default' : 'ghost'}
                   size="sm"
                   className="h-8 flex-1 text-xs"
                   onClick={() => setGroupMode('produto')}
                 >
-                  <Package className="mr-1 h-3.5 w-3.5" /> Por produto
+                  <Package className="mr-1 h-3.5 w-3.5" /> Produto
                 </Button>
                 <Button
                   variant={groupMode === 'nota' ? 'default' : 'ghost'}
@@ -573,16 +760,24 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                   className="h-8 flex-1 text-xs"
                   onClick={() => setGroupMode('nota')}
                 >
-                  <FileText className="mr-1 h-3.5 w-3.5" /> Por entrega
+                  <FileText className="mr-1 h-3.5 w-3.5" /> Entrega
                 </Button>
               </div>
+
+              <datalist id="picking-locations">
+                {locationCodes.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
 
               <div className="space-y-3">
                 {groups.map((g) => (
                   <div key={g.title} className="space-y-2">
-                    {groupMode === 'nota' && (
+                    {groupMode !== 'produto' && (
                       <div className="flex items-center justify-between rounded-md bg-muted px-2 py-1">
-                        <p className="truncate text-xs font-semibold">Entrega {g.title}</p>
+                        <p className="truncate text-xs font-semibold">
+                          {groupMode === 'nota' ? `Entrega ${g.title}` : g.title}
+                        </p>
                         <Badge variant="secondary" className="text-[10px]">
                           {g.picked}/{g.requested} un.
                         </Badge>
@@ -592,6 +787,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                   </div>
                 ))}
               </div>
+
 
 
               <Button className="w-full" disabled={saving || totals.picked === 0 || !dock} onClick={finalize}>
