@@ -87,12 +87,20 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
     setInputValue('');
   };
 
-  const handleCreateCustom = () => {
-    if (inputValue.trim()) {
-      onValueChange(inputValue.trim());
-      setOpen(false);
-      setInputValue('');
-    }
+  // Texto livre não é permitido: uma localização só pode ser usada depois de
+  // existir no cadastro. Administradores podem criá-la aqui mesmo.
+  const handleCreateCustom = async () => {
+    const code = inputValue.trim().toUpperCase();
+    if (!code || !isAdmin) return;
+    await createLocation.mutateAsync({
+      code,
+      position_in_aisle: 0,
+      is_staging: false,
+      location_type: 'stock',
+    } as never);
+    onValueChange(code);
+    setOpen(false);
+    setInputValue('');
   };
 
   const filteredGroups = useMemo(() => {
