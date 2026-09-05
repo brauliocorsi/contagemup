@@ -516,15 +516,15 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="matricula">Matrícula</Label>
-              <Select value={plate} onValueChange={setPlate}>
-                <SelectTrigger id="matricula" className="h-9 w-36">
-                  <SelectValue placeholder="Matrícula" />
+              <Label htmlFor="matricula">Carrinha</Label>
+              <Select value={vehicleId} onValueChange={setVehicleId}>
+                <SelectTrigger id="matricula" className="h-9 w-48">
+                  <SelectValue placeholder="Escolher carrinha" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PLATES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {vehiclePlate(v)} — {v.code}
                     </SelectItem>
                   ))}
                 </SelectContent>
