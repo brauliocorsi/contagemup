@@ -93,6 +93,12 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
   ): Promise<OrderNumberEntry | null> => {
     if (!productId) return null;
 
+    // Localização obrigatória sempre que a encomenda cria stock físico
+    if (addAsComplete && !location?.trim()) {
+      toast.error('Escolha a localização antes de adicionar a encomenda completa.');
+      return null;
+    }
+
     // Create colis_status based on addAsComplete flag
     const colisStatus: Record<string, boolean> = {};
     for (let i = 1; i <= totalColis; i++) {
