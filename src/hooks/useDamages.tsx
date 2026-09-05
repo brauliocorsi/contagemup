@@ -117,34 +117,10 @@ export function useDamages() {
     }
   });
 
-  // Update damage
+  // Update damage metadata only (damaged_stock is kept by the sync_damaged_stock trigger)
   const updateDamageMutation = useMutation({
     mutationFn: async (input: { id: string; damage_type?: string; description?: string | null; quantity?: number; location?: string | null; colis_number?: number | null }) => {
       const { id, ...updates } = input;
-      
-      // If quantity changed, adjust damaged_stock
-      if (updates.quantity !== undefined) {
-        const { data: oldDamage } = await supabase
-          .from('product_damages')
-          .select('product_id, quantity, status')
-          .eq('id', id)
-          .single();
-        
-        if (oldDamage && oldDamage.status === 'active') {
-          const diff = updates.quantity - oldDamage.quantity;
-          if (diff !== 0) {
-            const { data: product } = await supabase
-              .from('products')
-              .select('damaged_stock')
-              .eq('id', oldDamage.product_id)
-              .single();
-            await supabase
-              .from('products')
-              .update({ damaged_stock: Math.max(0, (product?.damaged_stock || 0) + diff) })
-              .eq('id', oldDamage.product_id);
-          }
-        }
-      }
 
       const { data, error } = await supabase
         .from('product_damages')
@@ -156,6 +132,7 @@ export function useDamages() {
       if (error) throw error;
       return data;
     },
+
     onSuccess: () => {
       toast({ title: 'Sucesso', description: 'Avaria atualizada com sucesso' });
       queryClient.invalidateQueries({ queryKey: ['damages'] });
