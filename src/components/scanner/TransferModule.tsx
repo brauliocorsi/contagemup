@@ -1,30 +1,27 @@
 import { useState } from 'react';
-import { ArrowRightLeft, MapPin, Trash2, Minus, Plus, CheckCircle2, Loader2, PackageSearch, Boxes, X, AlertTriangle } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  MapPin,
+  Minus,
+  Plus,
+  CheckCircle2,
+  Loader2,
+  Boxes,
+  X,
+  RotateCcw,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScanInput } from './ScanInput';
-import { PrintMenu } from './PrintMenu';
+import { ScanDock, type LastScan } from './ScanDock';
 import { LocationSelect } from '@/components/counting/LocationSelect';
 import { supabase } from '@/integrations/supabase/client';
-import { useProductResolver, useScannerTransfers } from '@/hooks/useScannerData';
-import { colisCode, parseScan } from '@/lib/scanner/commands';
-import type { LabelItem } from '@/lib/scanner/labels';
-import type { Product } from '@/types/stock';
+import { useScannerTransfers } from '@/hooks/useScannerData';
+import { colisCode } from '@/lib/scanner/commands';
+import { resolveScan } from '@/lib/scanner/resolveScan';
+import { scanFeedback } from '@/lib/scanner/feedback';
 import { toast } from 'sonner';
-
-interface PendingItem {
-  key: string;
-  count_id: string;
-  quantity: number;
-  available: number;
-  location: string | null;
-  product_code: string;
-  product_name: string;
-  colis_number: number;
-  from_location: string | null;
-}
 
 interface StockRow {
   id: string;
@@ -33,411 +30,347 @@ interface StockRow {
   location: string | null;
 }
 
+interface Selection {
+  count_id: string;
+  quantity: number;
+  available: number;
+  product_code: string;
+  product_name: string;
+  colis_number: number;
+  from_location: string | null;
+}
+
+interface HistoryEntry {
+  id: string;
+  text: string;
+}
+
 interface Props {
   onCommand?: (raw: string) => boolean;
 }
 
+const norm = (v?: string | null) => (v || '').trim().toUpperCase();
+
+/**
+ * Transferência inteiramente por leitura:
+ * 1) LOC- origem → 2) produto/coli → 3) quantidade → 4) LOC- destino executa.
+ */
 export function TransferModule({ onCommand }: Props) {
-  const resolve = useProductResolver();
   const [origin, setOrigin] = useState('');
-  const [destLocation, setDestLocation] = useState('');
-  const [step, setStep] = useState(1);
-  const [pending, setPending] = useState<PendingItem[]>([]);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [choices, setChoices] = useState<{ name: string; code: string; rows: StockRow[] } | null>(null);
+  const [last, setLast] = useState<LastScan | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [busy, setBusy] = useState(false);
-  const [choices, setChoices] = useState<{ product: Product; rows: StockRow[]; mismatch?: string } | null>(null);
-  const [allowDivergent, setAllowDivergent] = useState(false);
   const { transferItems } = useScannerTransfers();
 
+  const fail = (title: string, detail?: string) => {
+    scanFeedback('error');
+    setLast({ kind: 'erro', title, detail });
+    toast.error(detail ? `${title} — ${detail}` : title);
+  };
 
-  const setQty = (key: string, qty: number) =>
-    setPending((prev) =>
-      prev.map((p) => (p.key === key ? { ...p, quantity: Math.max(0, Math.min(p.available, qty)) } : p))
-    );
-
-  /** Adiciona (ou incrementa) um registo de stock concreto à lista pendente. */
-  const addRow = (row: StockRow, product: Product, qty?: number) => {
-    setPending((prev) => {
-      const existing = prev.find((p) => p.count_id === row.id);
-      if (existing) {
-        const next = Math.min(existing.available, qty ?? existing.quantity + step);
-        toast.success(`${product.name} — coli ${row.colis_number}: ${next}/${existing.available}`);
-        return prev.map((p) => (p.key === existing.key ? { ...p, quantity: next } : p));
+  const pickRow = (row: StockRow, product: { code: string; name: string }) => {
+    setChoices(null);
+    setSelection((prev) => {
+      if (prev && prev.count_id === row.id) {
+        const next = Math.min(prev.available, prev.quantity + 1);
+        setLast({
+          kind: 'produto',
+          title: product.name,
+          detail: `${colisCode(product.code, row.colis_number)} • ${row.location || 'S/L'}`,
+          quantity: `${next}`,
+          remaining: `saldo ${prev.available}`,
+        });
+        return { ...prev, quantity: next };
       }
-      const initial = Math.min(row.quantity, qty ?? step);
-      toast.success(`${product.name} — coli ${row.colis_number}: ${initial}/${row.quantity}`);
-      return [
-        ...prev,
-        {
-          key: `${row.id}-${Date.now()}`,
-          count_id: row.id,
-          quantity: initial,
-          available: row.quantity,
-          location: null,
-          product_code: product.code,
-          product_name: product.name,
-          colis_number: row.colis_number,
-          from_location: row.location,
-        },
-      ];
+      setLast({
+        kind: 'produto',
+        title: product.name,
+        detail: `${colisCode(product.code, row.colis_number)} • ${row.location || 'S/L'}`,
+        quantity: '1',
+        remaining: `saldo ${row.quantity}`,
+      });
+      return {
+        count_id: row.id,
+        quantity: 1,
+        available: row.quantity,
+        product_code: product.code,
+        product_name: product.name,
+        colis_number: row.colis_number,
+        from_location: row.location,
+      };
     });
   };
 
-  const addScan = async (value: string, coli?: number) => {
-    const results = await resolve(value);
-    if (results.length === 0) {
-      toast.error(`Produto não encontrado: ${value}`);
+  const execute = async (destination: string) => {
+    if (!selection) {
+      fail('Leia primeiro o produto a mover');
       return;
     }
-    const product = results[0];
-
-    const fetchRows = async (withOrigin: boolean) => {
-      let query = supabase
-        .from('counts')
-        .select('id, colis_number, quantity, location')
-        .eq('product_id', product.id)
-        .order('colis_number', { ascending: true });
-      if (withOrigin && origin) query = query.ilike('location', origin.trim());
-      if (coli) query = query.eq('colis_number', coli);
-      const { data, error } = await query;
-      if (error) throw error;
-      return ((data || []) as StockRow[]).filter((r) => r.quantity > 0);
-    };
-
-    let rows: StockRow[];
+    if (norm(destination) === norm(selection.from_location)) {
+      fail('Origem e destino são iguais', destination);
+      return;
+    }
+    const wanted = selection.quantity;
+    const moving = Math.min(wanted, selection.available);
+    if (moving <= 0) {
+      fail('Sem saldo na origem', selection.product_name);
+      return;
+    }
     try {
-      rows = await fetchRows(true);
-      // Não há stock na origem indicada → validar e mostrar onde o coli realmente está
-      if (rows.length === 0 && origin) {
-        const anywhere = await fetchRows(false);
-        if (anywhere.length > 0) {
-          const locs = Array.from(new Set(anywhere.map((r) => r.location || 'S/L'))).join(', ');
-          toast.error(
-            `${product.name}${coli ? ` — coli ${coli}` : ''} não está em ${origin}. Local real: ${locs}`
-          );
-          setChoices({
-            product,
-            rows: anywhere,
-            mismatch: `Este produto${coli ? ` (coli ${coli})` : ''} não existe em ${origin}. Localização real: ${locs}.`,
-          });
-          return;
-        }
-      }
-    } catch (e: any) {
-      toast.error('Erro ao procurar stock: ' + e.message);
+      await transferItems.mutateAsync([
+        { count_id: selection.count_id, quantity: moving, location: destination },
+      ]);
+    } catch {
+      fail('Não foi possível transferir', selection.product_name);
       return;
     }
+    const shortfall = wanted - moving;
+    if (shortfall > 0) {
+      scanFeedback('error');
+      toast.warning(`Só havia ${moving} un. em ${selection.from_location || 'origem'}. Faltaram ${shortfall}.`);
+    } else {
+      scanFeedback('done');
+    }
+    setLast({
+      kind: 'ok',
+      title: `${selection.product_name} → ${destination}`,
+      detail:
+        `${colisCode(selection.product_code, selection.colis_number)} • de ${selection.from_location || 'S/L'}` +
+        (shortfall > 0 ? ` • faltaram ${shortfall} un.` : ''),
+      quantity: `${moving}`,
+      remaining: shortfall > 0 ? `pedido ${wanted}` : 'transferido',
+    });
+    setHistory((prev) => [
+      {
+        id: `${selection.count_id}-${Date.now()}`,
+        text: `${moving} un. • ${selection.product_name} (coli ${selection.colis_number}) • ${
+          selection.from_location || 'S/L'
+        } → ${destination}`,
+      },
+      ...prev,
+    ].slice(0, 20));
+    setSelection(null);
+  };
 
+  const loadProduct = async (productId: string, product: { code: string; name: string }, colis?: number) => {
+    let query = supabase
+      .from('counts')
+      .select('id, colis_number, quantity, location')
+      .eq('product_id', productId)
+      .gt('quantity', 0)
+      .order('colis_number', { ascending: true });
+    if (origin) query = query.ilike('location', origin);
+    if (colis) query = query.eq('colis_number', colis);
+    const { data, error } = await query;
+    if (error) {
+      fail('Erro ao procurar stock', error.message);
+      return;
+    }
+    const rows = (data || []) as StockRow[];
 
     if (rows.length === 0) {
-      toast.error(
-        `${product.name}${coli ? ` — coli ${coli}` : ''} sem stock disponível`
+      // Onde está mesmo?
+      const { data: anywhere } = await supabase
+        .from('counts')
+        .select('id, colis_number, quantity, location')
+        .eq('product_id', productId)
+        .gt('quantity', 0);
+      const locs = Array.from(new Set(((anywhere || []) as StockRow[]).map((r) => r.location || 'S/L')));
+      fail(
+        `${product.name} não tem saldo em ${origin || 'nenhuma origem'}`,
+        locs.length ? `Está em: ${locs.join(', ')}` : 'Sem stock registado',
       );
       return;
     }
 
-    // Já está na lista pendente → incrementa direto (sem voltar a perguntar)
-    const already = rows.find((r) => pending.some((p) => p.count_id === r.id));
-    if (rows.length === 1 || already) {
-      setChoices(null);
-      addRow(already ?? rows[0], product);
+    if (rows.length === 1) {
+      pickRow(rows[0], product);
       return;
     }
-
-    // Vários colis/registos → o utilizador escolhe qual mover
-    setChoices({ product, rows });
+    setChoices({ name: product.name, code: product.code, rows });
+    setLast({ kind: 'produto', title: product.name, detail: 'Escolha o coli a mover' });
   };
-
 
   const handleScan = async (raw: string) => {
     if (onCommand?.(raw)) return;
-    const parsed = parseScan(raw);
-
-    if (parsed.kind === 'location') {
-      if (!origin) {
-        setOrigin(parsed.value);
-        toast.success(`Origem: ${parsed.value}`);
-      } else {
-        setDestLocation(parsed.value);
-        toast.success(`Destino: ${parsed.value}`);
-      }
-      return;
-    }
-
     setBusy(true);
     try {
-      await addScan(parsed.value, parsed.colis);
+      const scan = await resolveScan(raw);
+
+      if (scan.kind === 'location') {
+        const code = scan.location!.code;
+        if (!origin) {
+          setOrigin(code);
+          setLast({ kind: 'localizacao', title: code, detail: 'Origem definida — leia agora o produto' });
+          return;
+        }
+        if (!selection) {
+          setOrigin(code);
+          setLast({ kind: 'localizacao', title: code, detail: 'Nova origem — leia agora o produto' });
+          return;
+        }
+        await execute(code);
+        return;
+      }
+
+      if (scan.kind === 'product' && scan.product) {
+        await loadProduct(scan.product.id, { code: scan.product.code, name: scan.product.name }, scan.colis);
+        return;
+      }
+
+      fail(scan.message || 'Código não reconhecido', raw);
     } finally {
       setBusy(false);
     }
   };
 
-  const labels = (): LabelItem[] => {
-    const items: LabelItem[] = pending.map((p) => ({
-      code: colisCode(p.product_code, p.colis_number),
-      title: p.product_name,
-      subtitle: `Código: ${p.product_code}`,
-      extra: [`Coli ${p.colis_number}`, `${p.quantity} un.`],
-    }));
-    return items;
-  };
-
-  const norm = (v?: string | null) => (v || '').trim().toUpperCase();
-  const isDivergent = (p: PendingItem) => !!origin && norm(p.from_location) !== norm(origin);
-
-  const commit = () => {
-    const rows = pending.filter((p) => p.quantity > 0);
-    if (rows.length === 0) return;
-    if (!destLocation) {
-      toast.error('Defina a localização de destino');
-      return;
-    }
-    if (norm(destLocation) === norm(origin)) {
-      toast.error('Origem e destino são iguais');
-      return;
-    }
-    const bad = rows.filter(isDivergent);
-    if (bad.length > 0 && !allowDivergent) {
-      toast.error(
-        `${bad.length} item(s) não estão em ${origin} (ex.: ${bad[0].product_code} está em ${bad[0].from_location || 'S/L'}). Corrija a origem ou confirme a exceção.`
-      );
-      return;
-    }
-    transferItems.mutate(
-      rows.map((p) => ({
-        count_id: p.count_id,
-        quantity: p.quantity,
-        location: destLocation,
-      })),
-      {
-        onSuccess: () => {
-          setPending([]);
-          setDestLocation('');
-          setOrigin('');
-          setChoices(null);
-          setAllowDivergent(false);
-        },
-      }
+  const changeQty = (delta: number) =>
+    setSelection((prev) =>
+      prev ? { ...prev, quantity: Math.max(1, Math.min(prev.available, prev.quantity + delta)) } : prev,
     );
-  };
-
-
-  const totalUnits = pending.reduce((s, p) => s + p.quantity, 0);
-  const divergentCount = pending.filter(isDivergent).length;
-
-  const stepState = (n: number) =>
-    n === 1
-      ? !!origin
-      : n === 2
-        ? pending.length > 0
-        : !!destLocation;
 
   return (
     <div className="space-y-4">
-      {/* Passos da operação */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { n: 1, title: 'Origem', value: origin || 'Ler LOC-…' },
-          { n: 2, title: 'Produtos', value: pending.length ? `${pending.length} item(s) • ${totalUnits} un.` : 'Bipar 1 a 1' },
-          { n: 3, title: 'Destino', value: destLocation || 'Ler LOC-…' },
-        ].map((s) => (
-          <div
-            key={s.n}
-            className={`rounded-lg border p-2 text-center ${
-              stepState(s.n) ? 'border-primary bg-primary/10' : 'border-dashed'
-            }`}
-          >
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{s.n}. {s.title}</p>
-            <p className="truncate text-xs font-semibold">{s.value}</p>
+      <ScanDock last={last}>
+        <ScanInput
+          onScan={handleScan}
+          feedback={false}
+          label="1) LOC- origem • 2) produto/coli • 3) quantidade • 4) LOC- destino executa"
+        />
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className={`rounded-lg border p-2 ${origin ? 'border-primary bg-primary/10' : 'border-dashed'}`}>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Origem</p>
+            <p className="truncate font-semibold">{origin || 'Ler LOC-…'}</p>
           </div>
-        ))}
-      </div>
+          <div className={`rounded-lg border p-2 ${selection ? 'border-primary bg-primary/10' : 'border-dashed'}`}>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">A mover</p>
+            <p className="truncate font-semibold">
+              {selection ? `${selection.quantity} un. • coli ${selection.colis_number}` : 'Ler produto'}
+            </p>
+          </div>
+        </div>
+      </ScanDock>
 
-      <ScanInput
-        onScan={handleScan}
-        label="1) LOC- origem  •  2) ler produtos (cada leitura soma)  •  3) LOC- destino"
-      />
+      {busy && (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> A procurar…
+        </p>
+      )}
 
-      {/* Escolha de coli quando o produto tem vários registos */}
       {choices && (
         <Card className="border-primary/60 bg-primary/5">
           <CardHeader className="pb-2">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Boxes className="h-4 w-4" /> Escolher coli a transferir
-                </CardTitle>
-                <p className="truncate text-xs text-muted-foreground">{choices.product.name}</p>
-              </div>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Boxes className="h-4 w-4" /> Escolher coli — {choices.name}
+              </CardTitle>
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setChoices(null)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {choices.mismatch && (
-              <p className="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-2 text-xs font-medium text-destructive">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                {choices.mismatch}
-              </p>
-            )}
             {choices.rows.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 rounded-lg border bg-background p-2 text-xs">
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">Coli {r.colis_number}</p>
-                  <p className="truncate font-mono text-[11px] text-muted-foreground">
-                    {colisCode(choices.product.code, r.colis_number)} • {r.location || 'S/L'}
-                  </p>
-                </div>
-                <Badge variant="secondary" className="shrink-0">{r.quantity} un.</Badge>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 shrink-0"
-                  onClick={() => {
-                    addRow(r, choices.product);
-                    setChoices(null);
-                  }}
-                >
-                  +{step}
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-8 shrink-0"
-                  onClick={() => {
-                    addRow(r, choices.product, r.quantity);
-                    setChoices(null);
-                  }}
-                >
-                  Coli completo
-                </Button>
-              </div>
+              <button
+                key={r.id}
+                onClick={() => pickRow(r, { code: choices.code, name: choices.name })}
+                className="flex w-full items-center gap-2 rounded-lg border bg-background p-2 text-left text-xs hover:border-primary"
+              >
+                <Badge variant="outline">Coli {r.colis_number}</Badge>
+                <span className="flex-1 truncate text-muted-foreground">{r.location || 'S/L'}</span>
+                <span className="font-semibold tabular-nums">{r.quantity} un.</span>
+              </button>
             ))}
           </CardContent>
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <MapPin className="h-4 w-4" /> Origem e destino
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-2 sm:grid-cols-3">
-          <LocationSelect value={origin} onValueChange={setOrigin} placeholder="Local de origem" />
-          <LocationSelect value={destLocation} onValueChange={setDestLocation} placeholder="Localização destino" />
-        </CardContent>
-        <CardContent className="flex items-center gap-2 pt-0 text-xs text-muted-foreground">
-          <span>Cada leitura conta</span>
-          <Input
-            type="number"
-            min={1}
-            value={step}
-            className="h-8 w-16"
-            onChange={(e) => setStep(Math.max(1, Number(e.target.value) || 1))}
-          />
-          <span>un.</span>
-          {busy && <Loader2 className="ml-auto h-4 w-4 animate-spin" />}
-        </CardContent>
-      </Card>
-
-
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm">Itens lidos ({pending.length})</CardTitle>
-          <PrintMenu getItems={labels} label="Imprimir" disabled={pending.length === 0 && !destLocation} />
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {pending.length === 0 && (
-            <p className="flex items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-              <PackageSearch className="h-4 w-4" /> Leia o local de origem e depois os produtos.
-            </p>
-          )}
-          {pending.map((p) => (
-            <div
-              key={p.key}
-              className={`flex flex-wrap items-center gap-2 rounded-lg border p-2 text-xs ${
-                isDivergent(p) ? 'border-destructive/60 bg-destructive/5' : ''
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{p.product_name}</p>
-                <p className="truncate font-mono text-[11px] text-muted-foreground">
-                  {colisCode(p.product_code, p.colis_number)}
-                </p>
-                <p className="truncate text-muted-foreground">
-                  Coli {p.colis_number} • {p.from_location || 'S/L'} → {destLocation || 'S/L'}
-                </p>
-                {isDivergent(p) && (
-                  <p className="flex items-center gap-1 font-medium text-destructive">
-                    <AlertTriangle className="h-3 w-3" /> Não está em {origin}
-                  </p>
-                )}
+      {selection && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <ArrowRightLeft className="h-4 w-4" /> Quantidade a transferir
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <p className="truncate text-sm font-semibold">{selection.product_name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                {colisCode(selection.product_code, selection.colis_number)} • {selection.from_location || 'S/L'}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="icon" className="h-14 w-14" onClick={() => changeQty(-1)}>
+                <Minus className="h-6 w-6" />
+              </Button>
+              <div className="flex-1 text-center">
+                <p className="text-4xl font-extrabold tabular-nums leading-none">{selection.quantity}</p>
+                <p className="text-[11px] text-muted-foreground">saldo {selection.available} un.</p>
               </div>
-
-              <Badge variant="secondary" className="shrink-0">máx {p.available}</Badge>
+              <Button variant="outline" size="icon" className="h-14 w-14" onClick={() => changeQty(1)}>
+                <Plus className="h-6 w-6" />
+              </Button>
               <Button
-                variant="outline"
-                size="sm"
-                className="h-8 shrink-0"
-                onClick={() => setQty(p.key, p.available)}
-                disabled={p.quantity === p.available}
+                variant="secondary"
+                className="h-14 shrink-0"
+                onClick={() => setSelection({ ...selection, quantity: selection.available })}
               >
                 Coli completo
               </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setQty(p.key, p.quantity - 1)}>
-                <Minus className="h-3.5 w-3.5" />
-              </Button>
-              <Input
-                type="number"
-                min={0}
-                max={p.available}
-                value={p.quantity}
-                className="h-8 w-16"
-                onChange={(e) => setQty(p.key, Number(e.target.value) || 0)}
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-dashed p-2">
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5" /> Leia o destino (LOC-) para executar — ou escolha aqui:
+              </p>
+              <LocationSelect
+                value=""
+                onValueChange={(v) => v && void execute(v)}
+                placeholder="Localização de destino…"
               />
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setQty(p.key, p.quantity + 1)}>
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setPending((prev) => prev.filter((x) => x.key !== p.key))}
+                className="w-full"
+                onClick={() => setSelection(null)}
+                disabled={transferItems.isPending}
               >
-                <Trash2 className="h-4 w-4" />
+                <X className="mr-2 h-4 w-4" /> Cancelar leitura
               </Button>
             </div>
-          ))}
-          {divergentCount > 0 && (
-            <div className="space-y-2 rounded-lg border border-destructive/50 bg-destructive/10 p-2 text-xs">
-              <p className="flex items-center gap-2 font-medium text-destructive">
-                <AlertTriangle className="h-4 w-4" />
-                {divergentCount} item(s) não estão na origem {origin}
+            {transferItems.isPending && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> A transferir…
               </p>
-              <label className="flex items-center gap-2 text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={allowDivergent}
-                  onChange={(e) => setAllowDivergent(e.target.checked)}
-                />
-                Confirmo a exceção e quero transferir mesmo assim
-              </label>
-            </div>
-          )}
-          <Button
-            className="w-full"
-            disabled={pending.length === 0 || transferItems.isPending || (divergentCount > 0 && !allowDivergent)}
-            onClick={commit}
-          >
-            {transferItems.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="mr-2 h-4 w-4" />
             )}
-            <ArrowRightLeft className="mr-2 h-4 w-4" /> Confirmar transferência
-          </Button>
+          </CardContent>
+        </Card>
+      )}
 
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4" /> Transferências desta sessão ({history.length})
+          </CardTitle>
+          {!!origin && (
+            <Button variant="ghost" size="sm" onClick={() => { setOrigin(''); setSelection(null); }}>
+              <RotateCcw className="mr-2 h-3.5 w-3.5" /> Mudar origem
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-1">
+          {history.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+              Ainda não transferiu nada nesta sessão.
+            </p>
+          ) : (
+            history.map((h) => (
+              <p key={h.id} className="truncate rounded-md border bg-muted/40 p-2 text-xs">
+                {h.text}
+              </p>
+            ))
+          )}
         </CardContent>
       </Card>
     </div>
