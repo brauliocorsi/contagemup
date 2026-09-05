@@ -170,14 +170,18 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
           />
           <CommandList className="max-h-[300px]">
             <CommandEmpty>
-              {inputValue.trim() ? (
+              {inputValue.trim() && isAdmin ? (
                 <button
                   onClick={handleCreateCustom}
                   className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent rounded cursor-pointer"
                 >
                   <Plus className="h-4 w-4" />
-                  Usar "{inputValue}"
+                  Criar localização "{inputValue.trim().toUpperCase()}"
                 </button>
+              ) : inputValue.trim() ? (
+                <span className="text-xs text-muted-foreground">
+                  Localização não existe no cadastro. Peça a um administrador para a criar.
+                </span>
               ) : (
                 "Nenhuma localização configurada."
               )}
