@@ -2,7 +2,7 @@ import {
   Truck,
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History,
-  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck,
+  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck, FlaskConical,
 } from 'lucide-react';
 
 
