@@ -160,8 +160,64 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
 
   /** Agrupamento da lista: por produto (agregado) ou por entrega/nota. */
   const groups = useMemo(() => {
+  /** Metadados das localizações para ordenar pela rota física do armazém. */
+  const { locations: whLocations } = useWarehouseLocations();
+  const locMeta = useMemo(() => {
+    const m = new Map<
+      string,
+      { aisle: string; aisleOrder: number; levelOrder: number; pos: number; forklift: boolean }
+    >();
+    for (const l of whLocations) {
+      m.set(l.code.trim().toUpperCase(), {
+        aisle: l.aisle?.name ?? 'Sem corredor',
+        aisleOrder: l.aisle?.display_order ?? 9999,
+        levelOrder: l.level?.display_order ?? l.level?.level_number ?? 9999,
+        pos: l.position_in_aisle ?? 0,
+        forklift: !!l.level?.requires_forklift,
+      });
+    }
+    return m;
+  }, [whLocations]);
+
+  const locationCodes = useMemo(
+    () => whLocations.map((l) => l.code).sort((a, b) => a.localeCompare(b, 'pt', { numeric: true })),
+    [whLocations],
+  );
+
+  const metaFor = (l: PickLine) => locMeta.get((l.from || firstSuggested(l.locations)).trim().toUpperCase());
+  const forkliftCount = useMemo(
+    () => lines.filter((l) => metaFor(l)?.forklift).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lines, locMeta],
+  );
+
+  /** Agrupamento da lista: por rota física, por produto (agregado) ou por entrega/nota. */
+  const groups = useMemo(() => {
     if (groupMode === 'produto') {
       return [{ title: 'all', lines, requested: totals.requested, picked: totals.picked }];
+    }
+    if (groupMode === 'rota') {
+      const sorted = [...lines].sort((a, b) => {
+        const ma = metaFor(a);
+        const mb = metaFor(b);
+        return (
+          (ma?.aisleOrder ?? 9999) - (mb?.aisleOrder ?? 9999) ||
+          (ma?.levelOrder ?? 9999) - (mb?.levelOrder ?? 9999) ||
+          (ma?.pos ?? 0) - (mb?.pos ?? 0) ||
+          a.name.localeCompare(b.name, 'pt')
+        );
+      });
+      const map = new Map<string, PickLine[]>();
+      for (const l of sorted) {
+        const k = metaFor(l)?.aisle ?? 'Sem localização';
+        map.set(k, [...(map.get(k) ?? []), l]);
+      }
+      return [...map.entries()].map(([title, ls]) => ({
+        title,
+        lines: ls,
+        requested: ls.reduce((s, l) => s + l.quantity, 0),
+        picked: ls.reduce((s, l) => s + l.picked, 0),
+      }));
     }
     const map = new Map<string, PickLine[]>();
     for (const l of lines) {
@@ -180,7 +236,9 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
         requested: ls.reduce((s, l) => s + l.quantity, 0),
         picked: ls.reduce((s, l) => s + l.picked, 0),
       }));
-  }, [lines, groupMode, totals]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, groupMode, totals, locMeta]);
+
 
 
 
