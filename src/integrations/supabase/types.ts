@@ -255,6 +255,7 @@ export type Database = {
           notes: string | null
           order_number: string
           returned_at: string | null
+          route_id: string | null
           staged_at: string | null
           status: string
           task_id: string | null
@@ -273,6 +274,7 @@ export type Database = {
           notes?: string | null
           order_number: string
           returned_at?: string | null
+          route_id?: string | null
           staged_at?: string | null
           status?: string
           task_id?: string | null
@@ -291,6 +293,7 @@ export type Database = {
           notes?: string | null
           order_number?: string
           returned_at?: string | null
+          route_id?: string | null
           staged_at?: string | null
           status?: string
           task_id?: string | null
@@ -298,6 +301,13 @@ export type Database = {
           vehicle_location?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "delivery_notes_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "delivery_notes_task_id_fkey"
             columns: ["task_id"]
@@ -926,6 +936,7 @@ export type Database = {
       }
       route_schedules: {
         Row: {
+          barcode: string | null
           created_at: string
           created_by: string | null
           departure_address: string | null
@@ -940,8 +951,10 @@ export type Database = {
           scheduled_date: string
           status: string
           updated_at: string
+          vehicle_location_id: string | null
         }
         Insert: {
+          barcode?: string | null
           created_at?: string
           created_by?: string | null
           departure_address?: string | null
@@ -956,8 +969,10 @@ export type Database = {
           scheduled_date: string
           status?: string
           updated_at?: string
+          vehicle_location_id?: string | null
         }
         Update: {
+          barcode?: string | null
           created_at?: string
           created_by?: string | null
           departure_address?: string | null
@@ -972,6 +987,7 @@ export type Database = {
           scheduled_date?: string
           status?: string
           updated_at?: string
+          vehicle_location_id?: string | null
         }
         Relationships: [
           {
@@ -979,6 +995,13 @@ export type Database = {
             columns: ["region_id"]
             isOneToOne: false
             referencedRelation: "delivery_regions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_schedules_vehicle_location_id_fkey"
+            columns: ["vehicle_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
           },
         ]
@@ -1061,6 +1084,7 @@ export type Database = {
         Row: {
           created_at: string
           details: string | null
+          excluded: boolean
           id: string
           locations: string | null
           orders: string | null
@@ -1081,6 +1105,7 @@ export type Database = {
         Insert: {
           created_at?: string
           details?: string | null
+          excluded?: boolean
           id?: string
           locations?: string | null
           orders?: string | null
@@ -1101,6 +1126,7 @@ export type Database = {
         Update: {
           created_at?: string
           details?: string | null
+          excluded?: boolean
           id?: string
           locations?: string | null
           orders?: string | null
@@ -1145,6 +1171,7 @@ export type Database = {
           name: string
           notes: string | null
           reference: string | null
+          route_id: string | null
           source: string
           started_at: string | null
           status: string
@@ -1159,6 +1186,7 @@ export type Database = {
           name: string
           notes?: string | null
           reference?: string | null
+          route_id?: string | null
           source?: string
           started_at?: string | null
           status?: string
@@ -1173,12 +1201,21 @@ export type Database = {
           name?: string
           notes?: string | null
           reference?: string | null
+          route_id?: string | null
           source?: string
           started_at?: string | null
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scanner_picking_tasks_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_movement_lines: {
         Row: {
@@ -1492,6 +1529,7 @@ export type Database = {
           level_id: string | null
           location_type: string
           notes: string | null
+          plate: string | null
           position_in_aisle: number
           updated_at: string
         }
@@ -1504,6 +1542,7 @@ export type Database = {
           level_id?: string | null
           location_type?: string
           notes?: string | null
+          plate?: string | null
           position_in_aisle?: number
           updated_at?: string
         }
@@ -1516,6 +1555,7 @@ export type Database = {
           level_id?: string | null
           location_type?: string
           notes?: string | null
+          plate?: string | null
           position_in_aisle?: number
           updated_at?: string
         }
@@ -1611,6 +1651,7 @@ export type Database = {
       dedupe_counts_same_place: { Args: never; Returns: number }
       deliver_note: { Args: { p_note_id: string }; Returns: Json }
       effective_total_colis: { Args: { p_product_id: string }; Returns: number }
+      generate_route_barcode: { Args: never; Returns: string }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
       is_quarantine_location: { Args: { p_location: string }; Returns: boolean }
       load_notes_to_vehicle: {

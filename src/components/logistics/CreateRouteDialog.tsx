@@ -25,7 +25,8 @@ import {
   useCreateRoute,
   type RouteConflict,
 } from '@/hooks/useRoutes';
-import { DEFAULT_ADDRESS_FROM, PLATES, type SepOrder } from '@/lib/logistics/types';
+import { DEFAULT_ADDRESS_FROM, type SepOrder } from '@/lib/logistics/types';
+import { useVehicles, vehiclePlate } from '@/hooks/useVehicles';
 
 export function CreateRouteDialog({
   open,
@@ -52,7 +53,10 @@ export function CreateRouteDialog({
   const [name, setName] = useState('');
   const [date, setDate] = useState(suggestedDate);
   const [address, setAddress] = useState(defaultAddress || DEFAULT_ADDRESS_FROM);
-  const [plate, setPlate] = useState<string>(PLATES[0]);
+  const { data: vehicles = [] } = useVehicles();
+  const [vehicleId, setVehicleId] = useState<string>('');
+  const vehicle = vehicles.find((v) => v.id === vehicleId) ?? null;
+  const plate = vehiclePlate(vehicle);
   const [conflicts, setConflicts] = useState<RouteConflict[] | null>(null);
   const [checking, setChecking] = useState(false);
   const create = useCreateRoute();
@@ -62,13 +66,14 @@ export function CreateRouteDialog({
     setDate(suggestedDate);
     setName(`Rota ${suggestedDate}`);
     setAddress(defaultAddress || DEFAULT_ADDRESS_FROM);
+    setVehicleId((prev) => prev || vehicles[0]?.id || '');
     setConflicts(null);
     setChecking(true);
     findActiveRouteConflicts(orders.map((o) => o.id))
       .then(setConflicts)
       .catch(() => setConflicts([]))
       .finally(() => setChecking(false));
-  }, [open, orders, suggestedDate, defaultAddress]);
+  }, [open, orders, suggestedDate, defaultAddress, vehicles]);
 
   const blocked = (conflicts?.length ?? 0) > 0;
 
@@ -83,6 +88,7 @@ export function CreateRouteDialog({
       scheduledDate: date,
       departureAddress: address,
       plate,
+      vehicleLocationId: vehicleId || null,
       stops: orders.map((o) => ({
         venda_id: o.id,
         venda_codigo: o.codigo,
@@ -139,15 +145,15 @@ export function CreateRouteDialog({
               <Input id="rota-data" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="rota-matricula">Matrícula</Label>
-              <Select value={plate} onValueChange={setPlate}>
+              <Label htmlFor="rota-matricula">Carrinha</Label>
+              <Select value={vehicleId} onValueChange={setVehicleId}>
                 <SelectTrigger id="rota-matricula">
-                  <SelectValue placeholder="Matrícula" />
+                  <SelectValue placeholder="Escolher carrinha" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PLATES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {vehiclePlate(v)} — {v.code}
                     </SelectItem>
                   ))}
                 </SelectContent>

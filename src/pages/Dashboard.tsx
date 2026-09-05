@@ -13,6 +13,7 @@ const ProductsView = lazy(() => import('@/components/products/ProductsView').the
 const CategoriesView = lazy(() => import('@/components/categories/CategoriesView').then(m => ({ default: m.CategoriesView })));
 const SessionsView = lazy(() => import('@/components/sessions/SessionsView').then(m => ({ default: m.SessionsView })));
 const ReportsView = lazy(() => import('@/components/reports/ReportsView').then(m => ({ default: m.ReportsView })));
+const MovementsView = lazy(() => import('@/components/movements/MovementsView').then(m => ({ default: m.MovementsView })));
 
 const StockEntriesView = lazy(() => import('@/components/stock/StockEntriesView').then(m => ({ default: m.StockEntriesView })));
 const StockExitsView = lazy(() => import('@/components/stock/StockExitsView').then(m => ({ default: m.StockExitsView })));
@@ -112,6 +113,7 @@ export default function Dashboard() {
               {activeTab === 'damages' && <DamagesView />}
               {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
               {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
+              {activeTab === 'movements' && <MovementsView />}
               {activeTab === 'recent' && <RecentProductsView />}
               {activeTab === 'separation-notes' && (
                 <SeparationNotesView

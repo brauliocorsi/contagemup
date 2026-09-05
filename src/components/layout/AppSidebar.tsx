@@ -54,6 +54,7 @@ const groups: { label: string; items: NavItem[] }[] = [
     label: 'Análise',
     items: [
       { id: 'reports', label: 'Relatórios', icon: BarChart3 },
+      { id: 'movements', label: 'Movimentos', icon: History },
       { id: 'warehouse', label: 'Armazém', icon: Warehouse },
       { id: 'sessions', label: 'Sessões', icon: History },
     ],

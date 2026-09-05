@@ -21,6 +21,8 @@ export interface RouteSchedule {
   status: RouteStatus;
   notes: string | null;
   departure_address: string | null;
+  barcode: string | null;
+  vehicle_location_id: string | null;
   created_at: string;
 }
 
@@ -137,6 +139,7 @@ export function useCreateRoute() {
       scheduledDate: string;
       departureAddress: string;
       plate: string;
+      vehicleLocationId?: string | null;
       stops: {
         venda_id: string;
         venda_codigo: string;
@@ -155,6 +158,7 @@ export function useCreateRoute() {
           status: 'pending',
           departure_address: input.departureAddress || null,
           notes: input.plate ? `Matrícula: ${input.plate}` : null,
+          vehicle_location_id: input.vehicleLocationId ?? null,
           created_by: user.user?.id ?? null,
         })
         .select('id')
@@ -227,6 +231,7 @@ export function useUpdateRoute() {
       scheduled_date?: string;
       departure_address?: string | null;
       notes?: string | null;
+      vehicle_location_id?: string | null;
     }) => {
       const { id, ...patch } = input;
       const { error } = await supabase.from('route_schedules').update(patch).eq('id', id);

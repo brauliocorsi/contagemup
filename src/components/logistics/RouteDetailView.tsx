@@ -1,3 +1,10 @@
+import { useVehicles, vehiclePlate } from '@/hooks/useVehicles';
+import {
+  useRoutePicking,
+  useSaveRoutePicking,
+  PICKING_PROGRESS_LABELS,
+  type SavePickingLine,
+} from '@/hooks/useRoutePicking';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
@@ -52,7 +59,6 @@ import {
 } from '@/lib/logistics/api';
 import {
   DEFAULT_ADDRESS_FROM,
-  PLATES,
   type GcDocument,
   type GuideRecord,
   type GuideResult,
@@ -102,11 +108,15 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
   const [confirmReissue, setConfirmReissue] = useState(false);
   const [routeLinks, setRouteLinks] = useState<string[]>([]);
   const [addressFrom, setAddressFrom] = useState(DEFAULT_ADDRESS_FROM);
-  const [plate, setPlate] = useState<string>(PLATES[0]);
+  const { data: vehicles = [] } = useVehicles();
+  const [vehicleId, setVehicleId] = useState<string>('');
+  const [plate, setPlate] = useState<string>('');
   const [loadDate, setLoadDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loadTime, setLoadTime] = useState('08:00');
 
   const createTask = useCreatePickingTask();
+  const savePicking = useSaveRoutePicking();
+  const { data: savedPicking } = useRoutePicking(routeId ?? null);
   const updateRoute = useUpdateRoute();
   const removeStop = useRemoveRouteStop();
   const reorder = useReorderRouteStops();
@@ -114,10 +124,12 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
   useEffect(() => {
     if (!route) return;
     setAddressFrom(route.departure_address || DEFAULT_ADDRESS_FROM);
-    const p = plateFromNotes(route.notes);
+    const fromVehicle = vehicles.find((v) => v.id === route.vehicle_location_id);
+    const p = fromVehicle ? vehiclePlate(fromVehicle) : plateFromNotes(route.notes);
     if (p) setPlate(p);
+    setVehicleId(route.vehicle_location_id ?? fromVehicle?.id ?? '');
     if (route.scheduled_date) setLoadDate(route.scheduled_date);
-  }, [route]);
+  }, [route, vehicles]);
 
   useEffect(() => {
     setSelected((prev) =>
@@ -255,29 +267,45 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
   }
 
   async function sendToScanner() {
+    const all = picking ?? [];
+    if (all.length === 0) {
+      toast.error('Gere primeiro o picking');
+      return;
+    }
     if (pickingKept.length === 0) {
       toast.error('Nenhum artigo no picking');
       return;
     }
-    await createTask.mutateAsync({
+    const lines: SavePickingLine[] = all.flatMap((l) => {
+      const base = {
+        key: l.key,
+        product_code: l.codigo,
+        product_name: l.nome,
+        details: l.detalhes || null,
+        locations: l.localizacoes ?? null,
+        excluded: Boolean(excluded[l.key]),
+      };
+      const entries = Object.entries(l.porEncomenda ?? {}).filter(([, q]) => q > 0);
+      if (entries.length === 0) {
+        return [
+          { ...base, orders: l.encomendas.join(', ') || null, requested_quantity: l.quantidade },
+        ];
+      }
+      return entries.map(([order, qty]) => ({ ...base, orders: order, requested_quantity: qty }));
+    });
+
+    await savePicking.mutateAsync({
+      routeId: routeId ?? null,
       name: `Picking ${route?.name ?? 'rota'}`,
       reference: `ROTA-${route?.scheduled_date ?? ''}`,
       notes: `${chosenStops.length} nota(s) da rota ${route?.name ?? ''}`,
-      items: pickingKept.flatMap((l) => {
-        const base = {
-          product_code: l.codigo,
-          product_name: l.nome,
-          details: l.detalhes || null,
-          locations: l.localizacoes ?? null,
-        };
-        const entries = Object.entries(l.porEncomenda ?? {}).filter(([, q]) => q > 0);
-        if (entries.length === 0) {
-          return [{ ...base, orders: l.encomendas.join(', ') || null, requested_quantity: l.quantidade }];
-        }
-        return entries.map(([order, qty]) => ({ ...base, orders: order, requested_quantity: qty }));
-      }),
+      lines,
     });
-    toast.success('Lista enviada para o Picking do Scanner');
+    toast.success(
+      savedPicking
+        ? 'Picking da rota atualizado no Scanner'
+        : 'Lista enviada para o Picking do Scanner',
+    );
   }
 
   const guidesJob = useMutation({
@@ -393,6 +421,11 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
               {route.scheduled_date} · {stops.length} nota(s) · {totalItems} artigo(s) selecionados ·{' '}
               {plate || '—'}
             </p>
+            {route.barcode && (
+              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                Código da rota: {route.barcode} (ler no scanner para carregar)
+              </p>
+            )}
           </div>
           <Badge variant="secondary">{ROUTE_STATUS_LABELS[route.status] ?? route.status}</Badge>
           <Select
@@ -541,15 +574,25 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="rota-matricula-guia">Matrícula</Label>
-              <Select value={plate} onValueChange={setPlate}>
-                <SelectTrigger id="rota-matricula-guia" className="h-9 w-36">
-                  <SelectValue placeholder="Matrícula" />
+              <Label htmlFor="rota-matricula-guia">Carrinha</Label>
+              <Select
+                value={vehicleId}
+                onValueChange={(id) => {
+                  setVehicleId(id);
+                  const v = vehicles.find((x) => x.id === id);
+                  setPlate(vehiclePlate(v));
+                  if (route) {
+                    updateRoute.mutate({ id: route.id, vehicle_location_id: id });
+                  }
+                }}
+              >
+                <SelectTrigger id="rota-matricula-guia" className="h-9 w-48">
+                  <SelectValue placeholder="Escolher carrinha" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PLATES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {vehiclePlate(v)} — {v.code}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -623,6 +666,19 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
         <section className="rounded-lg border border-border bg-card">
           <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
             <h2 className="text-sm font-semibold">Relatório de Picking</h2>
+            {savedPicking && (
+              <Badge
+                variant={savedPicking.progress === 'done' ? 'default' : 'secondary'}
+                className={
+                  savedPicking.progress === 'partial'
+                    ? 'border-amber-300 bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                    : undefined
+                }
+              >
+                {PICKING_PROGRESS_LABELS[savedPicking.progress]} · {savedPicking.picked}/
+                {savedPicking.requested} un.
+              </Badge>
+            )}
             <label className="mr-auto flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               <Checkbox checked={byCategory} onCheckedChange={(v) => setByCategory(Boolean(v))} />
               Separar por categoria
@@ -636,10 +692,14 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
             <Button
               variant="outline"
               onClick={() => void sendToScanner()}
-              disabled={pickingKept.length === 0 || createTask.isPending}
+              disabled={pickingKept.length === 0 || savePicking.isPending}
             >
               <ScanBarcode className="mr-2 h-4 w-4" />
-              {createTask.isPending ? 'A enviar…' : 'Enviar para o Scanner'}
+              {savePicking.isPending
+                ? 'A guardar…'
+                : savedPicking
+                  ? 'Atualizar no Scanner'
+                  : 'Enviar para o Scanner'}
             </Button>
             <Button onClick={printPickingReport} disabled={pickingKept.length === 0}>
               <Printer className="mr-2 h-4 w-4" /> Imprimir picking

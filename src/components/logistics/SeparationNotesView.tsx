@@ -1,3 +1,5 @@
+import { useVehicles, vehiclePlate } from '@/hooks/useVehicles';
+import { findTasksForOrders } from '@/hooks/useRoutePicking';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { FileSpreadsheet, ListChecks, MapPin, Printer, Route as RouteIcon, ScanBarcode, Search, Truck } from 'lucide-react';
@@ -43,7 +45,6 @@ import {
 } from '@/lib/logistics/api';
 import {
   DEFAULT_ADDRESS_FROM,
-  PLATES,
   type GcDocument,
   type GuideRecord,
   type GuideResult,
@@ -70,7 +71,12 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
   const [printMode, setPrintMode] = useState<'docs' | 'picking' | 'guides'>('docs');
   const [byCategory, setByCategory] = useState(false);
   const [addressFrom, setAddressFrom] = useState(DEFAULT_ADDRESS_FROM);
-  const [plate, setPlate] = useState<string>(PLATES[0]);
+  const { data: vehicles = [] } = useVehicles();
+  const [vehicleId, setVehicleId] = useState<string>('');
+  const plate = vehiclePlate(vehicles.find((v) => v.id === vehicleId));
+  useEffect(() => {
+    if (!vehicleId && vehicles.length > 0) setVehicleId(vehicles[0].id);
+  }, [vehicles, vehicleId]);
   const [loadDate, setLoadDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loadTime, setLoadTime] = useState('08:00');
   const [guides, setGuides] = useState<GuideResult[]>([]);
@@ -283,6 +289,15 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
     if (pickingKept.length === 0) {
       toast.error('Nenhum artigo no picking');
       return;
+    }
+    const existing = await findTasksForOrders(chosen.map((o) => o.codigo)).catch(() => []);
+    if (existing.length > 0) {
+      toast.warning(
+        `Já existe picking por concluir para estas encomendas (${existing
+          .map((t) => t.name)
+          .join(', ')})`,
+        { description: 'Vai ser criada uma nova tarefa no Scanner.', duration: 6000 },
+      );
     }
     await createTask.mutateAsync({
       name: `Picking ${from} a ${to}`,
@@ -514,15 +529,15 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="matricula">Matrícula</Label>
-              <Select value={plate} onValueChange={setPlate}>
-                <SelectTrigger id="matricula" className="h-9 w-36">
-                  <SelectValue placeholder="Matrícula" />
+              <Label htmlFor="matricula">Carrinha</Label>
+              <Select value={vehicleId} onValueChange={setVehicleId}>
+                <SelectTrigger id="matricula" className="h-9 w-48">
+                  <SelectValue placeholder="Escolher carrinha" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PLATES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {vehiclePlate(v)} — {v.code}
                     </SelectItem>
                   ))}
                 </SelectContent>
