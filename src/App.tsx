@@ -38,6 +38,14 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/install" element={<InstallApp />} />
                 <Route
+                  path="/.lovable/oauth/consent"
+                  element={
+                    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">A carregar…</div>}>
+                      <OAuthConsent />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/scanner"
                   element={
                     <Suspense fallback={<div className="flex min-h-screen items-center justify-center">A carregar…</div>}>
