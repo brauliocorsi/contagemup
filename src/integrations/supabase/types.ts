@@ -1706,6 +1706,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      regularize_damage: {
+        Args: {
+          p_action: string
+          p_damage_id: string
+          p_found_location?: string
+        }
+        Returns: Json
+      }
       resolve_damage:
         | {
             Args: {
@@ -1748,6 +1756,16 @@ export type Database = {
         Returns: Json
       }
       transfer_stock_location: { Args: { p_items: Json }; Returns: Json }
+      undo_regularize_damage: {
+        Args: {
+          p_action: string
+          p_damage_id: string
+          p_movement_id?: string
+          p_prev_location?: string
+          p_prev_source_location?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
