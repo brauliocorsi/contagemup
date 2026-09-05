@@ -2,7 +2,7 @@ import {
   Truck,
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History,
-  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck,
+  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck, FlaskConical,
 } from 'lucide-react';
 
 
@@ -68,7 +68,11 @@ const groups: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'Sistema',
-    items: [{ id: 'settings', label: 'Configurações', icon: Settings }],
+    items: [
+      { id: 'settings', label: 'Configurações', icon: Settings },
+      // MÓDULO EXPERIMENTAL REMOVÍVEL — remover esta linha para retirar o módulo do menu
+      { id: 'needs-lab', label: 'Necessidades de Compra (Testes)', icon: FlaskConical },
+    ],
   },
 
 ];
