@@ -17,6 +17,7 @@ import { pt } from 'date-fns/locale';
 export function DamagesView() {
   const { damages, loading, resolveDamage, updateDamage, deleteDamage, isResolving, isUpdating, getStats } = useDamages();
   const [activeTab, setActiveTab] = useState('active');
+  const [showRegularization, setShowRegularization] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
@@ -106,6 +107,10 @@ export function DamagesView() {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Avarias');
     XLSX.writeFile(workbook, `avarias_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   }, [filteredDamages]);
+
+  if (showRegularization) {
+    return <DamageRegularizationView onBack={() => setShowRegularization(false)} />;
+  }
 
   if (loading) {
     return (
@@ -240,6 +245,10 @@ export function DamagesView() {
           <div className="flex flex-row items-center justify-between">
             <CardTitle>Avarias e Quarentena</CardTitle>
             <div className="flex gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setShowRegularization(true)}>
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Regularização
+              </Button>
               <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredDamages.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
                 CSV
