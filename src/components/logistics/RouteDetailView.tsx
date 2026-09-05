@@ -421,6 +421,11 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
               {route.scheduled_date} · {stops.length} nota(s) · {totalItems} artigo(s) selecionados ·{' '}
               {plate || '—'}
             </p>
+            {route.barcode && (
+              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                Código da rota: {route.barcode} (ler no scanner para carregar)
+              </p>
+            )}
           </div>
           <Badge variant="secondary">{ROUTE_STATUS_LABELS[route.status] ?? route.status}</Badge>
           <Select
