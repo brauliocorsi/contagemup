@@ -9,6 +9,10 @@ export interface Product {
   current_stock: number;
   min_stock: number;
   damaged_stock: number;
+  /** Soma de todas as unidades físicas (todos os colis, todas as localizações exceto quarentena). */
+  unidades_fisicas?: number;
+  /** Unidades acima do mínimo entre colis — não formam conjunto completo. */
+  colis_orfaos?: number;
   barcode?: string | null;
   supplier_code?: string | null;
   last_supplier?: string | null;
