@@ -11,6 +11,8 @@ import { useProducts } from '@/hooks/useProducts';
 import { parsePickingFile, resolveRows, type ResolvedRow } from '@/lib/stock/pickingImport';
 import { supabase } from '@/integrations/supabase/client';
 import { parseScan, type QtyHandler } from '@/lib/scanner/commands';
+import { scanFeedback } from '@/lib/scanner/feedback';
+import { ScanDock, type LastScan } from './ScanDock';
 import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
@@ -81,6 +83,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const [reference, setReference] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [last, setLast] = useState<LastScan | null>(null);
   const [step, setStep] = useState(1);
   const [lastKey, setLastKey] = useState<string | null>(null);
   const [task, setTask] = useState<PickingTask | null>(null);
@@ -323,6 +326,10 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     if (onCommand?.(raw)) return;
     const parsed = parseScan(raw);
     const code = parsed.value.trim().toLowerCase();
+    const fail = (title: string, detail?: string) => {
+      scanFeedback('error');
+      setLast({ kind: 'erro', title, detail });
+    };
     const match = lines.find(
       (l) =>
         l.code.trim().toLowerCase() === code ||
@@ -332,15 +339,18 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     );
 
     if (!match) {
+      fail(`"${parsed.value}" não está nesta lista de picking`);
       toast.error(`"${parsed.value}" não está nesta lista de picking`);
       return;
     }
     if (match.picked >= match.quantity) {
+      fail(match.name, `Já está completo (${match.picked}/${match.quantity})`);
       toast.warning(`${match.name} já está completo (${match.picked}/${match.quantity})`);
       return;
     }
     const blocked = blockedFor(match);
     if (blocked) {
+      fail(match.name, `Stock apenas em ${blocked}`);
       toast.error(
         `${match.product?.code || match.code}: stock apenas em ${blocked}. Transfira para uma localização de stock antes de fazer picking.`,
       );
@@ -349,7 +359,15 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     const inc = Math.max(1, stepRef.current);
     const next = Math.min(match.quantity, match.picked + inc);
     setPicked(match.key, next);
-    toast.success(`${match.name}: ${next}/${match.quantity}`);
+    const complete = next >= match.quantity;
+    scanFeedback(complete ? 'done' : 'ok');
+    setLast({
+      kind: 'produto',
+      title: match.name,
+      detail: `${match.product?.code || match.code} • ${match.from || 'sem origem'}`,
+      quantity: `${next}/${match.quantity}`,
+      remaining: complete ? 'completo' : `faltam ${match.quantity - next}`,
+    });
   };
 
   const labels = (): LabelItem[] =>
@@ -593,7 +611,16 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   return (
 
     <div className="space-y-4">
-      <ScanInput onScan={handleScan} label="Conferir produto da lista" />
+      <ScanDock
+        last={last}
+        progress={{
+          done: lines.filter((l) => l.picked >= l.quantity).length,
+          total: lines.length,
+          label: 'Linhas conferidas',
+        }}
+      >
+        <ScanInput onScan={handleScan} feedback={false} label="Conferir produto da lista" />
+      </ScanDock>
 
       <div className="flex items-center gap-2 rounded-lg border bg-card p-2">
         <span className="text-xs text-muted-foreground">Cada leitura conta</span>

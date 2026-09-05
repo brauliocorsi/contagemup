@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScanInput } from './ScanInput';
 import { LocationSelect } from '@/components/counting/LocationSelect';
 import { supabase } from '@/integrations/supabase/client';
-import { useProductResolver, useScannerTransfers } from '@/hooks/useScannerData';
+import { useScannerTransfers } from '@/hooks/useScannerData';
 import { useReceivingLocations } from '@/hooks/useReceivingLocations';
-import { parseScan } from '@/lib/scanner/commands';
+import { resolveScan } from '@/lib/scanner/resolveScan';
+import { scanFeedback } from '@/lib/scanner/feedback';
+import { ScanDock, type LastScan } from './ScanDock';
 import { toast } from 'sonner';
 
 interface PendingRow {
@@ -39,13 +41,13 @@ interface Props {
 const norm = (v?: string | null) => (v || '').trim().toUpperCase();
 
 export function PutawayModule({ onCommand }: Props) {
-  const resolve = useProductResolver();
   const queryClient = useQueryClient();
   const { codes: receivingCodes, isLoading: loadingZones } = useReceivingLocations();
   const { transferItems } = useScannerTransfers();
   const [selected, setSelected] = useState<Selected[]>([]);
   const [destination, setDestination] = useState('');
   const [busy, setBusy] = useState(false);
+  const [last, setLast] = useState<LastScan | null>(null);
 
   const { data: pending = [], isLoading } = useQuery({
     queryKey: ['putaway-pending', receivingCodes],
@@ -98,34 +100,48 @@ export function PutawayModule({ onCommand }: Props) {
 
   const handleScan = async (raw: string) => {
     if (onCommand?.(raw)) return;
-    const parsed = parseScan(raw);
-
-    if (parsed.kind === 'location') {
-      setDestination(parsed.value);
-      toast.success(`Destino: ${parsed.value}`);
-      return;
-    }
-
     setBusy(true);
     try {
-      const results = await resolve(parsed.value);
-      if (results.length === 0) {
-        toast.error(`Produto não encontrado: ${parsed.value}`);
+      const scan = await resolveScan(raw);
+
+      if (scan.kind === 'location') {
+        const code = scan.location!.code;
+        setDestination(code);
+        scanFeedback('ok');
+        setLast({ kind: 'localizacao', title: code, detail: 'Destino de arrumação' });
         return;
       }
-      const product = results[0];
+
+      if (scan.kind !== 'product' || !scan.product) {
+        scanFeedback('error');
+        setLast({ kind: 'erro', title: scan.message || 'Código não reconhecido', detail: raw });
+        toast.error(scan.message || `Código não reconhecido: ${raw}`);
+        return;
+      }
+
+      const product = scan.product;
       const rows = pending.filter(
-        (r) => r.product_id === product.id && (!parsed.colis || r.colis_number === parsed.colis)
+        (r) => r.product_id === product.id && (!scan.colis || r.colis_number === scan.colis)
       );
       if (rows.length === 0) {
+        scanFeedback('error');
+        setLast({ kind: 'erro', title: product.name, detail: 'Não está em conferência' });
         toast.error(`${product.name} não está em conferência`);
         return;
       }
       rows.forEach((r) => addRow(r));
+      scanFeedback('ok');
+      setLast({
+        kind: 'produto',
+        title: product.name,
+        detail: `${product.code} • ${rows.length} linha(s) selecionada(s)`,
+        quantity: `${rows.reduce((s, r) => s + r.quantity, 0)}`,
+      });
     } finally {
       setBusy(false);
     }
   };
+
 
   const setQty = (countId: string, qty: number) =>
     setSelected((prev) =>
@@ -168,6 +184,15 @@ export function PutawayModule({ onCommand }: Props) {
 
   return (
     <div className="space-y-4">
+      <ScanDock last={last} progress={{ done: selected.length, total: pending.length, label: 'Linhas por arrumar' }}>
+        <ScanInput
+          onScan={handleScan}
+          feedback={false}
+          placeholder="Ler produto ou destino (LOC-…)"
+          autoFocus
+        />
+      </ScanDock>
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -182,7 +207,6 @@ export function PutawayModule({ onCommand }: Props) {
           <p className="text-xs text-muted-foreground">
             Leia o produto (ou coli) que está em conferência e depois a localização de destino.
           </p>
-          <ScanInput onScan={handleScan} placeholder="Ler produto ou destino (LOC-…)" autoFocus feedback />
           <LocationSelect value={destination} onValueChange={setDestination} placeholder="Localização de destino…" />
           {busy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </CardContent>

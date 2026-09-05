@@ -18,6 +18,8 @@ import { Progress } from '@/components/ui/progress';
 import { ScanInput } from './ScanInput';
 import { useLocationAudits, useMyLocationAudits, type LocationAuditItem } from '@/hooks/useLocationAudits';
 import { parseScan, type QtyHandler } from '@/lib/scanner/commands';
+import { scanFeedback } from '@/lib/scanner/feedback';
+import { ScanDock, type LastScan } from './ScanDock';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -36,6 +38,13 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
   const [location, setLocation] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, number>>({});
   const [lastItemId, setLastItemId] = useState<string | null>(null);
+  const [last, setLast] = useState<LastScan | null>(null);
+
+  const fail = (title: string, detail?: string) => {
+    scanFeedback('error');
+    setLast({ kind: 'erro', title, detail });
+    toast.error(detail ? `${title} — ${detail}` : title);
+  };
 
   const { data: audit, isLoading: loadingAudit } = useAuditWithItems(auditId);
 
@@ -92,15 +101,17 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
     if (!code) return;
 
     // Leitura de localização
-    const loc = locations.find((l) => norm(l) === code);
+    const bare = code.replace(/^loc-/, '');
+    const loc = locations.find((l) => norm(l) === code || norm(l) === bare);
     if (loc) {
       setLocation(loc);
-      toast.success(`Localização ${loc}`);
+      scanFeedback('ok');
+      setLast({ kind: 'localizacao', title: loc, detail: 'Localização a contar' });
       return;
     }
 
     if (!location) {
-      toast.error('Leia primeiro a localização a contar');
+      fail('Leia primeiro a localização a contar');
       return;
     }
 
@@ -117,14 +128,14 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
     );
 
     if (candidates.length === 0) {
-      toast.error(`"${parsed.value}" não pertence a ${location}`);
+      fail(`"${parsed.value}" não pertence a ${location}`);
       return;
     }
 
     const match = coli != null ? candidates.find((i) => i.colis_number === coli) : candidates[0];
 
     if (!match) {
-      toast.error(`Coli ${coli} de ${baseCode.toUpperCase()} não está em ${location}`);
+      fail(`Coli ${coli} de ${baseCode.toUpperCase()} não está em ${location}`);
       return;
     }
 
@@ -132,7 +143,14 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
 
     const next = valueOf(match) + 1;
     setValue(match.id, next);
-    toast.success(`${match.product_name}${match.colis_number ? ` C${match.colis_number}` : ''}: ${next}`);
+    scanFeedback('ok');
+    setLast({
+      kind: 'produto',
+      title: match.product_name,
+      detail: `${match.product_code}${match.colis_number ? ` • coli ${match.colis_number}` : ''} • ${location}`,
+      quantity: `${next}`,
+      remaining: blind ? undefined : `esperado ${match.expected_quantity}`,
+    });
   };
 
   const confirmItem = async (item: LocationAuditItem) => {
@@ -175,7 +193,13 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
 
   return (
     <div className="space-y-4">
-      <ScanInput onScan={handleScan} label={location ? `A contar em ${location}` : 'Leia a localização'} />
+      <ScanDock last={last} progress={{ done: progress.done, total: progress.total, label: 'Artigos confirmados' }}>
+        <ScanInput
+          onScan={handleScan}
+          feedback={false}
+          label={location ? `A contar em ${location}` : 'Leia a localização (LOC-…)'}
+        />
+      </ScanDock>
 
       <Card>
         <CardHeader className="pb-2">
