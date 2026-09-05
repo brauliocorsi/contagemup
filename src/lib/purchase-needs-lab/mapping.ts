@@ -130,7 +130,7 @@ export function buildEngineInput(
       const review = [...base.review];
       const manual = state.manualSupplies[key];
       // quantidade_saida tem semântica NÃO CONFIRMADA: nunca assumida como recebido.
-      let porReceber: number | null = manual ? manual.porReceber : null;
+      const porReceber: number | null = manual ? manual.porReceber : null;
       if (!manual) review.push('Por receber desconhecido (quantidade_saida não confirmada) — indicar manualmente.');
       else review.push('Valor manual de teste (a confirmar).');
       supplies.push({
