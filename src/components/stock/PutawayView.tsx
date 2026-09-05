@@ -73,8 +73,12 @@ export function PutawayView() {
   });
 
   const totalUnits = rows.reduce((s, r) => s + r.quantity, 0);
-  const baseline = initialUnits ?? (rows.length ? totalUnits : 0);
-  if (initialUnits === null && rows.length > 0) setInitialUnits(totalUnits);
+
+  useEffect(() => {
+    if (initialUnits === null && !isLoading && rows.length > 0) setInitialUnits(totalUnits);
+  }, [initialUnits, isLoading, rows.length, totalUnits]);
+
+  const baseline = initialUnits ?? totalUnits;
   const done = Math.max(0, baseline - totalUnits);
   const progress = baseline > 0 ? Math.round((done / baseline) * 100) : 100;
 
