@@ -158,9 +158,8 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     return { requested, picked, pct: requested ? Math.round((picked / requested) * 100) : 0 };
   }, [lines]);
 
-  /** Agrupamento da lista: por produto (agregado) ou por entrega/nota. */
-  const groups = useMemo(() => {
   /** Metadados das localizações para ordenar pela rota física do armazém. */
+
   const { locations: whLocations } = useWarehouseLocations();
   const locMeta = useMemo(() => {
     const m = new Map<
