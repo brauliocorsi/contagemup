@@ -112,6 +112,7 @@ export default function Dashboard() {
               {activeTab === 'damages' && <DamagesView />}
               {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}
               {activeTab === 'reports' && <ReportsView onStartAudit={handleStartAudit} />}
+              {activeTab === 'movements' && <MovementsView />}
               {activeTab === 'recent' && <RecentProductsView />}
               {activeTab === 'separation-notes' && (
                 <SeparationNotesView
