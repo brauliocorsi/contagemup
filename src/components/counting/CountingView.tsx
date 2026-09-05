@@ -1,15 +1,13 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useCounting } from '@/hooks/useCounting';
-import { useSessions } from '@/hooks/useSessions';
 import { useCategories } from '@/hooks/useCategories';
 import { useDamages } from '@/hooks/useDamages';
 import { CountingSummary } from './CountingSummary';
 import { CountingFilters } from './CountingFilters';
 import { CountingExportMenu } from './CountingExportMenu';
 import { CountingProductList } from './CountingProductList';
-import { CountingSessionSelector } from './CountingSessionSelector';
-import { CountingHeader } from './CountingHeader';
+import { CountingAccessGate, CountingUnlock } from './CountingAccessGate';
 import { useCountingFilters } from './hooks/useCountingFilters';
 import { useCountingExport } from './hooks/useCountingExport';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,17 +15,15 @@ import { toast } from 'sonner';
 import { StockDistribution, ProductWithCounts } from '@/types/stock';
 import { PageContainer } from '@/components/layout/PageContainer';
 
-const STORAGE_KEY = 'counting_selected_session';
-
 export function CountingView() {
   const { products, loading: productsLoading, updateProduct, fetchProducts } = useProducts();
-  const { sessions, loading: sessionsLoading, createSession } = useSessions();
   const { categories, loading: categoriesLoading } = useCategories();
   const { reportDamage, getDamagesForProduct } = useDamages();
   
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(() => {
-    return localStorage.getItem(STORAGE_KEY);
-  });
+  // A sessão de contagem deixou de existir na navegação: as linhas vivas de counts têm session_id a NULL.
+  const selectedSessionId: string | null = null;
+  const [unlock, setUnlock] = useState<CountingUnlock | null>(null);
+  const readOnly = !unlock;
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterLocation, setFilterLocation] = useState<string>('all');
@@ -45,34 +41,6 @@ export function CountingView() {
     incrementCountAtLocation,
     decrementCountAtLocation,
   } = useCounting(selectedSessionId);
-
-  const activeSessions = sessions.filter(s => s.status === 'active');
-
-  // Auto-select session logic
-  useEffect(() => {
-    if (sessionsLoading || activeSessions.length === 0) return;
-    
-    if (selectedSessionId) {
-      const sessionExists = activeSessions.some(s => s.id === selectedSessionId);
-      if (sessionExists) return;
-    }
-    
-    const preferredSession = activeSessions.find(s => 
-      s.name.toLowerCase().includes('inventário 2026') || 
-      s.name.toLowerCase().includes('inventario 2026')
-    );
-    
-    if (preferredSession) {
-      setSelectedSessionId(preferredSession.id);
-      localStorage.setItem(STORAGE_KEY, preferredSession.id);
-    }
-  }, [sessionsLoading, activeSessions, selectedSessionId]);
-
-  const handleSessionChange = (sessionId: string) => {
-    setSelectedSessionId(sessionId);
-    localStorage.setItem(STORAGE_KEY, sessionId);
-    window.dispatchEvent(new CustomEvent('session-changed'));
-  };
 
   // Category helpers
   const availableCategories = useMemo(() => {
@@ -103,17 +71,14 @@ export function CountingView() {
     });
   }, [products, getProductWithCounts, categoryColisNamesMap]);
 
-  // Get current session
-  const currentSession = sessions.find(s => s.id === selectedSessionId);
-
-  // Filter products based on session category first
+  // Quando a contagem está desbloqueada por uma conferência, só se pode contar
+  // nas localizações dessa conferência. Fora delas, nada.
   const sessionFilteredProducts = useMemo(() => {
-    if (!currentSession || currentSession.category === 'Todas') {
-      return productsWithCounts;
-    }
-    const sessionCategories = currentSession.category.split(',').map(c => c.trim());
-    return productsWithCounts.filter(p => sessionCategories.includes(p.category));
-  }, [productsWithCounts, currentSession]);
+    if (!unlock) return productsWithCounts;
+    const allowed = new Set(unlock.locations.map(l => l.trim().toUpperCase()));
+    return productsWithCounts.filter((p: ProductWithCounts) =>
+      p.uniqueLocations.some(l => allowed.has((l || '').trim().toUpperCase())));
+  }, [productsWithCounts, unlock]);
 
   // Use counting filters hook
   const {
@@ -205,10 +170,6 @@ export function CountingView() {
     decrementCountAtLocation(productId, colisNumber, countId);
   }, [decrementCountAtLocation]);
 
-  const handleCreateSession = async (name: string, categoryValue: string) => {
-    return await createSession(name, categoryValue);
-  };
-
   const handleClearFilters = () => {
     setFilterStatus('all');
     setFilterLocation('all');
@@ -219,7 +180,7 @@ export function CountingView() {
   const hasActiveFilters = filterStatus !== 'all' || filterLocation !== 'all' || filterCategory !== 'all' || searchTerm !== '';
 
   // Loading state
-  if (productsLoading || sessionsLoading || categoriesLoading) {
+  if (productsLoading || categoriesLoading) {
     return (
       <div className="space-y-4 p-4">
         <Skeleton className="h-20 w-full" />
@@ -232,31 +193,11 @@ export function CountingView() {
     );
   }
 
-  // No session selected
-  if (!selectedSessionId) {
-    return (
-      <CountingSessionSelector
-        activeSessions={activeSessions}
-        availableCategories={availableCategories}
-        onSessionChange={handleSessionChange}
-        onCreateSession={handleCreateSession}
-      />
-    );
-  }
-
   return (
     <PageContainer className="p-4">
 
-      {/* Session header */}
-      <CountingHeader
-        currentSession={currentSession}
-        totalProducts={sessionFilteredProducts.length}
-        onChangeSession={() => {
-          setSelectedSessionId(null);
-          localStorage.removeItem(STORAGE_KEY);
-          window.dispatchEvent(new CustomEvent('session-changed'));
-        }}
-      />
+      {/* Acesso à contagem */}
+      <CountingAccessGate unlock={unlock} onUnlock={setUnlock} />
 
       {/* Summary */}
       <CountingSummary products={sessionFilteredProducts as ProductWithCounts[]} />
@@ -318,6 +259,7 @@ export function CountingView() {
         onSplitStock={handleSplitStock}
         onMergeStock={handleMergeStock}
         onReportDamage={reportDamage}
+        readOnly={readOnly}
       />
     </PageContainer>
   );
