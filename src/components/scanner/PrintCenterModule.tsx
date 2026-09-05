@@ -15,8 +15,9 @@ import { toast } from 'sonner';
 import { printLabels, type LabelItem, type LabelFormat } from '@/lib/scanner/labels';
 import { fetchLastEntryDates } from '@/lib/scanner/entryDates';
 import { COMMAND_SHEET, colisCode, locationCode } from '@/lib/scanner/commands';
+import { scanPrefix } from '@/lib/scanner/resolveScan';
 
-type Source = 'comandos' | 'localizacoes' | 'produtos';
+type Source = 'comandos' | 'localizacoes' | 'viaturas' | 'rotas' | 'produtos';
 
 
 interface Row {
@@ -136,6 +137,44 @@ export function PrintCenterModule() {
     },
   });
 
+  const vehicles = useQuery({
+    queryKey: ['print-vehicles'],
+    enabled: source === 'viaturas',
+    queryFn: async (): Promise<Row[]> => {
+      const { data, error } = await supabase
+        .from('warehouse_locations')
+        .select('id, code, plate')
+        .eq('location_type', 'transport')
+        .order('code');
+      if (error) throw error;
+      return (data || []).map((v) => ({
+        id: `via-${v.id}`,
+        code: scanPrefix.vehicle((v.plate || v.code) as string),
+        title: (v.plate as string) || v.code,
+        subtitle: `Viatura ${v.code}`,
+      }));
+    },
+  });
+
+  const routes = useQuery({
+    queryKey: ['print-routes'],
+    enabled: source === 'rotas',
+    queryFn: async (): Promise<Row[]> => {
+      const { data, error } = await supabase
+        .from('route_schedules')
+        .select('id, name, barcode, route_date')
+        .order('route_date', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data || []).map((r) => ({
+        id: `rota-${r.id}`,
+        code: scanPrefix.route((r.barcode as string) || (r.id as string)),
+        title: (r.name as string) || 'Rota',
+        subtitle: r.route_date ? `Data: ${r.route_date}` : 'Rota',
+      }));
+    },
+  });
+
   const commandRows: Row[] = useMemo(
     () =>
       COMMAND_SHEET.map((c) => ({
@@ -149,7 +188,9 @@ export function PrintCenterModule() {
 
   const loading =
     (source === 'produtos' && products.isFetching) ||
-    (source === 'localizacoes' && locations.isFetching);
+    (source === 'localizacoes' && locations.isFetching) ||
+    (source === 'viaturas' && vehicles.isFetching) ||
+    (source === 'rotas' && routes.isFetching);
 
   const rows: Row[] = useMemo(() => {
     const base =
@@ -157,14 +198,18 @@ export function PrintCenterModule() {
         ? commandRows
         : source === 'localizacoes'
           ? locations.data || []
-          : products.data || [];
+          : source === 'viaturas'
+            ? vehicles.data || []
+            : source === 'rotas'
+              ? routes.data || []
+              : products.data || [];
     if (source === 'produtos') return base;
     const term = search.trim().toLowerCase();
     if (!term) return base;
     return base.filter(
       (r) => r.title.toLowerCase().includes(term) || r.code.toLowerCase().includes(term)
     );
-  }, [source, search, commandRows, products.data, locations.data]);
+  }, [source, search, commandRows, products.data, locations.data, vehicles.data, routes.data]);
 
 
 
@@ -217,9 +262,11 @@ export function PrintCenterModule() {
           setPreviewUrl(null);
         }}
       >
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="comandos" className="text-[11px]">Comandos</TabsTrigger>
           <TabsTrigger value="localizacoes" className="text-[11px]">Locais</TabsTrigger>
+          <TabsTrigger value="viaturas" className="text-[11px]">Viaturas</TabsTrigger>
+          <TabsTrigger value="rotas" className="text-[11px]">Rotas</TabsTrigger>
           <TabsTrigger value="produtos" className="text-[11px]">Produtos</TabsTrigger>
 
         </TabsList>
