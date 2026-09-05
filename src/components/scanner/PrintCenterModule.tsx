@@ -162,15 +162,15 @@ export function PrintCenterModule() {
     queryFn: async (): Promise<Row[]> => {
       const { data, error } = await supabase
         .from('route_schedules')
-        .select('id, name, barcode, route_date')
-        .order('route_date', { ascending: false })
+        .select('id, name, barcode, scheduled_date')
+        .order('scheduled_date', { ascending: false })
         .limit(100);
       if (error) throw error;
       return (data || []).map((r) => ({
         id: `rota-${r.id}`,
         code: scanPrefix.route((r.barcode as string) || (r.id as string)),
         title: (r.name as string) || 'Rota',
-        subtitle: r.route_date ? `Data: ${r.route_date}` : 'Rota',
+        subtitle: r.scheduled_date ? `Data: ${r.scheduled_date}` : 'Rota',
       }));
     },
   });
