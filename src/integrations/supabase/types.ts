@@ -1592,17 +1592,6 @@ export type Database = {
         }
         Returns: Json
       }
-      decrement_counts_for_picking: {
-        Args: {
-          p_colis_quantities?: Json
-          p_is_complete_set: boolean
-          p_location_selections?: Json
-          p_product_id: string
-          p_set_quantity?: number
-          p_total_colis: number
-        }
-        Returns: boolean
-      }
       dedupe_counts_same_place: { Args: never; Returns: number }
       deliver_note: { Args: { p_note_id: string }; Returns: Json }
       effective_total_colis: { Args: { p_product_id: string }; Returns: number }
