@@ -17,6 +17,7 @@ export interface DeliveryNote {
   id: string;
   order_number: string;
   task_id: string | null;
+  route_id: string | null;
   client_name: string | null;
   status: DeliveryStatus;
   dock_location: string | null;
