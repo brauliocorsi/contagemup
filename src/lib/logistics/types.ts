@@ -166,4 +166,3 @@ export type RoutePlan = {
 };
 
 export const DEFAULT_ADDRESS_FROM = 'Rua Industrial, 5, 4590-000 Paços de Ferreira, Portugal';
-export const PLATES = ['BQ68FQ', 'CA68RN'] as const;
