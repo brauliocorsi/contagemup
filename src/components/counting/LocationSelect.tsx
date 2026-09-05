@@ -120,7 +120,7 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
 
   const totalFiltered = Object.values(filteredGroups).flat().length;
 
-  const showCreateOption = inputValue.trim() && 
+  const showCreateOption = isAdmin && !!inputValue.trim() &&
     !locationOptions.some(opt => opt.value.toLowerCase() === inputValue.toLowerCase());
 
   // Get selected option for display
