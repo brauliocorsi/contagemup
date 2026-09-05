@@ -177,19 +177,20 @@ export function DamagesView() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={agedCount > 0 ? 'border-destructive' : undefined}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Produtos Afetados</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Há mais de 30 dias</CardTitle>
+            <AlertOctagon className={`h-4 w-4 ${agedCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Object.keys(stats.byProduct).length}</div>
+            <div className={`text-2xl font-bold ${agedCount > 0 ? 'text-destructive' : ''}`}>{agedCount}</div>
             <p className="text-xs text-muted-foreground">
-              produtos diferentes
+              itens parados em quarentena
             </p>
           </CardContent>
         </Card>
       </div>
+
 
       {/* Quick Stats */}
       {(topDamagedProducts.length > 0 || damageTypeEntries.length > 0) && (
