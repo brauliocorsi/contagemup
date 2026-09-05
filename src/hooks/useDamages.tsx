@@ -173,38 +173,15 @@ export function useDamages() {
 
   const deleteDamageMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Get damage to know quantity and product
-      const { data: damage } = await supabase
-        .from('product_damages')
-        .select('product_id, quantity, status')
-        .eq('id', id)
-        .single();
-
       const { error } = await supabase
         .from('product_damages')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-
-      // If damage was active, decrement damaged_stock
-      if (damage && damage.status === 'active') {
-        const { data: product } = await supabase
-          .from('products')
-          .select('damaged_stock')
-          .eq('id', damage.product_id)
-          .single();
-
-        await supabase
-          .from('products')
-          .update({ 
-            damaged_stock: Math.max(0, (product?.damaged_stock || 0) - damage.quantity)
-          })
-          .eq('id', damage.product_id);
-      }
-
       return true;
     },
+
     onSuccess: () => {
       toast({ title: 'Sucesso', description: 'Avaria eliminada' });
       queryClient.invalidateQueries({ queryKey: ['damages'] });
