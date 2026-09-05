@@ -1066,11 +1066,15 @@ export type Database = {
           orders: string | null
           picked_at: string | null
           picked_by: string | null
+          picked_location: string | null
           picked_quantity: number
           product_code: string
           product_id: string | null
           product_name: string
           requested_quantity: number
+          shortage_notes: string | null
+          shortage_quantity: number
+          shortage_reason: string | null
           task_id: string
           updated_at: string
         }
@@ -1082,11 +1086,15 @@ export type Database = {
           orders?: string | null
           picked_at?: string | null
           picked_by?: string | null
+          picked_location?: string | null
           picked_quantity?: number
           product_code?: string
           product_id?: string | null
           product_name: string
           requested_quantity?: number
+          shortage_notes?: string | null
+          shortage_quantity?: number
+          shortage_reason?: string | null
           task_id: string
           updated_at?: string
         }
@@ -1098,11 +1106,15 @@ export type Database = {
           orders?: string | null
           picked_at?: string | null
           picked_by?: string | null
+          picked_location?: string | null
           picked_quantity?: number
           product_code?: string
           product_id?: string | null
           product_name?: string
           requested_quantity?: number
+          shortage_notes?: string | null
+          shortage_quantity?: number
+          shortage_reason?: string | null
           task_id?: string
           updated_at?: string
         }
@@ -1174,6 +1186,7 @@ export type Database = {
           created_at: string
           id: string
           location: string | null
+          location_to: string | null
           movement_id: string
           product_id: string
           quantity: number
@@ -1183,6 +1196,7 @@ export type Database = {
           created_at?: string
           id?: string
           location?: string | null
+          location_to?: string | null
           movement_id: string
           product_id: string
           quantity: number
@@ -1192,6 +1206,7 @@ export type Database = {
           created_at?: string
           id?: string
           location?: string | null
+          location_to?: string | null
           movement_id?: string
           product_id?: string
           quantity?: number
