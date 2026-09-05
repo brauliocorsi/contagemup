@@ -490,9 +490,15 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
             )}
             {l.locations && (
               <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-                <MapPin className="h-3 w-3" /> {l.locations}
+                <MapPin className="h-3 w-3" /> Sugerido: {l.locations}
               </p>
             )}
+            {meta?.forklift && (
+              <Badge variant="outline" className="mt-1 gap-1 border-amber-400 text-[10px] text-amber-700">
+                <Forklift className="h-3 w-3" /> Empilhador
+              </Badge>
+            )}
+
             {blocked && (
               <Badge variant="destructive" className="mt-1 max-w-full gap-1 whitespace-normal text-left text-[10px]">
                 <Ban className="h-3 w-3 shrink-0" /> Bloqueado — stock só em {blocked}
