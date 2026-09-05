@@ -10,7 +10,10 @@ import { SupplierSelect } from '@/components/stock/SupplierSelect';
 import { useProductResolver, CONFERENCE_LOCATION } from '@/hooks/useScannerData';
 import { useReceivingLocations } from '@/hooks/useReceivingLocations';
 import { supabase } from '@/integrations/supabase/client';
-import { colisCode, parseScan, type QtyHandler } from '@/lib/scanner/commands';
+import { colisCode, type QtyHandler } from '@/lib/scanner/commands';
+import { resolveScan } from '@/lib/scanner/resolveScan';
+import { scanFeedback } from '@/lib/scanner/feedback';
+import { ScanDock, type LastScan } from './ScanDock';
 import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
@@ -77,20 +80,24 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
 
   const handleScan = async (raw: string) => {
     if (onCommand?.(raw)) return;
-    const parsed = parseScan(raw);
+    const scan = await resolveScan(raw);
 
-    if (parsed.kind === 'location') {
+    if (scan.kind === 'location') {
+      scanFeedback('error');
+      setLast({ kind: 'erro', title: 'Entrada vai para conferência', detail: 'Arrume depois em Arrumação.' });
       toast.info('A entrada vai sempre para a zona de conferência. Arrume depois em Arrumação.');
       return;
     }
 
-    const results = await resolve(parsed.value);
-    if (results.length === 0) {
-      toast.error(`Produto não encontrado: ${parsed.value}`);
+    if (scan.kind !== 'product' || !scan.product) {
+      scanFeedback('error');
+      setLast({ kind: 'erro', title: scan.message || 'Código não reconhecido', detail: raw });
+      toast.error(scan.message || `Código não reconhecido: ${raw}`);
       return;
     }
-    const product = results[0];
-    const coli = parsed.colis || 1;
+
+    const product = scan.product;
+    const coli = scan.colis || 1;
     const inc = Math.max(1, stepRef.current);
 
     setLines((prev) => {
@@ -103,12 +110,14 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
         );
         const line = next.find((l) => l.product.id === product.id)!;
         setLastTarget({ key: line.key, coli });
-        toast.success(`${product.name} — coli ${coli}: ${line.colis[coli]} un.`);
+        scanFeedback('ok');
+        setLast({ kind: 'produto', title: product.name, detail: `${product.code} • coli ${coli}`, quantity: `${line.colis[coli]}` });
         return next;
       }
       const key = `${product.id}-${Date.now()}`;
       setLastTarget({ key, coli });
-      toast.success(`${product.name} — coli ${coli}: ${inc} un.`);
+      scanFeedback('ok');
+      setLast({ kind: 'produto', title: product.name, detail: `${product.code} • coli ${coli}`, quantity: `${inc}` });
       return [...prev, { key, product, colis: { [coli]: inc } }];
     });
   };
@@ -204,7 +213,9 @@ export function EntryModule({ onCommand, registerQtyHandler }: Props) {
 
   return (
     <div className="space-y-4">
-      <ScanInput onScan={handleScan} label="Ler produto recebido (código ou COD-C1 para coli)" />
+      <ScanDock last={last} progress={{ done: lines.length, total: Math.max(lines.length, 1), label: 'Linhas recebidas' }}>
+        <ScanInput onScan={handleScan} feedback={false} label="Ler produto recebido (código ou COD-C1 para coli)" />
+      </ScanDock>
 
       <div className="flex items-center gap-2 rounded-lg border bg-card p-2">
         <span className="text-xs text-muted-foreground">Cada leitura conta</span>
