@@ -468,6 +468,18 @@ export function BulkStockCorrectionDialog({
               Todas as alterações ficam registadas para auditoria.
             </p>
           </div>
+
+          <div className="space-y-1 mb-2">
+            <p className="text-sm font-medium">Localização das novas linhas de stock *</p>
+            <LocationSelect
+              value={correctionLocation}
+              onValueChange={setCorrectionLocation}
+              placeholder="Escolher localização (obrigatório)…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Se ainda não souber onde fica, escolha SEM-LOCALIZACAO — aparece depois no ecrã de Arrumação.
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
@@ -476,7 +488,7 @@ export function BulkStockCorrectionDialog({
           </Button>
           <Button
             onClick={() => correctionMutation.mutate()}
-            disabled={selectedItems.length === 0 || correctionMutation.isPending}
+            disabled={selectedItems.length === 0 || correctionMutation.isPending || !correctionLocation}
           >
             {correctionMutation.isPending ? 'A corrigir...' : `Confirmar Correcções (${selectedItems.length})`}
           </Button>
