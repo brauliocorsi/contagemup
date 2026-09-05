@@ -430,8 +430,15 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
           ['Linhas', String(lineItems.length)],
           ['Unidades', String(totals.picked)],
         ],
-        columns: ['Código', 'Produto', 'Nota', 'Conferido'],
-        rows: lineItems.map((l) => [l.product_code, l.product_name, l.order_number || '—', l.quantity]),
+        columns: ['Código', 'Produto', 'Origem', 'Nota', 'Conferido'],
+        rows: lineItems.map((l) => [
+          l.product_code,
+          l.product_name,
+          l.from_location || '—',
+          l.order_number || '—',
+          l.quantity,
+        ]),
+
       });
 
       if (task) {
