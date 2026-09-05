@@ -54,7 +54,9 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
 }, ref) => {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const { locations, isLoading } = useWarehouseLocations();
+  const { locations, isLoading, createLocation } = useWarehouseLocations();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
 
   const locationOptions = useMemo(() => locations
     .filter(loc => loc.code && loc.code.trim() !== '')
