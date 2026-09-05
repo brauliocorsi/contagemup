@@ -69,6 +69,7 @@ export function BulkStockCorrectionDialog({
     }))
   );
   
+  const [correctionLocation, setCorrectionLocation] = useState('');
   const [importedItems, setImportedItems] = useState<CorrectionItem[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'discrepancies' | 'import'>('discrepancies');
