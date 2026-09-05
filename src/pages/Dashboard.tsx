@@ -127,6 +127,8 @@ export default function Dashboard() {
                 <RouteOptimizationView onSendToSeparation={() => setActiveTab('separation-notes')} />
               )}
               {activeTab === 'settings' && <SettingsView />}
+              {/* MÓDULO EXPERIMENTAL REMOVÍVEL */}
+              {activeTab === 'needs-lab' && <PurchaseNeedsLabView />}
 
             </Suspense>
           </main>
