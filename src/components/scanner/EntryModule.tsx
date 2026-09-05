@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScanInput } from './ScanInput';
 import { PrintMenu } from './PrintMenu';
 import { SupplierSelect } from '@/components/stock/SupplierSelect';
-import { useProductResolver, CONFERENCE_LOCATION } from '@/hooks/useScannerData';
+import { CONFERENCE_LOCATION } from '@/hooks/useScannerData';
 import { useReceivingLocations } from '@/hooks/useReceivingLocations';
 import { supabase } from '@/integrations/supabase/client';
 import { colisCode, type QtyHandler } from '@/lib/scanner/commands';
@@ -32,9 +32,9 @@ interface Props {
 }
 
 export function EntryModule({ onCommand, registerQtyHandler }: Props) {
-  const resolve = useProductResolver();
   const queryClient = useQueryClient();
   const [lines, setLines] = useState<EntryLine[]>([]);
+  const [last, setLast] = useState<LastScan | null>(null);
   const [supplier, setSupplier] = useState('');
   const [reference, setReference] = useState('');
   const { defaultCode: receivingLocation } = useReceivingLocations();
