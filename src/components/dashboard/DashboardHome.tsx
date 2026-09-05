@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   TrendingUp, TrendingDown, AlertTriangle, Package,
-  ArrowRight, Clock, AlertOctagon, BarChart3, LayoutDashboard
+  ArrowRight, Clock, AlertOctagon, BarChart3, LayoutDashboard, PackageSearch
 } from 'lucide-react';
 import { format, subDays, startOfDay } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -23,6 +23,34 @@ interface DashboardHomeProps {
 export function DashboardHome({ onNavigate }: DashboardHomeProps) {
   const { products } = useProducts();
   const { alerts, outOfStockCount, lowStockCount, totalAlerts } = useStockAlerts();
+
+  // Indicador permanente: stock sem localização
+  const { data: unlocated } = useQuery({
+    queryKey: ['dashboard-unlocated'],
+    queryFn: async () => {
+      const rows: { product_id: string; quantity: number }[] = [];
+      let from = 0;
+      const step = 1000;
+      for (;;) {
+        const { data, error } = await supabase
+          .from('counts')
+          .select('product_id, quantity')
+          .or('location.is.null,location.eq.,location.eq.SEM-LOCALIZACAO')
+          .gt('quantity', 0)
+          .order('product_id', { ascending: true })
+          .range(from, from + step - 1);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < step) break;
+        from += step;
+      }
+      return {
+        units: rows.reduce((s, r) => s + (r.quantity || 0), 0),
+        products: new Set(rows.map(r => r.product_id)).size,
+      };
+    },
+    staleTime: 60000,
+  });
 
   const { data: recentMovements = [] } = useQuery({
     queryKey: ['dashboard-recent-movements'],
@@ -129,6 +157,26 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
           onClick={() => onNavigate('alerts')}
         />
       </div>
+
+      {(unlocated?.units ?? 0) > 0 && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex flex-col sm:flex-row sm:items-center gap-3 py-4">
+            <PackageSearch className="h-5 w-5 text-destructive" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-destructive">
+                {unlocated?.units} unidades sem localização em {unlocated?.products} produtos
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Este stock não pode ser separado até ter uma morada no armazém.
+              </p>
+            </div>
+            <Button size="sm" variant="destructive" onClick={() => onNavigate('putaway')}>
+              Arrumar agora
+              <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

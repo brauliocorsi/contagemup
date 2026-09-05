@@ -93,6 +93,12 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
   ): Promise<OrderNumberEntry | null> => {
     if (!productId) return null;
 
+    // Localização obrigatória sempre que a encomenda cria stock físico
+    if (addAsComplete && !location?.trim()) {
+      toast.error('Escolha a localização antes de adicionar a encomenda completa.');
+      return null;
+    }
+
     // Create colis_status based on addAsComplete flag
     const colisStatus: Record<string, boolean> = {};
     for (let i = 1; i <= totalColis; i++) {
@@ -145,7 +151,7 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
                 product_id: productId, 
                 colis_number: i, 
                 quantity: 1, 
-                location: location || null
+                location: (location as string).trim()
               });
           }
         }
@@ -219,13 +225,18 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
           }
         }
       } else if (isPresent) {
-        // Only insert if marking as present and no count exists
+        // Localização obrigatória: sem morada não criamos stock
+        if (!order.location?.trim()) {
+          toast.error('Defina a localização da encomenda antes de marcar colis como presentes.');
+          return false;
+        }
         await supabase
           .from('counts')
-          .insert({ 
-            product_id: order.product_id, 
-            colis_number: colisNumber, 
-            quantity: 1 
+          .insert({
+            product_id: order.product_id,
+            colis_number: colisNumber,
+            quantity: 1,
+            location: order.location.trim(),
           });
       }
 

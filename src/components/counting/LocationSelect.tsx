@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { useWarehouseLocations } from '@/hooks/useWarehouseConfig';
+import { useAuth } from '@/hooks/useAuth';
 
 interface LocationSelectProps {
   value: string;
@@ -53,7 +54,9 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
 }, ref) => {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const { locations, isLoading } = useWarehouseLocations();
+  const { locations, isLoading, createLocation } = useWarehouseLocations();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
 
   const locationOptions = useMemo(() => locations
     .filter(loc => loc.code && loc.code.trim() !== '')
@@ -84,12 +87,20 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
     setInputValue('');
   };
 
-  const handleCreateCustom = () => {
-    if (inputValue.trim()) {
-      onValueChange(inputValue.trim());
-      setOpen(false);
-      setInputValue('');
-    }
+  // Texto livre não é permitido: uma localização só pode ser usada depois de
+  // existir no cadastro. Administradores podem criá-la aqui mesmo.
+  const handleCreateCustom = async () => {
+    const code = inputValue.trim().toUpperCase();
+    if (!code || !isAdmin) return;
+    await createLocation.mutateAsync({
+      code,
+      position_in_aisle: 0,
+      is_staging: false,
+      location_type: 'stock',
+    } as never);
+    onValueChange(code);
+    setOpen(false);
+    setInputValue('');
   };
 
   const filteredGroups = useMemo(() => {
@@ -109,7 +120,7 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
 
   const totalFiltered = Object.values(filteredGroups).flat().length;
 
-  const showCreateOption = inputValue.trim() && 
+  const showCreateOption = isAdmin && !!inputValue.trim() &&
     !locationOptions.some(opt => opt.value.toLowerCase() === inputValue.toLowerCase());
 
   // Get selected option for display
@@ -159,14 +170,18 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
           />
           <CommandList className="max-h-[300px]">
             <CommandEmpty>
-              {inputValue.trim() ? (
+              {inputValue.trim() && isAdmin ? (
                 <button
                   onClick={handleCreateCustom}
                   className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent rounded cursor-pointer"
                 >
                   <Plus className="h-4 w-4" />
-                  Usar "{inputValue}"
+                  Criar localização "{inputValue.trim().toUpperCase()}"
                 </button>
+              ) : inputValue.trim() ? (
+                <span className="text-xs text-muted-foreground">
+                  Localização não existe no cadastro. Peça a um administrador para a criar.
+                </span>
               ) : (
                 "Nenhuma localização configurada."
               )}
@@ -230,13 +245,13 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
             })}
             
             {showCreateOption && totalFiltered > 0 && (
-              <CommandGroup heading="Personalizado">
+              <CommandGroup heading="Administração">
                 <CommandItem
                   value={inputValue}
                   onSelect={handleCreateCustom}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Usar "{inputValue}"
+                  Criar localização "{inputValue.trim().toUpperCase()}"
                 </CommandItem>
               </CommandGroup>
             )}

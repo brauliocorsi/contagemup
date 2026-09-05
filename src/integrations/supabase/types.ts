@@ -1594,6 +1594,7 @@ export type Database = {
     }
     Functions: {
       admin_reset_stock_data: { Args: never; Returns: Json }
+      assert_valid_location: { Args: { p_location: string }; Returns: string }
       assign_count_location: {
         Args: { p_count_id: string; p_location: string }
         Returns: string
@@ -1642,6 +1643,10 @@ export type Database = {
           p_to: string
         }
         Returns: number
+      }
+      putaway_counts: {
+        Args: { p_count_ids: string[]; p_location: string }
+        Returns: Json
       }
       recalculate_all_stock: { Args: never; Returns: undefined }
       register_damage: {

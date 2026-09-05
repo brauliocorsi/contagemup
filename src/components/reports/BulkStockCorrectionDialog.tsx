@@ -18,6 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { AlertTriangle, Upload, TrendingUp, TrendingDown, FileSpreadsheet, Download } from 'lucide-react';
 import { loadXLSX } from '@/lib/lazyXlsx';
+import { LocationSelect } from '@/components/counting/LocationSelect';
 interface CorrectionItem {
   productId: string;
   code: string;
@@ -69,6 +70,7 @@ export function BulkStockCorrectionDialog({
     }))
   );
   
+  const [correctionLocation, setCorrectionLocation] = useState('');
   const [importedItems, setImportedItems] = useState<CorrectionItem[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'discrepancies' | 'import'>('discrepancies');
@@ -266,7 +268,7 @@ export function BulkStockCorrectionDialog({
                 colis_number: colis,
                 quantity: item.targetStock,
                 session_id: null,
-                location: null,
+                location: correctionLocation,
               });
 
             if (insertError) throw insertError;
@@ -466,6 +468,18 @@ export function BulkStockCorrectionDialog({
               Todas as alterações ficam registadas para auditoria.
             </p>
           </div>
+
+          <div className="space-y-1 mb-2">
+            <p className="text-sm font-medium">Localização das novas linhas de stock *</p>
+            <LocationSelect
+              value={correctionLocation}
+              onValueChange={setCorrectionLocation}
+              placeholder="Escolher localização (obrigatório)…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Se ainda não souber onde fica, escolha SEM-LOCALIZACAO — aparece depois no ecrã de Arrumação.
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
@@ -474,7 +488,7 @@ export function BulkStockCorrectionDialog({
           </Button>
           <Button
             onClick={() => correctionMutation.mutate()}
-            disabled={selectedItems.length === 0 || correctionMutation.isPending}
+            disabled={selectedItems.length === 0 || correctionMutation.isPending || !correctionLocation}
           >
             {correctionMutation.isPending ? 'A corrigir...' : `Confirmar Correcções (${selectedItems.length})`}
           </Button>
