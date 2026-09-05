@@ -98,34 +98,48 @@ export function PutawayModule({ onCommand }: Props) {
 
   const handleScan = async (raw: string) => {
     if (onCommand?.(raw)) return;
-    const parsed = parseScan(raw);
-
-    if (parsed.kind === 'location') {
-      setDestination(parsed.value);
-      toast.success(`Destino: ${parsed.value}`);
-      return;
-    }
-
     setBusy(true);
     try {
-      const results = await resolve(parsed.value);
-      if (results.length === 0) {
-        toast.error(`Produto não encontrado: ${parsed.value}`);
+      const scan = await resolveScan(raw);
+
+      if (scan.kind === 'location') {
+        const code = scan.location!.code;
+        setDestination(code);
+        scanFeedback('ok');
+        setLast({ kind: 'localizacao', title: code, detail: 'Destino de arrumação' });
         return;
       }
-      const product = results[0];
+
+      if (scan.kind !== 'product' || !scan.product) {
+        scanFeedback('error');
+        setLast({ kind: 'erro', title: scan.message || 'Código não reconhecido', detail: raw });
+        toast.error(scan.message || `Código não reconhecido: ${raw}`);
+        return;
+      }
+
+      const product = scan.product;
       const rows = pending.filter(
-        (r) => r.product_id === product.id && (!parsed.colis || r.colis_number === parsed.colis)
+        (r) => r.product_id === product.id && (!scan.colis || r.colis_number === scan.colis)
       );
       if (rows.length === 0) {
+        scanFeedback('error');
+        setLast({ kind: 'erro', title: product.name, detail: 'Não está em conferência' });
         toast.error(`${product.name} não está em conferência`);
         return;
       }
       rows.forEach((r) => addRow(r));
+      scanFeedback('ok');
+      setLast({
+        kind: 'produto',
+        title: product.name,
+        detail: `${product.code} • ${rows.length} linha(s) selecionada(s)`,
+        quantity: `${rows.reduce((s, r) => s + r.quantity, 0)}`,
+      });
     } finally {
       setBusy(false);
     }
   };
+
 
   const setQty = (countId: string, qty: number) =>
     setSelected((prev) =>
