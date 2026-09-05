@@ -11,6 +11,8 @@ export interface LocationAudit {
   created_by: string | null;
   assigned_to: string | null;
   blind_mode: boolean;
+  /** Código curto que o ADM comunica ao operador para poder contar. */
+  access_code: string | null;
   started_at: string | null;
   completed_at: string | null;
   notes: string | null;
