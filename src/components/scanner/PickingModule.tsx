@@ -546,12 +546,52 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
             </Button>
           </div>
         </div>
+
+        {!blocked && (
+          <div className="mt-2 space-y-2 border-t pt-2">
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-[11px] text-muted-foreground">Tirado de</span>
+              <Input
+                list="picking-locations"
+                className="h-8 flex-1 text-xs"
+                placeholder="localização de origem"
+                value={l.from}
+                onChange={(e) => update({ from: e.target.value.toUpperCase() })}
+              />
+            </div>
+            {short && (
+              <div className="space-y-1">
+                <Select value={l.reason} onValueChange={(v) => update({ reason: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Motivo da falta (obrigatório)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SHORTAGE_REASONS.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {l.reason === 'outro' && (
+                  <Input
+                    className="h-8 text-xs"
+                    placeholder="Notas (opcional)"
+                    value={l.note}
+                    onChange={(e) => update({ note: e.target.value })}
+                    maxLength={200}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
 
-
   return (
+
     <div className="space-y-4">
       <ScanInput onScan={handleScan} label="Conferir produto da lista" />
 
