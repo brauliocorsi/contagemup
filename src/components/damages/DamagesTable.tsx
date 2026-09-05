@@ -145,7 +145,7 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
               </TableRow>
             ) : (
               filteredDamages.map((damage) => (
-                <TableRow key={damage.id} className={`cursor-pointer hover:bg-muted/50 ${damage.status === 'resolved' ? 'opacity-60' : ''}`} onClick={() => setDetailDamage(damage)}>
+                <TableRow key={damage.id} className={`cursor-pointer hover:bg-muted/50 ${damage.status === 'resolved' ? 'opacity-60' : ''} ${damage.status === 'active' && ageInDays(damage.created_at) > 30 ? 'bg-destructive/5' : ''}`} onClick={() => setDetailDamage(damage)}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-muted-foreground" />
