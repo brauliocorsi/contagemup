@@ -84,7 +84,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const [step, setStep] = useState(1);
   const [lastKey, setLastKey] = useState<string | null>(null);
   const [task, setTask] = useState<PickingTask | null>(null);
-  const [groupMode, setGroupMode] = useState<'produto' | 'nota'>('produto');
+  const [groupMode, setGroupMode] = useState<'rota' | 'produto' | 'nota'>('rota');
   const [dock, setDock] = useState('');
   const { data: docks = [] } = useTypedLocations('pre_exit');
 
