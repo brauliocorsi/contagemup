@@ -39,8 +39,9 @@ export interface ScanRoute {
 
 export interface ScanNote {
   id: string;
-  order_code: string | null;
+  order_number: string;
   status: string | null;
+  client_name?: string | null;
 }
 
 export interface ResolvedScan {
@@ -111,8 +112,8 @@ function isUuid(v: string) {
 async function findNote(code: string): Promise<ScanNote | null> {
   const { data } = await supabase
     .from('delivery_notes')
-    .select('id, order_code, status')
-    .ilike('order_code', code)
+    .select('id, order_number, status, client_name')
+    .ilike('order_number', code)
     .limit(1);
   return (data?.[0] as ScanNote) ?? null;
 }
@@ -179,7 +180,7 @@ export async function resolveScan(raw: string): Promise<ResolvedScan> {
     const code = stripPrefix(value, 'NOTA-');
     const note = await findNote(code);
     return note
-      ? { kind: 'note', value: note.order_code || code, raw, note }
+      ? { kind: 'note', value: note.order_number || code, raw, note }
       : { kind: 'unknown', value: code, raw, message: `Nota de encomenda desconhecida: ${code}` };
   }
 
