@@ -43,7 +43,28 @@ interface PickLine extends ResolvedRow {
   /** id do artigo da tarefa (quando o picking vem das Notas de Separação) */
   itemId?: string;
   locations?: string | null;
+  /** localização de onde o operador tirou fisicamente a peça */
+  from: string;
+  /** motivo de falta, quando conferiu menos do que o pedido */
+  reason: string;
+  note: string;
 }
+
+const SHORTAGE_REASONS: Array<{ id: string; label: string }> = [
+  { id: 'nao_estava_la', label: 'Não estava lá' },
+  { id: 'avariado', label: 'Avariado' },
+  { id: 'quantidade_insuficiente', label: 'Quantidade insuficiente' },
+  { id: 'localizacao_errada', label: 'Localização errada' },
+  { id: 'outro', label: 'Outro' },
+];
+
+/** Primeira localização sugerida do texto "A1, B2". */
+const firstSuggested = (s?: string | null) =>
+  (s || '')
+    .split(/[,;/|]/)
+    .map((x) => x.trim())
+    .filter(Boolean)[0] ?? '';
+
 
 interface Props {
   onCommand?: (raw: string) => boolean;
