@@ -85,9 +85,6 @@ export function DamageRegularizationView({ onBack }: Props) {
     staleTime: 30_000,
   });
 
-  const [baseline] = useState<number | null>(null);
-  const total = baseline ?? pending.length;
-
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['damages-regularization'] });
     queryClient.invalidateQueries({ queryKey: ['damages'] });
@@ -165,7 +162,7 @@ export function DamageRegularizationView({ onBack }: Props) {
   const foundEntries = done.filter(d => d.action === 'found');
   const closedEntries = done.filter(d => d.action !== 'found');
   const treatedCount = done.length;
-  const progress = total > 0 ? Math.round((treatedCount / (treatedCount + pending.length || 1)) * 100) : 0;
+  const progress = Math.round((treatedCount / Math.max(treatedCount + pending.length, 1)) * 100);
 
   const openFound = (damage: ProductDamageWithProduct) => {
     setFoundLocation('');
