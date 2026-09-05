@@ -87,7 +87,7 @@ export async function findTasksForOrders(orderCodes: string[]): Promise<PickingT
   const { data, error } = await supabase
     .from('scanner_picking_task_items')
     .select('orders, scanner_picking_tasks!inner(id, name, reference, status, created_at, route_id)')
-    .in('status' in {} ? 'orders' : 'orders', codes)
+    .in('orders', codes)
     .limit(500);
   if (error) throw error;
   type Row = { scanner_picking_tasks: PickingTask & { status: string } };
