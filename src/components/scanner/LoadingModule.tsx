@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Truck, CheckCircle2, Loader2, FileText, PackageCheck, AlertCircle, Lock } from 'lucide-react';
+import { Truck, CheckCircle2, Loader2, FileText, PackageCheck, AlertCircle, Lock, Route as RouteIcon, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,15 @@ import {
   useLoadNotesToVehicle,
   useTypedLocations,
 } from '@/hooks/useDeliveryNotes';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ScannedRoute {
+  id: string;
+  name: string;
+  barcode: string | null;
+  vehicle_location_id: string | null;
+  vehicle_code: string | null;
+}
 
 
 interface Props {
@@ -41,6 +50,18 @@ export function LoadingModule({ onCommand }: Props) {
   const [noteConfirmed, setNoteConfirmed] = useState(false);
   /** Conferência local (por artigo) antes de confirmar. */
   const [checked, setChecked] = useState<Record<string, number>>({});
+  /** Rota lida por código de barras (ROTA-XXXXXX): filtra as notas do cais. */
+  const [route, setRoute] = useState<ScannedRoute | null>(null);
+  const [loadingRoute, setLoadingRoute] = useState(false);
+
+  const visibleNotes = useMemo(
+    () => (route ? notes.filter((n) => n.route_id === route.id) : notes),
+    [notes, route],
+  );
+  /** A carrinha lida é diferente da definida na rota? */
+  const vehicleMismatch = Boolean(
+    route?.vehicle_code && vehicle && route.vehicle_code !== vehicle,
+  );
 
   const note = notes.find((n) => n.id === noteId) ?? null;
   const noteItems = useMemo(
@@ -58,6 +79,67 @@ export function LoadingModule({ onCommand }: Props) {
     });
   };
 
+  const selectRouteByBarcode = async (code: string) => {
+    setLoadingRoute(true);
+    try {
+      const { data, error } = await supabase
+        .from('route_schedules')
+        .select('id, name, barcode, vehicle_location_id')
+        .eq('barcode', code)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        toast.error(`Rota "${code}" não encontrada`);
+        return;
+      }
+      let vehicleCode: string | null = null;
+      if (data.vehicle_location_id) {
+        const { data: loc } = await supabase
+          .from('warehouse_locations')
+          .select('code')
+          .eq('id', data.vehicle_location_id)
+          .maybeSingle();
+        vehicleCode = loc?.code ?? null;
+      }
+      setRoute({ ...data, vehicle_code: vehicleCode } as ScannedRoute);
+      setNoteId(null);
+      setChecked({});
+      setNoteConfirmed(false);
+      if (vehicleCode && !vehicle) {
+        setVehicle(vehicleCode);
+      }
+      toast.success(`Rota ${data.name} selecionada`, {
+        description: vehicleCode
+          ? `Carrinha definida na rota: ${vehicleCode}.`
+          : 'Esta rota não tem carrinha definida.',
+      });
+    } catch (e) {
+      toast.error('Não foi possível ler a rota');
+    } finally {
+      setLoadingRoute(false);
+    }
+  };
+
+  /** Carrega de uma vez todas as notas do cais que pertencem à rota lida. */
+  const loadWholeRoute = async () => {
+    if (!vehicle) {
+      toast.error('Escolha a viatura de destino.');
+      return;
+    }
+    const ids = visibleNotes.map((n) => n.id);
+    if (ids.length === 0) {
+      toast.error('Esta rota não tem notas no cais.');
+      return;
+    }
+    await loadNotes.mutateAsync({ noteIds: ids, vehicleLocation: vehicle, items: undefined });
+    setChecked({});
+    setNoteId(null);
+    setNoteConfirmed(false);
+    toast.success(`Rota carregada (${ids.length} notas)`, {
+      description: `Stock movido do cais para ${vehicle}.`,
+    });
+  };
+
   const totals = useMemo(() => {
     const requested = noteItems.reduce(
       (s, i) => s + Math.max(i.staged_quantity - i.loaded_quantity, 0),
@@ -70,6 +152,12 @@ export function LoadingModule({ onCommand }: Props) {
   const handleScan = (raw: string) => {
     if (onCommand?.(raw)) return;
     const value = parseScan(raw).value.trim().toLowerCase();
+
+    // leitura de rota (ROTA-XXXXXX)
+    if (value.startsWith('rota-')) {
+      void selectRouteByBarcode(parseScan(raw).value.trim().toUpperCase());
+      return;
+    }
 
     // leitura de viatura
     const veh = vehicles.find((v) => v.code.trim().toLowerCase() === value);
@@ -159,7 +247,66 @@ export function LoadingModule({ onCommand }: Props) {
 
   return (
     <div className="space-y-4">
-      <ScanInput onScan={handleScan} placeholder="Ler viatura ou artigo…" />
+      <ScanInput onScan={handleScan} placeholder="Ler rota, viatura ou artigo…" />
+
+      {loadingRoute && (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> A procurar a rota…
+        </p>
+      )}
+
+      {route && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="space-y-2 p-3">
+            <div className="flex items-center gap-2">
+              <RouteIcon className="h-4 w-4 text-primary" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{route.name}</p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {route.barcode} • {visibleNotes.length} nota(s) no cais •{' '}
+                  {route.vehicle_code ? `Carrinha: ${route.vehicle_code}` : 'Sem carrinha definida'}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2"
+                onClick={() => {
+                  setRoute(null);
+                  setNoteId(null);
+                  setChecked({});
+                  setNoteConfirmed(false);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {vehicleMismatch && (
+              <p className="flex items-start gap-2 rounded-md bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Atenção: está a carregar para <strong>{vehicle}</strong>, mas esta rota está
+                  definida para <strong>{route.vehicle_code}</strong>.
+                </span>
+              </p>
+            )}
+
+            <Button
+              className="w-full"
+              disabled={loadNotes.isPending || !vehicle || visibleNotes.length === 0}
+              onClick={() => void loadWholeRoute()}
+            >
+              {loadNotes.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Truck className="mr-2 h-4 w-4" />
+              )}
+              Carregar rota completa
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
         <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
@@ -220,12 +367,12 @@ export function LoadingModule({ onCommand }: Props) {
           )}
           {isLoading ? (
             <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
-          ) : notes.length === 0 ? (
+          ) : visibleNotes.length === 0 ? (
             <p className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-              Nenhuma nota no cais de carga.
+              {route ? 'Esta rota não tem notas no cais.' : 'Nenhuma nota no cais de carga.'}
             </p>
           ) : (
-            notes.map((n) => (
+            visibleNotes.map((n) => (
               <button
                 key={n.id}
                 disabled={!vehicle}
