@@ -18,6 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { AlertTriangle, Upload, TrendingUp, TrendingDown, FileSpreadsheet, Download } from 'lucide-react';
 import { loadXLSX } from '@/lib/lazyXlsx';
+import { LocationSelect } from '@/components/counting/LocationSelect';
 interface CorrectionItem {
   productId: string;
   code: string;
