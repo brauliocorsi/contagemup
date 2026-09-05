@@ -68,6 +68,10 @@ export interface ProductDamage {
   resolved_at: string | null;
   resolution_type: string | null;
   resolution_notes: string | null;
+  source_count_id?: string | null;
+  source_colis_number?: number | null;
+  source_location?: string | null;
+
   created_at: string;
   updated_at: string;
 }
