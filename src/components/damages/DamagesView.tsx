@@ -237,7 +237,7 @@ export function DamagesView() {
       <Card>
         <CardHeader className="space-y-3">
           <div className="flex flex-row items-center justify-between">
-            <CardTitle>Lista de Avarias</CardTitle>
+            <CardTitle>Avarias e Quarentena</CardTitle>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredDamages.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
@@ -255,10 +255,18 @@ export function DamagesView() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="active">
-                Ativas
-                {activeDamages.length > 0 && (
+                Em quarentena
+                {quarantineDamages.length > 0 && (
                   <Badge variant="destructive" className="ml-2">
-                    {activeDamages.length}
+                    {quarantineDamages.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="returns">
+                Devoluções por triar
+                {returnDamages.length > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {returnDamages.length}
                   </Badge>
                 )}
               </TabsTrigger>
@@ -275,7 +283,7 @@ export function DamagesView() {
 
             <TabsContent value="active">
               <DamagesTable
-                damages={activeDamages}
+                damages={quarantineDamages}
                 onResolve={resolveDamage}
                 onUpdate={updateDamage}
                 onDelete={deleteDamage}
@@ -283,6 +291,18 @@ export function DamagesView() {
                 isUpdating={isUpdating}
               />
             </TabsContent>
+
+            <TabsContent value="returns">
+              <DamagesTable
+                damages={returnDamages}
+                onResolve={resolveDamage}
+                onUpdate={updateDamage}
+                onDelete={deleteDamage}
+                isResolving={isResolving}
+                isUpdating={isUpdating}
+              />
+            </TabsContent>
+
 
             <TabsContent value="resolved">
               <DamagesTable
