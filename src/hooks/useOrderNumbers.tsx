@@ -225,13 +225,18 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
           }
         }
       } else if (isPresent) {
-        // Only insert if marking as present and no count exists
+        // Localização obrigatória: sem morada não criamos stock
+        if (!order.location?.trim()) {
+          toast.error('Defina a localização da encomenda antes de marcar colis como presentes.');
+          return false;
+        }
         await supabase
           .from('counts')
-          .insert({ 
-            product_id: order.product_id, 
-            colis_number: colisNumber, 
-            quantity: 1 
+          .insert({
+            product_id: order.product_id,
+            colis_number: colisNumber,
+            quantity: 1,
+            location: order.location.trim(),
           });
       }
 
