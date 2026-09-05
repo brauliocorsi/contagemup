@@ -323,7 +323,14 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
 
                     return (
                       <TableRow key={audit.id}>
-                        <TableCell className="font-medium">{audit.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {audit.name}
+                          {audit.access_code && audit.status !== 'completed' && (
+                            <span className="ml-2 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                              código {audit.access_code}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md w-fit ${statusConfig.bg}`}>
                             <StatusIcon className={`h-3.5 w-3.5 ${statusConfig.color}`} />
