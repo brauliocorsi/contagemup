@@ -245,13 +245,13 @@ export const LocationSelect = forwardRef<HTMLButtonElement, LocationSelectProps>
             })}
             
             {showCreateOption && totalFiltered > 0 && (
-              <CommandGroup heading="Personalizado">
+              <CommandGroup heading="Administração">
                 <CommandItem
                   value={inputValue}
                   onSelect={handleCreateCustom}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Usar "{inputValue}"
+                  Criar localização "{inputValue.trim().toUpperCase()}"
                 </CommandItem>
               </CommandGroup>
             )}
