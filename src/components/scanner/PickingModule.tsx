@@ -362,16 +362,24 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     }));
 
   const finalize = async () => {
-    const lineItems = lines
-      .filter((l) => l.picked > 0 && !blockedFor(l))
-      .map((l) => ({
-        product_id: l.product?.id ?? null,
-        product_code: l.product?.code || l.code || '',
-        product_name: l.name,
-        details: l.details ?? null,
-        order_number: (l.orders || '').split(',')[0]?.trim() || null,
-        quantity: l.picked,
-      }));
+    const picking = lines.filter((l) => l.picked > 0 && !blockedFor(l));
+    const missingReason = picking.find((l) => l.picked < l.quantity && !l.reason);
+    if (missingReason) {
+      toast.error(`Indique o motivo da falta em "${missingReason.name}"`);
+      return;
+    }
+    const lineItems = picking.map((l) => ({
+      product_id: l.product?.id ?? null,
+      product_code: l.product?.code || l.code || '',
+      product_name: l.name,
+      details: l.details ?? null,
+      order_number: (l.orders || '').split(',')[0]?.trim() || null,
+      quantity: l.picked,
+      from_location: l.from.trim() || null,
+      item_id: l.itemId ?? null,
+      shortage_reason: l.picked < l.quantity ? l.reason || null : null,
+      shortage_notes: l.picked < l.quantity ? l.note || null : null,
+    }));
 
     if (lineItems.length === 0) {
       toast.error(
@@ -388,12 +396,25 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
 
     setSaving(true);
     try {
-      const { error } = await supabase.rpc('stage_picking_to_dock', {
+      const { data: result, error } = await supabase.rpc('stage_picking_to_dock', {
         p_task_id: task?.id ?? null,
         p_dock_location: dock,
         p_lines: lineItems as unknown as never,
       });
       if (error) throw error;
+
+      const res = (result ?? {}) as { lines?: any[]; partial_lines?: number };
+      const shortLines = (res.lines ?? []).filter((l) => (l.missing ?? 0) > 0);
+      if (shortLines.length > 0) {
+        toast.warning(
+          `Picking parcial em ${shortLines.length} artigo(s): ` +
+            shortLines
+              .map((l) => `${l.product_code || l.product_name} faltam ${l.missing}`)
+              .slice(0, 4)
+              .join('; '),
+        );
+      }
+
 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['counts'] });
