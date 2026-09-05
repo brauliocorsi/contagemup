@@ -1,4 +1,10 @@
 import { useVehicles, vehiclePlate } from '@/hooks/useVehicles';
+import {
+  useRoutePicking,
+  useSaveRoutePicking,
+  PICKING_PROGRESS_LABELS,
+  type SavePickingLine,
+} from '@/hooks/useRoutePicking';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
@@ -109,6 +115,8 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
   const [loadTime, setLoadTime] = useState('08:00');
 
   const createTask = useCreatePickingTask();
+  const savePicking = useSaveRoutePicking();
+  const { data: savedPicking } = useRoutePicking(routeId ?? null);
   const updateRoute = useUpdateRoute();
   const removeStop = useRemoveRouteStop();
   const reorder = useReorderRouteStops();
@@ -259,29 +267,45 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
   }
 
   async function sendToScanner() {
+    const all = picking ?? [];
+    if (all.length === 0) {
+      toast.error('Gere primeiro o picking');
+      return;
+    }
     if (pickingKept.length === 0) {
       toast.error('Nenhum artigo no picking');
       return;
     }
-    await createTask.mutateAsync({
+    const lines: SavePickingLine[] = all.flatMap((l) => {
+      const base = {
+        key: l.key,
+        product_code: l.codigo,
+        product_name: l.nome,
+        details: l.detalhes || null,
+        locations: l.localizacoes ?? null,
+        excluded: Boolean(excluded[l.key]),
+      };
+      const entries = Object.entries(l.porEncomenda ?? {}).filter(([, q]) => q > 0);
+      if (entries.length === 0) {
+        return [
+          { ...base, orders: l.encomendas.join(', ') || null, requested_quantity: l.quantidade },
+        ];
+      }
+      return entries.map(([order, qty]) => ({ ...base, orders: order, requested_quantity: qty }));
+    });
+
+    await savePicking.mutateAsync({
+      routeId: routeId ?? null,
       name: `Picking ${route?.name ?? 'rota'}`,
       reference: `ROTA-${route?.scheduled_date ?? ''}`,
       notes: `${chosenStops.length} nota(s) da rota ${route?.name ?? ''}`,
-      items: pickingKept.flatMap((l) => {
-        const base = {
-          product_code: l.codigo,
-          product_name: l.nome,
-          details: l.detalhes || null,
-          locations: l.localizacoes ?? null,
-        };
-        const entries = Object.entries(l.porEncomenda ?? {}).filter(([, q]) => q > 0);
-        if (entries.length === 0) {
-          return [{ ...base, orders: l.encomendas.join(', ') || null, requested_quantity: l.quantidade }];
-        }
-        return entries.map(([order, qty]) => ({ ...base, orders: order, requested_quantity: qty }));
-      }),
+      lines,
     });
-    toast.success('Lista enviada para o Picking do Scanner');
+    toast.success(
+      savedPicking
+        ? 'Picking da rota atualizado no Scanner'
+        : 'Lista enviada para o Picking do Scanner',
+    );
   }
 
   const guidesJob = useMutation({
@@ -637,6 +661,19 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
         <section className="rounded-lg border border-border bg-card">
           <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
             <h2 className="text-sm font-semibold">Relatório de Picking</h2>
+            {savedPicking && (
+              <Badge
+                variant={savedPicking.progress === 'done' ? 'default' : 'secondary'}
+                className={
+                  savedPicking.progress === 'partial'
+                    ? 'border-amber-300 bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                    : undefined
+                }
+              >
+                {PICKING_PROGRESS_LABELS[savedPicking.progress]} · {savedPicking.picked}/
+                {savedPicking.requested} un.
+              </Badge>
+            )}
             <label className="mr-auto flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               <Checkbox checked={byCategory} onCheckedChange={(v) => setByCategory(Boolean(v))} />
               Separar por categoria
@@ -650,10 +687,14 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
             <Button
               variant="outline"
               onClick={() => void sendToScanner()}
-              disabled={pickingKept.length === 0 || createTask.isPending}
+              disabled={pickingKept.length === 0 || savePicking.isPending}
             >
               <ScanBarcode className="mr-2 h-4 w-4" />
-              {createTask.isPending ? 'A enviar…' : 'Enviar para o Scanner'}
+              {savePicking.isPending
+                ? 'A guardar…'
+                : savedPicking
+                  ? 'Atualizar no Scanner'
+                  : 'Enviar para o Scanner'}
             </Button>
             <Button onClick={printPickingReport} disabled={pickingKept.length === 0}>
               <Printer className="mr-2 h-4 w-4" /> Imprimir picking
