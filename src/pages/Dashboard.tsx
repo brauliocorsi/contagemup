@@ -26,6 +26,8 @@ const SeparationNotesView = lazy(() => import('@/components/logistics/Separation
 const DeliveriesView = lazy(() => import('@/components/logistics/DeliveriesView').then(m => ({ default: m.DeliveriesView })));
 const RouteOptimizationView = lazy(() => import('@/components/logistics/RouteOptimizationView').then(m => ({ default: m.RouteOptimizationView })));
 const RoutesView = lazy(() => import('@/components/logistics/RoutesView').then(m => ({ default: m.RoutesView })));
+// MÓDULO EXPERIMENTAL REMOVÍVEL — Necessidades de Compra — Testes
+const PurchaseNeedsLabView = lazy(() => import('@/components/purchase-needs-lab/PurchaseNeedsLabView').then(m => ({ default: m.PurchaseNeedsLabView })));
 
 
 // Loading skeleton component
