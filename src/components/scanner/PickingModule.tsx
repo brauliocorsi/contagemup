@@ -247,7 +247,16 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       const raw = await parsePickingFile(file);
       const resolved = resolveRows(raw, products);
       setTask(null);
-      setLines(resolved.map((r) => ({ ...r, picked: 0 })));
+      setLines(
+        resolved.map((r) => ({
+          ...r,
+          picked: 0,
+          from: firstSuggested((r as any).locations),
+          reason: '',
+          note: '',
+        })),
+      );
+
       toast.success(`${resolved.length} linha(s) carregadas`);
     } catch (e: any) {
       console.error(e);
