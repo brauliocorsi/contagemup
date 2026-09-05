@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import { lazy, Suspense } from "react";
 
 const ScannerApp = lazy(() => import("./pages/ScannerApp"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +37,14 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/install" element={<InstallApp />} />
+                <Route
+                  path="/.lovable/oauth/consent"
+                  element={
+                    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">A carregar…</div>}>
+                      <OAuthConsent />
+                    </Suspense>
+                  }
+                />
                 <Route
                   path="/scanner"
                   element={
