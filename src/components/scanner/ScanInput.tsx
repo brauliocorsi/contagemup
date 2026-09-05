@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { Camera, CameraOff, Keyboard, ScanLine } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Camera, CameraOff, Keyboard, ScanLine, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { isSoundEnabled, scanFeedback, setSoundEnabled } from '@/lib/scanner/feedback';
 
 interface ScanInputProps {
   onScan: (code: string) => void;
@@ -17,35 +18,17 @@ interface ScanInputProps {
   feedback?: boolean;
 }
 
-/** Beep curto sem ficheiros externos. */
-function beep() {
-  try {
-    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.value = 1400;
-    gain.gain.value = 0.05;
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    setTimeout(() => {
-      osc.stop();
-      ctx.close();
-    }, 70);
-  } catch {
-    /* ignore */
-  }
-}
-
 /**
  * Entrada universal de leitura: teclado/pistola (wedge) sempre ativo,
  * câmara opcional através do @zxing/browser.
+ *
+ * O campo usa `inputMode="none"` por defeito para que o teclado do telemóvel
+ * NÃO abra e o ecrã não salte. A pistola continua a funcionar porque escreve
+ * como teclado externo. O botão do teclado alterna para escrita manual.
  */
 export function ScanInput({
   onScan,
-  placeholder = 'Ler ou escrever código…',
+  placeholder = 'Ler código…',
   label,
   autoFocus = true,
   className,
@@ -54,10 +37,19 @@ export function ScanInput({
 }: ScanInputProps) {
   const [value, setValue] = useState('');
   const [cameraOn, setCameraOn] = useState(false);
+  const [manual, setManual] = useState(false);
+  const [sound, setSound] = useState(() => isSoundEnabled());
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const lastRef = useRef<{ code: string; at: number }>({ code: '', at: 0 });
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const manualRef = useRef(false);
+  manualRef.current = manual;
+
+  /** Foca sem nunca deslocar o ecrã. */
+  const focusField = useCallback(() => {
+    inputRef.current?.focus({ preventScroll: true });
+  }, []);
 
   /**
    * @param fromCamera leituras da câmara repetem-se dezenas de vezes por segundo,
@@ -69,21 +61,14 @@ export function ScanInput({
     const now = Date.now();
     if (fromCamera && lastRef.current.code === clean && now - lastRef.current.at < dedupeMs) return;
     lastRef.current = { code: clean, at: now };
-    if (feedback) {
-      beep();
-      try {
-        navigator.vibrate?.(40);
-      } catch {
-        /* ignore */
-      }
-    }
+    if (feedback) scanFeedback('ok');
     onScan(clean);
+    focusField();
   };
 
   /**
-   * Mantém o campo de leitura sempre focado para o scanner nunca falhar.
-   * Só recupera o foco quando ninguém está a escrever noutro campo, num
-   * diálogo ou menu aberto — assim não rouba o foco às quantidades.
+   * O foco é recuperado apenas por eventos (fim de toque, regresso à app,
+   * início de escrita), nunca por temporizador — assim o ecrã não salta.
    */
   useEffect(() => {
     if (!autoFocus) return;
@@ -100,10 +85,9 @@ export function ScanInput({
     };
 
     const refocus = () => {
-      if (canSteal()) inputRef.current?.focus();
+      if (canSteal()) focusField();
     };
 
-    const id = window.setInterval(refocus, 700);
     const onPointerUp = () => window.setTimeout(refocus, 60);
     const onVisibility = () => {
       if (!document.hidden) window.setTimeout(refocus, 120);
@@ -113,20 +97,20 @@ export function ScanInput({
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key.length !== 1) return;
       if (!canSteal()) return;
-      inputRef.current?.focus();
+      focusField();
     };
 
     document.addEventListener('pointerup', onPointerUp);
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', refocus);
     return () => {
-      window.clearInterval(id);
       document.removeEventListener('pointerup', onPointerUp);
       document.removeEventListener('keydown', onKeyDown, true);
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', refocus);
     };
-  }, [autoFocus]);
-
+  }, [autoFocus, focusField]);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,17 +119,12 @@ export function ScanInput({
       try {
         const { BrowserMultiFormatReader } = await import('@zxing/browser');
         const reader = new BrowserMultiFormatReader();
-        const controls = await reader.decodeFromVideoDevice(
-          undefined,
-          videoRef.current!,
-          (result) => {
-            if (result) emit(result.getText(), true);
-          }
-
-        );
+        const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current!, (result) => {
+          if (result) emit(result.getText(), true);
+        });
         if (cancelled) controls.stop();
         else controlsRef.current = controls;
-      } catch (e: any) {
+      } catch (e) {
         console.error('camera error', e);
         toast.error('Não foi possível aceder à câmara');
         setCameraOn(false);
@@ -172,19 +151,18 @@ export function ScanInput({
             ref={inputRef}
             value={value}
             autoFocus={autoFocus}
-            inputMode="text"
+            inputMode={manual ? 'text' : 'none'}
             className="h-12 pl-9 text-base"
-            placeholder={placeholder}
+            placeholder={manual ? 'Escrever código…' : placeholder}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
                 emit(value);
                 setValue('');
-                inputRef.current?.focus();
+                if (manualRef.current) setManual(false);
               }
             }}
-
           />
         </div>
         <Button
@@ -199,15 +177,40 @@ export function ScanInput({
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant={manual ? 'default' : 'outline'}
           size="icon"
           className="h-12 w-12 shrink-0"
-          onClick={() => inputRef.current?.focus()}
-          aria-label="Focar teclado"
+          onClick={() => {
+            setManual((v) => !v);
+            window.setTimeout(focusField, 0);
+          }}
+          aria-label={manual ? 'Desligar escrita manual' : 'Escrever à mão'}
+          title={manual ? 'Escrita manual ligada' : 'Escrita manual desligada'}
         >
           <Keyboard className="h-5 w-5" />
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-12 w-12 shrink-0"
+          onClick={() => {
+            const next = !sound;
+            setSound(next);
+            setSoundEnabled(next);
+            if (next) scanFeedback('ok');
+          }}
+          aria-label={sound ? 'Desligar som' : 'Ligar som'}
+        >
+          {sound ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+        </Button>
       </div>
+
+      {manual && (
+        <p className="text-[11px] font-medium text-primary">
+          Escrita manual ligada — o teclado abre. Confirma com Enter para voltar ao modo de leitura.
+        </p>
+      )}
 
       {cameraOn && (
         <div className="overflow-hidden rounded-xl border bg-black">
