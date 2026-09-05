@@ -114,6 +114,14 @@ export function DamagesView() {
 
   const activeDamages = filteredDamages.filter(d => d.status === 'active');
   const resolvedDamages = filteredDamages.filter(d => d.status === 'resolved');
+  const isReturn = (loc?: string | null) =>
+    (loc || '').trim().toUpperCase() === RETURNS_QUARANTINE_LOCATION;
+  const quarantineDamages = activeDamages.filter(d => !isReturn(d.location));
+  const returnDamages = activeDamages.filter(d => isReturn(d.location));
+  const agedCount = activeDamages.filter(
+    d => (Date.now() - new Date(d.created_at).getTime()) / 86_400_000 > 30
+  ).length;
+
 
   // Get top damaged products
   const topDamagedProducts = Object.entries(stats.byProduct)
