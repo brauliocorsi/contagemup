@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useDamages } from '@/hooks/useDamages';
+import { RETURNS_QUARANTINE_LOCATION } from '@/types/damages';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
