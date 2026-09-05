@@ -151,7 +151,7 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
                 product_id: productId, 
                 colis_number: i, 
                 quantity: 1, 
-                location: location || null
+                location: (location as string).trim()
               });
           }
         }
