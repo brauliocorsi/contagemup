@@ -9,7 +9,9 @@ import { LocationSelect } from '@/components/counting/LocationSelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useProductResolver, useScannerTransfers } from '@/hooks/useScannerData';
 import { useReceivingLocations } from '@/hooks/useReceivingLocations';
-import { parseScan } from '@/lib/scanner/commands';
+import { resolveScan } from '@/lib/scanner/resolveScan';
+import { scanFeedback } from '@/lib/scanner/feedback';
+import { ScanDock, type LastScan } from './ScanDock';
 import { toast } from 'sonner';
 
 interface PendingRow {
@@ -46,6 +48,7 @@ export function PutawayModule({ onCommand }: Props) {
   const [selected, setSelected] = useState<Selected[]>([]);
   const [destination, setDestination] = useState('');
   const [busy, setBusy] = useState(false);
+  const [last, setLast] = useState<LastScan | null>(null);
 
   const { data: pending = [], isLoading } = useQuery({
     queryKey: ['putaway-pending', receivingCodes],
@@ -182,6 +185,15 @@ export function PutawayModule({ onCommand }: Props) {
 
   return (
     <div className="space-y-4">
+      <ScanDock last={last} progress={{ done: selected.length, total: pending.length, label: 'Linhas por arrumar' }}>
+        <ScanInput
+          onScan={handleScan}
+          feedback={false}
+          placeholder="Ler produto ou destino (LOC-…)"
+          autoFocus
+        />
+      </ScanDock>
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -196,7 +208,6 @@ export function PutawayModule({ onCommand }: Props) {
           <p className="text-xs text-muted-foreground">
             Leia o produto (ou coli) que está em conferência e depois a localização de destino.
           </p>
-          <ScanInput onScan={handleScan} placeholder="Ler produto ou destino (LOC-…)" autoFocus feedback />
           <LocationSelect value={destination} onValueChange={setDestination} placeholder="Localização de destino…" />
           {busy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </CardContent>
