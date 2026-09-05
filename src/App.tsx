@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import { lazy, Suspense } from "react";
 
 const ScannerApp = lazy(() => import("./pages/ScannerApp"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
