@@ -6,9 +6,11 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AuditExecutionView } from '@/components/audit/AuditExecutionView';
 import { DashboardHome } from '@/components/dashboard/DashboardHome';
+import { useAuth } from '@/hooks/useAuth';
 
 // Lazy loading - cada view é carregada apenas quando necessária
-const CountingView = lazy(() => import('@/components/counting/CountingView').then(m => ({ default: m.CountingView })));
+const AuditManagementView = lazy(() => import('@/components/counting/AuditManagementView').then(m => ({ default: m.AuditManagementView })));
+const ProductLookupView = lazy(() => import('@/components/products/ProductLookupView').then(m => ({ default: m.ProductLookupView })));
 const ProductsView = lazy(() => import('@/components/products/ProductsView').then(m => ({ default: m.ProductsView })));
 const CategoriesView = lazy(() => import('@/components/categories/CategoriesView').then(m => ({ default: m.CategoriesView })));
 const SessionsView = lazy(() => import('@/components/sessions/SessionsView').then(m => ({ default: m.SessionsView })));
@@ -52,6 +54,8 @@ function ViewLoader() {
 }
 
 export default function Dashboard() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const [activeTab, setActiveTab] = useState('home');
   const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
   const [openRouteId, setOpenRouteId] = useState<string | null>(null);
@@ -102,7 +106,8 @@ export default function Dashboard() {
           <main className="flex-1 px-4 md:px-6 lg:px-8 py-6">
             <Suspense fallback={<ViewLoader />}>
               {activeTab === 'home' && <DashboardHome onNavigate={setActiveTab} />}
-              {activeTab === 'counting' && <CountingView />}
+              {activeTab === 'counting' && isAdmin && <AuditManagementView />}
+              {activeTab === 'lookup' && <ProductLookupView onNavigate={setActiveTab} />}
               {activeTab === 'products' && <ProductsView />}
               {activeTab === 'categories' && <CategoriesView />}
               {activeTab === 'sessions' && <SessionsView />}
@@ -111,7 +116,6 @@ export default function Dashboard() {
               {activeTab === 'alerts' && <StockAlertsView />}
               {activeTab === 'scanner-picking' && <ScannerPickingAdminView />}
               {activeTab === 'putaway' && <PutawayView />}
-              {activeTab === 'orphan-colis' && <OrphanColisView />}
               {activeTab === 'orphans' && <OrphanColisView />}
               {activeTab === 'damages' && <DamagesView />}
               {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}

@@ -27,6 +27,7 @@ import { EntryModule } from '@/components/scanner/EntryModule';
 import { PrintCenterModule } from '@/components/scanner/PrintCenterModule';
 import { SupplierCodeModule } from '@/components/scanner/SupplierCodeModule';
 import { CountingModule } from '@/components/scanner/CountingModule';
+import { useMyLocationAudits } from '@/hooks/useLocationAudits';
 import { LoadingModule } from '@/components/scanner/LoadingModule';
 import { PutawayModule } from '@/components/scanner/PutawayModule';
 import { parseCommand, SCANNER_MODES, type QtyHandler, type ScannerMode } from '@/lib/scanner/commands';
@@ -120,6 +121,9 @@ const NAV: Array<{ id: View; label: string; icon: typeof Search }> = [
 
 export default function ScannerApp() {
   const { user, loading } = useAuth();
+  const { data: myAudits = [] } = useMyLocationAudits();
+  /** A contagem só existe quando há conferência aberta e atribuída a este utilizador. */
+  const canCount = myAudits.length > 0;
   const [view, setView] = useState<View>('home');
   /** O módulo ativo regista aqui o seu handler de quantidade. */
   const qtyHandlerRef = useRef<QtyHandler | null>(null);
@@ -169,7 +173,9 @@ export default function ScannerApp() {
 
   if (!user) return <LoginForm />;
 
-  const current = OPERATIONS.find((o) => o.id === view);
+  const operations = OPERATIONS.filter((o) => o.id !== 'contagem' || canCount);
+  const navItems = NAV.filter((n) => n.id !== 'contagem' || canCount);
+  const current = operations.find((o) => o.id === view);
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">
@@ -204,7 +210,7 @@ export default function ScannerApp() {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Escolhe a operação:</p>
             <div className="grid grid-cols-2 gap-3">
-              {OPERATIONS.map((op) => {
+              {operations.map((op) => {
                 const Icon = op.icon;
                 return (
                   <button
@@ -233,14 +239,14 @@ export default function ScannerApp() {
         {view === 'entradas' && <EntryModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'arrumacao' && <PutawayModule onCommand={handleCommand} />}
         {view === 'carregamento' && <LoadingModule onCommand={handleCommand} />}
-        {view === 'contagem' && <CountingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
+        {view === 'contagem' && canCount && <CountingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'fornecedor' && <SupplierCodeModule onCommand={handleCommand} />}
         {view === 'impressao' && <PrintCenterModule />}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur">
         <div className="mx-auto grid max-w-3xl grid-cols-7">
-          {NAV.map((m) => {
+          {navItems.map((m) => {
             const Icon = m.icon;
             const active = view === m.id;
             return (

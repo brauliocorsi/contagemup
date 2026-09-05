@@ -7,7 +7,6 @@ import { CountingSummary } from './CountingSummary';
 import { CountingFilters } from './CountingFilters';
 import { CountingExportMenu } from './CountingExportMenu';
 import { CountingProductList } from './CountingProductList';
-import { CountingAccessGate, CountingUnlock } from './CountingAccessGate';
 import { useCountingFilters } from './hooks/useCountingFilters';
 import { useCountingExport } from './hooks/useCountingExport';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,8 +21,8 @@ export function CountingView() {
   
   // A sessão de contagem deixou de existir na navegação: as linhas vivas de counts têm session_id a NULL.
   const selectedSessionId: string | null = null;
-  const [unlock, setUnlock] = useState<CountingUnlock | null>(null);
-  const readOnly = !unlock;
+  // Contar é exclusivo do scanner, dentro de uma conferência atribuída.
+  const readOnly = true;
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterLocation, setFilterLocation] = useState<string>('all');
@@ -73,12 +72,7 @@ export function CountingView() {
 
   // Quando a contagem está desbloqueada por uma conferência, só se pode contar
   // nas localizações dessa conferência. Fora delas, nada.
-  const sessionFilteredProducts = useMemo(() => {
-    if (!unlock) return productsWithCounts;
-    const allowed = new Set(unlock.locations.map(l => l.trim().toUpperCase()));
-    return productsWithCounts.filter((p: ProductWithCounts) =>
-      p.uniqueLocations.some(l => allowed.has((l || '').trim().toUpperCase())));
-  }, [productsWithCounts, unlock]);
+  const sessionFilteredProducts = productsWithCounts;
 
   // Use counting filters hook
   const {
@@ -195,9 +189,6 @@ export function CountingView() {
 
   return (
     <PageContainer className="p-4">
-
-      {/* Acesso à contagem */}
-      <CountingAccessGate unlock={unlock} onUnlock={setUnlock} />
 
       {/* Summary */}
       <CountingSummary products={sessionFilteredProducts as ProductWithCounts[]} />

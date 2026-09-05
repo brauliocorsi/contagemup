@@ -186,7 +186,8 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
       toast.error(`Faltam ${pending.length} artigo(s) por confirmar`);
       return;
     }
-    await completeAudit.mutateAsync(audit.id);
+    // O fecho com ajustes é feito pelo responsável, na área de Conferências.
+    toast.success('Contagem entregue. O responsável vai fechar a conferência.');
     setAuditId(null);
     setLocation(null);
   };
@@ -289,9 +290,9 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
                   className="w-full"
                   variant="outline"
                   onClick={finishAudit}
-                  disabled={completeAudit.isPending || progress.done < progress.total}
+                  disabled={progress.done < progress.total}
                 >
-                  Concluir contagem
+                  Entregar contagem
                 </Button>
               </>
             )}
