@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { useWarehouseLocations } from '@/hooks/useWarehouseConfig';
+import { useAuth } from '@/hooks/useAuth';
 
 interface LocationSelectProps {
   value: string;
