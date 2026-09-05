@@ -460,6 +460,10 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const renderLine = (l: PickLine) => {
     const done = l.picked >= l.quantity;
     const blocked = blockedFor(l);
+    const meta = metaFor(l);
+    const short = l.picked > 0 && l.picked < l.quantity;
+    const update = (patch: Partial<PickLine>) =>
+      setLines((prev) => prev.map((x) => (x.key === l.key ? { ...x, ...patch } : x)));
     return (
       <div
         key={l.key}
@@ -471,6 +475,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
               : ''
         }`}
       >
+
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium">{l.name}</p>
