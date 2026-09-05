@@ -2,7 +2,7 @@
 // SOMENTE LEITURA + simulação local. Nunca cria/edita compras, vendas, produtos, stock ou movimentos.
 // Remoção: apagar src/components/purchase-needs-lab, src/lib/purchase-needs-lab,
 // supabase/functions/needs-lab-gc e o item 'needs-lab' do menu (AppSidebar + Dashboard).
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -424,8 +424,8 @@ export function PurchaseNeedsLabView() {
                       const diff = manual?.quantidade == null ? null : manual.quantidade - g.faltaComprar;
                       const open = !!aberto[g.groupKey];
                       return (
-                        <>
-                          <TableRow key={g.groupKey}>
+                        <Fragment key={g.groupKey}>
+                          <TableRow>
                             <TableCell>
                               <button
                                 type="button"
@@ -482,7 +482,7 @@ export function PurchaseNeedsLabView() {
                             </TableCell>
                           </TableRow>
                           {open && (
-                            <TableRow key={`${g.groupKey}-detail`}>
+                            <TableRow>
                               <TableCell colSpan={9} className="bg-muted/40">
                                 <div className="space-y-3 py-2 text-sm">
                                   {g.review.length > 0 && (
@@ -569,7 +569,7 @@ export function PurchaseNeedsLabView() {
                               </TableCell>
                             </TableRow>
                           )}
-                        </>
+                        </Fragment>
                       );
                     })}
                   </TableBody>
