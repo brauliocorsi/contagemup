@@ -11,8 +11,6 @@ export interface LocationAudit {
   created_by: string | null;
   assigned_to: string | null;
   blind_mode: boolean;
-  /** Código curto que o ADM comunica ao operador para poder contar. */
-  access_code: string | null;
   started_at: string | null;
   completed_at: string | null;
   notes: string | null;
@@ -380,7 +378,7 @@ export function useLocationAudits() {
   };
 }
 
-/** Conferências atribuídas ao utilizador autenticado (ou sem responsável). */
+/** Conferências abertas e atribuídas ao utilizador autenticado. */
 export function useMyLocationAudits() {
   return useQuery({
     queryKey: ['my-location-audits'],
@@ -392,7 +390,8 @@ export function useMyLocationAudits() {
         .select('*')
         .in('status', ['pending', 'in_progress'])
         .order('created_at', { ascending: false });
-      if (uid) query = query.or(`assigned_to.eq.${uid},assigned_to.is.null`);
+      if (!uid) return [];
+      query = query.eq('assigned_to', uid);
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as LocationAudit[];

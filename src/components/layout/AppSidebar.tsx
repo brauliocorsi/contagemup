@@ -2,11 +2,12 @@ import {
   Truck,
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History,
-  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck, FlaskConical, PackageSearch, PackageX,
+  Search, BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck, FlaskConical, PackageSearch, PackageX,
 } from 'lucide-react';
 
 
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Sidebar,
   SidebarContent,
@@ -25,20 +26,20 @@ interface AppSidebarProps {
   onTabChange: (tab: string) => void;
 }
 
-type NavItem = { id: string; label: string; icon: React.ComponentType<{ className?: string }> };
+type NavItem = { id: string; label: string; icon: React.ComponentType<{ className?: string }>; adminOnly?: boolean };
 
 const groups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Operação',
     items: [
       { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'counting', label: 'Contagem', icon: ClipboardList },
+      { id: 'counting', label: 'Conferências', icon: ClipboardList, adminOnly: true },
+      { id: 'lookup', label: 'Consultar Produto', icon: Search },
       { id: 'entries', label: 'Entradas', icon: TrendingUp },
       { id: 'exits', label: 'Saídas', icon: TrendingDown },
       { id: 'alerts', label: 'Alertas', icon: AlertTriangle },
       { id: 'scanner-picking', label: 'Picking Scanner', icon: ClipboardCheck },
       { id: 'putaway', label: 'Arrumação', icon: PackageSearch },
-      { id: 'orphan-colis', label: 'Colis Órfãos', icon: PackageSearch },
       { id: 'orphans', label: 'Colis Órfãos', icon: PackageX },
     ],
   },
@@ -83,6 +84,11 @@ const groups: { label: string; items: NavItem[] }[] = [
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+  const visibleGroups = groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => !i.adminOnly || isAdmin) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -105,7 +111,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent className="bg-gradient-sidebar px-1.5 py-3">
-        {groups.map((group) => (
+        {visibleGroups.map((group) => (
           <SidebarGroup key={group.label} className="mb-1">
             {!collapsed && (
               <SidebarGroupLabel className="text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 px-2 mb-1">
