@@ -12,15 +12,48 @@ export const DAMAGE_TYPES = [
 
 export type DamageType = typeof DAMAGE_TYPES[number];
 
-export const RESOLUTION_TYPES = [
-  'Reparado',
-  'Descartado',
-  'Devolvido ao fornecedor',
-  'Vendido com desconto',
-  'Outro'
+export const QUARANTINE_LOCATION = 'QUARENTENA';
+export const RETURNS_QUARANTINE_LOCATION = 'QUARENTENA-DEV';
+
+export const RESOLUTION_OPTIONS = [
+  {
+    value: 'recuperado',
+    label: 'Recuperado',
+    description: 'Volta para a localização de origem',
+    needsDestination: false,
+    needsSupplierRef: false,
+  },
+  {
+    value: 'abatido',
+    label: 'Abatido',
+    description: 'Sai definitivamente do armazém',
+    needsDestination: false,
+    needsSupplierRef: false,
+  },
+  {
+    value: 'devolvido_fornecedor',
+    label: 'Devolvido ao fornecedor',
+    description: 'Sai com referência do fornecedor',
+    needsDestination: false,
+    needsSupplierRef: true,
+  },
+  {
+    value: 'vendido_saldo',
+    label: 'Vendido em saldo (2.ª escolha)',
+    description: 'Volta ao stock numa localização à escolha',
+    needsDestination: true,
+    needsSupplierRef: false,
+  },
 ] as const;
 
-export type ResolutionType = typeof RESOLUTION_TYPES[number];
+export const RESOLUTION_TYPES = RESOLUTION_OPTIONS.map((o) => o.value);
+
+export type ResolutionType = typeof RESOLUTION_OPTIONS[number]['value'];
+
+export const RESOLUTION_LABELS: Record<string, string> = Object.fromEntries(
+  RESOLUTION_OPTIONS.map((o) => [o.value, o.label])
+);
+
 
 export interface ProductDamage {
   id: string;
