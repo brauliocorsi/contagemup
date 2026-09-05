@@ -1,5 +1,4 @@
 import { useAuth } from '@/hooks/useAuth';
-import { useActiveSession } from '@/hooks/useActiveSession';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +19,6 @@ interface HeaderProps {
 
 export function Header({ onNavigateToProducts }: HeaderProps) {
   const { profile, signOut } = useAuth();
-  const { activeSession } = useActiveSession();
   const { canInstall, isInstalled, install } = usePWAInstall();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
@@ -35,14 +33,6 @@ export function Header({ onNavigateToProducts }: HeaderProps) {
         <div className="flex items-center gap-2 min-w-0">
           <SidebarTrigger className="h-9 w-9 shrink-0" />
 
-          {activeSession && (
-            <div className="hidden sm:flex items-center gap-2 pl-2 ml-1 border-l border-border-subtle">
-              <ClipboardList className="h-4 w-4 text-primary" />
-              <Badge variant="outline" className="bg-primary-soft text-primary border-primary/20 font-medium">
-                {activeSession.name}
-              </Badge>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center gap-2">
