@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CheckCircle, Trash2, Search, Package, MapPin, Box, Calendar, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { DAMAGE_TYPES } from '@/types/damages';
+import { DAMAGE_TYPES, RESOLUTION_LABELS } from '@/types/damages';
 import { DamageResolutionDialog } from './DamageResolutionDialog';
 import { DamageEditDialog } from './DamageEditDialog';
 import { DamageDetailDialog } from './DamageDetailDialog';
