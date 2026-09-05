@@ -234,9 +234,68 @@ export function useLocationAudits() {
     },
   });
 
-  // Complete audit
+  // Complete audit — gera os ajustes das divergências
   const completeAudit = useMutation({
     mutationFn: async (auditId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { data: items, error: itemsError } = await supabase
+        .from('location_audit_items')
+        .select('*')
+        .eq('audit_id', auditId)
+        .eq('status', 'counted');
+      if (itemsError) throw itemsError;
+
+      const divergent = (items || []).filter(
+        (i) => i.difference !== null && i.difference !== 0,
+      );
+
+      const semMotivo = divergent.filter((i) => !i.notes || !i.notes.trim());
+      if (semMotivo.length > 0) {
+        throw new Error(
+          `Indique o motivo em ${semMotivo.length} linha(s) com divergência antes de finalizar.`,
+        );
+      }
+
+      for (const item of divergent) {
+        if (!item.product_id) continue;
+        const counted = item.counted_quantity ?? 0;
+
+        // Acerta o saldo da localização conferida
+        let query = supabase
+          .from('counts')
+          .select('id, quantity')
+          .eq('product_id', item.product_id)
+          .eq('location', item.location);
+        if (item.colis_number !== null) query = query.eq('colis_number', item.colis_number);
+        const { data: countRows } = await query.order('quantity', { ascending: false }).limit(1);
+
+        if (countRows && countRows.length > 0) {
+          await supabase
+            .from('counts')
+            .update({ quantity: counted, updated_at: new Date().toISOString() })
+            .eq('id', countRows[0].id);
+        } else if (counted > 0) {
+          await supabase.from('counts').insert({
+            product_id: item.product_id,
+            colis_number: item.colis_number ?? 1,
+            quantity: counted,
+            location: item.location,
+            counted_by: user?.id ?? null,
+          });
+        }
+
+        await supabase.from('stock_movements').insert({
+          product_id: item.product_id,
+          movement_type: 'ajuste',
+          quantity: Math.abs(item.difference || 0),
+          reason: item.notes,
+          reference: `Conferência ${auditId.slice(0, 8)}`,
+          notes: `${item.location} · coli ${item.colis_number ?? '—'} · esperado ${item.expected_quantity} · contado ${counted}`,
+          created_by: user?.id ?? null,
+        });
+      }
+
       const { error } = await supabase
         .from('location_audits')
         .update({
@@ -246,11 +305,26 @@ export function useLocationAudits() {
         .eq('id', auditId);
 
       if (error) throw error;
+      return divergent.length;
     },
-    onSuccess: () => {
-      toast({ title: 'Conferência finalizada', description: 'Todos os itens foram conferidos' });
+    onSuccess: (adjustments) => {
+      toast({
+        title: 'Conferência finalizada',
+        description: adjustments
+          ? `${adjustments} ajuste(s) de stock registados`
+          : 'Sem divergências a ajustar',
+      });
       queryClient.invalidateQueries({ queryKey: ['location-audits'] });
       queryClient.invalidateQueries({ queryKey: ['location-audit'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['counts'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Não foi possível finalizar',
+        description: mapDatabaseError(error, error.message),
+        variant: 'destructive',
+      });
     },
   });
 
