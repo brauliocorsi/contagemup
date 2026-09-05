@@ -730,14 +730,29 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 maxLength={80}
               />
 
+              {forkliftCount > 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-800 dark:bg-amber-950/20">
+                  <Forklift className="h-4 w-4 shrink-0" />
+                  {forkliftCount} artigo(s) em localizações que exigem empilhador — leve-o já consigo.
+                </div>
+              )}
+
               <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
+                <Button
+                  variant={groupMode === 'rota' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-8 flex-1 text-xs"
+                  onClick={() => setGroupMode('rota')}
+                >
+                  <Route className="mr-1 h-3.5 w-3.5" /> Por rota
+                </Button>
                 <Button
                   variant={groupMode === 'produto' ? 'default' : 'ghost'}
                   size="sm"
                   className="h-8 flex-1 text-xs"
                   onClick={() => setGroupMode('produto')}
                 >
-                  <Package className="mr-1 h-3.5 w-3.5" /> Por produto
+                  <Package className="mr-1 h-3.5 w-3.5" /> Produto
                 </Button>
                 <Button
                   variant={groupMode === 'nota' ? 'default' : 'ghost'}
@@ -745,16 +760,24 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                   className="h-8 flex-1 text-xs"
                   onClick={() => setGroupMode('nota')}
                 >
-                  <FileText className="mr-1 h-3.5 w-3.5" /> Por entrega
+                  <FileText className="mr-1 h-3.5 w-3.5" /> Entrega
                 </Button>
               </div>
+
+              <datalist id="picking-locations">
+                {locationCodes.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
 
               <div className="space-y-3">
                 {groups.map((g) => (
                   <div key={g.title} className="space-y-2">
-                    {groupMode === 'nota' && (
+                    {groupMode !== 'produto' && (
                       <div className="flex items-center justify-between rounded-md bg-muted px-2 py-1">
-                        <p className="truncate text-xs font-semibold">Entrega {g.title}</p>
+                        <p className="truncate text-xs font-semibold">
+                          {groupMode === 'nota' ? `Entrega ${g.title}` : g.title}
+                        </p>
                         <Badge variant="secondary" className="text-[10px]">
                           {g.picked}/{g.requested} un.
                         </Badge>
@@ -764,6 +787,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                   </div>
                 ))}
               </div>
+
 
 
               <Button className="w-full" disabled={saving || totals.picked === 0 || !dock} onClick={finalize}>
