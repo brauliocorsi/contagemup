@@ -167,54 +167,13 @@ export function useCounting(sessionId: string | null) {
       }
       console.log('Count actualizado com sucesso');
     } else {
-      // Localização obrigatória: não criamos stock sem morada.
+      // Localização obrigatória: não criamos linhas de stock sem morada.
       toast({
         title: 'Localização obrigatória',
         description: 'Escolha primeiro a localização deste coli (use SEM-LOCALIZACAO se ainda não souber onde fica).',
         variant: 'destructive'
       });
       return false;
-      // eslint-disable-next-line no-unreachable
-      const { error } = await supabase
-        .from('counts')
-        .insert({
-          session_id: sessionId,
-          product_id: productId,
-          colis_number: colisNumber,
-          quantity,
-          counted_by: user.id
-        });
-
-      if (error) {
-        console.error('Erro ao inserir count:', error);
-        // Se o erro for de constraint única, tentar update
-        if (error.code === '23505') {
-          // Registo foi criado por outro processo, tentar update
-          const retryCount = await fetchFreshCount(productId, colisNumber);
-          if (retryCount) {
-            const { error: retryError } = await supabase
-              .from('counts')
-              .update({ quantity, counted_by: user.id, updated_at: new Date().toISOString() })
-              .eq('id', retryCount.id);
-            
-            if (retryError) {
-              toast({
-                title: 'Erro',
-                description: 'Não foi possível registar a contagem',
-                variant: 'destructive'
-              });
-              return false;
-            }
-          }
-        } else {
-          toast({
-            title: 'Erro',
-            description: 'Não foi possível registar a contagem',
-            variant: 'destructive'
-          });
-          return false;
-        }
-      }
     }
 
     invalidateCounts();
