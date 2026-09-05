@@ -210,7 +210,7 @@ export default function ScannerApp() {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Escolhe a operação:</p>
             <div className="grid grid-cols-2 gap-3">
-              {OPERATIONS.map((op) => {
+              {operations.map((op) => {
                 const Icon = op.icon;
                 return (
                   <button
@@ -246,7 +246,7 @@ export default function ScannerApp() {
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur">
         <div className="mx-auto grid max-w-3xl grid-cols-7">
-          {NAV.map((m) => {
+          {navItems.map((m) => {
             const Icon = m.icon;
             const active = view === m.id;
             return (
