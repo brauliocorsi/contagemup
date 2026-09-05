@@ -25,7 +25,9 @@ import {
 } from '@/hooks/useScannerPickingTasks';
 import { useAuth } from '@/hooks/useAuth';
 import { useTypedLocations } from '@/hooks/useDeliveryNotes';
+import { useWarehouseLocations } from '@/hooks/useWarehouseConfig';
 import { usePickingStockLocations } from '@/hooks/usePickingStockLocations';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
