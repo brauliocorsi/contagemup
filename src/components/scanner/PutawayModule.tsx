@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScanInput } from './ScanInput';
 import { LocationSelect } from '@/components/counting/LocationSelect';
 import { supabase } from '@/integrations/supabase/client';
-import { useProductResolver, useScannerTransfers } from '@/hooks/useScannerData';
+import { useScannerTransfers } from '@/hooks/useScannerData';
 import { useReceivingLocations } from '@/hooks/useReceivingLocations';
 import { resolveScan } from '@/lib/scanner/resolveScan';
 import { scanFeedback } from '@/lib/scanner/feedback';
@@ -41,7 +41,6 @@ interface Props {
 const norm = (v?: string | null) => (v || '').trim().toUpperCase();
 
 export function PutawayModule({ onCommand }: Props) {
-  const resolve = useProductResolver();
   const queryClient = useQueryClient();
   const { codes: receivingCodes, isLoading: loadingZones } = useReceivingLocations();
   const { transferItems } = useScannerTransfers();
