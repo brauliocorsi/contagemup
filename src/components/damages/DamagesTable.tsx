@@ -128,6 +128,8 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
               <TableHead className="text-center">Qtd</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead>Localização</TableHead>
+              <TableHead>Origem</TableHead>
+              <TableHead>Antiguidade</TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -136,7 +138,8 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
           <TableBody>
             {filteredDamages.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+
                   Nenhuma avaria encontrada
                 </TableCell>
               </TableRow>
