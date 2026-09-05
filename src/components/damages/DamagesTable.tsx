@@ -219,7 +219,7 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
                       <Badge variant="destructive">Ativo</Badge>
                     ) : (
                       <Badge variant="secondary" className="bg-green-100 text-green-800">
-                        {damage.resolution_type || 'Resolvido'}
+                        {damage.resolution_type ? (RESOLUTION_LABELS[damage.resolution_type] || damage.resolution_type) : 'Resolvido'}
                       </Badge>
                     )}
                   </TableCell>
