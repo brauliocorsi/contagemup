@@ -472,6 +472,7 @@ export type Database = {
       }
       location_audits: {
         Row: {
+          access_code: string | null
           assigned_to: string | null
           blind_mode: boolean
           completed_at: string | null
@@ -486,6 +487,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_code?: string | null
           assigned_to?: string | null
           blind_mode?: boolean
           completed_at?: string | null
@@ -500,6 +502,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_code?: string | null
           assigned_to?: string | null
           blind_mode?: boolean
           completed_at?: string | null
@@ -514,6 +517,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      orphan_colis_flags: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          missing_coli: number | null
+          note: string | null
+          product_id: string
+          resolved_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          missing_coli?: number | null
+          note?: string | null
+          product_id: string
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          missing_coli?: number | null
+          note?: string | null
+          product_id?: string
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orphan_colis_flags_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       picking_items: {
         Row: {
@@ -753,6 +800,7 @@ export type Database = {
           barcode: string | null
           category: string
           code: string
+          colis_orfaos: number
           created_at: string
           current_stock: number
           damaged_stock: number
@@ -764,12 +812,14 @@ export type Database = {
           name: string
           supplier_code: string | null
           total_colis: number
+          unidades_fisicas: number
           updated_at: string
         }
         Insert: {
           barcode?: string | null
           category?: string
           code: string
+          colis_orfaos?: number
           created_at?: string
           current_stock?: number
           damaged_stock?: number
@@ -781,12 +831,14 @@ export type Database = {
           name: string
           supplier_code?: string | null
           total_colis?: number
+          unidades_fisicas?: number
           updated_at?: string
         }
         Update: {
           barcode?: string | null
           category?: string
           code?: string
+          colis_orfaos?: number
           created_at?: string
           current_stock?: number
           damaged_stock?: number
@@ -798,6 +850,7 @@ export type Database = {
           name?: string
           supplier_code?: string | null
           total_colis?: number
+          unidades_fisicas?: number
           updated_at?: string
         }
         Relationships: []
@@ -1651,6 +1704,7 @@ export type Database = {
       dedupe_counts_same_place: { Args: never; Returns: number }
       deliver_note: { Args: { p_note_id: string }; Returns: Json }
       effective_total_colis: { Args: { p_product_id: string }; Returns: number }
+      generate_audit_access_code: { Args: never; Returns: string }
       generate_route_barcode: { Args: never; Returns: string }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
       is_quarantine_location: { Args: { p_location: string }; Returns: boolean }

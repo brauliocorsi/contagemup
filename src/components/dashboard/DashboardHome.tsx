@@ -16,6 +16,26 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/layout/StatCard';
 
+function ActionTile({ label, value, hint, onClick }: { label: string; value: number; hint: string; onClick: () => void }) {
+  const active = value > 0;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        'text-left rounded-lg border p-3 transition-colors ' +
+        (active
+          ? 'border-warning/40 bg-warning-soft/50 hover:bg-warning-soft'
+          : 'border-border-subtle bg-surface-muted/40 hover:bg-surface-muted')
+      }
+    >
+      <p className="text-2xl font-bold tabular-nums">{value.toLocaleString('pt-PT')}</p>
+      <p className="text-sm font-medium">{label}</p>
+      <p className="text-xs text-muted-foreground">{hint}</p>
+    </button>
+  );
+}
+
 interface DashboardHomeProps {
   onNavigate: (tab: string) => void;
 }
@@ -47,6 +67,29 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
       return {
         units: rows.reduce((s, r) => s + (r.quantity || 0), 0),
         products: new Set(rows.map(r => r.product_id)).size,
+      };
+    },
+    staleTime: 60000,
+  });
+
+  // Zona "Precisa de Ação": o que está parado à espera de alguém
+  const { data: action } = useQuery({
+    queryKey: ['dashboard-action-zone'],
+    queryFn: async () => {
+      const [damages, staged, tasks, orphans, quarantine] = await Promise.all([
+        supabase.from('product_damages').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('delivery_notes').select('id', { count: 'exact', head: true }).in('status', ['staged', 'loaded']),
+        supabase.from('scanner_picking_tasks').select('id', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
+        supabase.from('products').select('colis_orfaos').gt('colis_orfaos', 0),
+        supabase.from('counts').select('quantity').ilike('location', '%QUARENTENA%').gt('quantity', 0),
+      ]);
+      return {
+        damages: damages.count ?? 0,
+        staged: staged.count ?? 0,
+        tasks: tasks.count ?? 0,
+        orphanProducts: (orphans.data || []).length,
+        orphanUnits: (orphans.data || []).reduce((s: number, r: any) => s + (r.colis_orfaos || 0), 0),
+        quarantineUnits: (quarantine.data || []).reduce((s: number, r: any) => s + (r.quantity || 0), 0),
       };
     },
     staleTime: 60000,
@@ -109,6 +152,10 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
 
   const totalProducts = products.length;
   const totalStock = useMemo(() => products.reduce((s, p) => s + p.current_stock, 0), [products]);
+  const physicalUnits = useMemo(
+    () => products.reduce((s, p: any) => s + (p.unidades_fisicas ?? p.current_stock * (p.total_colis || 1)), 0),
+    [products],
+  );
 
   const todayStats = movementStats?.today;
   const weekStats = movementStats?.week;
@@ -177,6 +224,75 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Precisa de Ação */}
+      <Card className="border-border-subtle">
+        <CardHeader className="pb-3">
+          <CardTitle className="font-heading text-base flex items-center gap-2">
+            <AlertOctagon className="h-4 w-4 text-muted-foreground" />
+            Precisa de ação
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <ActionTile
+            label="Sem localização"
+            value={unlocated?.units ?? 0}
+            hint="unidades por arrumar"
+            onClick={() => onNavigate('putaway')}
+          />
+          <ActionTile
+            label="Colis órfãos"
+            value={action?.orphanUnits ?? 0}
+            hint={`${action?.orphanProducts ?? 0} produtos incompletos`}
+            onClick={() => onNavigate('orphan-colis')}
+          />
+          <ActionTile
+            label="Avarias por resolver"
+            value={action?.damages ?? 0}
+            hint="em quarentena"
+            onClick={() => onNavigate('damages')}
+          />
+          <ActionTile
+            label="Pickings a decorrer"
+            value={action?.tasks ?? 0}
+            hint={`${action?.staged ?? 0} notas no cais/carrinha`}
+            onClick={() => onNavigate('scanner-picking')}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Estado do armazém */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          label="Conjuntos completos"
+          value={totalStock.toLocaleString('pt-PT')}
+          hint="prontos a vender"
+          icon={<Package className="h-5 w-5" />}
+          tone="success"
+        />
+        <StatCard
+          label="Unidades físicas"
+          value={physicalUnits.toLocaleString('pt-PT')}
+          hint="tudo o que existe no armazém"
+          icon={<PackageSearch className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Colis órfãos"
+          value={(action?.orphanUnits ?? 0).toLocaleString('pt-PT')}
+          hint="partes sem conjunto"
+          icon={<AlertTriangle className="h-5 w-5" />}
+          tone="warning"
+          onClick={() => onNavigate('orphan-colis')}
+        />
+        <StatCard
+          label="Em quarentena"
+          value={(action?.quarantineUnits ?? 0).toLocaleString('pt-PT')}
+          hint="fora do stock disponível"
+          icon={<AlertOctagon className="h-5 w-5" />}
+          tone="danger"
+          onClick={() => onNavigate('damages')}
+        />
+      </div>
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -2,7 +2,7 @@ import {
   Truck,
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History,
-  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck, FlaskConical, PackageSearch,
+  BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck, FlaskConical, PackageSearch, PackageX,
 } from 'lucide-react';
 
 
@@ -38,6 +38,8 @@ const groups: { label: string; items: NavItem[] }[] = [
       { id: 'alerts', label: 'Alertas', icon: AlertTriangle },
       { id: 'scanner-picking', label: 'Picking Scanner', icon: ClipboardCheck },
       { id: 'putaway', label: 'Arrumação', icon: PackageSearch },
+      { id: 'orphan-colis', label: 'Colis Órfãos', icon: PackageSearch },
+      { id: 'orphans', label: 'Colis Órfãos', icon: PackageX },
     ],
   },
   {
@@ -56,7 +58,6 @@ const groups: { label: string; items: NavItem[] }[] = [
       { id: 'reports', label: 'Relatórios', icon: BarChart3 },
       { id: 'movements', label: 'Movimentos', icon: History },
       { id: 'warehouse', label: 'Armazém', icon: Warehouse },
-      { id: 'sessions', label: 'Sessões', icon: History },
     ],
   },
   {

@@ -13,6 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,6 +33,7 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
   const [currentIndex, setCurrentIndex] = useState(0);
   const [countedQuantities, setCountedQuantities] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [needsReason, setNeedsReason] = useState<Record<string, boolean>>({});
   const blind = !!audit?.blind_mode;
 
   // Start audit if pending
@@ -100,6 +102,12 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
 
     const quantity = parseInt(countedValue, 10);
     if (isNaN(quantity) || quantity < 0) return;
+
+    // Divergência sem motivo não passa: o ajuste de stock precisa de justificação.
+    if (quantity !== item.expected_quantity && !(notes[item.id] || '').trim()) {
+      setNeedsReason(prev => ({ ...prev, [item.id]: true }));
+      return;
+    }
 
     await updateAuditItem.mutateAsync({
       itemId: item.id,
@@ -246,6 +254,35 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
               </div>
             </div>
           </div>
+
+          {/* Motivo da divergência */}
+          {currentItem.status === 'pending' && (
+            <div className="space-y-1">
+              <label className="text-sm text-muted-foreground">
+                Motivo (obrigatório se a quantidade for diferente da esperada)
+              </label>
+              <Textarea
+                value={notes[currentItem.id] ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNotes(prev => ({ ...prev, [currentItem.id]: v }));
+                  if (v.trim()) setNeedsReason(prev => ({ ...prev, [currentItem.id]: false }));
+                }}
+                placeholder="Ex.: produto partido, encontrado noutra localização, erro de contagem anterior"
+                rows={2}
+                className={cn(needsReason[currentItem.id] && 'border-destructive')}
+              />
+              {needsReason[currentItem.id] && (
+                <p className="text-xs text-destructive">
+                  Explique a diferença antes de confirmar.
+                </p>
+              )}
+            </div>
+          )}
+
+          {currentItem.status === 'counted' && currentItem.notes && (
+            <p className="text-xs text-muted-foreground">Motivo: {currentItem.notes}</p>
+          )}
 
           {/* Difference indicator */}
           {!blind && currentItem.status === 'counted' && currentItem.difference !== null && currentItem.difference !== 0 && (

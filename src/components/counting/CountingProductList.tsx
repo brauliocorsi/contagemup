@@ -25,6 +25,8 @@ interface CountingProductListProps {
   onSplitStock: (productId: string, colisNumber: number, distributions: StockDistribution[]) => Promise<boolean>;
   onMergeStock: (productId: string, colisNumber: number, location: string) => Promise<boolean>;
   onReportDamage: (data: { product_id: string; quantity: number; colis_number?: number; damage_type: string; description?: string; location?: string }) => Promise<unknown>;
+  /** Modo consulta: cartões visíveis mas sem qualquer edição. */
+  readOnly?: boolean;
 }
 
 interface VirtualizedGridProps {
@@ -45,6 +47,7 @@ interface VirtualizedGridProps {
   onSplitStock: (productId: string, colisNumber: number, distributions: StockDistribution[]) => Promise<boolean>;
   onMergeStock: (productId: string, colisNumber: number, location: string) => Promise<boolean>;
   onReportDamage: (data: { product_id: string; quantity: number; colis_number?: number; damage_type: string; description?: string; location?: string }) => Promise<unknown>;
+  readOnly?: boolean;
   emptyMessage?: { icon: React.ReactNode; text: string };
 }
 
@@ -66,6 +69,7 @@ function VirtualizedGrid({
   onSplitStock,
   onMergeStock,
   onReportDamage,
+  readOnly = false,
   emptyMessage,
 }: VirtualizedGridProps) {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -155,8 +159,14 @@ function VirtualizedGrid({
             >
               <div className={`grid ${gridColsClass} gap-4 pr-2`}>
                 {rowProducts.map((product) => (
+                  <div key={product.id} className="relative">
+                  {readOnly && (
+                    <div
+                      className="absolute inset-0 z-10 rounded-lg cursor-not-allowed"
+                      title="Contagem bloqueada — precisa de uma conferência aberta"
+                    />
+                  )}
                   <ProductCard
-                    key={product.id}
                     product={product}
                     onIncrement={onIncrement}
                     onDecrement={onDecrement}
@@ -174,7 +184,9 @@ function VirtualizedGrid({
                     colisNames={categoryColisNamesMap[product.category]}
                     sessionId={sessionId}
                     requiresOrderNumber={categoriesRequiringOrder[product.category]}
+                    readOnly={readOnly}
                   />
+                  </div>
                 ))}
               </div>
             </div>
@@ -205,6 +217,7 @@ export function CountingProductList({
   onSplitStock,
   onMergeStock,
   onReportDamage,
+  readOnly = false,
 }: CountingProductListProps) {
   const gridProps = {
     sessionId,
@@ -223,6 +236,7 @@ export function CountingProductList({
     onSplitStock,
     onMergeStock,
     onReportDamage,
+    readOnly,
   };
 
   return (

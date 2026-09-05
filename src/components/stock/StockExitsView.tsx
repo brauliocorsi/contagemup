@@ -157,10 +157,11 @@ function ExitCart({ externalAdd, onExternalConsumed }: ExitCartProps) {
         product_code: p.code,
         product_name: p.name,
         total_colis: totalColis,
-        mode: 'set',
+        // Predefinido: saída por coli individual. "Conjunto completo" fica como atalho.
+        mode: 'individual',
         setQuantity: 1,
         colisQuantities: Object.fromEntries(
-          Array.from({ length: totalColis }, (_, i) => [i + 1, 0])
+          Array.from({ length: totalColis }, (_, i) => [i + 1, 1])
         ),
         selections: {},
       }];

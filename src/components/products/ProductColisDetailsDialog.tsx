@@ -184,14 +184,37 @@ export function ProductColisDetailsDialog({ product, lastCount, open, onOpenChan
               </Card>
               <Card>
                 <CardContent className="p-3 flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <Package className="h-4 w-4 text-success" />
                   <div>
-                    <p className="text-xs text-muted-foreground">Stock Atual</p>
-                    <p className="font-bold text-lg">{product.current_stock} un.</p>
+                    <p className="text-xs text-muted-foreground">Conjuntos completos</p>
+                    <p className="font-bold text-lg">{product.current_stock}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 flex items-center gap-2">
+                  <Warehouse className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Unidades físicas</p>
+                    <p className="font-bold text-lg">{product.unidades_fisicas ?? '—'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-warning" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Colis órfãos</p>
+                    <p className="font-bold text-lg">{product.colis_orfaos ?? 0}</p>
                   </div>
                 </CardContent>
               </Card>
             </div>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Conjuntos completos é o que se pode vender e entregar. Unidades físicas é tudo o que existe.
+              Quarentena não entra em nenhum dos dois.
+            </p>
+
 
             {/* Colis Details Tabs */}
             <Tabs defaultValue="colis" className="w-full">

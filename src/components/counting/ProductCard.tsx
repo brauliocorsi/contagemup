@@ -49,6 +49,8 @@ interface ProductCardProps {
   colisNames?: Record<string, string> | null;
   sessionId?: string;
   requiresOrderNumber?: boolean;
+  /** Modo consulta: mostra tudo expandido, sem edição. */
+  readOnly?: boolean;
 }
 
 export function ProductCard({ 
@@ -68,14 +70,15 @@ export function ProductCard({
   damagedStock = 0,
   colisNames,
   sessionId,
-  requiresOrderNumber = false
+  requiresOrderNumber = false,
+  readOnly = false
 }: ProductCardProps) {
   // Global location removed - each coli manages its own
   const [localCode, setLocalCode] = useState(product.code);
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [expandedColis, setExpandedColis] = useState<Set<number>>(new Set());
-  const [showAllColis, setShowAllColis] = useState(false);
+  const [showAllColis, setShowAllColis] = useState(readOnly);
   const [colisLocations, setColisLocations] = useState<Record<number, string>>({});
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [selectedColisForSplit, setSelectedColisForSplit] = useState<ColisDetail | null>(null);
