@@ -190,11 +190,24 @@ export function DamagesTable({ damages, onResolve, onUpdate, onDelete, isResolvi
                       )}
                     </div>
                   </TableCell>
+                  <TableCell className="text-sm">
+                    {damage.source_location || <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    {damage.status === 'active' ? (
+                      <Badge variant={ageInDays(damage.created_at) > 30 ? 'destructive' : 'secondary'}>
+                        {ageInDays(damage.created_at)} dia(s)
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm">
                       <Calendar className="h-3 w-3 text-muted-foreground" />
                       {format(new Date(damage.created_at), 'dd/MM/yyyy', { locale: pt })}
                     </div>
+
                     {damage.resolved_at && (
                       <p className="text-xs text-muted-foreground">
                         Resolvido: {format(new Date(damage.resolved_at), 'dd/MM/yyyy', { locale: pt })}
