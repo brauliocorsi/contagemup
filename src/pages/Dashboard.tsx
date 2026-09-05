@@ -28,6 +28,7 @@ const SeparationNotesView = lazy(() => import('@/components/logistics/Separation
 const DeliveriesView = lazy(() => import('@/components/logistics/DeliveriesView').then(m => ({ default: m.DeliveriesView })));
 const RouteOptimizationView = lazy(() => import('@/components/logistics/RouteOptimizationView').then(m => ({ default: m.RouteOptimizationView })));
 const RoutesView = lazy(() => import('@/components/logistics/RoutesView').then(m => ({ default: m.RoutesView })));
+const OrphanColisView = lazy(() => import('@/components/stock/OrphanColisView').then(m => ({ default: m.OrphanColisView })));
 const PutawayView = lazy(() => import('@/components/stock/PutawayView').then(m => ({ default: m.PutawayView })));
 // MÓDULO EXPERIMENTAL REMOVÍVEL — Necessidades de Compra — Testes
 const PurchaseNeedsLabView = lazy(() => import('@/components/purchase-needs-lab/PurchaseNeedsLabView').then(m => ({ default: m.PurchaseNeedsLabView })));
@@ -111,6 +112,7 @@ export default function Dashboard() {
               {activeTab === 'alerts' && <StockAlertsView />}
               {activeTab === 'scanner-picking' && <ScannerPickingAdminView />}
               {activeTab === 'putaway' && <PutawayView />}
+              {activeTab === 'orphan-colis' && <OrphanColisView />}
               {activeTab === 'orphans' && <OrphanColisView />}
               {activeTab === 'damages' && <DamagesView />}
               {activeTab === 'warehouse' && <WarehouseMapView onStartAudit={handleStartAudit} />}

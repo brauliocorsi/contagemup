@@ -38,6 +38,7 @@ const groups: { label: string; items: NavItem[] }[] = [
       { id: 'alerts', label: 'Alertas', icon: AlertTriangle },
       { id: 'scanner-picking', label: 'Picking Scanner', icon: ClipboardCheck },
       { id: 'putaway', label: 'Arrumação', icon: PackageSearch },
+      { id: 'orphan-colis', label: 'Colis Órfãos', icon: PackageSearch },
       { id: 'orphans', label: 'Colis Órfãos', icon: PackageX },
     ],
   },
