@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.is_quarantine_location(text) FROM anon;
