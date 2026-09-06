@@ -50,6 +50,8 @@ import { PickingReport } from './PickingReport';
 import { AddRouteStops } from './AddRouteStops';
 import { RouteDriverCard } from './RouteDriverCard';
 import { RoutePreparationCard } from './RoutePreparationCard';
+import { useRoutePayables } from '@/hooks/useDeliveryFinance';
+import { formatCents } from '@/lib/finance/money';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
