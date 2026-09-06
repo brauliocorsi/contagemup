@@ -41,7 +41,7 @@ function ClosureCard({ closure }: { closure: RouteCashClosure }) {
   const { data: checks = [] } = useClosureChecks(closure.id);
   const { data: methods = [] } = usePaymentMethods();
   const { data: routes = [] } = useRoutes();
-  const { data: profiles = [] } = useProfiles();
+  const { nameOf } = useProfiles();
   const count = useCountEnvelope();
   const confirm = useConfirmMethodCheck();
   const resolve = useResolveClosure();
@@ -51,7 +51,7 @@ function ClosureCard({ closure }: { closure: RouteCashClosure }) {
   const [checkValues, setCheckValues] = useState<Record<string, { value: string; ref: string }>>({});
 
   const route = routes.find((r) => r.id === closure.route_id);
-  const driver = profiles.find((p) => p.user_id === closure.driver_id);
+  const driverName = nameOf(closure.driver_id);
 
   return (
     <Card>
@@ -62,7 +62,7 @@ function ClosureCard({ closure }: { closure: RouteCashClosure }) {
           <Badge variant="outline">{closure.envelope_code}</Badge>
           <Badge>{STATUS_LABELS[closure.status]}</Badge>
           <span className="text-xs text-muted-foreground">
-            {route?.scheduled_date} • custódia: {driver?.name ?? 'entregador'} •{' '}
+            {route?.scheduled_date} • custódia: {driverName} •{' '}
             {new Date(closure.submitted_at).toLocaleString('pt-PT')}
           </span>
         </div>
