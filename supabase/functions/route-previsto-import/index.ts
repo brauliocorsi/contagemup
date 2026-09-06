@@ -256,10 +256,26 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (existing) return json({ import: existing, idempotent: true });
 
+    // Números de encomenda vinculados à rota: paragens da rota + notas já
+    // ligadas por route_id. Só estas notas entram no previsto.
+    const { data: stops, error: stopsErr } = await admin
+      .from('route_stops')
+      .select('venda_codigo')
+      .eq('route_id', routeId);
+    if (stopsErr) throw stopsErr;
+    const stopCodes = (stops ?? [])
+      .map((s: { venda_codigo: string | null }) => String(s.venda_codigo ?? '').trim())
+      .filter((c: string) => c.length > 0);
+
+    const orFilters = [`route_id.eq.${routeId}`];
+    if (stopCodes.length > 0) {
+      orFilters.push(`order_number.in.(${stopCodes.map((c) => `"${c.replace(/"/g, '\\"')}"`).join(',')})`);
+    }
+
     let notesQuery = admin
       .from('delivery_notes')
       .select('id, order_number, created_at')
-      .eq('route_id', routeId)
+      .or(orFilters.join(','))
       .order('created_at', { ascending: true });
     if (onlyNotes) notesQuery = notesQuery.in('id', onlyNotes);
     const { data: notes, error: notesErr } = await notesQuery;
