@@ -49,6 +49,7 @@ import { GuidesDocument } from './GuidesDocument';
 import { PickingReport } from './PickingReport';
 import { AddRouteStops } from './AddRouteStops';
 import { RouteDriverCard } from './RouteDriverCard';
+import { RoutePreparationCard } from './RoutePreparationCard';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
@@ -451,6 +452,13 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
           driverId={route.driver_id}
           driverAssignedAt={route.driver_assigned_at}
           driverAssignedBy={route.driver_assigned_by}
+        />
+
+        <RoutePreparationCard
+          routeId={routeId}
+          preparationClosedAt={route.preparation_closed_at}
+          compositionVersion={route.composition_version}
+          financialStatus={route.financial_status}
         />
 
         {route.status === 'pending' && <AddRouteStops routeId={routeId} stops={stops} />}

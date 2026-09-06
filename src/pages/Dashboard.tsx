@@ -30,6 +30,7 @@ const SeparationNotesView = lazy(() => import('@/components/logistics/Separation
 const DeliveriesView = lazy(() => import('@/components/logistics/DeliveriesView').then(m => ({ default: m.DeliveriesView })));
 const RouteOptimizationView = lazy(() => import('@/components/logistics/RouteOptimizationView').then(m => ({ default: m.RouteOptimizationView })));
 const RoutesView = lazy(() => import('@/components/logistics/RoutesView').then(m => ({ default: m.RoutesView })));
+const FinanceClosuresView = lazy(() => import('@/components/finance/FinanceClosuresView').then(m => ({ default: m.FinanceClosuresView })));
 const PutawayView = lazy(() => import('@/components/stock/PutawayView').then(m => ({ default: m.PutawayView })));
 // MÓDULO EXPERIMENTAL REMOVÍVEL — Necessidades de Compra — Testes
 const PurchaseNeedsLabView = lazy(() => import('@/components/purchase-needs-lab/PurchaseNeedsLabView').then(m => ({ default: m.PurchaseNeedsLabView })));
@@ -134,6 +135,7 @@ export default function Dashboard() {
                 <RoutesView key={openRouteId ?? 'list'} initialRouteId={openRouteId} />
               )}
               {activeTab === 'deliveries' && <DeliveriesView />}
+              {activeTab === 'finance-closures' && <FinanceClosuresView />}
               {activeTab === 'route-optimization' && (
                 <RouteOptimizationView onSendToSeparation={() => setActiveTab('separation-notes')} />
               )}
