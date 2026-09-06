@@ -176,8 +176,13 @@ export default function DriverApp() {
         )}
 
         {open ? (
-          <DeliveryExecution attempt={open} onBack={() => setOpenId(null)} />
+          <DeliveryExecution
+            attempt={open}
+            assembly={assemblyByCode[open.order_number.trim()] ?? null}
+            onBack={() => setOpenId(null)}
+          />
         ) : isLoading || loadingRoutes ? (
+
           <div className="flex justify-center py-10">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
