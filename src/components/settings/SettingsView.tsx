@@ -33,13 +33,16 @@ export function SettingsView() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserName, setNewUserName] = useState('');
+  const [newUserRole, setNewUserRole] = useState('operator');
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [passwordTarget, setPasswordTarget] = useState<{ userId: string; name: string } | null>(null);
-  
+
   const { toast } = useToast();
   const { profile: currentProfile } = useAuth();
   const queryClient = useQueryClient();
+  const isMaster = currentProfile?.role === 'master';
 
   // Fetch all users/profiles
   const { data: profiles = [], isLoading: isLoadingProfiles } = useQuery({
