@@ -166,6 +166,11 @@ export default function DriverApp() {
                 <ArrowLeft className="mr-1 h-4 w-4" /> Minhas rotas
               </Button>
             )}
+            {routeId && routeId !== 'sem-rota' && (
+              <Button variant="outline" className="w-full" onClick={simulateRoute}>
+                <Navigation className="mr-2 h-4 w-4" /> Simular rota no Google Maps
+              </Button>
+            )}
             {routeId && currentRoute && (
               <RouteAccountingDialog
                 routeId={routeId}
