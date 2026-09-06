@@ -119,5 +119,9 @@ export function getProductWithCounts(
     colisDetails,
     uniqueLocations,
     hasMultipleLocations,
+    physicalUnits: totals.physicalUnits,
+    quarantineUnits: totals.quarantineUnits,
+    orphanUnits: totals.orphanUnits,
   };
 }
+
