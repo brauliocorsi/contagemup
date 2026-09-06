@@ -1,4 +1,5 @@
 import {
+  Wallet,
   Truck,
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History,
@@ -68,6 +69,7 @@ const groups: { label: string; items: NavItem[] }[] = [
       { id: 'deliveries', label: 'Entregas', icon: Truck },
       { id: 'routes', label: 'Rotas', icon: RouteIcon },
       { id: 'route-optimization', label: 'Otimizar Semana', icon: RouteIcon },
+      { id: 'finance-closures', label: 'Fechos de Rotas', icon: Wallet },
     ],
   },
   {

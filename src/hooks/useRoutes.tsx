@@ -26,7 +26,13 @@ export interface RouteSchedule {
   driver_id: string | null;
   driver_assigned_by: string | null;
   driver_assigned_at: string | null;
+  composition_version: number;
+  preparation_closed_at: string | null;
+  preparation_closed_by: string | null;
+  preparation_reopen_reason: string | null;
+  financial_status: 'open' | 'submitted' | 'counted' | 'settled';
   created_at: string;
+
 }
 
 export interface RouteStop {
