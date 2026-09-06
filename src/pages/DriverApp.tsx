@@ -189,6 +189,11 @@ export default function DriverApp() {
                   <CardContent className="p-0">
                     <button className="w-full space-y-1 p-4 text-left" onClick={() => setOpenId(a.id)}>
                       <div className="flex items-center gap-2">
+                        {stopOrder.has(a.order_number) && (
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                            {stopOrder.get(a.order_number)}
+                          </span>
+                        )}
                         <span className="min-w-0 flex-1 truncate font-semibold">
                           {a.client_name || 'Cliente'}
                         </span>
