@@ -357,16 +357,49 @@ export function SettingsView() {
                       <TableCell className="text-right text-muted-foreground">
                         {new Date(profile.created_at).toLocaleDateString('pt-PT')}
                       </TableCell>
-                      {currentProfile?.role === 'admin' && (
+                      {isMaster && (
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPasswordTarget({ userId: profile.user_id, name: profile.name })}
-                          >
-                            <KeyRound className="h-4 w-4 mr-1" />
-                            Alterar senha
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPasswordTarget({ userId: profile.user_id, name: profile.name })}
+                            >
+                              <KeyRound className="h-4 w-4 mr-1" />
+                              Alterar senha
+                            </Button>
+                            {profile.user_id !== currentProfile?.user_id && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    disabled={deleteUser.isPending && deletingUserId === profile.user_id}
+                                    onClick={() => setDeletingUserId(profile.user_id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Eliminar
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Eliminar utilizador</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem a certeza que deseja eliminar {profile.name}? Esta ação remove o acesso ao sistema e não pode ser anulada.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteUser.mutate(profile.user_id)}
+                                    >
+                                      Eliminar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
