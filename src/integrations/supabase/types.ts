@@ -629,6 +629,8 @@ export type Database = {
         Row: {
           active: boolean
           amount_cents: number
+          approved_at: string | null
+          approved_by: string | null
           classification: string
           created_at: string
           due_date: string | null
@@ -655,6 +657,8 @@ export type Database = {
         Insert: {
           active?: boolean
           amount_cents: number
+          approved_at?: string | null
+          approved_by?: string | null
           classification: string
           created_at?: string
           due_date?: string | null
@@ -681,6 +685,8 @@ export type Database = {
         Update: {
           active?: boolean
           amount_cents?: number
+          approved_at?: string | null
+          approved_by?: string | null
           classification?: string
           created_at?: string
           due_date?: string | null
@@ -841,6 +847,8 @@ export type Database = {
           created_at: string
           kind: string
           op_key: string
+          payload_hash: string | null
+          resource: string | null
           result: Json
         }
         Insert: {
@@ -849,6 +857,8 @@ export type Database = {
           created_at?: string
           kind: string
           op_key: string
+          payload_hash?: string | null
+          resource?: string | null
           result?: Json
         }
         Update: {
@@ -857,6 +867,8 @@ export type Database = {
           created_at?: string
           kind?: string
           op_key?: string
+          payload_hash?: string | null
+          resource?: string | null
           result?: Json
         }
         Relationships: []
@@ -934,7 +946,10 @@ export type Database = {
           notes: string | null
           op_key: string
           reference: string | null
+          revision: number
           route_id: string | null
+          superseded_at: string | null
+          superseded_by: string | null
         }
         Insert: {
           amount_cents: number
@@ -953,7 +968,10 @@ export type Database = {
           notes?: string | null
           op_key: string
           reference?: string | null
+          revision?: number
           route_id?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
         }
         Update: {
           amount_cents?: number
@@ -972,7 +990,10 @@ export type Database = {
           notes?: string | null
           op_key?: string
           reference?: string | null
+          revision?: number
           route_id?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
         }
         Relationships: [
           {
@@ -1766,10 +1787,14 @@ export type Database = {
           no_cash: boolean
           notes: string | null
           op_key: string | null
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
           resolution_note: string | null
           resolved_at: string | null
           resolved_by: string | null
           route_id: string
+          settlement_note: string | null
           status: string
           submitted_at: string
           submitted_by: string
@@ -1792,10 +1817,14 @@ export type Database = {
           no_cash?: boolean
           notes?: string | null
           op_key?: string | null
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           route_id: string
+          settlement_note?: string | null
           status?: string
           submitted_at?: string
           submitted_by: string
@@ -1818,10 +1847,14 @@ export type Database = {
           no_cash?: boolean
           notes?: string | null
           op_key?: string | null
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           route_id?: string
+          settlement_note?: string | null
           status?: string
           submitted_at?: string
           submitted_by?: string
@@ -2716,6 +2749,10 @@ export type Database = {
         Args: { p_count_id: string; p_delta: number; p_op_key?: string }
         Returns: Json
       }
+      approve_note_payable_revision: {
+        Args: { p_note_id: string; p_reason: string; p_revision: number }
+        Returns: Json
+      }
       assert_valid_location: { Args: { p_location: string }; Returns: string }
       assign_count_location: {
         Args: { p_count_id: string; p_location: string }
@@ -2819,6 +2856,10 @@ export type Database = {
       }
       finance_count_envelope: {
         Args: { p_closure_id: string; p_counted_cents: number; p_note: string }
+        Returns: Json
+      }
+      finance_reopen_closure: {
+        Args: { p_closure_id: string; p_reason: string }
         Returns: Json
       }
       finance_resolve_closure: {

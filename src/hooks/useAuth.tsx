@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { Profile } from '@/types/stock';
+import { clearAllDrafts } from '@/lib/finance/paymentDrafts';
 
 interface AuthContextType {
   user: User | null;
@@ -32,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('User changed, clearing cache...');
         queryClient.clear();
         localStorage.removeItem('counting_selected_session');
+        // rascunhos financeiros nunca podem passar de um operador para outro
+        clearAllDrafts();
       }
       prevUserId.current = user?.id ?? null;
     }
@@ -98,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Limpar localStorage específico do utilizador
     localStorage.removeItem('counting_selected_session');
+    clearAllDrafts();
     
     // Fazer logout
     await supabase.auth.signOut();
