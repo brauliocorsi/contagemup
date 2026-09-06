@@ -53,16 +53,34 @@ export interface NotePayable {
   source_url: string | null;
 }
 
+export type AmountDueState =
+  | 'por_importar'
+  | 'desatualizado'
+  | 'revisao_pendente'
+  | 'por_rever'
+  | 'contraditorio'
+  | 'ja_pago_no_gc'
+  | 'recebido_antes'
+  | 'a_cobrar'
+  | 'ajustado';
+
 export interface AmountDue {
   has_previsto: boolean;
   revision: number | null;
+  latest_revision: number | null;
+  state: AmountDueState;
+  reliable: boolean;
+  requires_review: boolean;
+  state_note: string | null;
   expected_cents: number;
   already_paid_cents: number;
   paid_previous_attempts_cents: number;
   override_cents: number | null;
   unknown_parcels: number;
+  gc_sale_id: string | null;
   due_cents: number;
 }
+
 
 export interface DeliveryPayment {
   id: string;
