@@ -22,6 +22,10 @@ import { useMyDeliveryAttempts, type DeliveryAttempt } from '@/hooks/useDelivery
 import { useMyRoutes, useRoute, ROUTE_STATUS_LABELS } from '@/hooks/useRoutes';
 import { clearAllDrafts, pruneRevokedDrafts } from '@/lib/delivery/draft';
 import { RouteAccountingDialog } from '@/components/driver/RouteAccountingDialog';
+import { useQuery } from '@tanstack/react-query';
+import { fetchOrderDocuments } from '@/lib/logistics/api';
+import { assemblyFromServices, type AssemblyInfo } from '@/lib/logistics/assembly';
+
 
 
 function fmtDate(d: string | null) {
@@ -49,6 +53,24 @@ export default function DriverApp() {
   // Paragens da rota: dão a ordem planeada e as moradas para a simulação.
   const { data: routeData } = useRoute(routeId && routeId !== 'sem-rota' ? routeId : null);
   const stops = routeData?.stops ?? [];
+  // Serviços de montagem da encomenda (vêm da Gestão Click, por número de encomenda).
+  const vendaIds = stops.map((s) => s.venda_id).filter((v): v is string => Boolean(v));
+  const { data: assemblyByCode = {} } = useQuery({
+    queryKey: ['driver-assembly', routeId, vendaIds.join(',')],
+    enabled: vendaIds.length > 0,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async (): Promise<Record<string, AssemblyInfo>> => {
+      const { documents } = await fetchOrderDocuments(vendaIds);
+      const map: Record<string, AssemblyInfo> = {};
+      for (const d of documents) {
+        const code = String(d.codigo ?? '').trim();
+        if (code) map[code] = assemblyFromServices(d.servicos);
+      }
+      return map;
+    },
+  });
+
+
 
   // Rascunhos de entregas que já não estão acessíveis (rota reatribuída) são
   // descartados quando o aparelho volta a ter rede — e sinalizados ao entregador.
@@ -154,8 +176,13 @@ export default function DriverApp() {
         )}
 
         {open ? (
-          <DeliveryExecution attempt={open} onBack={() => setOpenId(null)} />
+          <DeliveryExecution
+            attempt={open}
+            assembly={assemblyByCode[open.order_number.trim()] ?? null}
+            onBack={() => setOpenId(null)}
+          />
         ) : isLoading || loadingRoutes ? (
+
           <div className="flex justify-center py-10">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
@@ -211,11 +238,19 @@ export default function DriverApp() {
                           <span className="truncate">{a.address}</span>
                         </p>
                       )}
-                      {a.partial_load && (
-                        <Badge variant="outline" className="border-warning/50 text-warning">
-                          Carga incompleta do armazém
-                        </Badge>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {assemblyByCode[a.order_number.trim()]?.hasAssembly ? (
+                          <Badge variant="default">Com montagem</Badge>
+                        ) : assemblyByCode[a.order_number.trim()] ? (
+                          <Badge variant="outline">Sem montagem</Badge>
+                        ) : null}
+                        {a.partial_load && (
+                          <Badge variant="outline" className="border-warning/50 text-warning">
+                            Carga incompleta do armazém
+                          </Badge>
+                        )}
+                      </div>
+
                     </button>
                   </CardContent>
                 </Card>

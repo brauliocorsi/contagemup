@@ -52,6 +52,8 @@ import { RouteDriverCard } from './RouteDriverCard';
 import { RoutePreparationCard } from './RoutePreparationCard';
 import { useRoutePayables } from '@/hooks/useDeliveryFinance';
 import { formatCents } from '@/lib/finance/money';
+import { assemblyFromServices, type AssemblyInfo } from '@/lib/logistics/assembly';
+
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
@@ -201,6 +203,14 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
     () => chosenDocs.reduce((sum, d) => sum + d.produtos.length, 0),
     [chosenDocs],
   );
+
+  // Serviços de montagem por encomenda (linhas de serviço da Gestão Click).
+  const assemblyByVendaId = useMemo(() => {
+    const map: Record<string, AssemblyInfo> = {};
+    for (const d of docsQuery.data ?? []) map[d.id] = assemblyFromServices(d.servicos);
+    return map;
+  }, [docsQuery.data]);
+
 
   function runPrint() {
     const style = document.createElement('style');
@@ -528,6 +538,8 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
                   <th className="px-3 py-2">Morada</th>
                   <th className="px-3 py-2">Situação</th>
                   <th className="px-3 py-2">Valores (previsto)</th>
+                  <th className="px-3 py-2">Montagem</th>
+
                   <th className="px-3 py-2">Guia</th>
                   <th className="px-3 py-2">Cópias</th>
                   <th className="px-3 py-2" />
@@ -564,7 +576,26 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
                         );
                       })()}
                     </td>
+                    <td className="px-3 py-2 text-xs">
+                      {(() => {
+                        if (docsQuery.isLoading)
+                          return <span className="text-muted-foreground">A verificar…</span>;
+                        const info = s.venda_id ? assemblyByVendaId[s.venda_id] : undefined;
+                        if (!info) return <span className="text-muted-foreground">—</span>;
+                        if (!info.hasAssembly)
+                          return <span className="text-muted-foreground">Sem montagem</span>;
+                        return (
+                          <div className="space-y-0.5">
+                            <Badge variant="default">Com montagem</Badge>
+                            <p className="max-w-[14rem] truncate text-muted-foreground">
+                              {info.services.join(', ')}
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-3 py-2">
+
                       {s.venda_id && history[s.venda_id] ? (
                         <span className="text-amber-600">
                           Guia {history[s.venda_id]?.guide_number || '—'} ({history[s.venda_id]?.version}.ª via)

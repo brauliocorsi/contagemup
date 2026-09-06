@@ -53,15 +53,18 @@ import {
 import { PaymentPanel } from '@/components/driver/PaymentPanel';
 import { AssistanceDialog } from '@/components/driver/AssistanceDialog';
 import { toast } from 'sonner';
+import type { AssemblyInfo } from '@/lib/logistics/assembly';
 
 interface Props {
   attempt: DeliveryAttempt;
+  /** Serviços de montagem da encomenda (Gestão Click), quando conhecidos. */
+  assembly?: AssemblyInfo | null;
   onBack: () => void;
 }
 
 type Step = 'artigos' | 'motivo' | 'resumo';
 
-export function DeliveryExecution({ attempt, onBack }: Props) {
+export function DeliveryExecution({ attempt, assembly, onBack }: Props) {
   const { user } = useAuth();
   const uid = user?.id ?? 'anon';
   const { data: lines = [], isLoading } = useAttemptLines(attempt.id);
@@ -152,6 +155,10 @@ export function DeliveryExecution({ attempt, onBack }: Props) {
     [lines, applyScan],
   );
 
+  // Artigos que seguem mesmo na viatura vs. artigos que não foram carregados.
+  const loadedLines = useMemo(() => lines.filter((l) => l.loaded_quantity > 0), [lines]);
+  const unloadedLines = useMemo(() => lines.filter((l) => l.loaded_quantity <= 0), [lines]);
+
   const totals = useMemo(() => {
     const loaded = lines.reduce((s, l) => s + l.loaded_quantity, 0);
     const delivered = lines.reduce((s, l) => s + qtyOf(l.id), 0);
@@ -227,6 +234,25 @@ export function DeliveryExecution({ attempt, onBack }: Props) {
         </Card>
       )}
 
+      {assembly && (
+        <div
+          className={
+            assembly.hasAssembly
+              ? 'rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm'
+              : 'rounded-lg border p-3 text-sm text-muted-foreground'
+          }
+        >
+          {assembly.hasAssembly ? (
+            <>
+              <p className="font-semibold">Esta encomenda tem serviço de montagem.</p>
+              <p className="text-xs text-muted-foreground">{assembly.services.join(', ')}</p>
+            </>
+          ) : (
+            <p>Sem serviço de montagem — apenas entrega.</p>
+          )}
+        </div>
+      )}
+
       {attempt.partial_load && (
         <div className="flex items-start gap-2 rounded-lg border border-warning/50 bg-warning-soft p-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
@@ -257,7 +283,7 @@ export function DeliveryExecution({ attempt, onBack }: Props) {
           </ScanDock>
 
           <div className="space-y-2">
-            {lines.map((l) => {
+            {loadedLines.map((l) => {
               const q = qtyOf(l.id);
               return (
                 <Card key={l.id}>
@@ -295,10 +321,31 @@ export function DeliveryExecution({ attempt, onBack }: Props) {
                 </Card>
               );
             })}
-            {lines.length === 0 && (
+            {loadedLines.length === 0 && (
               <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
                 Esta entrega não tem artigos carregados.
               </p>
+            )}
+
+            {unloadedLines.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <p className="text-xs font-medium uppercase text-muted-foreground">
+                  Não carregado ({unloadedLines.length}) — não entra nesta entrega
+                </p>
+                {unloadedLines.map((l) => (
+                  <Card key={l.id} className="border-dashed opacity-50">
+                    <CardContent className="flex items-center gap-3 p-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium line-through">{l.product_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {l.product_code} • caixa {l.colis_number} • {l.ordered_quantity} pedida(s)
+                        </p>
+                      </div>
+                      <Badge variant="outline">Não carregado</Badge>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </div>
         </>
@@ -349,7 +396,7 @@ export function DeliveryExecution({ attempt, onBack }: Props) {
           <CardContent className="space-y-3 p-4 text-sm">
             <p className="font-semibold">Resumo antes de gravar</p>
             <ul className="space-y-1">
-              {lines.map((l) => (
+              {loadedLines.map((l) => (
                 <li key={l.id} className="flex justify-between gap-2">
                   <span className="min-w-0 truncate">
                     {l.product_name} (caixa {l.colis_number})
