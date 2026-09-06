@@ -1,0 +1,1 @@
+- [Master Role](mem://auth/master-role) — Só o Master (Braulio) gere utilizadores; master inclui admin+financeiro
