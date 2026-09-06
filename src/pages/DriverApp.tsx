@@ -53,6 +53,24 @@ export default function DriverApp() {
   // Paragens da rota: dão a ordem planeada e as moradas para a simulação.
   const { data: routeData } = useRoute(routeId && routeId !== 'sem-rota' ? routeId : null);
   const stops = routeData?.stops ?? [];
+  // Serviços de montagem da encomenda (vêm da Gestão Click, por número de encomenda).
+  const vendaIds = stops.map((s) => s.venda_id).filter((v): v is string => Boolean(v));
+  const { data: assemblyByCode = {} } = useQuery({
+    queryKey: ['driver-assembly', routeId, vendaIds.join(',')],
+    enabled: vendaIds.length > 0,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async (): Promise<Record<string, AssemblyInfo>> => {
+      const { documents } = await fetchOrderDocuments(vendaIds);
+      const map: Record<string, AssemblyInfo> = {};
+      for (const d of documents) {
+        const code = String(d.codigo ?? '').trim();
+        if (code) map[code] = assemblyFromServices(d.servicos);
+      }
+      return map;
+    },
+  });
+
+
 
   // Rascunhos de entregas que já não estão acessíveis (rota reatribuída) são
   // descartados quando o aparelho volta a ter rede — e sinalizados ao entregador.
