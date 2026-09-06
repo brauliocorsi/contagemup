@@ -192,10 +192,13 @@ export function SettingsView() {
               Adicionar Utilizador
             </CardTitle>
             <CardDescription>
-              Crie uma nova conta de utilizador para acesso ao sistema
+              {isMaster
+                ? 'Crie uma nova conta de utilizador para acesso ao sistema'
+                : 'Apenas o Master pode adicionar utilizadores'}
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <fieldset disabled={!isMaster} className={isMaster ? '' : 'opacity-50 pointer-events-none'}>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Nome</Label>
