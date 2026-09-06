@@ -1,8 +1,12 @@
 import type { Count, ColisDetail, Product, ProductWithCounts } from '@/types/stock';
+import { computeColiTotals, effectiveTotalColis as effColis, isQuarantineLocation } from './colis';
 
 /**
  * Pure computation: given a product, its counts, and (optional) category coli
  * names, return the ProductWithCounts derived view.
+ *
+ * As unidades em quarentena são mostradas no detalhe por coli mas NÃO entram
+ * no cálculo de conjuntos completos — igual ao `sync_product_stock` na base de dados.
  *
  * No side effects, no react-query, safe to unit-test.
  */
@@ -10,11 +14,21 @@ export function getProductWithCounts(
   product: Product,
   counts: Count[],
   categoryColisNames?: Record<string, string> | null,
+  quarantineCodes?: string[],
 ): ProductWithCounts {
   const productCounts = counts.filter((c) => c.product_id === product.id);
 
-  const categoryColisCount = categoryColisNames ? Object.keys(categoryColisNames).length : 0;
-  const effectiveTotalColis = Math.max(product.total_colis, categoryColisCount);
+  const effectiveTotalColis = effColis(product.total_colis, categoryColisNames);
+
+  const totals = computeColiTotals(
+    productCounts.map((c) => ({
+      colis_number: c.colis_number,
+      quantity: c.quantity,
+      location: c.location,
+    })),
+    effectiveTotalColis,
+    quarantineCodes,
+  );
 
   const colisDetails: ColisDetail[] = [];
   const colisQuantities: Record<number, number> = {};
@@ -29,9 +43,12 @@ export function getProductWithCounts(
     }));
 
     const totalQuantity = locationEntries.reduce((sum, e) => sum + e.quantity, 0);
-    colisQuantities[i] = totalQuantity;
+    colisQuantities[i] = totals.perColi[i] ?? 0;
 
-    const primaryEntry = locationEntries.find((e) => e.quantity > 0) || locationEntries[0];
+    const primaryEntry =
+      locationEntries.find((e) => e.quantity > 0 && !isQuarantineLocation(e.location, quarantineCodes)) ||
+      locationEntries.find((e) => e.quantity > 0) ||
+      locationEntries[0];
 
     colisDetails.push({
       colis_number: i,
@@ -41,6 +58,7 @@ export function getProductWithCounts(
       hasMultipleLocations: locationEntries.filter((e) => e.quantity > 0).length > 1,
     });
   }
+
 
   // Only locations that actually hold stock (quantity > 0) count as "onde está o produto".
   // Zero-quantity rows are leftovers of transfers and must not appear in the badge.
