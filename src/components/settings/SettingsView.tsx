@@ -331,7 +331,7 @@ export function SettingsView() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {currentProfile?.role === 'admin' &&
+                        {isMaster &&
                         profile.user_id !== currentProfile?.user_id ? (
                           <Select
                             value={profile.role}
@@ -343,7 +343,9 @@ export function SettingsView() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="master">Master</SelectItem>
                               <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="financeiro">Financeiro</SelectItem>
                               <SelectItem value="operator">Operador</SelectItem>
                               <SelectItem value="entregador">Entregador</SelectItem>
                             </SelectContent>
