@@ -207,7 +207,15 @@ Deno.serve(async (req) => {
   const token = authHeader.slice('Bearer '.length).trim();
   const { data: userData, error: userError } = await admin.auth.getUser(token);
   const uid = userData?.user?.id;
-  if (userError || !uid) return json({ error: 'Unauthorized' }, 401);
+  if (userError || !uid) {
+    console.log('auth-debug', {
+      hasServiceKey: Boolean(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')),
+      tokenLen: token.length,
+      err: userError?.message,
+    });
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
 
   const { data: profile } = await admin
     .from('profiles')
