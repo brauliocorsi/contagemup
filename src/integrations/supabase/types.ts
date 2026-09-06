@@ -452,6 +452,113 @@ export type Database = {
           },
         ]
       }
+      delivery_incidents: {
+        Row: {
+          attachments: Json
+          attempt_id: string | null
+          client_name: string | null
+          created_at: string
+          deduplicated: boolean | null
+          delivery_outcome: string | null
+          description: string
+          dispatch_attempts: number
+          dispatch_status: string
+          driver_id: string | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          note_id: string | null
+          occurred_at: string
+          op_key: string | null
+          order_number: string
+          product_lines: Json
+          route_id: string | null
+          subject: string
+          ticket_id: string | null
+          ticket_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          attachments?: Json
+          attempt_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          deduplicated?: boolean | null
+          delivery_outcome?: string | null
+          description: string
+          dispatch_attempts?: number
+          dispatch_status?: string
+          driver_id?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          note_id?: string | null
+          occurred_at?: string
+          op_key?: string | null
+          order_number: string
+          product_lines?: Json
+          route_id?: string | null
+          subject: string
+          ticket_id?: string | null
+          ticket_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attachments?: Json
+          attempt_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          deduplicated?: boolean | null
+          delivery_outcome?: string | null
+          description?: string
+          dispatch_attempts?: number
+          dispatch_status?: string
+          driver_id?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          note_id?: string | null
+          occurred_at?: string
+          op_key?: string | null
+          order_number?: string
+          product_lines?: Json
+          route_id?: string | null
+          subject?: string
+          ticket_id?: string | null
+          ticket_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_incidents_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_assignment_conflicts"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "delivery_incidents_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_incidents_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_incidents_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_note_items: {
         Row: {
           created_at: string
@@ -514,6 +621,116 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_note_payables: {
+        Row: {
+          active: boolean
+          amount_cents: number
+          classification: string
+          created_at: string
+          due_date: string | null
+          exception_note: string | null
+          fetched_at: string | null
+          gc_sale_code: string | null
+          gc_sale_id: string | null
+          gc_status: string | null
+          gc_store: string | null
+          id: string
+          import_id: string | null
+          imported_by: string | null
+          method_id: string | null
+          method_raw_id: string | null
+          method_raw_name: string | null
+          note_id: string
+          parcel_key: string
+          revision: number
+          route_id: string | null
+          snapshot: Json
+          source_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount_cents: number
+          classification: string
+          created_at?: string
+          due_date?: string | null
+          exception_note?: string | null
+          fetched_at?: string | null
+          gc_sale_code?: string | null
+          gc_sale_id?: string | null
+          gc_status?: string | null
+          gc_store?: string | null
+          id?: string
+          import_id?: string | null
+          imported_by?: string | null
+          method_id?: string | null
+          method_raw_id?: string | null
+          method_raw_name?: string | null
+          note_id: string
+          parcel_key: string
+          revision?: number
+          route_id?: string | null
+          snapshot?: Json
+          source_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount_cents?: number
+          classification?: string
+          created_at?: string
+          due_date?: string | null
+          exception_note?: string | null
+          fetched_at?: string | null
+          gc_sale_code?: string | null
+          gc_sale_id?: string | null
+          gc_status?: string | null
+          gc_store?: string | null
+          id?: string
+          import_id?: string | null
+          imported_by?: string | null
+          method_id?: string | null
+          method_raw_id?: string | null
+          method_raw_name?: string | null
+          note_id?: string
+          parcel_key?: string
+          revision?: number
+          route_id?: string | null
+          snapshot?: Json
+          source_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_note_payables_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "route_previsto_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_note_payables_method_id_fkey"
+            columns: ["method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_note_payables_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_note_payables_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
             referencedColumns: ["id"]
           },
         ]
@@ -643,6 +860,164 @@ export type Database = {
           result?: Json
         }
         Relationships: []
+      }
+      delivery_payable_adjustments: {
+        Row: {
+          active: boolean
+          amount_cents: number
+          attempt_id: string
+          authorized_by: string
+          created_at: string
+          id: string
+          note_id: string
+          reason: string
+        }
+        Insert: {
+          active?: boolean
+          amount_cents: number
+          attempt_id: string
+          authorized_by: string
+          created_at?: string
+          id?: string
+          note_id: string
+          reason: string
+        }
+        Update: {
+          active?: boolean
+          amount_cents?: number
+          attempt_id?: string
+          authorized_by?: string
+          created_at?: string
+          id?: string
+          note_id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_payable_adjustments_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_assignment_conflicts"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "delivery_payable_adjustments_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_payable_adjustments_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_payments: {
+        Row: {
+          amount_cents: number
+          attempt_id: string
+          change_cents: number
+          closure_id: string | null
+          created_at: string
+          declared_at: string
+          declared_by: string
+          difference_reason: string | null
+          gross_cents: number | null
+          id: string
+          locked: boolean
+          method_id: string
+          note_id: string
+          notes: string | null
+          op_key: string
+          reference: string | null
+          route_id: string | null
+        }
+        Insert: {
+          amount_cents: number
+          attempt_id: string
+          change_cents?: number
+          closure_id?: string | null
+          created_at?: string
+          declared_at?: string
+          declared_by: string
+          difference_reason?: string | null
+          gross_cents?: number | null
+          id?: string
+          locked?: boolean
+          method_id: string
+          note_id: string
+          notes?: string | null
+          op_key: string
+          reference?: string | null
+          route_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          attempt_id?: string
+          change_cents?: number
+          closure_id?: string | null
+          created_at?: string
+          declared_at?: string
+          declared_by?: string
+          difference_reason?: string | null
+          gross_cents?: number | null
+          id?: string
+          locked?: boolean
+          method_id?: string
+          note_id?: string
+          notes?: string | null
+          op_key?: string
+          reference?: string | null
+          route_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_payments_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_assignment_conflicts"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "delivery_payments_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_payments_closure_fk"
+            columns: ["closure_id"]
+            isOneToOne: false
+            referencedRelation: "route_cash_closures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_payments_method_id_fkey"
+            columns: ["method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_payments_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_payments_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       delivery_regions: {
         Row: {
@@ -906,6 +1281,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_methods: {
+        Row: {
+          active: boolean
+          collect_on_delivery: boolean
+          created_at: string
+          display_order: number
+          gc_identifiers: string[]
+          gc_name_patterns: string[]
+          id: string
+          kind: string
+          label: string
+          requires_reference: boolean
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          collect_on_delivery?: boolean
+          created_at?: string
+          display_order?: number
+          gc_identifiers?: string[]
+          gc_name_patterns?: string[]
+          id: string
+          kind: string
+          label: string
+          requires_reference?: boolean
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          collect_on_delivery?: boolean
+          created_at?: string
+          display_order?: number
+          gc_identifiers?: string[]
+          gc_name_patterns?: string[]
+          id?: string
+          kind?: string
+          label?: string
+          requires_reference?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       picking_items: {
         Row: {
@@ -1332,9 +1749,218 @@ export type Database = {
         }
         Relationships: []
       }
+      route_cash_closures: {
+        Row: {
+          cash_declared_cents: number
+          counted_at: string | null
+          counted_by: string | null
+          counted_cents: number | null
+          created_at: string
+          declared_cents: number
+          difference_cents: number | null
+          driver_id: string
+          envelope_code: string
+          exceptions: Json
+          expected_cents: number
+          id: string
+          no_cash: boolean
+          notes: string | null
+          op_key: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          route_id: string
+          status: string
+          submitted_at: string
+          submitted_by: string
+          totals: Json
+          updated_at: string
+        }
+        Insert: {
+          cash_declared_cents?: number
+          counted_at?: string | null
+          counted_by?: string | null
+          counted_cents?: number | null
+          created_at?: string
+          declared_cents?: number
+          difference_cents?: number | null
+          driver_id: string
+          envelope_code: string
+          exceptions?: Json
+          expected_cents?: number
+          id?: string
+          no_cash?: boolean
+          notes?: string | null
+          op_key?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          route_id: string
+          status?: string
+          submitted_at?: string
+          submitted_by: string
+          totals?: Json
+          updated_at?: string
+        }
+        Update: {
+          cash_declared_cents?: number
+          counted_at?: string | null
+          counted_by?: string | null
+          counted_cents?: number | null
+          created_at?: string
+          declared_cents?: number
+          difference_cents?: number | null
+          driver_id?: string
+          envelope_code?: string
+          exceptions?: Json
+          expected_cents?: number
+          id?: string
+          no_cash?: boolean
+          notes?: string | null
+          op_key?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          route_id?: string
+          status?: string
+          submitted_at?: string
+          submitted_by?: string
+          totals?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_cash_closures_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_closure_method_checks: {
+        Row: {
+          closure_id: string
+          confirmed_at: string | null
+          confirmed_by: string | null
+          confirmed_cents: number | null
+          created_at: string
+          declared_cents: number
+          id: string
+          method_id: string
+          note: string | null
+          reference: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          closure_id: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_cents?: number | null
+          created_at?: string
+          declared_cents: number
+          id?: string
+          method_id: string
+          note?: string | null
+          reference?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          closure_id?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_cents?: number | null
+          created_at?: string
+          declared_cents?: number
+          id?: string
+          method_id?: string
+          note?: string | null
+          reference?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_closure_method_checks_closure_id_fkey"
+            columns: ["closure_id"]
+            isOneToOne: false
+            referencedRelation: "route_cash_closures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_closure_method_checks_method_id_fkey"
+            columns: ["method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_previsto_imports: {
+        Row: {
+          composition_version: number
+          created_at: string
+          failures: Json
+          id: string
+          invalidated_at: string | null
+          invalidated_reason: string | null
+          notes_failed: number
+          notes_ok: number
+          notes_total: number
+          op_key: string | null
+          requested_by: string | null
+          route_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          composition_version: number
+          created_at?: string
+          failures?: Json
+          id?: string
+          invalidated_at?: string | null
+          invalidated_reason?: string | null
+          notes_failed?: number
+          notes_ok?: number
+          notes_total?: number
+          op_key?: string | null
+          requested_by?: string | null
+          route_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          composition_version?: number
+          created_at?: string
+          failures?: Json
+          id?: string
+          invalidated_at?: string | null
+          invalidated_reason?: string | null
+          notes_failed?: number
+          notes_ok?: number
+          notes_total?: number
+          op_key?: string | null
+          requested_by?: string | null
+          route_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_previsto_imports_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       route_schedules: {
         Row: {
           barcode: string | null
+          composition_version: number
           created_at: string
           created_by: string | null
           departure_address: string | null
@@ -1344,9 +1970,13 @@ export type Database = {
           driver_assigned_at: string | null
           driver_assigned_by: string | null
           driver_id: string | null
+          financial_status: string
           id: string
           name: string
           notes: string | null
+          preparation_closed_at: string | null
+          preparation_closed_by: string | null
+          preparation_reopen_reason: string | null
           region_id: string | null
           return_to_base: boolean
           scheduled_date: string
@@ -1356,6 +1986,7 @@ export type Database = {
         }
         Insert: {
           barcode?: string | null
+          composition_version?: number
           created_at?: string
           created_by?: string | null
           departure_address?: string | null
@@ -1365,9 +1996,13 @@ export type Database = {
           driver_assigned_at?: string | null
           driver_assigned_by?: string | null
           driver_id?: string | null
+          financial_status?: string
           id?: string
           name: string
           notes?: string | null
+          preparation_closed_at?: string | null
+          preparation_closed_by?: string | null
+          preparation_reopen_reason?: string | null
           region_id?: string | null
           return_to_base?: boolean
           scheduled_date: string
@@ -1377,6 +2012,7 @@ export type Database = {
         }
         Update: {
           barcode?: string | null
+          composition_version?: number
           created_at?: string
           created_by?: string | null
           departure_address?: string | null
@@ -1386,9 +2022,13 @@ export type Database = {
           driver_assigned_at?: string | null
           driver_assigned_by?: string | null
           driver_id?: string | null
+          financial_status?: string
           id?: string
           name?: string
           notes?: string | null
+          preparation_closed_at?: string | null
+          preparation_closed_by?: string | null
+          preparation_reopen_reason?: string | null
           region_id?: string | null
           return_to_base?: boolean
           scheduled_date?: string
@@ -2108,6 +2748,7 @@ export type Database = {
         }
         Returns: Json
       }
+      attempt_amount_due: { Args: { p_attempt_id: string }; Returns: Json }
       can_execute_attempt: {
         Args: { _attempt_id: string; _uid: string }
         Returns: boolean
@@ -2116,6 +2757,7 @@ export type Database = {
         Args: { p_note_id: string; p_op_key?: string; p_reason: string }
         Returns: Json
       }
+      close_route_preparation: { Args: { p_route_id: string }; Returns: Json }
       commit_exit_cart: {
         Args: {
           p_items: Json
@@ -2149,6 +2791,15 @@ export type Database = {
         }
         Returns: number
       }
+      declare_delivery_payments: {
+        Args: {
+          p_attempt_id: string
+          p_difference_reason: string
+          p_lines: Json
+          p_op_key: string
+        }
+        Returns: Json
+      }
       dedupe_counts_same_place: { Args: never; Returns: number }
       deliver_location_audit: { Args: { p_audit_id: string }; Returns: Json }
       deliver_note: { Args: { p_note_id: string }; Returns: Json }
@@ -2157,11 +2808,29 @@ export type Database = {
         Returns: boolean
       }
       effective_total_colis: { Args: { p_product_id: string }; Returns: number }
+      finance_confirm_method: {
+        Args: {
+          p_check_id: string
+          p_confirmed_cents: number
+          p_note: string
+          p_reference: string
+        }
+        Returns: Json
+      }
+      finance_count_envelope: {
+        Args: { p_closure_id: string; p_counted_cents: number; p_note: string }
+        Returns: Json
+      }
+      finance_resolve_closure: {
+        Args: { p_closure_id: string; p_note: string }
+        Returns: Json
+      }
       generate_audit_access_code: { Args: never; Returns: string }
       generate_route_barcode: { Args: never; Returns: string }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
       is_delivery_manager: { Args: { _uid: string }; Returns: boolean }
       is_driver_only: { Args: { _uid: string }; Returns: boolean }
+      is_finance: { Args: { _uid: string }; Returns: boolean }
       is_quarantine_location: { Args: { p_location: string }; Returns: boolean }
       load_notes_to_vehicle: {
         Args: {
@@ -2193,6 +2862,17 @@ export type Database = {
           p_to: string
         }
         Returns: number
+      }
+      open_delivery_incident: {
+        Args: {
+          p_attachments: Json
+          p_attempt_id: string
+          p_description: string
+          p_lines: Json
+          p_op_key: string
+          p_subject: string
+        }
+        Returns: Json
       }
       putaway_counts: {
         Args: { p_count_ids: string[]; p_location: string }
@@ -2282,6 +2962,10 @@ export type Database = {
         }
         Returns: Json
       }
+      reopen_route_preparation: {
+        Args: { p_reason: string; p_route_id: string }
+        Returns: Json
+      }
       reschedule_delivery_note: {
         Args: {
           p_driver?: string
@@ -2311,6 +2995,10 @@ export type Database = {
         Returns: Json
       }
       reverse_stock_movement: { Args: { p_movement_id: string }; Returns: Json }
+      set_attempt_payable_override: {
+        Args: { p_amount_cents: number; p_attempt_id: string; p_reason: string }
+        Returns: Json
+      }
       set_count_quantity: {
         Args: {
           p_count_id: string
@@ -2338,6 +3026,16 @@ export type Database = {
         Returns: Json
       }
       start_delivery_attempt: { Args: { p_attempt_id: string }; Returns: Json }
+      submit_route_accounting: {
+        Args: {
+          p_cash_cents: number
+          p_no_cash: boolean
+          p_notes: string
+          p_op_key: string
+          p_route_id: string
+        }
+        Returns: Json
+      }
       transfer_stock_location: { Args: { p_items: Json }; Returns: Json }
       undo_regularize_damage: {
         Args: {
