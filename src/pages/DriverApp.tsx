@@ -22,6 +22,10 @@ import { useMyDeliveryAttempts, type DeliveryAttempt } from '@/hooks/useDelivery
 import { useMyRoutes, useRoute, ROUTE_STATUS_LABELS } from '@/hooks/useRoutes';
 import { clearAllDrafts, pruneRevokedDrafts } from '@/lib/delivery/draft';
 import { RouteAccountingDialog } from '@/components/driver/RouteAccountingDialog';
+import { useQuery } from '@tanstack/react-query';
+import { fetchOrderDocuments } from '@/lib/logistics/api';
+import { assemblyFromServices, type AssemblyInfo } from '@/lib/logistics/assembly';
+
 
 
 function fmtDate(d: string | null) {
