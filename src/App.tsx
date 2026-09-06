@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import { lazy, Suspense } from "react";
 
 const ScannerApp = lazy(() => import("./pages/ScannerApp"));
+const DriverApp = lazy(() => import("./pages/DriverApp"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 
 const queryClient = new QueryClient({
@@ -53,6 +54,15 @@ const App = () => (
                     </Suspense>
                   }
                 />
+                <Route
+                  path="/entregador"
+                  element={
+                    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">A carregar…</div>}>
+                      <DriverApp />
+                    </Suspense>
+                  }
+                />
+
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
