@@ -238,11 +238,19 @@ export default function DriverApp() {
                           <span className="truncate">{a.address}</span>
                         </p>
                       )}
-                      {a.partial_load && (
-                        <Badge variant="outline" className="border-warning/50 text-warning">
-                          Carga incompleta do armazém
-                        </Badge>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {assemblyByCode[a.order_number.trim()]?.hasAssembly ? (
+                          <Badge variant="default">Com montagem</Badge>
+                        ) : assemblyByCode[a.order_number.trim()] ? (
+                          <Badge variant="outline">Sem montagem</Badge>
+                        ) : null}
+                        {a.partial_load && (
+                          <Badge variant="outline" className="border-warning/50 text-warning">
+                            Carga incompleta do armazém
+                          </Badge>
+                        )}
+                      </div>
+
                     </button>
                   </CardContent>
                 </Card>
