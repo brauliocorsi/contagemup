@@ -369,6 +369,15 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
           </Button>
         </div>
       )}
+
+      <AuditDriftDialog
+        open={!!driftLines}
+        onOpenChange={(o) => !o && setDriftLines(null)}
+        lines={driftLines ?? []}
+        pending={completeAudit.isPending}
+        onConfirm={() => handleComplete(true).catch(() => undefined)}
+      />
     </div>
+
   );
 }
