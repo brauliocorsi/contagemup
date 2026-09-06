@@ -50,6 +50,8 @@ import { PickingReport } from './PickingReport';
 import { AddRouteStops } from './AddRouteStops';
 import { RouteDriverCard } from './RouteDriverCard';
 import { RoutePreparationCard } from './RoutePreparationCard';
+import { useRoutePayables } from '@/hooks/useDeliveryFinance';
+import { formatCents } from '@/lib/finance/money';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
@@ -97,6 +99,23 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
   const { data, isLoading } = useRoute(routeId);
   const route = data?.route;
   const stops = useMemo(() => data?.stops ?? [], [data]);
+
+  // Previsto da Gestão Click por encomenda: já pago vs. por receber na entrega.
+  const { data: payables = [] } = useRoutePayables(routeId);
+  const previstoByCode = useMemo(() => {
+    const map: Record<string, { paid: number; due: number; review: number }> = {};
+    for (const p of payables) {
+      const code = String(p.gc_sale_code ?? '').trim();
+      if (!code) continue;
+      const entry = (map[code] ??= { paid: 0, due: 0, review: 0 });
+      if (p.classification === 'already_paid') entry.paid += p.amount_cents;
+      else if (p.classification === 'collect_on_delivery') entry.due += p.amount_cents;
+      else entry.review += p.amount_cents;
+    }
+    return map;
+  }, [payables]);
+
+
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [copies, setCopies] = useState<Record<string, number>>({});
@@ -508,6 +527,7 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
                   <th className="px-3 py-2">Cliente</th>
                   <th className="px-3 py-2">Morada</th>
                   <th className="px-3 py-2">Situação</th>
+                  <th className="px-3 py-2">Valores (previsto)</th>
                   <th className="px-3 py-2">Guia</th>
                   <th className="px-3 py-2">Cópias</th>
                   <th className="px-3 py-2" />
@@ -529,6 +549,21 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
                       {s.address || '—'}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{s.venda_status || '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs">
+                      {(() => {
+                        const v = previstoByCode[String(s.venda_codigo ?? '').trim()];
+                        if (!v) return <span className="text-muted-foreground">Sem previsto</span>;
+                        return (
+                          <div className="space-y-0.5">
+                            <p className="text-success">Já pago: {formatCents(v.paid)}</p>
+                            <p className="font-semibold">Por receber: {formatCents(v.due)}</p>
+                            {v.review > 0 && (
+                              <p className="text-warning">Por rever: {formatCents(v.review)}</p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-3 py-2">
                       {s.venda_id && history[s.venda_id] ? (
                         <span className="text-amber-600">
