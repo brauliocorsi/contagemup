@@ -82,7 +82,35 @@ export default function DriverApp() {
   const loose = byRoute.get('sem-rota') ?? [];
   const open: DeliveryAttempt | undefined = attempts.find((a) => a.id === openId);
   const currentRoute = routes.find((r) => r.id === routeId);
-  const routeAttempts = routeId ? (byRoute.get(routeId) ?? []) : loose;
+  // Ordem planeada da rota: cada encomenda segue o número de paragem definido no escritório.
+  const stopOrder = new Map<string, number>();
+  for (const s of stops) if (s.venda_codigo) stopOrder.set(s.venda_codigo, s.order_number);
+  const routeAttempts = (routeId ? (byRoute.get(routeId) ?? []) : loose)
+    .slice()
+    .sort(
+      (a, b) =>
+        (stopOrder.get(a.order_number) ?? 9999) - (stopOrder.get(b.order_number) ?? 9999) ||
+        a.order_number.localeCompare(b.order_number),
+    );
+
+  const simulateRoute = () => {
+    const addresses = stops
+      .slice()
+      .sort((a, b) => a.order_number - b.order_number)
+      .map((s) => s.address?.trim())
+      .filter((a): a is string => Boolean(a));
+    if (addresses.length === 0) {
+      toast.error('Esta rota não tem moradas para simular');
+      return;
+    }
+    const origin = routeData?.route.departure_address?.trim() || addresses[0];
+    const destination = addresses[addresses.length - 1];
+    const waypoints = addresses.slice(0, -1).filter((a) => a !== origin);
+    const params = new URLSearchParams({ api: '1', travelmode: 'driving', origin, destination });
+    if (waypoints.length > 0) params.set('waypoints', waypoints.join('|'));
+    window.open(`https://maps.google.com/maps/dir/?${params.toString()}`, '_blank', 'noopener');
+  };
+
 
   const refreshAll = () => {
     void refetch();
