@@ -196,7 +196,7 @@ export function PaymentPanel({ attemptId, routeId = null, orderNumber = null, di
             ))}
           </CardContent>
         </Card>
-      ) : due.due_cents === 0 && lines.length === 0 ? (
+      ) : (due?.due_cents ?? 0) === 0 && lines.length === 0 ? (
         <Button
           variant="outline"
           size="sm"
