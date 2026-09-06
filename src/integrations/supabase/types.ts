@@ -1872,36 +1872,17 @@ export type Database = {
         }
         Returns: Json
       }
-      resolve_damage:
-        | {
-            Args: {
-              p_damage_id: string
-              p_resolution_notes: string
-              p_resolution_type: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_damage_id: string
-              p_destination_location: string
-              p_resolution_notes: string
-              p_resolution_type: string
-              p_supplier_reference: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_allow_partial?: boolean
-              p_damage_id: string
-              p_destination_location: string
-              p_resolution_notes: string
-              p_resolution_type: string
-              p_supplier_reference: string
-            }
-            Returns: Json
-          }
+      resolve_damage: {
+        Args: {
+          p_allow_partial?: boolean
+          p_damage_id: string
+          p_destination_location: string
+          p_resolution_notes: string
+          p_resolution_type: string
+          p_supplier_reference: string
+        }
+        Returns: Json
+      }
       return_note_items: {
         Args: {
           p_items?: Json
