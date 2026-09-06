@@ -38,6 +38,7 @@ export function DamageResolutionDialog({
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [destination, setDestination] = useState('');
   const [supplierRef, setSupplierRef] = useState('');
+  const [allowPartial, setAllowPartial] = useState(false);
 
   const option = useMemo(
     () => RESOLUTION_OPTIONS.find((o) => o.value === resolutionType),
@@ -49,6 +50,7 @@ export function DamageResolutionDialog({
     setResolutionNotes('');
     setDestination('');
     setSupplierRef('');
+    setAllowPartial(false);
   };
 
   const canSubmit =
@@ -66,11 +68,13 @@ export function DamageResolutionDialog({
       resolution_notes: resolutionNotes || undefined,
       destination_location: option?.needsDestination ? destination : undefined,
       supplier_reference: option?.needsSupplierRef ? supplierRef.trim() : undefined,
+      allow_partial: allowPartial,
     });
 
     reset();
     onOpenChange(false);
   };
+
 
   const handleCancel = () => {
     reset();
