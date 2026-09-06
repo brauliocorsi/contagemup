@@ -99,23 +99,35 @@ export function useDamages() {
 
   // Resolve damage — branches by resolution type via RPC
   const resolveDamageMutation = useMutation({
-    mutationFn: async (input: ResolveDamageInput) => {
+    mutationFn: async (input: ResolveDamageInput): Promise<ResolveDamageResult> => {
       const { data, error } = await supabase.rpc('resolve_damage', {
         p_damage_id: input.id,
         p_resolution_type: input.resolution_type,
         p_resolution_notes: input.resolution_notes ?? null,
         p_destination_location: input.destination_location ?? null,
         p_supplier_reference: input.supplier_reference ?? null,
+        // Por defeito a resolução é total: se faltar stock em quarentena, nada é alterado.
+        p_allow_partial: input.allow_partial ?? false,
       });
 
       if (error) throw error;
-      return data;
+      return data as unknown as ResolveDamageResult;
 
     },
-    onSuccess: () => {
-      toast({ title: 'Sucesso', description: 'Avaria resolvida com sucesso' });
+    onSuccess: (result) => {
+      if (result?.status === 'partial') {
+        toast({
+          title: 'Resolvida em parte',
+          description: `${result.quantity ?? 0} un. resolvidas; ficam ${result.remaining ?? 0} un. por resolver.`,
+        });
+      } else if (result?.status === 'already_resolved') {
+        toast({ title: 'Já estava resolvida', description: 'Nada foi duplicado.' });
+      } else {
+        toast({ title: 'Sucesso', description: 'Avaria resolvida com sucesso' });
+      }
       queryClient.invalidateQueries({ queryKey: ['damages'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['counts'] });
     },
     onError: (error: Error) => {
       toast({
@@ -125,6 +137,7 @@ export function useDamages() {
       });
     }
   });
+
 
   // Update damage metadata only (damaged_stock is kept by the sync_damaged_stock trigger)
   const updateDamageMutation = useMutation({
