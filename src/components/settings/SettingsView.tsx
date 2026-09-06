@@ -284,7 +284,28 @@ export function SettingsView() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{getRoleBadge(profile.role)}</TableCell>
+                      <TableCell>
+                        {currentProfile?.role === 'admin' &&
+                        profile.user_id !== currentProfile?.user_id ? (
+                          <Select
+                            value={profile.role}
+                            onValueChange={(role) =>
+                              updateRole.mutate({ userId: profile.user_id, role })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="operator">Operador</SelectItem>
+                              <SelectItem value="entregador">Entregador</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          getRoleBadge(profile.role)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {new Date(profile.created_at).toLocaleDateString('pt-PT')}
                       </TableCell>
