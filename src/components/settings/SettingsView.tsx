@@ -245,7 +245,22 @@ export function SettingsView() {
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={isCreating}>
+              <div className="space-y-2">
+                <Label htmlFor="new-role">Função</Label>
+                <Select value={newUserRole} onValueChange={setNewUserRole}>
+                  <SelectTrigger id="new-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="operator">Operador</SelectItem>
+                    <SelectItem value="entregador">Entregador</SelectItem>
+                    <SelectItem value="financeiro">Financeiro</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button type="submit" className="w-full" disabled={isCreating || !isMaster}>
                 {isCreating ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -259,6 +274,7 @@ export function SettingsView() {
                 )}
               </Button>
             </form>
+            </fieldset>
           </CardContent>
         </Card>
 
