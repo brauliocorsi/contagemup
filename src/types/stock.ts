@@ -87,7 +87,14 @@ export interface ProductWithCounts extends Product {
   colisDetails: ColisDetail[];
   uniqueLocations: string[];
   hasMultipleLocations: boolean;
+  /** Unidades fora de quarentena (todas as colis). */
+  physicalUnits?: number;
+  /** Unidades atualmente em quarentena. */
+  quarantineUnits?: number;
+  /** Unidades que não formam conjunto completo. */
+  orphanUnits?: number;
 }
+
 
 export interface Profile {
   id: string;
