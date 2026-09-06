@@ -24,6 +24,7 @@ import {
   useSubmitRouteAccounting,
 } from '@/hooks/useDeliveryFinance';
 import { centsToInput, formatCents, parseEurosToCents } from '@/lib/finance/money';
+import { listDrafts } from '@/lib/finance/paymentDrafts';
 import type { DeliveryAttempt } from '@/hooks/useDeliveryAttempts';
 
 interface Props {
@@ -61,11 +62,17 @@ export function RouteAccountingDialog({ routeId, routeName, attempts }: Props) {
     [mine, methods],
   );
 
+  // recebimentos escritos no aparelho mas ainda não guardados no servidor
+  const [open, setOpen] = useState(false);
+  const pendingDrafts = useMemo(
+    () => (user?.id && open ? listDrafts(user.id, routeId) : []),
+    [user?.id, routeId, open],
+  );
+
   const pendingAttempts = attempts.filter(
     (a) => a.route_id === routeId && (a.status === 'assigned' || a.status === 'in_transit'),
   );
 
-  const [open, setOpen] = useState(false);
   const [cash, setCash] = useState('');
   const [noCash, setNoCash] = useState(false);
   const [notes, setNotes] = useState('');
@@ -126,6 +133,20 @@ export function RouteAccountingDialog({ routeId, routeName, attempts }: Props) {
             </div>
           </div>
 
+          {pendingDrafts.length > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-xs">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <span>
+                Tem {pendingDrafts.length} recebimento(s) escritos neste aparelho que ainda não
+                foram guardados no servidor
+                {pendingDrafts.some((d) => d.orderNumber)
+                  ? ` (${pendingDrafts.map((d) => d.orderNumber ?? '—').join(', ')})`
+                  : ''}
+                . Guarde-os antes de fechar as contas.
+              </span>
+            </div>
+          )}
+
           {pendingAttempts.length > 0 && (
             <div className="flex items-start gap-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
@@ -163,8 +184,12 @@ export function RouteAccountingDialog({ routeId, routeName, attempts }: Props) {
             Voltar
           </Button>
           <Button
-            disabled={submit.isPending}
+            disabled={submit.isPending || pendingDrafts.length > 0}
             onClick={async () => {
+              if (pendingDrafts.length > 0) {
+                toast.error('Há recebimentos por guardar neste aparelho');
+                return;
+              }
               const cents = noCash ? 0 : parseEurosToCents(cash);
               if (cents === null) {
                 toast.error('Valor do envelope mal escrito');

@@ -378,7 +378,11 @@ export function DeliveryExecution({ attempt, onBack }: Props) {
 
       {step === 'resumo' && (
         <>
-          <PaymentPanel attemptId={attempt.id} />
+          <PaymentPanel
+            attemptId={attempt.id}
+            routeId={attempt.route_id}
+            orderNumber={attempt.order_number}
+          />
           <AssistanceDialog attempt={attempt} lines={lines} />
         </>
       )}
