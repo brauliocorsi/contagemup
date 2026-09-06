@@ -384,8 +384,17 @@ export function useImportPrevisto() {
           op_key: input.opKey ?? crypto.randomUUID(),
         },
       });
-      if (error) throw error;
+      if (error) {
+        // a mensagem real vem no corpo da resposta da função
+        const ctx = (error as { context?: Response }).context;
+        if (ctx && typeof ctx.json === 'function') {
+          const body = await ctx.json().catch(() => null);
+          if (body?.error) throw new Error(body.error as string);
+        }
+        throw error;
+      }
       if (data?.error) throw new Error(data.error);
+
       return data as { import: PrevistoImport; failures: PrevistoImport['failures'] };
     },
     onSuccess: (r) => {
