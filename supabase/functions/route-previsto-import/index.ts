@@ -256,13 +256,15 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (existing) return json({ import: existing, idempotent: true });
 
-    // Números de encomenda vinculados à rota: paragens da rota + notas já
-    // ligadas por route_id. Só estas notas entram no previsto.
+    // Alvos do previsto: as encomendas da rota. A ligação real está nas
+    // paragens (route_stops); a nota de separação pode ainda não existir.
     const { data: stops, error: stopsErr } = await admin
       .from('route_stops')
-      .select('venda_codigo')
-      .eq('route_id', routeId);
+      .select('id, venda_codigo, venda_id, order_number')
+      .eq('route_id', routeId)
+      .order('order_number', { ascending: true });
     if (stopsErr) throw stopsErr;
+
     const stopCodes = (stops ?? [])
       .map((s: { venda_codigo: string | null }) => String(s.venda_codigo ?? '').trim())
       .filter((c: string) => c.length > 0);
@@ -272,14 +274,43 @@ Deno.serve(async (req) => {
       orFilters.push(`order_number.in.(${stopCodes.map((c) => `"${c.replace(/"/g, '\\"')}"`).join(',')})`);
     }
 
-    let notesQuery = admin
+    const { data: notes, error: notesErr } = await admin
       .from('delivery_notes')
       .select('id, order_number, created_at')
       .or(orFilters.join(','))
       .order('created_at', { ascending: true });
-    if (onlyNotes) notesQuery = notesQuery.in('id', onlyNotes);
-    const { data: notes, error: notesErr } = await notesQuery;
     if (notesErr) throw notesErr;
+
+    const noteByCode = new Map<string, string>();
+    for (const n of notes ?? []) {
+      const c = String(n.order_number ?? '').trim();
+      if (c && !noteByCode.has(c)) noteByCode.set(c, n.id as string);
+    }
+
+    type Target = { note_id: string | null; code: string; sale_id: string | null };
+    const targets: Target[] = [];
+    const added = new Set<string>();
+    for (const s of stops ?? []) {
+      const code = String((s as Dict)['venda_codigo'] ?? '').trim();
+      if (!code || added.has(code)) continue;
+      added.add(code);
+      targets.push({
+        note_id: noteByCode.get(code) ?? null,
+        code,
+        sale_id: str((s as Dict)['venda_id']) || null,
+      });
+    }
+    // notas ligadas à rota sem paragem correspondente
+    for (const n of notes ?? []) {
+      const code = String(n.order_number ?? '').trim();
+      if (!code || added.has(code)) continue;
+      added.add(code);
+      targets.push({ note_id: n.id as string, code, sale_id: null });
+    }
+
+    const scoped = onlyNotes
+      ? targets.filter((t) => (t.note_id && onlyNotes.includes(t.note_id)) || onlyNotes.includes(t.code))
+      : targets;
 
     const { data: methodsRaw } = await admin
       .from('payment_methods')
@@ -295,8 +326,9 @@ Deno.serve(async (req) => {
         status: 'running',
         op_key: opKey,
         requested_by: uid,
-        notes_total: notes?.length ?? 0,
+        notes_total: scoped.length,
       })
+
       .select()
       .single();
     if (runErr) throw runErr;
