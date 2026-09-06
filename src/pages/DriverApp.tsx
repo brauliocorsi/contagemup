@@ -4,12 +4,14 @@ import {
   Loader2,
   LogOut,
   MapPin,
+  Navigation,
   PackageCheck,
   RefreshCw,
   ArrowLeft,
   AlertTriangle,
   Route as RouteIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { Button } from '@/components/ui/button';
@@ -17,9 +19,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { DeliveryExecution } from '@/components/driver/DeliveryExecution';
 import { useMyDeliveryAttempts, type DeliveryAttempt } from '@/hooks/useDeliveryAttempts';
-import { useMyRoutes, ROUTE_STATUS_LABELS } from '@/hooks/useRoutes';
+import { useMyRoutes, useRoute, ROUTE_STATUS_LABELS } from '@/hooks/useRoutes';
 import { clearAllDrafts, pruneRevokedDrafts } from '@/lib/delivery/draft';
 import { RouteAccountingDialog } from '@/components/driver/RouteAccountingDialog';
+
 
 function fmtDate(d: string | null) {
   if (!d) return 'Sem data';
@@ -43,6 +46,9 @@ export default function DriverApp() {
   const [routeId, setRouteId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [revoked, setRevoked] = useState(0);
+  // Paragens da rota: dão a ordem planeada e as moradas para a simulação.
+  const { data: routeData } = useRoute(routeId && routeId !== 'sem-rota' ? routeId : null);
+  const stops = routeData?.stops ?? [];
 
   // Rascunhos de entregas que já não estão acessíveis (rota reatribuída) são
   // descartados quando o aparelho volta a ter rede — e sinalizados ao entregador.
@@ -76,7 +82,35 @@ export default function DriverApp() {
   const loose = byRoute.get('sem-rota') ?? [];
   const open: DeliveryAttempt | undefined = attempts.find((a) => a.id === openId);
   const currentRoute = routes.find((r) => r.id === routeId);
-  const routeAttempts = routeId ? (byRoute.get(routeId) ?? []) : loose;
+  // Ordem planeada da rota: cada encomenda segue o número de paragem definido no escritório.
+  const stopOrder = new Map<string, number>();
+  for (const s of stops) if (s.venda_codigo) stopOrder.set(s.venda_codigo, s.order_number);
+  const routeAttempts = (routeId ? (byRoute.get(routeId) ?? []) : loose)
+    .slice()
+    .sort(
+      (a, b) =>
+        (stopOrder.get(a.order_number) ?? 9999) - (stopOrder.get(b.order_number) ?? 9999) ||
+        a.order_number.localeCompare(b.order_number),
+    );
+
+  const simulateRoute = () => {
+    const addresses = stops
+      .slice()
+      .sort((a, b) => a.order_number - b.order_number)
+      .map((s) => s.address?.trim())
+      .filter((a): a is string => Boolean(a));
+    if (addresses.length === 0) {
+      toast.error('Esta rota não tem moradas para simular');
+      return;
+    }
+    const origin = routeData?.route.departure_address?.trim() || addresses[0];
+    const destination = addresses[addresses.length - 1];
+    const waypoints = addresses.slice(0, -1).filter((a) => a !== origin);
+    const params = new URLSearchParams({ api: '1', travelmode: 'driving', origin, destination });
+    if (waypoints.length > 0) params.set('waypoints', waypoints.join('|'));
+    window.open(`https://maps.google.com/maps/dir/?${params.toString()}`, '_blank', 'noopener');
+  };
+
 
   const refreshAll = () => {
     void refetch();
@@ -132,6 +166,11 @@ export default function DriverApp() {
                 <ArrowLeft className="mr-1 h-4 w-4" /> Minhas rotas
               </Button>
             )}
+            {routeId && routeId !== 'sem-rota' && (
+              <Button variant="outline" className="w-full" onClick={simulateRoute}>
+                <Navigation className="mr-2 h-4 w-4" /> Simular rota no Google Maps
+              </Button>
+            )}
             {routeId && currentRoute && (
               <RouteAccountingDialog
                 routeId={routeId}
@@ -150,6 +189,11 @@ export default function DriverApp() {
                   <CardContent className="p-0">
                     <button className="w-full space-y-1 p-4 text-left" onClick={() => setOpenId(a.id)}>
                       <div className="flex items-center gap-2">
+                        {stopOrder.has(a.order_number) && (
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                            {stopOrder.get(a.order_number)}
+                          </span>
+                        )}
                         <span className="min-w-0 flex-1 truncate font-semibold">
                           {a.client_name || 'Cliente'}
                         </span>
