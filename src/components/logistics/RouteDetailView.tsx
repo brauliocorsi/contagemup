@@ -549,6 +549,21 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
                       {s.address || '—'}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{s.venda_status || '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs">
+                      {(() => {
+                        const v = previstoByCode[String(s.venda_codigo ?? '').trim()];
+                        if (!v) return <span className="text-muted-foreground">Sem previsto</span>;
+                        return (
+                          <div className="space-y-0.5">
+                            <p className="text-success">Já pago: {formatCents(v.paid)}</p>
+                            <p className="font-semibold">Por receber: {formatCents(v.due)}</p>
+                            {v.review > 0 && (
+                              <p className="text-warning">Por rever: {formatCents(v.review)}</p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-3 py-2">
                       {s.venda_id && history[s.venda_id] ? (
                         <span className="text-amber-600">
