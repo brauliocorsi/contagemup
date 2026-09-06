@@ -646,7 +646,7 @@ export type Database = {
           method_id: string | null
           method_raw_id: string | null
           method_raw_name: string | null
-          note_id: string
+          note_id: string | null
           parcel_key: string
           revision: number
           route_id: string | null
@@ -674,7 +674,7 @@ export type Database = {
           method_id?: string | null
           method_raw_id?: string | null
           method_raw_name?: string | null
-          note_id: string
+          note_id?: string | null
           parcel_key: string
           revision?: number
           route_id?: string | null
@@ -702,7 +702,7 @@ export type Database = {
           method_id?: string | null
           method_raw_id?: string | null
           method_raw_name?: string | null
-          note_id?: string
+          note_id?: string | null
           parcel_key?: string
           revision?: number
           route_id?: string | null
