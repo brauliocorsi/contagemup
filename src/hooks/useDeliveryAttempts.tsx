@@ -104,26 +104,33 @@ export function pendingReturn(l: DeliveryAttemptLine) {
   );
 }
 
-/** Tentativas atribuídas ao utilizador autenticado (área do entregador). */
-export function useMyDeliveryAttempts() {
+/**
+ * Tentativas acessíveis ao utilizador autenticado (área do entregador).
+ * O filtro real está no servidor: a rota é a fonte da atribuição e as regras
+ * de acesso (RLS) só devolvem as entregas das rotas deste entregador —
+ * ou, como exceção herdada, as que lhe foram atribuídas uma a uma.
+ */
+export function useMyDeliveryAttempts(routeId?: string | null) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['my-delivery-attempts', user?.id],
+    queryKey: ['my-delivery-attempts', user?.id, routeId ?? 'todas'],
     enabled: !!user?.id,
     queryFn: async (): Promise<DeliveryAttempt[]> => {
-      const { data, error } = await client
+      let q = client
         .from('delivery_attempts')
         .select('*')
-        .eq('driver_id', user!.id)
         .in('status', ['assigned', 'in_transit'])
         .order('scheduled_date', { ascending: true })
         .order('attempt_number', { ascending: true });
+      if (routeId) q = q.eq('route_id', routeId);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as DeliveryAttempt[];
     },
     staleTime: 15 * 1000,
   });
 }
+
 
 export interface AttemptFilters {
   status?: AttemptStatus | 'all';

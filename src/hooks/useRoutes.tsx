@@ -23,6 +23,9 @@ export interface RouteSchedule {
   departure_address: string | null;
   barcode: string | null;
   vehicle_location_id: string | null;
+  driver_id: string | null;
+  driver_assigned_by: string | null;
+  driver_assigned_at: string | null;
   created_at: string;
 }
 
@@ -291,5 +294,92 @@ export function useReorderRouteStops() {
     },
     onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['route', v.routeId] }),
     onError: (e) => toast.error('Erro ao reordenar: ' + mapDatabaseError(e)),
+  });
+}
+
+/* ─── Atribuição por rota ─────────────────────────────────────────────
+ * A rota é a fonte da atribuição: o entregador da rota vê automaticamente
+ * todas as tentativas dessa rota, incluindo as acrescentadas depois. */
+
+/** Define ou troca o entregador responsável por esta rota concreta. */
+export function useAssignRouteDriver() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { routeId: string; driverId: string | null; reason?: string }) => {
+      const { data, error } = await (
+        supabase as unknown as {
+          rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+        }
+      ).rpc('assign_route_delivery', {
+        p_route_id: input.routeId,
+        p_driver: input.driverId,
+        p_reason: input.reason?.trim() || null,
+        p_op_key: crypto.randomUUID(),
+      });
+      if (error) throw error;
+      return data as { attempts_created: number };
+    },
+    onSuccess: (r, v) => {
+      qc.invalidateQueries({ queryKey: ['routes'] });
+      qc.invalidateQueries({ queryKey: ['route', v.routeId] });
+      qc.invalidateQueries({ queryKey: ['my-routes'] });
+      qc.invalidateQueries({ queryKey: ['delivery-attempts'] });
+      qc.invalidateQueries({ queryKey: ['my-delivery-attempts'] });
+      toast.success(
+        v.driverId
+          ? `Entregador da rota atualizado${r.attempts_created ? ` — ${r.attempts_created} entrega(s) preparada(s)` : ''}`
+          : 'Rota ficou sem entregador',
+      );
+    },
+    onError: (e) => toast.error(mapDatabaseError(e)),
+  });
+}
+
+/** Rotas atribuídas ao utilizador autenticado (área do entregador). */
+export function useMyRoutes(userId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['my-routes', userId],
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<RouteSchedule[]> => {
+      const { data, error } = await supabase
+        .from('route_schedules')
+        .select('*')
+        .eq('driver_id', userId!)
+        .in('status', ACTIVE_ROUTE_STATUSES)
+        .order('scheduled_date', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as RouteSchedule[];
+    },
+    staleTime: 15 * 1000,
+  });
+}
+
+export interface AssignmentConflict {
+  attempt_id: string;
+  note_id: string;
+  order_number: string;
+  client_name: string | null;
+  status: string;
+  scheduled_date: string | null;
+  legacy_driver_id: string | null;
+  route_id: string | null;
+  route_name: string | null;
+  route_driver_id: string | null;
+  conflict_type: 'sem_rota' | 'rota_sem_entregador' | 'entregador_diferente';
+}
+
+/** Atribuições antigas (entrega a entrega) que divergem do entregador da rota. */
+export function useAssignmentConflicts() {
+  return useQuery({
+    queryKey: ['delivery-assignment-conflicts'],
+    queryFn: async (): Promise<AssignmentConflict[]> => {
+      const { data, error } = await (supabase as unknown as { from: (t: string) => any })
+        .from('delivery_assignment_conflicts')
+        .select('*')
+        .order('scheduled_date', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as AssignmentConflict[];
+    },
+    staleTime: 30 * 1000,
   });
 }

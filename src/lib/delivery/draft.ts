@@ -74,3 +74,55 @@ export function parseLabel(raw: string): { code: string; coli: number | null } {
   if (m) return { code: m[1], coli: Number(m[2]) };
   return { code: clean, coli: null };
 }
+
+/** Apaga todos os rascunhos deste utilizador (usado ao sair da aplicação). */
+export function clearAllDrafts(userId: string) {
+  try {
+    const prefix = `delivery_draft:${userId}:`;
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(prefix)) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* ignorar */
+  }
+}
+
+/**
+ * Apaga os rascunhos de entregas a que o utilizador já não tem acesso
+ * (rota reatribuída a outro entregador). Devolve os rascunhos descartados
+ * que tinham trabalho por enviar, para poderem ser mostrados como conflito.
+ */
+export function pruneRevokedDrafts(userId: string, allowedAttemptIds: string[]): DeliveryDraft[] {
+  const allowed = new Set(allowedAttemptIds);
+  const dropped: DeliveryDraft[] = [];
+  try {
+    const prefix = `delivery_draft:${userId}:`;
+    const stale: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k?.startsWith(prefix)) continue;
+      const attemptId = k.slice(prefix.length);
+      if (allowed.has(attemptId)) continue;
+      stale.push(k);
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      try {
+        const d = JSON.parse(raw) as DeliveryDraft;
+        const hasWork =
+          d.pendingSend ||
+          Object.values(d.quantities ?? {}).some((q) => q > 0) ||
+          Boolean(d.failureReason);
+        if (hasWork) dropped.push(d);
+      } catch {
+        /* rascunho ilegível */
+      }
+    }
+    stale.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* ignorar */
+  }
+  return dropped;
+}
