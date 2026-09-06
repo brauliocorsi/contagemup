@@ -138,35 +138,19 @@ export function useCounting(sessionId: string | null) {
     return data[0];
   };
 
+  /**
+   * Grava um valor absoluto na linha de contagem.
+   *
+   * A gravação passa pela função `set_count_quantity`, que bloqueia a linha,
+   * recusa gravar se a quantidade mudou entretanto (evita apagar o trabalho de
+   * outra pessoa) e escreve o registo em `count_logs` na mesma transação.
+   */
   const updateCount = async (productId: string, colisNumber: number, quantity: number) => {
-    console.log('updateCount chamado:', { productId, colisNumber, quantity, sessionId, userId: user?.id });
-    
-    if (!sessionId || !user) {
-      console.log('updateCount: sessionId ou user em falta', { sessionId, user: !!user });
-      return false;
-    }
+    if (!sessionId || !user) return false;
 
-    // Buscar count fresco da BD para evitar stale cache
     const freshCount = await fetchFreshCount(productId, colisNumber);
-    console.log('freshCount encontrado:', freshCount);
 
-    if (freshCount) {
-      const { error } = await supabase
-        .from('counts')
-        .update({ quantity, counted_by: user.id, updated_at: new Date().toISOString() })
-        .eq('id', freshCount.id);
-
-      if (error) {
-        console.error('Erro ao actualizar count:', error);
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível atualizar a contagem',
-          variant: 'destructive'
-        });
-        return false;
-      }
-      console.log('Count actualizado com sucesso');
-    } else {
+    if (!freshCount) {
       // Localização obrigatória: não criamos linhas de stock sem morada.
       toast({
         title: 'Localização obrigatória',
@@ -176,110 +160,97 @@ export function useCounting(sessionId: string | null) {
       return false;
     }
 
+    const { error } = await supabase.rpc('set_count_quantity', {
+      p_count_id: freshCount.id,
+      p_quantity: quantity,
+      p_observed_quantity: freshCount.quantity ?? 0,
+    });
+
+    if (error) {
+      toast({
+        title: 'Não foi possível atualizar a contagem',
+        description: mapDatabaseError(error, 'Tente novamente.'),
+        variant: 'destructive'
+      });
+      return false;
+    }
+
     invalidateCounts();
     return true;
   };
 
-  const incrementCount = async (productId: string, colisNumber: number) => {
-    const operationKey = `inc-${productId}-${colisNumber}`;
-    
-    // Prevenir cliques rápidos - usar ref para evitar re-renders
-    if (pendingOperationsRef.current.has(operationKey)) {
-      console.log('Operação já em progresso, ignorando clique');
-      return false;
-    }
-    
+  /** Aplica uma variação atómica (+1/−1) sobre a linha com mais unidades. */
+  const applyDelta = async (productId: string, colisNumber: number, delta: number) => {
+    const operationKey = `delta-${productId}-${colisNumber}`;
+    if (pendingOperationsRef.current.has(operationKey)) return false;
     pendingOperationsRef.current.add(operationKey);
-    
+
     try {
-      // Buscar count fresco directamente da BD
       const freshCount = await fetchFreshCount(productId, colisNumber);
-      const oldQuantity = freshCount?.quantity || 0;
-      const newQuantity = oldQuantity + 1;
-      
-      const success = await updateCount(productId, colisNumber, newQuantity);
-      
-      if (success && sessionId) {
-        // Log the count operation
-        await supabase.from('count_logs').insert({
-          product_id: productId,
-          session_id: sessionId,
-          colis_number: colisNumber,
-          operation: 'increment',
-          quantity_before: oldQuantity,
-          quantity_after: newQuantity,
-          counted_by: user?.id
+      if (!freshCount) {
+        toast({
+          title: 'Localização obrigatória',
+          description: 'Escolha primeiro a localização deste coli (use SEM-LOCALIZACAO se ainda não souber onde fica).',
+          variant: 'destructive'
         });
+        return false;
       }
-      
-      return success;
+      if (delta < 0 && (freshCount.quantity ?? 0) <= 0) return true;
+
+      const { error } = await supabase.rpc('apply_count_delta', {
+        p_count_id: freshCount.id,
+        p_delta: delta,
+      });
+
+      if (error) {
+        toast({
+          title: delta > 0 ? 'Não foi possível incrementar' : 'Não foi possível decrementar',
+          description: mapDatabaseError(error, 'Tente novamente.'),
+          variant: 'destructive'
+        });
+        return false;
+      }
+
+      invalidateCounts();
+      return true;
     } finally {
       pendingOperationsRef.current.delete(operationKey);
     }
   };
+
+  const incrementCount = async (productId: string, colisNumber: number) =>
+    applyDelta(productId, colisNumber, 1);
 
   const decrementCount = async (productId: string, colisNumber: number) => {
-    const operationKey = `dec-${productId}-${colisNumber}`;
-    
-    // Prevenir cliques rápidos
-    if (pendingOperationsRef.current.has(operationKey)) {
-      console.log('Operação já em progresso, ignorando clique');
-      return false;
-    }
-    
-    pendingOperationsRef.current.add(operationKey);
-    
-    try {
-      // Buscar count fresco directamente da BD
-      const freshCount = await fetchFreshCount(productId, colisNumber);
-      const oldQuantity = freshCount?.quantity || 0;
-      const newQuantity = Math.max(0, oldQuantity - 1);
-      
-      if (newQuantity === oldQuantity) return true; // No change needed
-      
-      const success = await updateCount(productId, colisNumber, newQuantity);
-      
-      if (success && sessionId) {
-        // Log the count operation
-        await supabase.from('count_logs').insert({
-          product_id: productId,
-          session_id: sessionId,
-          colis_number: colisNumber,
-          operation: 'decrement',
-          quantity_before: oldQuantity,
-          quantity_after: newQuantity,
-          counted_by: user?.id
-        });
+    const ok = await applyDelta(productId, colisNumber, -1);
 
-        // Check for stock alerts based on new count
-        const { data: product } = await supabase
-          .from('products')
-          .select('current_stock, name, min_stock')
-          .eq('id', productId)
-          .maybeSingle();
+    if (ok) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('current_stock, name, min_stock')
+        .eq('id', productId)
+        .maybeSingle();
 
-        if (product) {
-          const newStock = product.current_stock || 0;
-          if (newStock === 0) {
-            toast({
-              title: 'Produto Esgotado',
-              description: `${product.name} está sem stock!`,
-              variant: 'destructive'
-            });
-          } else if (newStock <= (product.min_stock || 5)) {
-            toast({
-              title: 'Stock Baixo',
-              description: `${product.name} está com stock baixo (${newStock})`,
-            });
-          }
+      if (product) {
+        const newStock = product.current_stock || 0;
+        if (newStock === 0) {
+          toast({
+            title: 'Produto Esgotado',
+            description: `${product.name} está sem stock!`,
+            variant: 'destructive'
+          });
+        } else if (newStock <= (product.min_stock || 5)) {
+          toast({
+            title: 'Stock Baixo',
+            description: `${product.name} está com stock baixo (${newStock})`,
+          });
         }
       }
-      
-      return success;
-    } finally {
-      pendingOperationsRef.current.delete(operationKey);
     }
+
+    return ok;
   };
+
 
   const updateLocation = async (productId: string, location: string) => {
     if (!sessionId || !user) return false;
@@ -503,97 +474,44 @@ export function useCounting(sessionId: string | null) {
   };
 
 
+  /** Variação atómica numa linha concreta (coli numa localização concreta). */
+  const applyDeltaToRow = async (countId: string, delta: number) => {
+    const { error } = await supabase.rpc('apply_count_delta', {
+      p_count_id: countId,
+      p_delta: delta,
+    });
+
+    if (error) {
+      toast({
+        title: delta > 0 ? 'Não foi possível incrementar' : 'Não foi possível decrementar',
+        description: mapDatabaseError(error, 'Tente novamente.'),
+        variant: 'destructive'
+      });
+      return false;
+    }
+
+    invalidateCounts();
+    return true;
+  };
+
   // Increment count at a specific location
   const incrementCountAtLocation = async (productId: string, colisNumber: number, countId?: string) => {
     if (!sessionId || !user) return false;
-
-    // If countId provided, increment that specific record
-    if (countId) {
-      const existingCount = counts.find(c => c.id === countId);
-      if (!existingCount) return false;
-
-      const oldQuantity = existingCount.quantity;
-      const newQuantity = oldQuantity + 1;
-
-      const { error } = await supabase
-        .from('counts')
-        .update({ quantity: newQuantity, counted_by: user.id })
-        .eq('id', countId);
-
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível incrementar',
-          variant: 'destructive'
-        });
-        return false;
-      }
-
-      // Log and sync stock
-      await supabase.from('count_logs').insert({
-        product_id: productId,
-        session_id: sessionId,
-        colis_number: colisNumber,
-        operation: 'increment',
-        quantity_before: oldQuantity,
-        quantity_after: newQuantity,
-        counted_by: user.id
-      });
-
-      // Stock is recalculated automatically by sync_product_stock trigger
-      invalidateCounts();
-      return true;
-    }
-
-    // Default: use the standard increment
+    if (countId) return applyDeltaToRow(countId, 1);
     return incrementCount(productId, colisNumber);
   };
 
   // Decrement count at a specific location
   const decrementCountAtLocation = async (productId: string, colisNumber: number, countId?: string) => {
     if (!sessionId || !user) return false;
-
-    // If countId provided, decrement that specific record
     if (countId) {
       const existingCount = counts.find(c => c.id === countId);
-      if (!existingCount || existingCount.quantity === 0) return false;
-
-      const oldQuantity = existingCount.quantity;
-      const newQuantity = oldQuantity - 1;
-
-      const { error } = await supabase
-        .from('counts')
-        .update({ quantity: newQuantity, counted_by: user.id })
-        .eq('id', countId);
-
-      if (error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível decrementar',
-          variant: 'destructive'
-        });
-        return false;
-      }
-
-      // Log and sync stock
-      await supabase.from('count_logs').insert({
-        product_id: productId,
-        session_id: sessionId,
-        colis_number: colisNumber,
-        operation: 'decrement',
-        quantity_before: oldQuantity,
-        quantity_after: newQuantity,
-        counted_by: user.id
-      });
-
-      // Stock is recalculated automatically by sync_product_stock trigger
-      invalidateCounts();
-      return true;
+      if (existingCount && existingCount.quantity <= 0) return false;
+      return applyDeltaToRow(countId, -1);
     }
-
-    // Default: use the standard decrement
     return decrementCount(productId, colisNumber);
   };
+
 
   return {
     session,
