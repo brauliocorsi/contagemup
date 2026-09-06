@@ -4,12 +4,14 @@ import {
   Loader2,
   LogOut,
   MapPin,
+  Navigation,
   PackageCheck,
   RefreshCw,
   ArrowLeft,
   AlertTriangle,
   Route as RouteIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { Button } from '@/components/ui/button';
@@ -17,9 +19,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { DeliveryExecution } from '@/components/driver/DeliveryExecution';
 import { useMyDeliveryAttempts, type DeliveryAttempt } from '@/hooks/useDeliveryAttempts';
-import { useMyRoutes, ROUTE_STATUS_LABELS } from '@/hooks/useRoutes';
+import { useMyRoutes, useRoute, ROUTE_STATUS_LABELS } from '@/hooks/useRoutes';
 import { clearAllDrafts, pruneRevokedDrafts } from '@/lib/delivery/draft';
 import { RouteAccountingDialog } from '@/components/driver/RouteAccountingDialog';
+
 
 function fmtDate(d: string | null) {
   if (!d) return 'Sem data';
