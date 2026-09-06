@@ -380,7 +380,7 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => completeAudit.mutate(audit.id)}
+                                onClick={() => closeAudit(audit.id).catch(() => undefined)}
                                 disabled={completeAudit.isPending}
                               >
                                 Fechar e ajustar
@@ -449,6 +449,17 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
           audit={selectedAudit}
         />
       )}
+
+      <AuditDriftDialog
+        open={!!drift}
+        onOpenChange={(o) => !o && setDrift(null)}
+        lines={drift?.lines ?? []}
+        pending={completeAudit.isPending}
+        onConfirm={() => {
+          if (drift) closeAudit(drift.auditId, true).catch(() => undefined);
+        }}
+      />
     </div>
   );
 }
+
