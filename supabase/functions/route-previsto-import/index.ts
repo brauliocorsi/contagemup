@@ -199,10 +199,8 @@ Deno.serve(async (req) => {
 
   const authHeader = req.headers.get('Authorization') ?? '';
   if (!authHeader.startsWith('Bearer ')) {
-    console.log('auth-debug-header', { headers: [...req.headers.keys()].join(',') });
-    return json({ error: 'Unauthorized' }, 401);
+    return json({ error: 'Sessão não encontrada: inicie sessão novamente.' }, 401);
   }
-
 
   const url = Deno.env.get('SUPABASE_URL')!;
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -216,11 +214,13 @@ Deno.serve(async (req) => {
     },
   });
   if (!userRes.ok) {
-    console.log('auth-debug', { status: userRes.status, body: (await userRes.text()).slice(0, 200) });
-    return json({ error: 'Unauthorized' }, 401);
+    console.log('previsto-auth', { status: userRes.status });
+    return json({ error: 'Sessão expirada: termine sessão e volte a entrar.' }, 401);
   }
   const uid = ((await userRes.json()) as { id?: string }).id;
-  if (!uid) return json({ error: 'Unauthorized' }, 401);
+  if (!uid) return json({ error: 'Sessão expirada: termine sessão e volte a entrar.' }, 401);
+
+
 
 
 
