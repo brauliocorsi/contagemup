@@ -21,7 +21,16 @@ interface ResolveDamageInput {
   resolution_notes?: string;
   destination_location?: string;
   supplier_reference?: string;
+  /** Aceita resolver só a parte que existe em quarentena, deixando o resto pendente. */
+  allow_partial?: boolean;
 }
+
+interface ResolveDamageResult {
+  status: 'resolved' | 'partial' | 'already_resolved';
+  quantity?: number;
+  remaining?: number;
+}
+
 
 
 export function useDamages() {
