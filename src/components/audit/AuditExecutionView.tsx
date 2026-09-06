@@ -185,7 +185,7 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
           </div>
         </div>
         <Button 
-          onClick={handleComplete} 
+          onClick={() => handleComplete().catch(() => undefined)} 
           disabled={!canComplete || completeAudit.isPending}
           className={cn(!canComplete && "opacity-50")}
         >
