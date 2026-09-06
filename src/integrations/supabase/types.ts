@@ -54,7 +54,7 @@ export type Database = {
           product_id: string
           quantity_after: number
           quantity_before: number
-          session_id: string
+          session_id: string | null
         }
         Insert: {
           colis_number: number
@@ -65,7 +65,7 @@ export type Database = {
           product_id: string
           quantity_after: number
           quantity_before: number
-          session_id: string
+          session_id?: string | null
         }
         Update: {
           colis_number?: number
@@ -76,7 +76,7 @@ export type Database = {
           product_id?: string
           quantity_after?: number
           quantity_before?: number
-          session_id?: string
+          session_id?: string | null
         }
         Relationships: [
           {
