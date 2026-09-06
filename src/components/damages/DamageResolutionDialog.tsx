@@ -152,8 +152,24 @@ export function DamageResolutionDialog({
             </div>
           )}
 
+          <label className="flex items-start gap-2 rounded-lg border p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4"
+              checked={allowPartial}
+              onChange={(e) => setAllowPartial(e.target.checked)}
+            />
+            <span>
+              Resolver só o que existir em quarentena
+              <span className="block text-xs text-muted-foreground">
+                Sem esta opção, se faltarem unidades nada é alterado. Com ela, o restante fica pendente.
+              </span>
+            </span>
+          </label>
+
           <div className="space-y-2">
             <Label htmlFor="resolutionNotes">Notas</Label>
+
             <Textarea
               id="resolutionNotes"
               value={resolutionNotes}
