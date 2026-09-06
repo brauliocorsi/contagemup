@@ -538,6 +538,8 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
                   <th className="px-3 py-2">Morada</th>
                   <th className="px-3 py-2">Situação</th>
                   <th className="px-3 py-2">Valores (previsto)</th>
+                  <th className="px-3 py-2">Montagem</th>
+
                   <th className="px-3 py-2">Guia</th>
                   <th className="px-3 py-2">Cópias</th>
                   <th className="px-3 py-2" />
