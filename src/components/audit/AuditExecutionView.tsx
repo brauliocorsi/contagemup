@@ -17,8 +17,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useLocationAudits, LocationAuditItem } from '@/hooks/useLocationAudits';
+import { useLocationAudits, LocationAuditItem, type AuditDriftLine } from '@/hooks/useLocationAudits';
+import { AuditDriftDialog } from './AuditDriftDialog';
 import { cn } from '@/lib/utils';
+
 
 interface AuditExecutionViewProps {
   auditId: string;
