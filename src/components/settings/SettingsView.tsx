@@ -33,13 +33,16 @@ export function SettingsView() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserName, setNewUserName] = useState('');
+  const [newUserRole, setNewUserRole] = useState('operator');
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [passwordTarget, setPasswordTarget] = useState<{ userId: string; name: string } | null>(null);
-  
+
   const { toast } = useToast();
   const { profile: currentProfile } = useAuth();
   const queryClient = useQueryClient();
+  const isMaster = currentProfile?.role === 'master';
 
   // Fetch all users/profiles
   const { data: profiles = [], isLoading: isLoadingProfiles } = useQuery({
@@ -79,15 +82,18 @@ export function SettingsView() {
     setIsCreating(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email: newUserEmail,
-        password: newUserPassword,
-        options: {
-          data: { name: newUserName }
-        }
+      const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+        body: {
+          action: 'create',
+          email: newUserEmail,
+          password: newUserPassword,
+          name: newUserName,
+          role: newUserRole,
+        },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast({
         title: 'Utilizador criado',
@@ -97,7 +103,8 @@ export function SettingsView() {
       setNewUserEmail('');
       setNewUserPassword('');
       setNewUserName('');
-      
+      setNewUserRole('operator');
+
       // Refresh profiles list
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
     } catch (error: any) {
@@ -113,8 +120,9 @@ export function SettingsView() {
 
   const updateRole = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const { error } = await supabase.from('profiles').update({ role }).eq('user_id', userId);
+      const { data, error } = await supabase.rpc('set_user_role', { p_user_id: userId, p_role: role });
       if (error) throw error;
+      if (data && (data as any).ok !== true) throw new Error((data as any)?.error || 'Erro ao atualizar função');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
@@ -124,12 +132,30 @@ export function SettingsView() {
       toast({ title: 'Erro ao atualizar função', description: error.message, variant: 'destructive' }),
   });
 
+  const deleteUser = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+        body: { action: 'delete', user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      toast({ title: 'Utilizador eliminado' });
+    },
+    onError: (error: any) =>
+      toast({ title: 'Erro ao eliminar utilizador', description: error.message, variant: 'destructive' }),
+  });
+
   const getRoleBadge = (role: string) => {
     switch (role) {
+      case 'master':
+        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20">Master</Badge>;
       case 'admin':
         return <Badge className="bg-primary/10 text-primary border-primary/20">Admin</Badge>;
-      case 'supervisor':
-        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Supervisor</Badge>;
+      case 'financeiro':
+        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Financeiro</Badge>;
       case 'entregador':
         return <Badge className="bg-info-soft text-info border-info/20">Entregador</Badge>;
       default:
@@ -166,10 +192,13 @@ export function SettingsView() {
               Adicionar Utilizador
             </CardTitle>
             <CardDescription>
-              Crie uma nova conta de utilizador para acesso ao sistema
+              {isMaster
+                ? 'Crie uma nova conta de utilizador para acesso ao sistema'
+                : 'Apenas o Master pode adicionar utilizadores'}
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <fieldset disabled={!isMaster} className={isMaster ? '' : 'opacity-50 pointer-events-none'}>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Nome</Label>
@@ -216,7 +245,22 @@ export function SettingsView() {
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={isCreating}>
+              <div className="space-y-2">
+                <Label htmlFor="new-role">Função</Label>
+                <Select value={newUserRole} onValueChange={setNewUserRole}>
+                  <SelectTrigger id="new-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="operator">Operador</SelectItem>
+                    <SelectItem value="entregador">Entregador</SelectItem>
+                    <SelectItem value="financeiro">Financeiro</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button type="submit" className="w-full" disabled={isCreating || !isMaster}>
                 {isCreating ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -230,6 +274,7 @@ export function SettingsView() {
                 )}
               </Button>
             </form>
+            </fieldset>
           </CardContent>
         </Card>
 
@@ -261,7 +306,7 @@ export function SettingsView() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Função</TableHead>
                     <TableHead className="text-right">Data de Registo</TableHead>
-                    {currentProfile?.role === 'admin' && (
+                    {isMaster && (
                       <TableHead className="text-right">Ações</TableHead>
                     )}
                   </TableRow>
@@ -286,7 +331,7 @@ export function SettingsView() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {currentProfile?.role === 'admin' &&
+                        {isMaster &&
                         profile.user_id !== currentProfile?.user_id ? (
                           <Select
                             value={profile.role}
@@ -298,7 +343,9 @@ export function SettingsView() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="master">Master</SelectItem>
                               <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="financeiro">Financeiro</SelectItem>
                               <SelectItem value="operator">Operador</SelectItem>
                               <SelectItem value="entregador">Entregador</SelectItem>
                             </SelectContent>
@@ -310,16 +357,49 @@ export function SettingsView() {
                       <TableCell className="text-right text-muted-foreground">
                         {new Date(profile.created_at).toLocaleDateString('pt-PT')}
                       </TableCell>
-                      {currentProfile?.role === 'admin' && (
+                      {isMaster && (
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPasswordTarget({ userId: profile.user_id, name: profile.name })}
-                          >
-                            <KeyRound className="h-4 w-4 mr-1" />
-                            Alterar senha
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPasswordTarget({ userId: profile.user_id, name: profile.name })}
+                            >
+                              <KeyRound className="h-4 w-4 mr-1" />
+                              Alterar senha
+                            </Button>
+                            {profile.user_id !== currentProfile?.user_id && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    disabled={deleteUser.isPending && deletingUserId === profile.user_id}
+                                    onClick={() => setDeletingUserId(profile.user_id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Eliminar
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Eliminar utilizador</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem a certeza que deseja eliminar {profile.name}? Esta ação remove o acesso ao sistema e não pode ser anulada.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteUser.mutate(profile.user_id)}
+                                    >
+                                      Eliminar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
