@@ -78,16 +78,13 @@ Deno.serve(async (req) => {
       });
       if (createError) return json({ error: createError.message }, 400);
 
-      if (body.role && body.role !== 'operator') {
-        await admin.rpc('set_user_role_internal' as never).throwOnError?.();
-      }
       if (body.role && created.user) {
-        // Atribuir função inicial com bypass controlado
-        await admin
+        // Atribuir função inicial (service role é permitido no trigger de proteção)
+        const { error: roleError } = await admin
           .from('profiles')
           .update({ role: body.role })
-          .eq('user_id', created.user.id)
-          .throwOnError();
+          .eq('user_id', created.user.id);
+        if (roleError) return json({ error: roleError.message }, 400);
       }
 
       return json({ ok: true, user_id: created.user?.id });
