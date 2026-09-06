@@ -38,8 +38,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X, Filter } from 'lucide-react';
-import { useLocationAudits, LocationAudit } from '@/hooks/useLocationAudits';
+import { useLocationAudits, LocationAudit, type AuditDriftLine } from '@/hooks/useLocationAudits';
 import { AuditResultsDialog } from '@/components/audit/AuditResultsDialog';
+import { AuditDriftDialog } from '@/components/audit/AuditDriftDialog';
 import { useProfiles } from '@/hooks/useProfiles';
 import { loadXLSX } from '@/lib/lazyXlsx';
 interface AuditReportsViewProps {
@@ -51,6 +52,19 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
   const { nameOf } = useProfiles();
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
   const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
+  /** Conferência cujo fecho está bloqueado por stock movimentado. */
+  const [drift, setDrift] = useState<{ auditId: string; lines: AuditDriftLine[] } | null>(null);
+
+  /** Fecha a conferência; se o stock tiver mudado, pede confirmação explícita. */
+  const closeAudit = async (auditId: string, acceptDrift = false) => {
+    const result = await completeAudit.mutateAsync({ auditId, acceptDrift });
+    if (result?.status === 'movimentado') {
+      setDrift({ auditId, lines: result.drift ?? [] });
+      return;
+    }
+    setDrift(null);
+  };
+
 
   // Filtros
   const [search, setSearch] = useState('');
