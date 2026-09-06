@@ -2845,6 +2845,10 @@ export type Database = {
         Returns: boolean
       }
       effective_total_colis: { Args: { p_product_id: string }; Returns: number }
+      ensure_route_notes_from_stops: {
+        Args: { p_route_id: string }
+        Returns: number
+      }
       finance_confirm_method: {
         Args: {
           p_check_id: string
