@@ -100,6 +100,23 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
   const route = data?.route;
   const stops = useMemo(() => data?.stops ?? [], [data]);
 
+  // Previsto da Gestão Click por encomenda: já pago vs. por receber na entrega.
+  const { data: payables = [] } = useRoutePayables(routeId);
+  const previstoByCode = useMemo(() => {
+    const map: Record<string, { paid: number; due: number; review: number }> = {};
+    for (const p of payables) {
+      const code = String(p.gc_sale_code ?? '').trim();
+      if (!code) continue;
+      const entry = (map[code] ??= { paid: 0, due: 0, review: 0 });
+      if (p.classification === 'already_paid') entry.paid += p.amount_cents;
+      else if (p.classification === 'collect_on_delivery') entry.due += p.amount_cents;
+      else entry.review += p.amount_cents;
+    }
+    return map;
+  }, [payables]);
+
+
+
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [copies, setCopies] = useState<Record<string, number>>({});
   const [printMode, setPrintMode] = useState<'docs' | 'picking' | 'guides'>('docs');
