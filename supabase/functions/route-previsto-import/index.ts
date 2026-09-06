@@ -198,7 +198,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const authHeader = req.headers.get('Authorization') ?? '';
-  if (!authHeader.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
+  if (!authHeader.startsWith('Bearer ')) {
+    console.log('auth-debug-header', { headers: [...req.headers.keys()].join(',') });
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
 
   const url = Deno.env.get('SUPABASE_URL')!;
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
