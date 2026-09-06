@@ -76,8 +76,9 @@ export function getProductWithCounts(
   const location = uniqueLocations[0] || product.location || null;
 
   const quantities = Object.values(colisQuantities);
-  const completeSets = quantities.length > 0 ? Math.min(...quantities) : 0;
+  const completeSets = totals.completeSets;
   const maxQuantity = quantities.length > 0 ? Math.max(...quantities) : 0;
+
 
   const incompleteColis: { colis_number: number; quantity: number }[] = [];
   const excessColis: { colis_number: number; excess: number }[] = [];
