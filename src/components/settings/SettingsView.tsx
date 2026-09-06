@@ -17,6 +17,7 @@ import { ProfileSettings } from './ProfileSettings';
 import { Separator } from '@/components/ui/separator';
 import { ResetStockDialog } from './ResetStockDialog';
 import { ChangeUserPasswordDialog } from './ChangeUserPasswordDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 interface Profile {
