@@ -36,7 +36,9 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
   const [countedQuantities, setCountedQuantities] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [needsReason, setNeedsReason] = useState<Record<string, boolean>>({});
+  const [driftLines, setDriftLines] = useState<AuditDriftLine[] | null>(null);
   const blind = !!audit?.blind_mode;
+
 
   // Start audit if pending
   useEffect(() => {
