@@ -1,8 +1,21 @@
 import { useMemo, useState } from 'react';
-import { Truck, CheckCircle2, Undo2, Trash2, Loader2, Package } from 'lucide-react';
+import {
+  AlertTriangle,
+  Ban,
+  CalendarClock,
+  CheckCircle2,
+  Loader2,
+  Package,
+  Truck,
+  Undo2,
+  UserPlus,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -30,260 +43,503 @@ import {
 } from '@/components/ui/alert-dialog';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfiles } from '@/hooks/useProfiles';
 import {
   DELIVERY_STATUS_LABELS,
-  useDeleteDeliveryNote,
-  useDeliverNote,
   useDeliveryNoteItems,
   useDeliveryNotes,
-  useReturnNote,
-  useTypedLocations,
   type DeliveryNote,
-  type DeliveryStatus,
 } from '@/hooks/useDeliveryNotes';
-import { toast } from 'sonner';
+import {
+  ATTEMPT_STATUS_LABELS,
+  FAILURE_REASON_LABELS,
+  OUTCOME_LABELS,
+  pendingReturn,
+  useAttemptLines,
+  useCancelNote,
+  useDeliveryAttempts,
+  useDeliveryEvents,
+  useRescheduleNote,
+  type DeliveryAttempt,
+} from '@/hooks/useDeliveryAttempts';
+import { AssignDeliveryDialog } from './AssignDeliveryDialog';
+import { ReturnReceiptDialog } from './ReturnReceiptDialog';
 
-const STATUS_VARIANT: Record<DeliveryStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
-  picking: 'outline',
-  staged: 'secondary',
-  loaded: 'default',
-  delivered: 'outline',
-  returned: 'destructive',
-};
-
-function fmt(value: string | null) {
-  return value ? new Date(value).toLocaleString('pt-PT') : '—';
+function fmt(v: string | null) {
+  return v ? new Date(v).toLocaleString('pt-PT') : '—';
+}
+function fmtDay(v: string | null) {
+  return v ? new Date(v + 'T00:00:00').toLocaleDateString('pt-PT') : '—';
 }
 
-function NoteItems({ note }: { note: DeliveryNote }) {
-  const { data: items = [], isLoading } = useDeliveryNoteItems([note.id]);
+const EVENT_LABELS: Record<string, string> = {
+  tentativa_atribuida: 'Entrega atribuída',
+  tentativa_iniciada: 'Entregador a caminho',
+  entrega_confirmada: 'Entrega confirmada',
+  retorno_recebido: 'Retorno conferido',
+  reagendada: 'Reagendada',
+  encomenda_cancelada: 'Encomenda cancelada',
+};
+
+/** Detalhe de uma tentativa: pedido, carregado, entregue, retorno e saldo. */
+function AttemptDetail({ attempt }: { attempt: DeliveryAttempt }) {
+  const { data: lines = [], isLoading } = useAttemptLines(attempt.id);
+  const { data: events = [] } = useDeliveryEvents(attempt.note_id);
+  const { nameOf } = useProfiles();
+
   if (isLoading) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+
   return (
-    <div className="rounded-lg border bg-muted/30 p-3">
-      <div className="mb-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-4">
-        <span>Cais: {note.dock_location || '—'}</span>
-        <span>Viatura: {note.vehicle_location || '—'}</span>
-        <span>No cais: {fmt(note.staged_at)}</span>
-        <span>Carregado: {fmt(note.loaded_at)}</span>
+    <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+      <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-4">
+        <span>Viatura: {attempt.vehicle_location || '—'}</span>
+        <span>Entregador: {nameOf(attempt.driver_id)}</span>
+        <span>Prevista: {fmtDay(attempt.scheduled_date)}</span>
+        <span>Fechada: {fmt(attempt.completed_at)}</span>
       </div>
+      {attempt.partial_load && (
+        <p className="rounded-md border border-warning/50 bg-warning-soft p-2 text-xs">
+          Carga incompleta à saída do armazém
+          {attempt.partial_load_reason ? `: ${attempt.partial_load_reason}` : ''}.
+        </p>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Código</TableHead>
-            <TableHead>Produto</TableHead>
+            <TableHead>Artigo</TableHead>
+            <TableHead className="text-center">Caixa</TableHead>
             <TableHead className="text-center">Pedido</TableHead>
-            <TableHead className="text-center">Cais</TableHead>
             <TableHead className="text-center">Carregado</TableHead>
             <TableHead className="text-center">Entregue</TableHead>
-            <TableHead>Local</TableHead>
+            <TableHead className="text-center">Retorno esperado</TableHead>
+            <TableHead className="text-center">Recebido</TableHead>
+            <TableHead>Motivo / exceção</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((i) => (
-            <TableRow key={i.id}>
-              <TableCell className="font-mono text-xs">{i.product_code || '—'}</TableCell>
-              <TableCell className="text-xs">{i.product_name}</TableCell>
-              <TableCell className="text-center text-xs">{i.quantity}</TableCell>
-              <TableCell className="text-center text-xs">{i.staged_quantity}</TableCell>
-              <TableCell className="text-center text-xs">{i.loaded_quantity}</TableCell>
-              <TableCell className="text-center text-xs">{i.delivered_quantity}</TableCell>
-              <TableCell className="text-xs">{i.location || '—'}</TableCell>
+          {lines.map((l) => (
+            <TableRow key={l.id}>
+              <TableCell className="text-xs">
+                <span className="font-mono">{l.product_code}</span> {l.product_name}
+              </TableCell>
+              <TableCell className="text-center text-xs">{l.colis_number}</TableCell>
+              <TableCell className="text-center text-xs">{l.ordered_quantity}</TableCell>
+              <TableCell className="text-center text-xs">{l.loaded_quantity}</TableCell>
+              <TableCell className="text-center text-xs">{l.delivered_quantity}</TableCell>
+              <TableCell className="text-center text-xs">{pendingReturn(l)}</TableCell>
+              <TableCell className="text-center text-xs">
+                {l.return_received_ok} bom / {l.return_received_damaged} avariado
+              </TableCell>
+              <TableCell className="text-xs">
+                {[l.undelivered_reason ? FAILURE_REASON_LABELS[l.undelivered_reason] ?? l.undelivered_reason : null,
+                  l.exception_note]
+                  .filter(Boolean)
+                  .join(' • ') || '—'}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+      <div>
+        <p className="mb-1 text-xs font-semibold">Linha temporal</p>
+        <ul className="space-y-1 text-xs text-muted-foreground">
+          {events.map((e) => (
+            <li key={e.id}>
+              {fmt(e.created_at)} — {EVENT_LABELS[e.event_type] ?? e.event_type} · {nameOf(e.actor)}
+            </li>
+          ))}
+          {events.length === 0 && <li>Sem eventos.</li>}
+        </ul>
+      </div>
     </div>
   );
 }
 
 export function DeliveriesView() {
-  const [status, setStatus] = useState<DeliveryStatus | 'all'>('all');
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [toDeliver, setToDeliver] = useState<DeliveryNote | null>(null);
-  const [toReturn, setToReturn] = useState<DeliveryNote | null>(null);
-  const [toDelete, setToDelete] = useState<DeliveryNote | null>(null);
-
   const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
-  const { data: notes = [], isLoading } = useDeliveryNotes(status);
-  const { data: quarantines = [] } = useTypedLocations('quarantine');
-  const deliver = useDeliverNote();
-  const returnNote = useReturnNote();
-  const removeNote = useDeleteDeliveryNote();
+  const isManager = profile?.role === 'admin' || profile?.role === 'operator';
+  const { profiles, nameOf } = useProfiles();
 
-  const byVehicle = useMemo(() => {
-    const map = new Map<string, DeliveryNote[]>();
-    for (const n of notes) {
-      const key = n.vehicle_location || 'Sem viatura';
-      map.set(key, [...(map.get(key) ?? []), n]);
-    }
-    return [...map.entries()];
-  }, [notes]);
+  const [status, setStatus] = useState<'all' | 'assigned' | 'in_transit' | 'completed' | 'cancelled'>('all');
+  const [driverId, setDriverId] = useState<string>('all');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [search, setSearch] = useState('');
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [assignNotes, setAssignNotes] = useState<string[] | null>(null);
+  const [returnAttempt, setReturnAttempt] = useState<DeliveryAttempt | null>(null);
+  const [rescheduleNote, setRescheduleNoteState] = useState<DeliveryNote | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [rescheduleDriver, setRescheduleDriver] = useState('');
+  const [cancelNoteTarget, setCancelNoteTarget] = useState<DeliveryNote | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+
+  const { data: attempts = [], isLoading } = useDeliveryAttempts({
+    status,
+    driverId: driverId === 'all' ? null : driverId,
+    from: from || null,
+    to: to || null,
+    search,
+  });
+  const { data: notes = [] } = useDeliveryNotes('all');
+  const reschedule = useRescheduleNote();
+  const cancel = useCancelNote();
+
+  const openNoteIds = useMemo(
+    () =>
+      new Set(
+        attempts.filter((a) => a.status === 'assigned' || a.status === 'in_transit').map((a) => a.note_id),
+      ),
+    [attempts],
+  );
+
+  const toAssign = useMemo(
+    () =>
+      notes.filter(
+        (n) =>
+          !openNoteIds.has(n.id) &&
+          !['delivered', 'cancelled'].includes(n.status as string) &&
+          (n.status === 'staged' || n.status === 'loaded' || n.status === 'partial' || n.status === 'not_delivered'),
+      ),
+    [notes, openNoteIds],
+  );
+
+  const returnsPending = useMemo(
+    () => attempts.filter((a) => a.status === 'completed' && a.outcome !== 'delivered_full'),
+    [attempts],
+  );
+
+  const flagged = useMemo(
+    () => notes.filter((n) => n.cancellation_requested || n.reschedule_requested),
+    [notes],
+  );
+
+  const drivers = useMemo(() => profiles.filter((p) => p.role === 'entregador' || p.role === 'operator'), [profiles]);
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Entregas"
-        description="Notas em cais, em transporte e entregues. A saída de stock só acontece ao confirmar a entrega."
+        description="Tentativas por rota e cliente, resultado no cliente, retornos a conferir e saldos por encomenda."
       />
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Truck className="h-4 w-4" /> Notas de entrega
-          </CardTitle>
-          <Select value={status} onValueChange={(v) => setStatus(v as DeliveryStatus | 'all')}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os estados</SelectItem>
-              {(Object.keys(DELIVERY_STATUS_LABELS) as DeliveryStatus[]).map((s) => (
-                <SelectItem key={s} value={s}>
-                  {DELIVERY_STATUS_LABELS[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading ? (
-            <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
-          ) : notes.length === 0 ? (
-            <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Nenhuma nota de entrega.
-            </p>
-          ) : (
-            byVehicle.map(([vehicle, group]) => (
-              <div key={vehicle} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold">{vehicle}</span>
-                  <Badge variant="secondary">{group.length}</Badge>
-                </div>
-                {group.map((n) => (
-                  <div key={n.id} className="space-y-2 rounded-lg border p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        className="min-w-0 flex-1 text-left"
-                        onClick={() => setExpanded(expanded === n.id ? null : n.id)}
-                      >
-                        <p className="truncate font-medium">{n.order_number}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {n.client_name || 'Sem cliente'} • criada {fmt(n.created_at)}
-                          {n.delivered_at ? ` • entregue ${fmt(n.delivered_at)}` : ''}
-                        </p>
-                      </button>
-                      <Badge variant={STATUS_VARIANT[n.status]}>
-                        {DELIVERY_STATUS_LABELS[n.status]}
-                      </Badge>
-                      {n.status !== 'delivered' && n.status !== 'returned' && (
-                        <Button size="sm" onClick={() => setToDeliver(n)}>
-                          <CheckCircle2 className="mr-1 h-4 w-4" /> Entregue
-                        </Button>
-                      )}
-                      {n.status !== 'returned' && (
-                        <Button size="sm" variant="outline" onClick={() => setToReturn(n)}>
-                          <Undo2 className="mr-1 h-4 w-4" /> Devolvido
-                        </Button>
-                      )}
-                      {isAdmin && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="text-destructive"
-                          aria-label="Eliminar nota"
-                          onClick={() => setToDelete(n)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {expanded === n.id && <NoteItems note={n} />}
-                  </div>
-                ))}
+      <Tabs defaultValue="tentativas">
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="tentativas">Tentativas</TabsTrigger>
+          <TabsTrigger value="atribuir">Por atribuir ({toAssign.length})</TabsTrigger>
+          <TabsTrigger value="retornos">Retornos ({returnsPending.length})</TabsTrigger>
+          <TabsTrigger value="ocorrencias">Ocorrências ({flagged.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tentativas" className="space-y-3">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Truck className="h-4 w-4" /> Tentativas de entrega
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-2 sm:grid-cols-5">
+                <Input
+                  placeholder="Encomenda ou cliente"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os estados</SelectItem>
+                    {(Object.keys(ATTEMPT_STATUS_LABELS) as (keyof typeof ATTEMPT_STATUS_LABELS)[]).map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {ATTEMPT_STATUS_LABELS[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={driverId} onValueChange={setDriverId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os entregadores</SelectItem>
+                    {drivers.map((d) => (
+                      <SelectItem key={d.user_id} value={d.user_id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
               </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
 
-      <AlertDialog open={!!toDeliver} onOpenChange={(o) => !o && setToDeliver(null)}>
+              {isLoading ? (
+                <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+              ) : attempts.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  Nenhuma tentativa com estes filtros.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {attempts.map((a) => (
+                    <div key={a.id} className="space-y-2 rounded-lg border p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          className="min-w-0 flex-1 text-left"
+                          onClick={() => setExpanded(expanded === a.id ? null : a.id)}
+                        >
+                          <p className="truncate font-medium">
+                            {a.order_number}
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              tentativa {a.attempt_number}
+                            </span>
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {a.client_name || 'Sem cliente'} • {nameOf(a.driver_id)} •{' '}
+                            {fmtDay(a.scheduled_date)}
+                          </p>
+                        </button>
+                        {a.partial_load && (
+                          <Badge variant="outline" className="border-warning/50 text-warning">
+                            Carga parcial
+                          </Badge>
+                        )}
+                        <Badge variant={a.status === 'completed' ? 'outline' : 'default'}>
+                          {ATTEMPT_STATUS_LABELS[a.status]}
+                        </Badge>
+                        {a.outcome && <Badge variant="secondary">{OUTCOME_LABELS[a.outcome]}</Badge>}
+                        {a.failure_reason && (
+                          <Badge variant="outline">
+                            {FAILURE_REASON_LABELS[a.failure_reason] ?? a.failure_reason}
+                          </Badge>
+                        )}
+                      </div>
+                      {expanded === a.id && <AttemptDetail attempt={a} />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="atribuir">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-4 w-4" /> Encomendas sem entrega marcada
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {toAssign.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  Nada por atribuir.
+                </p>
+              ) : (
+                toAssign.map((n) => (
+                  <div key={n.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{n.order_number}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {n.client_name || 'Sem cliente'} • {DELIVERY_STATUS_LABELS[n.status] ?? n.status}
+                        {n.vehicle_location ? ` • ${n.vehicle_location}` : ''}
+                      </p>
+                    </div>
+                    {isManager && (
+                      <Button size="sm" onClick={() => setAssignNotes([n.id])}>
+                        <UserPlus className="mr-1 h-4 w-4" /> Atribuir
+                      </Button>
+                    )}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="retornos">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Undo2 className="h-4 w-4" /> Retornos por conferir
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {returnsPending.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  Sem retornos pendentes.
+                </p>
+              ) : (
+                returnsPending.map((a) => (
+                  <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{a.order_number}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {a.client_name || 'Sem cliente'} • {a.vehicle_location || 'viatura'} •{' '}
+                        {a.outcome ? OUTCOME_LABELS[a.outcome] : ''}
+                      </p>
+                    </div>
+                    {isManager && (
+                      <Button size="sm" variant="outline" onClick={() => setReturnAttempt(a)}>
+                        <Undo2 className="mr-1 h-4 w-4" /> Conferir retorno
+                      </Button>
+                    )}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ocorrencias">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <AlertTriangle className="h-4 w-4" /> Pedidos do cliente por validar
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {flagged.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  Nada por validar.
+                </p>
+              ) : (
+                flagged.map((n) => (
+                  <div key={n.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{n.order_number}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {n.client_name || 'Sem cliente'} •{' '}
+                        {n.cancellation_requested ? 'Cliente pediu cancelamento' : 'Cliente pediu nova data'}
+                        {n.cancellation_reason ? ` — ${n.cancellation_reason}` : ''}
+                      </p>
+                    </div>
+                    {isManager && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setRescheduleNoteState(n);
+                            setRescheduleDriver('');
+                          }}
+                        >
+                          <CalendarClock className="mr-1 h-4 w-4" /> Agendar restante
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            setCancelNoteTarget(n);
+                            setCancelReason(n.cancellation_reason ?? '');
+                          }}
+                        >
+                          <Ban className="mr-1 h-4 w-4" /> Validar cancelamento
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <AssignDeliveryDialog
+        open={!!assignNotes}
+        onOpenChange={(o) => !o && setAssignNotes(null)}
+        noteIds={assignNotes ?? []}
+      />
+      <ReturnReceiptDialog attempt={returnAttempt} onOpenChange={(o) => !o && setReturnAttempt(null)} />
+
+      <AlertDialog open={!!rescheduleNote} onOpenChange={(o) => !o && setRescheduleNoteState(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar entrega da nota {toDeliver?.order_number}?</AlertDialogTitle>
+            <AlertDialogTitle>Agendar o que falta — {rescheduleNote?.order_number}</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação dá a saída definitiva do stock associado à nota.
+              Cria uma nova tentativa apenas para o saldo em falta. O histórico da tentativa anterior
+              mantém-se como está.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Nova data</Label>
+              <Input
+                type="date"
+                className="mt-1"
+                value={rescheduleDate}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Entregador (opcional)</Label>
+              <Select value={rescheduleDriver} onValueChange={setRescheduleDriver}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Definir mais tarde" />
+                </SelectTrigger>
+                <SelectContent>
+                  {drivers.map((d) => (
+                    <SelectItem key={d.user_id} value={d.user_id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={deliver.isPending}
+              disabled={reschedule.isPending}
               onClick={(e) => {
                 e.preventDefault();
-                if (toDeliver)
-                  void deliver.mutateAsync(toDeliver.id).then(() => setToDeliver(null));
+                if (!rescheduleNote) return;
+                void reschedule
+                  .mutateAsync({
+                    noteId: rescheduleNote.id,
+                    date: rescheduleDate,
+                    driverId: rescheduleDriver || null,
+                  })
+                  .then(() => setRescheduleNoteState(null));
               }}
             >
-              Confirmar entrega
+              <CheckCircle2 className="mr-1 h-4 w-4" /> Criar tentativa
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!toReturn} onOpenChange={(o) => !o && setToReturn(null)}>
+      <AlertDialog open={!!cancelNoteTarget} onOpenChange={(o) => !o && setCancelNoteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Registar devolução da nota {toReturn?.order_number}?</AlertDialogTitle>
+            <AlertDialogTitle>Cancelar {cancelNoteTarget?.order_number}?</AlertDialogTitle>
             <AlertDialogDescription>
-              O stock volta para a zona de quarentena
-              {quarantines[0] ? ` (${quarantines[0].code})` : ''}.
+              A encomenda deixa de poder ser agendada. A mercadoria só fica disponível depois de
+              recebida e conferida como apta; o que estiver avariado fica em quarentena. Nada é
+              alterado no sistema comercial externo.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <Input
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Motivo do cancelamento"
+          />
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={returnNote.isPending}
+              disabled={cancel.isPending || cancelReason.trim().length < 3}
               onClick={(e) => {
                 e.preventDefault();
-                if (!quarantines[0]) {
-                  toast.error('Configure uma localização do tipo Quarentena');
-                  return;
-                }
-                if (toReturn)
-                  void returnNote
-                    .mutateAsync({
-                      noteId: toReturn.id,
-                      quarantineLocation: quarantines[0].code,
-                    })
-                    .then(() => setToReturn(null));
+                if (!cancelNoteTarget) return;
+                void cancel
+                  .mutateAsync({ noteId: cancelNoteTarget.id, reason: cancelReason })
+                  .then(() => setCancelNoteTarget(null));
               }}
             >
-              Registar devolução
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar a nota {toDelete?.order_number}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O registo é removido definitivamente. O stock já movimentado não é revertido.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={removeNote.isPending}
-              onClick={(e) => {
-                e.preventDefault();
-                if (toDelete) void removeNote.mutateAsync(toDelete.id).then(() => setToDelete(null));
-              }}
-            >
-              Eliminar
+              Cancelar encomenda
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

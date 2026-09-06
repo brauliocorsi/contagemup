@@ -203,6 +203,241 @@ export type Database = {
           },
         ]
       }
+      delivery_attempt_lines: {
+        Row: {
+          attempt_id: string
+          colis_number: number
+          created_at: string
+          delivered_quantity: number
+          details: string | null
+          exception_note: string | null
+          id: string
+          loaded_quantity: number
+          note_item_id: string | null
+          ordered_quantity: number
+          product_code: string
+          product_id: string | null
+          product_name: string
+          received_at: string | null
+          received_by: string | null
+          return_location: string | null
+          return_received_damaged: number
+          return_received_ok: number
+          undelivered_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempt_id: string
+          colis_number?: number
+          created_at?: string
+          delivered_quantity?: number
+          details?: string | null
+          exception_note?: string | null
+          id?: string
+          loaded_quantity?: number
+          note_item_id?: string | null
+          ordered_quantity?: number
+          product_code?: string
+          product_id?: string | null
+          product_name?: string
+          received_at?: string | null
+          received_by?: string | null
+          return_location?: string | null
+          return_received_damaged?: number
+          return_received_ok?: number
+          undelivered_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempt_id?: string
+          colis_number?: number
+          created_at?: string
+          delivered_quantity?: number
+          details?: string | null
+          exception_note?: string | null
+          id?: string
+          loaded_quantity?: number
+          note_item_id?: string | null
+          ordered_quantity?: number
+          product_code?: string
+          product_id?: string | null
+          product_name?: string
+          received_at?: string | null
+          received_by?: string | null
+          return_location?: string | null
+          return_received_damaged?: number
+          return_received_ok?: number
+          undelivered_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_attempt_lines_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_attempt_lines_note_item_id_fkey"
+            columns: ["note_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_note_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_attempt_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_attempts: {
+        Row: {
+          address: string | null
+          assigned_at: string
+          assigned_by: string | null
+          attempt_number: number
+          client_name: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          delivery_instructions: string | null
+          driver_id: string | null
+          failure_notes: string | null
+          failure_reason: string | null
+          id: string
+          note_id: string
+          order_number: string
+          outcome: string | null
+          partial_load: boolean
+          partial_load_reason: string | null
+          route_id: string | null
+          scheduled_date: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          vehicle_location: string | null
+          version: number
+        }
+        Insert: {
+          address?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          attempt_number: number
+          client_name?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          delivery_instructions?: string | null
+          driver_id?: string | null
+          failure_notes?: string | null
+          failure_reason?: string | null
+          id?: string
+          note_id: string
+          order_number: string
+          outcome?: string | null
+          partial_load?: boolean
+          partial_load_reason?: string | null
+          route_id?: string | null
+          scheduled_date?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_location?: string | null
+          version?: number
+        }
+        Update: {
+          address?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          attempt_number?: number
+          client_name?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          delivery_instructions?: string | null
+          driver_id?: string | null
+          failure_notes?: string | null
+          failure_reason?: string | null
+          id?: string
+          note_id?: string
+          order_number?: string
+          outcome?: string | null
+          partial_load?: boolean
+          partial_load_reason?: string | null
+          route_id?: string | null
+          scheduled_date?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_location?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_attempts_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_attempts_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_events: {
+        Row: {
+          actor: string | null
+          attempt_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          note_id: string | null
+          payload: Json
+        }
+        Insert: {
+          actor?: string | null
+          attempt_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          note_id?: string | null
+          payload?: Json
+        }
+        Update: {
+          actor?: string | null
+          attempt_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          note_id?: string | null
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_events_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_events_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_note_items: {
         Row: {
           created_at: string
@@ -271,16 +506,23 @@ export type Database = {
       }
       delivery_notes: {
         Row: {
+          address: string | null
+          cancellation_reason: string | null
+          cancellation_requested: boolean
+          cancelled_at: string | null
+          cancelled_by: string | null
           client_name: string | null
           created_at: string
           created_by: string | null
           delivered_at: string | null
           delivered_by: string | null
+          delivery_instructions: string | null
           dock_location: string | null
           id: string
           loaded_at: string | null
           notes: string | null
           order_number: string
+          reschedule_requested: boolean
           returned_at: string | null
           route_id: string | null
           staged_at: string | null
@@ -288,18 +530,26 @@ export type Database = {
           task_id: string | null
           updated_at: string
           vehicle_location: string | null
+          version: number
         }
         Insert: {
+          address?: string | null
+          cancellation_reason?: string | null
+          cancellation_requested?: boolean
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           client_name?: string | null
           created_at?: string
           created_by?: string | null
           delivered_at?: string | null
           delivered_by?: string | null
+          delivery_instructions?: string | null
           dock_location?: string | null
           id?: string
           loaded_at?: string | null
           notes?: string | null
           order_number: string
+          reschedule_requested?: boolean
           returned_at?: string | null
           route_id?: string | null
           staged_at?: string | null
@@ -307,18 +557,26 @@ export type Database = {
           task_id?: string | null
           updated_at?: string
           vehicle_location?: string | null
+          version?: number
         }
         Update: {
+          address?: string | null
+          cancellation_reason?: string | null
+          cancellation_requested?: boolean
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           client_name?: string | null
           created_at?: string
           created_by?: string | null
           delivered_at?: string | null
           delivered_by?: string | null
+          delivery_instructions?: string | null
           dock_location?: string | null
           id?: string
           loaded_at?: string | null
           notes?: string | null
           order_number?: string
+          reschedule_requested?: boolean
           returned_at?: string | null
           route_id?: string | null
           staged_at?: string | null
@@ -326,6 +584,7 @@ export type Database = {
           task_id?: string | null
           updated_at?: string
           vehicle_location?: string | null
+          version?: number
         }
         Relationships: [
           {
@@ -343,6 +602,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      delivery_operations: {
+        Row: {
+          actor: string | null
+          attempt_id: string | null
+          created_at: string
+          kind: string
+          op_key: string
+          result: Json
+        }
+        Insert: {
+          actor?: string | null
+          attempt_id?: string | null
+          created_at?: string
+          kind: string
+          op_key: string
+          result?: Json
+        }
+        Update: {
+          actor?: string | null
+          attempt_id?: string | null
+          created_at?: string
+          kind?: string
+          op_key?: string
+          result?: Json
+        }
+        Relationships: []
       }
       delivery_regions: {
         Row: {
@@ -1741,6 +2027,19 @@ export type Database = {
         Args: { p_count_id: string; p_location: string }
         Returns: string
       }
+      assign_delivery_attempts: {
+        Args: {
+          p_driver: string
+          p_note_ids: string[]
+          p_op_key?: string
+          p_scheduled_date?: string
+        }
+        Returns: Json
+      }
+      cancel_delivery_note: {
+        Args: { p_note_id: string; p_op_key?: string; p_reason: string }
+        Returns: Json
+      }
       commit_exit_cart: {
         Args: {
           p_items: Json
@@ -1754,6 +2053,26 @@ export type Database = {
         Args: { p_accept_drift?: boolean; p_audit_id: string }
         Returns: Json
       }
+      confirm_delivery_attempt: {
+        Args: {
+          p_attempt_id: string
+          p_expected_version?: number
+          p_failure_notes?: string
+          p_failure_reason?: string
+          p_lines: Json
+          p_op_key?: string
+        }
+        Returns: Json
+      }
+      debit_counts_at: {
+        Args: {
+          p_coli: number
+          p_location: string
+          p_product: string
+          p_qty: number
+        }
+        Returns: number
+      }
       dedupe_counts_same_place: { Args: never; Returns: number }
       deliver_location_audit: { Args: { p_audit_id: string }; Returns: Json }
       deliver_note: { Args: { p_note_id: string }; Returns: Json }
@@ -1761,6 +2080,8 @@ export type Database = {
       generate_audit_access_code: { Args: never; Returns: string }
       generate_route_barcode: { Args: never; Returns: string }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
+      is_delivery_manager: { Args: { _uid: string }; Returns: boolean }
+      is_driver_only: { Args: { _uid: string }; Returns: boolean }
       is_quarantine_location: { Args: { p_location: string }; Returns: boolean }
       load_notes_to_vehicle: {
         Args: {
@@ -1798,6 +2119,15 @@ export type Database = {
         Returns: Json
       }
       recalculate_all_stock: { Args: never; Returns: undefined }
+      receive_delivery_return: {
+        Args: {
+          p_attempt_id: string
+          p_lines: Json
+          p_op_key?: string
+          p_quarantine_location?: string
+        }
+        Returns: Json
+      }
       register_damage: {
         Args: {
           p_colis_number: number
@@ -1872,6 +2202,15 @@ export type Database = {
         }
         Returns: Json
       }
+      reschedule_delivery_note: {
+        Args: {
+          p_driver?: string
+          p_note_id: string
+          p_op_key?: string
+          p_scheduled_date: string
+        }
+        Returns: Json
+      }
       resolve_damage: {
         Args: {
           p_allow_partial?: boolean
@@ -1901,6 +2240,10 @@ export type Database = {
         }
         Returns: Json
       }
+      set_user_role: {
+        Args: { p_role: string; p_user_id: string }
+        Returns: Json
+      }
       split_colis_counts: {
         Args: {
           p_colis_number: number
@@ -1914,6 +2257,7 @@ export type Database = {
         Args: { p_dock_location: string; p_lines: Json; p_task_id: string }
         Returns: Json
       }
+      start_delivery_attempt: { Args: { p_attempt_id: string }; Returns: Json }
       transfer_stock_location: { Args: { p_items: Json }; Returns: Json }
       undo_regularize_damage: {
         Args: {

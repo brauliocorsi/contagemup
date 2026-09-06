@@ -3,14 +3,25 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { mapDatabaseError } from '@/lib/errorMessages';
 
-export type DeliveryStatus = 'picking' | 'staged' | 'loaded' | 'delivered' | 'returned';
+export type DeliveryStatus =
+  | 'picking'
+  | 'staged'
+  | 'loaded'
+  | 'delivered'
+  | 'partial'
+  | 'not_delivered'
+  | 'returned'
+  | 'cancelled';
 
 export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
   picking: 'Em picking',
   staged: 'No cais',
   loaded: 'Em transporte',
   delivered: 'Entregue',
+  partial: 'Entrega parcial',
+  not_delivered: 'Não entregue',
   returned: 'Devolvido',
+  cancelled: 'Cancelada',
 };
 
 export interface DeliveryNote {
@@ -19,6 +30,8 @@ export interface DeliveryNote {
   task_id: string | null;
   route_id: string | null;
   client_name: string | null;
+  address: string | null;
+  delivery_instructions: string | null;
   status: DeliveryStatus;
   dock_location: string | null;
   vehicle_location: string | null;
@@ -29,6 +42,11 @@ export interface DeliveryNote {
   delivered_at: string | null;
   delivered_by: string | null;
   returned_at: string | null;
+  cancellation_requested: boolean;
+  cancellation_reason: string | null;
+  cancelled_at: string | null;
+  reschedule_requested: boolean;
+  version: number;
   created_at: string;
 }
 

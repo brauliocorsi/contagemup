@@ -17,6 +17,7 @@ import { ProfileSettings } from './ProfileSettings';
 import { Separator } from '@/components/ui/separator';
 import { ResetStockDialog } from './ResetStockDialog';
 import { ChangeUserPasswordDialog } from './ChangeUserPasswordDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 interface Profile {
@@ -110,12 +111,27 @@ export function SettingsView() {
     }
   };
 
+  const updateRole = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const { error } = await supabase.from('profiles').update({ role }).eq('user_id', userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      toast({ title: 'Função atualizada' });
+    },
+    onError: (error: any) =>
+      toast({ title: 'Erro ao atualizar função', description: error.message, variant: 'destructive' }),
+  });
+
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'admin':
         return <Badge className="bg-primary/10 text-primary border-primary/20">Admin</Badge>;
       case 'supervisor':
         return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Supervisor</Badge>;
+      case 'entregador':
+        return <Badge className="bg-info-soft text-info border-info/20">Entregador</Badge>;
       default:
         return <Badge variant="outline">Operador</Badge>;
     }
@@ -269,7 +285,28 @@ export function SettingsView() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{getRoleBadge(profile.role)}</TableCell>
+                      <TableCell>
+                        {currentProfile?.role === 'admin' &&
+                        profile.user_id !== currentProfile?.user_id ? (
+                          <Select
+                            value={profile.role}
+                            onValueChange={(role) =>
+                              updateRole.mutate({ userId: profile.user_id, role })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="operator">Operador</SelectItem>
+                              <SelectItem value="entregador">Entregador</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          getRoleBadge(profile.role)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {new Date(profile.created_at).toLocaleDateString('pt-PT')}
                       </TableCell>
