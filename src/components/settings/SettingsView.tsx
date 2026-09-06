@@ -110,12 +110,27 @@ export function SettingsView() {
     }
   };
 
+  const updateRole = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const { error } = await supabase.from('profiles').update({ role }).eq('user_id', userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      toast({ title: 'Função atualizada' });
+    },
+    onError: (error: any) =>
+      toast({ title: 'Erro ao atualizar função', description: error.message, variant: 'destructive' }),
+  });
+
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'admin':
         return <Badge className="bg-primary/10 text-primary border-primary/20">Admin</Badge>;
       case 'supervisor':
         return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Supervisor</Badge>;
+      case 'entregador':
+        return <Badge className="bg-info-soft text-info border-info/20">Entregador</Badge>;
       default:
         return <Badge variant="outline">Operador</Badge>;
     }
