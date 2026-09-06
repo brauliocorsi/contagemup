@@ -21,7 +21,9 @@ interface DamageResolutionDialogProps {
     resolution_notes?: string;
     destination_location?: string;
     supplier_reference?: string;
+    allow_partial?: boolean;
   }) => Promise<unknown>;
+
   isLoading?: boolean;
 }
 
