@@ -128,10 +128,17 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
     }
   };
 
-  const handleComplete = async () => {
-    await completeAudit.mutateAsync(auditId);
+  const handleComplete = async (acceptDrift = false) => {
+    const result = await completeAudit.mutateAsync({ auditId, acceptDrift });
+    if (result?.status === 'movimentado') {
+      // Não fechamos por cima de stock que se moveu depois da contagem.
+      setDriftLines(result.drift ?? []);
+      return;
+    }
+    setDriftLines(null);
     onComplete();
   };
+
 
   const canComplete = progressStats.counted === progressStats.total && progressStats.total > 0;
 
