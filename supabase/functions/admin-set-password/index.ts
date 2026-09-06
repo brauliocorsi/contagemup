@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       .eq('user_id', userData.user.id)
       .maybeSingle();
 
-    if (callerProfile?.role !== 'admin') {
+    if (callerProfile?.role !== 'admin' && callerProfile?.role !== 'master') {
       return json({ error: 'Apenas administradores podem alterar senhas' }, 403);
     }
 
