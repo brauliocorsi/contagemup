@@ -334,25 +334,12 @@ Deno.serve(async (req) => {
     if (runErr) throw runErr;
 
     const failures: { note_id: string; order_number: string; reason: string }[] = [];
-    const seenSales = new Set<string>();
     let ok = 0;
 
-    for (const note of notes ?? []) {
-      const code = String(note.order_number ?? '').trim();
+    for (const target of scoped) {
+      const code = target.code;
       try {
-        if (!code) throw new Error('Nota sem número de encomenda');
-
-        // notas repetidas da mesma venda não duplicam previsão
-        if (seenSales.has(code)) {
-          failures.push({
-            note_id: note.id,
-            order_number: code,
-            reason: 'Nota repetida da mesma venda — previsão mantida apenas na primeira nota',
-          });
-          continue;
-        }
-
-        const saleId = await findSaleId(code);
+        const saleId = target.sale_id ?? (await findSaleId(code));
         if (!saleId) throw new Error('Venda não encontrada na Gestão Click');
 
         const detail = await gcGet<{ data?: Dict }>(`/vendas/${saleId}`);
@@ -377,16 +364,26 @@ Deno.serve(async (req) => {
           });
         }
 
+        // revisão seguinte desta encomenda nesta rota
         const { data: prev } = await admin
           .from('delivery_note_payables')
           .select('revision')
-          .eq('note_id', note.id)
+          .eq('route_id', routeId)
+          .eq('gc_sale_code', code)
           .order('revision', { ascending: false })
           .limit(1);
         const revision = (prev?.[0]?.revision ?? 0) + 1;
 
+        // a revisão anterior deixa de estar activa
+        await admin
+          .from('delivery_note_payables')
+          .update({ active: false })
+          .eq('route_id', routeId)
+          .eq('gc_sale_code', code)
+          .eq('active', true);
+
         const rows = parcels.map((p) => ({
-          note_id: note.id,
+          note_id: target.note_id,
           route_id: routeId,
           import_id: run.id,
           revision,
@@ -411,13 +408,13 @@ Deno.serve(async (req) => {
         const { error: insErr } = await admin.from('delivery_note_payables').insert(rows);
         if (insErr) throw insErr;
 
-        seenSales.add(code);
         ok++;
       } catch (e) {
         failures.push({
-          note_id: note.id,
+          note_id: target.note_id ?? code,
           order_number: code,
           reason: e instanceof Error ? e.message : 'Falha desconhecida',
+
         });
       }
     }
