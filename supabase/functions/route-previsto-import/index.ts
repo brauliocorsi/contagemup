@@ -203,18 +203,21 @@ Deno.serve(async (req) => {
   const url = Deno.env.get('SUPABASE_URL')!;
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-  // validar o token com a chave de serviço (funciona com as novas chaves de assinatura)
+  // validar o token diretamente no serviço de autenticação
   const token = authHeader.slice('Bearer '.length).trim();
-  const { data: userData, error: userError } = await admin.auth.getUser(token);
-  const uid = userData?.user?.id;
-  if (userError || !uid) {
-    console.log('auth-debug', {
-      hasServiceKey: Boolean(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')),
-      tokenLen: token.length,
-      err: userError?.message,
-    });
+  const userRes = await fetch(`${url}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    },
+  });
+  if (!userRes.ok) {
+    console.log('auth-debug', { status: userRes.status, body: (await userRes.text()).slice(0, 200) });
     return json({ error: 'Unauthorized' }, 401);
   }
+  const uid = ((await userRes.json()) as { id?: string }).id;
+  if (!uid) return json({ error: 'Unauthorized' }, 401);
+
 
 
   const { data: profile } = await admin
