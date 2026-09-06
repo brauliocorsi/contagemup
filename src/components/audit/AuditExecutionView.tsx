@@ -17,8 +17,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useLocationAudits, LocationAuditItem } from '@/hooks/useLocationAudits';
+import { useLocationAudits, LocationAuditItem, type AuditDriftLine } from '@/hooks/useLocationAudits';
+import { AuditDriftDialog } from './AuditDriftDialog';
 import { cn } from '@/lib/utils';
+
 
 interface AuditExecutionViewProps {
   auditId: string;
@@ -34,7 +36,9 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
   const [countedQuantities, setCountedQuantities] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [needsReason, setNeedsReason] = useState<Record<string, boolean>>({});
+  const [driftLines, setDriftLines] = useState<AuditDriftLine[] | null>(null);
   const blind = !!audit?.blind_mode;
+
 
   // Start audit if pending
   useEffect(() => {
@@ -124,10 +128,17 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
     }
   };
 
-  const handleComplete = async () => {
-    await completeAudit.mutateAsync(auditId);
+  const handleComplete = async (acceptDrift = false) => {
+    const result = await completeAudit.mutateAsync({ auditId, acceptDrift });
+    if (result?.status === 'movimentado') {
+      // Não fechamos por cima de stock que se moveu depois da contagem.
+      setDriftLines(result.drift ?? []);
+      return;
+    }
+    setDriftLines(null);
     onComplete();
   };
+
 
   const canComplete = progressStats.counted === progressStats.total && progressStats.total > 0;
 
@@ -174,7 +185,7 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
           </div>
         </div>
         <Button 
-          onClick={handleComplete} 
+          onClick={() => handleComplete().catch(() => undefined)} 
           disabled={!canComplete || completeAudit.isPending}
           className={cn(!canComplete && "opacity-50")}
         >
@@ -358,6 +369,15 @@ export function AuditExecutionView({ auditId, onComplete, onBack }: AuditExecuti
           </Button>
         </div>
       )}
+
+      <AuditDriftDialog
+        open={!!driftLines}
+        onOpenChange={(o) => !o && setDriftLines(null)}
+        lines={driftLines ?? []}
+        pending={completeAudit.isPending}
+        onConfirm={() => handleComplete(true).catch(() => undefined)}
+      />
     </div>
+
   );
 }

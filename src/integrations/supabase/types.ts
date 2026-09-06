@@ -95,6 +95,33 @@ export type Database = {
           },
         ]
       }
+      count_operations: {
+        Row: {
+          count_id: string | null
+          created_at: string
+          delta: number | null
+          op_key: string
+          quantity_after: number
+          user_id: string | null
+        }
+        Insert: {
+          count_id?: string | null
+          created_at?: string
+          delta?: number | null
+          op_key: string
+          quantity_after: number
+          user_id?: string | null
+        }
+        Update: {
+          count_id?: string | null
+          created_at?: string
+          delta?: number | null
+          op_key?: string
+          quantity_after?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       counting_sessions: {
         Row: {
           category: string
@@ -403,6 +430,7 @@ export type Database = {
       }
       location_audit_items: {
         Row: {
+          applied_at: string | null
           audit_id: string
           colis_number: number | null
           counted_at: string | null
@@ -413,13 +441,17 @@ export type Database = {
           expected_quantity: number
           id: string
           location: string
+          movement_id: string | null
           notes: string | null
           product_code: string
           product_id: string | null
           product_name: string
+          quantity_after: number | null
+          quantity_before: number | null
           status: string
         }
         Insert: {
+          applied_at?: string | null
           audit_id: string
           colis_number?: number | null
           counted_at?: string | null
@@ -430,13 +462,17 @@ export type Database = {
           expected_quantity?: number
           id?: string
           location: string
+          movement_id?: string | null
           notes?: string | null
           product_code: string
           product_id?: string | null
           product_name: string
+          quantity_after?: number | null
+          quantity_before?: number | null
           status?: string
         }
         Update: {
+          applied_at?: string | null
           audit_id?: string
           colis_number?: number | null
           counted_at?: string | null
@@ -447,10 +483,13 @@ export type Database = {
           expected_quantity?: number
           id?: string
           location?: string
+          movement_id?: string | null
           notes?: string | null
           product_code?: string
           product_id?: string | null
           product_name?: string
+          quantity_after?: number | null
+          quantity_before?: number | null
           status?: string
         }
         Relationships: [
@@ -478,6 +517,8 @@ export type Database = {
           completed_at: string | null
           created_at: string
           created_by: string | null
+          delivered_at: string | null
+          delivered_by: string | null
           id: string
           locations: string[]
           name: string
@@ -493,6 +534,8 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          delivered_at?: string | null
+          delivered_by?: string | null
           id?: string
           locations: string[]
           name: string
@@ -508,6 +551,8 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          delivered_at?: string | null
+          delivered_by?: string | null
           id?: string
           locations?: string[]
           name?: string
@@ -1687,6 +1732,10 @@ export type Database = {
     }
     Functions: {
       admin_reset_stock_data: { Args: never; Returns: Json }
+      apply_count_delta: {
+        Args: { p_count_id: string; p_delta: number; p_op_key?: string }
+        Returns: Json
+      }
       assert_valid_location: { Args: { p_location: string }; Returns: string }
       assign_count_location: {
         Args: { p_count_id: string; p_location: string }
@@ -1701,7 +1750,12 @@ export type Database = {
         }
         Returns: Json
       }
+      complete_location_audit: {
+        Args: { p_accept_drift?: boolean; p_audit_id: string }
+        Returns: Json
+      }
       dedupe_counts_same_place: { Args: never; Returns: number }
+      deliver_location_audit: { Args: { p_audit_id: string }; Returns: Json }
       deliver_note: { Args: { p_note_id: string }; Returns: Json }
       effective_total_colis: { Args: { p_product_id: string }; Returns: number }
       generate_audit_access_code: { Args: never; Returns: string }
@@ -1818,25 +1872,17 @@ export type Database = {
         }
         Returns: Json
       }
-      resolve_damage:
-        | {
-            Args: {
-              p_damage_id: string
-              p_resolution_notes: string
-              p_resolution_type: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_damage_id: string
-              p_destination_location: string
-              p_resolution_notes: string
-              p_resolution_type: string
-              p_supplier_reference: string
-            }
-            Returns: Json
-          }
+      resolve_damage: {
+        Args: {
+          p_allow_partial?: boolean
+          p_damage_id: string
+          p_destination_location: string
+          p_resolution_notes: string
+          p_resolution_type: string
+          p_supplier_reference: string
+        }
+        Returns: Json
+      }
       return_note_items: {
         Args: {
           p_items?: Json
@@ -1846,6 +1892,15 @@ export type Database = {
         Returns: Json
       }
       reverse_stock_movement: { Args: { p_movement_id: string }; Returns: Json }
+      set_count_quantity: {
+        Args: {
+          p_count_id: string
+          p_observed_quantity: number
+          p_op_key?: string
+          p_quantity: number
+        }
+        Returns: Json
+      }
       split_colis_counts: {
         Args: {
           p_colis_number: number

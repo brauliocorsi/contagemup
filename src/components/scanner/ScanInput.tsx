@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { isSoundEnabled, scanFeedback, setSoundEnabled } from '@/lib/scanner/feedback';
+import { evaluateScan, type ScanGateState } from '@/lib/scanner/scanGate';
+
 
 interface ScanInputProps {
   onScan: (code: string) => void;
@@ -41,7 +43,7 @@ export function ScanInput({
   const [sound, setSound] = useState(() => isSoundEnabled());
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
-  const lastRef = useRef<{ code: string; at: number }>({ code: '', at: 0 });
+  const lastRef = useRef<ScanGateState | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const manualRef = useRef(false);
   manualRef.current = manual;
@@ -53,18 +55,26 @@ export function ScanInput({
 
   /**
    * @param fromCamera leituras da câmara repetem-se dezenas de vezes por segundo,
-   * por isso só essas passam pelo filtro anti-duplicado. Pistola/teclado conta sempre.
+   * por isso só essas passam pelo filtro anti-duplicado. Pistola/teclado conta sempre,
+   * mesmo que seja a mesma etiqueta seguidas vezes — é assim que se conta caixa a caixa.
    */
   const emit = (code: string, fromCamera = false) => {
     const clean = (code || '').trim();
     if (!clean) return;
-    const now = Date.now();
-    if (fromCamera && lastRef.current.code === clean && now - lastRef.current.at < dedupeMs) return;
-    lastRef.current = { code: clean, at: now };
+    const decision = evaluateScan(
+      lastRef.current,
+      clean,
+      fromCamera ? 'camera' : 'wedge',
+      Date.now(),
+      dedupeMs,
+    );
+    lastRef.current = decision.next;
+    if (!decision.accept) return;
     if (feedback) scanFeedback('ok');
     onScan(clean);
     focusField();
   };
+
 
   /**
    * O foco é recuperado apenas por eventos (fim de toque, regresso à app,

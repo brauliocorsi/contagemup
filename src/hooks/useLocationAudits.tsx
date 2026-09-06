@@ -13,6 +13,10 @@ export interface LocationAudit {
   blind_mode: boolean;
   started_at: string | null;
   completed_at: string | null;
+  /** Momento em que o operador entregou a contagem ao responsável. */
+  delivered_at?: string | null;
+  delivered_by?: string | null;
+  access_code?: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -34,6 +38,28 @@ export interface LocationAuditItem {
   counted_at: string | null;
   notes: string | null;
   created_at: string;
+  /** Preenchidos quando o ajuste desta linha já foi aplicado ao stock. */
+  applied_at?: string | null;
+  movement_id?: string | null;
+  quantity_before?: number | null;
+  quantity_after?: number | null;
+}
+
+/** Linha cujo saldo mudou entre a contagem e o fecho. */
+export interface AuditDriftLine {
+  item_id: string;
+  product_code: string;
+  location: string;
+  colis_number: number | null;
+  reference: number;
+  current: number;
+}
+
+export interface CompleteAuditResult {
+  status: 'fechada' | 'ja_fechada' | 'movimentado';
+  adjustments?: number;
+  drift?: AuditDriftLine[];
+  completed_at?: string;
 }
 
 export interface AuditWithItems extends LocationAudit {
@@ -47,6 +73,7 @@ export interface CreateAuditInput {
   assignedTo?: string | null;
   blindMode?: boolean;
 }
+
 
 export function useLocationAudits() {
   const { toast } = useToast();
@@ -73,27 +100,35 @@ export function useLocationAudits() {
       queryFn: async (): Promise<AuditWithItems | null> => {
         if (!auditId) return null;
 
-        const [auditRes, itemsRes] = await Promise.all([
-          supabase
-            .from('location_audits')
-            .select('*')
-            .eq('id', auditId)
-            .single(),
-          supabase
+        const auditRes = await supabase
+          .from('location_audits')
+          .select('*')
+          .eq('id', auditId)
+          .single();
+        if (auditRes.error) throw auditRes.error;
+
+        // Conferências grandes ultrapassam o limite de 1000 linhas por pedido.
+        const items: LocationAuditItem[] = [];
+        const pageSize = 1000;
+        for (let from = 0; ; from += pageSize) {
+          const { data, error } = await supabase
             .from('location_audit_items')
             .select('*')
             .eq('audit_id', auditId)
             .order('location', { ascending: true })
-            .order('product_code', { ascending: true }),
-        ]);
-
-        if (auditRes.error) throw auditRes.error;
-        if (itemsRes.error) throw itemsRes.error;
+            .order('product_code', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          items.push(...((data ?? []) as LocationAuditItem[]));
+          if (!data || data.length < pageSize) break;
+        }
 
         return {
           ...(auditRes.data as LocationAudit),
-          items: itemsRes.data as LocationAuditItem[],
+          items,
         };
+
       },
       enabled: !!auditId,
     });
@@ -232,86 +267,70 @@ export function useLocationAudits() {
     },
   });
 
-  // Complete audit — gera os ajustes das divergências
-  const completeAudit = useMutation({
+  /**
+   * Entrega da contagem pelo operador. Não mexe em stock — apenas fecha a
+   * recolha e avisa o responsável de que pode fechar a conferência.
+   */
+  const deliverAudit = useMutation({
     mutationFn: async (auditId: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase.rpc('deliver_location_audit', { p_audit_id: auditId });
+      if (error) throw error;
+      return data as { status: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['location-audits'] });
+      queryClient.invalidateQueries({ queryKey: ['location-audit'] });
+      queryClient.invalidateQueries({ queryKey: ['my-location-audits'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Não foi possível entregar a contagem',
+        description: mapDatabaseError(error, error.message),
+        variant: 'destructive',
+      });
+    },
+  });
 
-      const { data: items, error: itemsError } = await supabase
-        .from('location_audit_items')
-        .select('*')
-        .eq('audit_id', auditId)
-        .eq('status', 'counted');
-      if (itemsError) throw itemsError;
+  /**
+   * Fecho da conferência: uma única transação no servidor
+   * (`complete_location_audit`) que valida permissões, exige motivo em cada
+   * divergência, deteta stock movimentado desde a contagem, aplica os ajustes
+   * por diferença (nunca por valor absoluto) e escreve movimento + linha de
+   * movimento com saldo antes e depois. Repetir o fecho não duplica ajustes.
+   */
+  const completeAudit = useMutation({
+    mutationFn: async (
+      input: string | { auditId: string; acceptDrift?: boolean },
+    ): Promise<CompleteAuditResult> => {
+      const auditId = typeof input === 'string' ? input : input.auditId;
+      const acceptDrift = typeof input === 'string' ? false : !!input.acceptDrift;
 
-      const divergent = (items || []).filter(
-        (i) => i.difference !== null && i.difference !== 0,
-      );
-
-      const semMotivo = divergent.filter((i) => !i.notes || !i.notes.trim());
-      if (semMotivo.length > 0) {
-        throw new Error(
-          `Indique o motivo em ${semMotivo.length} linha(s) com divergência antes de finalizar.`,
-        );
+      const { data, error } = await supabase.rpc('complete_location_audit', {
+        p_audit_id: auditId,
+        p_accept_drift: acceptDrift,
+      });
+      if (error) throw error;
+      return data as unknown as CompleteAuditResult;
+    },
+    onSuccess: (result) => {
+      if (result?.status === 'movimentado') {
+        toast({
+          title: 'Stock movimentado desde a contagem',
+          description: `${result.drift?.length ?? 0} linha(s) mudaram depois da contagem. Reveja antes de fechar.`,
+          variant: 'destructive',
+        });
+        return;
       }
-
-      for (const item of divergent) {
-        if (!item.product_id) continue;
-        const counted = item.counted_quantity ?? 0;
-
-        // Acerta o saldo da localização conferida
-        let query = supabase
-          .from('counts')
-          .select('id, quantity')
-          .eq('product_id', item.product_id)
-          .eq('location', item.location);
-        if (item.colis_number !== null) query = query.eq('colis_number', item.colis_number);
-        const { data: countRows } = await query.order('quantity', { ascending: false }).limit(1);
-
-        if (countRows && countRows.length > 0) {
-          await supabase
-            .from('counts')
-            .update({ quantity: counted, updated_at: new Date().toISOString() })
-            .eq('id', countRows[0].id);
-        } else if (counted > 0) {
-          await supabase.from('counts').insert({
-            product_id: item.product_id,
-            colis_number: item.colis_number ?? 1,
-            quantity: counted,
-            location: item.location,
-            counted_by: user?.id ?? null,
-          });
-        }
-
-        await supabase.from('stock_movements').insert({
-          product_id: item.product_id,
-          movement_type: 'ajuste',
-          quantity: Math.abs(item.difference || 0),
-          reason: item.notes,
-          reference: `Conferência ${auditId.slice(0, 8)}`,
-          notes: `${item.location} · coli ${item.colis_number ?? '—'} · esperado ${item.expected_quantity} · contado ${counted}`,
-          created_by: user?.id ?? null,
+      if (result?.status === 'ja_fechada') {
+        toast({ title: 'Conferência já estava fechada', description: 'Nada foi duplicado.' });
+      } else {
+        toast({
+          title: 'Conferência finalizada',
+          description: result?.adjustments
+            ? `${result.adjustments} ajuste(s) de stock registados`
+            : 'Sem divergências a ajustar',
         });
       }
-
-      const { error } = await supabase
-        .from('location_audits')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', auditId);
-
-      if (error) throw error;
-      return divergent.length;
-    },
-    onSuccess: (adjustments) => {
-      toast({
-        title: 'Conferência finalizada',
-        description: adjustments
-          ? `${adjustments} ajuste(s) de stock registados`
-          : 'Sem divergências a ajustar',
-      });
       queryClient.invalidateQueries({ queryKey: ['location-audits'] });
       queryClient.invalidateQueries({ queryKey: ['location-audit'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -325,6 +344,7 @@ export function useLocationAudits() {
       });
     },
   });
+
 
   // Delete audit
   const deleteAudit = useMutation({
@@ -373,7 +393,9 @@ export function useLocationAudits() {
     createAudit,
     startAudit,
     updateAuditItem,
+    deliverAudit,
     completeAudit,
+
     deleteAudit,
   };
 }
@@ -389,6 +411,9 @@ export function useMyLocationAudits() {
         .from('location_audits')
         .select('*')
         .in('status', ['pending', 'in_progress'])
+        // Uma contagem já entregue sai da lista do operador.
+        .is('delivered_at', null)
+
         .order('created_at', { ascending: false });
       if (!uid) return [];
       query = query.eq('assigned_to', uid);

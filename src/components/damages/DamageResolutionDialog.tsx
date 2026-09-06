@@ -21,7 +21,9 @@ interface DamageResolutionDialogProps {
     resolution_notes?: string;
     destination_location?: string;
     supplier_reference?: string;
+    allow_partial?: boolean;
   }) => Promise<unknown>;
+
   isLoading?: boolean;
 }
 
@@ -36,6 +38,7 @@ export function DamageResolutionDialog({
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [destination, setDestination] = useState('');
   const [supplierRef, setSupplierRef] = useState('');
+  const [allowPartial, setAllowPartial] = useState(false);
 
   const option = useMemo(
     () => RESOLUTION_OPTIONS.find((o) => o.value === resolutionType),
@@ -47,6 +50,7 @@ export function DamageResolutionDialog({
     setResolutionNotes('');
     setDestination('');
     setSupplierRef('');
+    setAllowPartial(false);
   };
 
   const canSubmit =
@@ -64,11 +68,13 @@ export function DamageResolutionDialog({
       resolution_notes: resolutionNotes || undefined,
       destination_location: option?.needsDestination ? destination : undefined,
       supplier_reference: option?.needsSupplierRef ? supplierRef.trim() : undefined,
+      allow_partial: allowPartial,
     });
 
     reset();
     onOpenChange(false);
   };
+
 
   const handleCancel = () => {
     reset();
@@ -146,8 +152,24 @@ export function DamageResolutionDialog({
             </div>
           )}
 
+          <label className="flex items-start gap-2 rounded-lg border p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4"
+              checked={allowPartial}
+              onChange={(e) => setAllowPartial(e.target.checked)}
+            />
+            <span>
+              Resolver só o que existir em quarentena
+              <span className="block text-xs text-muted-foreground">
+                Sem esta opção, se faltarem unidades nada é alterado. Com ela, o restante fica pendente.
+              </span>
+            </span>
+          </label>
+
           <div className="space-y-2">
             <Label htmlFor="resolutionNotes">Notas</Label>
+
             <Textarea
               id="resolutionNotes"
               value={resolutionNotes}
