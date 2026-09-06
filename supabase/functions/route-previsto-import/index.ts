@@ -201,21 +201,21 @@ Deno.serve(async (req) => {
   if (!authHeader.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
 
   const url = Deno.env.get('SUPABASE_URL')!;
-  const authClient = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: userData } = await authClient.auth.getUser();
-  const uid = userData?.user?.id;
-  if (!uid) return json({ error: 'Unauthorized' }, 401);
-
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+  // validar o token com a chave de serviço (funciona com as novas chaves de assinatura)
+  const token = authHeader.slice('Bearer '.length).trim();
+  const { data: userData, error: userError } = await admin.auth.getUser(token);
+  const uid = userData?.user?.id;
+  if (userError || !uid) return json({ error: 'Unauthorized' }, 401);
 
   const { data: profile } = await admin
     .from('profiles')
     .select('role')
     .eq('user_id', uid)
     .maybeSingle();
-  if (!profile || !['admin', 'operator', 'financeiro'].includes(profile.role)) {
+  if (!profile || !['master', 'admin', 'operator', 'financeiro'].includes(profile.role)) {
+
     return json({ error: 'Sem permissão para importar o previsto' }, 403);
   }
 
