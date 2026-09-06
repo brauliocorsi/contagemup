@@ -202,6 +202,14 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
     [chosenDocs],
   );
 
+  // Serviços de montagem por encomenda (linhas de serviço da Gestão Click).
+  const assemblyByVendaId = useMemo(() => {
+    const map: Record<string, AssemblyInfo> = {};
+    for (const d of docsQuery.data ?? []) map[d.id] = assemblyFromServices(d.servicos);
+    return map;
+  }, [docsQuery.data]);
+
+
   function runPrint() {
     const style = document.createElement('style');
     style.id = 'a4-page-rule';
