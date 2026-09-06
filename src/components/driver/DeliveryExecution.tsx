@@ -50,6 +50,8 @@ import {
   saveDraft,
   type DeliveryDraft,
 } from '@/lib/delivery/draft';
+import { PaymentPanel } from '@/components/driver/PaymentPanel';
+import { AssistanceDialog } from '@/components/driver/AssistanceDialog';
 import { toast } from 'sonner';
 
 interface Props {
@@ -372,6 +374,13 @@ export function DeliveryExecution({ attempt, onBack }: Props) {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {step === 'resumo' && (
+        <>
+          <PaymentPanel attemptId={attempt.id} />
+          <AssistanceDialog attempt={attempt} lines={lines} />
+        </>
       )}
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 backdrop-blur">

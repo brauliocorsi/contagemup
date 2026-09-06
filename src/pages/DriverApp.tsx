@@ -19,6 +19,7 @@ import { DeliveryExecution } from '@/components/driver/DeliveryExecution';
 import { useMyDeliveryAttempts, type DeliveryAttempt } from '@/hooks/useDeliveryAttempts';
 import { useMyRoutes, ROUTE_STATUS_LABELS } from '@/hooks/useRoutes';
 import { clearAllDrafts, pruneRevokedDrafts } from '@/lib/delivery/draft';
+import { RouteAccountingDialog } from '@/components/driver/RouteAccountingDialog';
 
 function fmtDate(d: string | null) {
   if (!d) return 'Sem data';
@@ -130,6 +131,13 @@ export default function DriverApp() {
               <Button variant="ghost" size="sm" className="mb-1" onClick={() => setRouteId(null)}>
                 <ArrowLeft className="mr-1 h-4 w-4" /> Minhas rotas
               </Button>
+            )}
+            {routeId && currentRoute && (
+              <RouteAccountingDialog
+                routeId={routeId}
+                routeName={currentRoute.name}
+                attempts={routeAttempts}
+              />
             )}
             {routeAttempts.length === 0 ? (
               <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
