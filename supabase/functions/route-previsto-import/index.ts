@@ -198,24 +198,39 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const authHeader = req.headers.get('Authorization') ?? '';
-  if (!authHeader.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
+  if (!authHeader.startsWith('Bearer ')) {
+    return json({ error: 'Sessão não encontrada: inicie sessão novamente.' }, 401);
+  }
 
   const url = Deno.env.get('SUPABASE_URL')!;
-  const authClient = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: userData } = await authClient.auth.getUser();
-  const uid = userData?.user?.id;
-  if (!uid) return json({ error: 'Unauthorized' }, 401);
-
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+  // validar o token diretamente no serviço de autenticação
+  const token = authHeader.slice('Bearer '.length).trim();
+  const userRes = await fetch(`${url}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    },
+  });
+  if (!userRes.ok) {
+    console.log('previsto-auth', { status: userRes.status });
+    return json({ error: 'Sessão expirada: termine sessão e volte a entrar.' }, 401);
+  }
+  const uid = ((await userRes.json()) as { id?: string }).id;
+  if (!uid) return json({ error: 'Sessão expirada: termine sessão e volte a entrar.' }, 401);
+
+
+
+
 
   const { data: profile } = await admin
     .from('profiles')
     .select('role')
     .eq('user_id', uid)
     .maybeSingle();
-  if (!profile || !['admin', 'operator', 'financeiro'].includes(profile.role)) {
+  if (!profile || !['master', 'admin', 'operator', 'financeiro'].includes(profile.role)) {
+
     return json({ error: 'Sem permissão para importar o previsto' }, 403);
   }
 
