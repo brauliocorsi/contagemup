@@ -46,6 +46,9 @@ export default function DriverApp() {
   const [routeId, setRouteId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [revoked, setRevoked] = useState(0);
+  // Paragens da rota: dão a ordem planeada e as moradas para a simulação.
+  const { data: routeData } = useRoute(routeId && routeId !== 'sem-rota' ? routeId : null);
+  const stops = routeData?.stops ?? [];
 
   // Rascunhos de entregas que já não estão acessíveis (rota reatribuída) são
   // descartados quando o aparelho volta a ter rede — e sinalizados ao entregador.
