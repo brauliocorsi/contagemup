@@ -202,6 +202,7 @@ export function useAttemptPayments(attemptId: string | null) {
         .from('delivery_payments')
         .select('*')
         .eq('attempt_id', attemptId)
+        .is('superseded_at', null)
         .order('declared_at');
       if (error) throw error;
       return (data ?? []) as DeliveryPayment[];
@@ -218,6 +219,7 @@ export function useRoutePayments(routeId: string | null) {
         .from('delivery_payments')
         .select('*')
         .eq('route_id', routeId)
+        .is('superseded_at', null)
         .order('declared_at');
       if (error) throw error;
       return (data ?? []) as DeliveryPayment[];
