@@ -120,8 +120,9 @@ export function SettingsView() {
 
   const updateRole = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const { error } = await supabase.from('profiles').update({ role }).eq('user_id', userId);
+      const { data, error } = await supabase.rpc('set_user_role', { p_user_id: userId, p_role: role });
       if (error) throw error;
+      if (data && (data as any).ok !== true) throw new Error((data as any)?.error || 'Erro ao atualizar função');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
@@ -131,12 +132,30 @@ export function SettingsView() {
       toast({ title: 'Erro ao atualizar função', description: error.message, variant: 'destructive' }),
   });
 
+  const deleteUser = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+        body: { action: 'delete', user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      toast({ title: 'Utilizador eliminado' });
+    },
+    onError: (error: any) =>
+      toast({ title: 'Erro ao eliminar utilizador', description: error.message, variant: 'destructive' }),
+  });
+
   const getRoleBadge = (role: string) => {
     switch (role) {
+      case 'master':
+        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20">Master</Badge>;
       case 'admin':
         return <Badge className="bg-primary/10 text-primary border-primary/20">Admin</Badge>;
-      case 'supervisor':
-        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Supervisor</Badge>;
+      case 'financeiro':
+        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Financeiro</Badge>;
       case 'entregador':
         return <Badge className="bg-info-soft text-info border-info/20">Entregador</Badge>;
       default:
