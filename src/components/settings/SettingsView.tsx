@@ -82,15 +82,18 @@ export function SettingsView() {
     setIsCreating(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email: newUserEmail,
-        password: newUserPassword,
-        options: {
-          data: { name: newUserName }
-        }
+      const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+        body: {
+          action: 'create',
+          email: newUserEmail,
+          password: newUserPassword,
+          name: newUserName,
+          role: newUserRole,
+        },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast({
         title: 'Utilizador criado',
@@ -100,7 +103,8 @@ export function SettingsView() {
       setNewUserEmail('');
       setNewUserPassword('');
       setNewUserName('');
-      
+      setNewUserRole('operator');
+
       // Refresh profiles list
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
     } catch (error: any) {
