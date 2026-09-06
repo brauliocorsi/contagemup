@@ -275,6 +275,13 @@ export type Database = {
             foreignKeyName: "delivery_attempt_lines_attempt_id_fkey"
             columns: ["attempt_id"]
             isOneToOne: false
+            referencedRelation: "delivery_assignment_conflicts"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "delivery_attempt_lines_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
             referencedRelation: "delivery_attempts"
             referencedColumns: ["id"]
           },
@@ -422,6 +429,13 @@ export type Database = {
           payload?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "delivery_events_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_assignment_conflicts"
+            referencedColumns: ["attempt_id"]
+          },
           {
             foreignKeyName: "delivery_events_attempt_id_fkey"
             columns: ["attempt_id"]
@@ -1327,6 +1341,9 @@ export type Database = {
           departure_lat: number | null
           departure_lon: number | null
           departure_postal_code: string | null
+          driver_assigned_at: string | null
+          driver_assigned_by: string | null
+          driver_id: string | null
           id: string
           name: string
           notes: string | null
@@ -1345,6 +1362,9 @@ export type Database = {
           departure_lat?: number | null
           departure_lon?: number | null
           departure_postal_code?: string | null
+          driver_assigned_at?: string | null
+          driver_assigned_by?: string | null
+          driver_id?: string | null
           id?: string
           name: string
           notes?: string | null
@@ -1363,6 +1383,9 @@ export type Database = {
           departure_lat?: number | null
           departure_lon?: number | null
           departure_postal_code?: string | null
+          driver_assigned_at?: string | null
+          driver_assigned_by?: string | null
+          driver_id?: string | null
           id?: string
           name?: string
           notes?: string | null
@@ -1998,6 +2021,37 @@ export type Database = {
       }
     }
     Views: {
+      delivery_assignment_conflicts: {
+        Row: {
+          attempt_id: string | null
+          client_name: string | null
+          conflict_type: string | null
+          legacy_driver_id: string | null
+          note_id: string | null
+          order_number: string | null
+          route_driver_id: string | null
+          route_id: string | null
+          route_name: string | null
+          scheduled_date: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_attempts_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_attempts_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "route_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movements_unified: {
         Row: {
           created_at: string | null
@@ -2035,6 +2089,28 @@ export type Database = {
           p_scheduled_date?: string
         }
         Returns: Json
+      }
+      assign_route_delivery: {
+        Args: {
+          p_driver: string
+          p_op_key?: string
+          p_reason?: string
+          p_route_id: string
+        }
+        Returns: Json
+      }
+      assign_route_driver: {
+        Args: {
+          p_driver: string
+          p_op_key?: string
+          p_reason?: string
+          p_route_id: string
+        }
+        Returns: Json
+      }
+      can_execute_attempt: {
+        Args: { _attempt_id: string; _uid: string }
+        Returns: boolean
       }
       cancel_delivery_note: {
         Args: { p_note_id: string; p_op_key?: string; p_reason: string }
@@ -2076,6 +2152,10 @@ export type Database = {
       dedupe_counts_same_place: { Args: never; Returns: number }
       deliver_location_audit: { Args: { p_audit_id: string }; Returns: Json }
       deliver_note: { Args: { p_note_id: string }; Returns: Json }
+      driver_sees_attempt: {
+        Args: { _attempt_driver: string; _route_id: string; _uid: string }
+        Returns: boolean
+      }
       effective_total_colis: { Args: { p_product_id: string }; Returns: number }
       generate_audit_access_code: { Args: never; Returns: string }
       generate_route_barcode: { Args: never; Returns: string }

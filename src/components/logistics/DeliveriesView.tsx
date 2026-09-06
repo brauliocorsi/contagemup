@@ -44,6 +44,7 @@ import {
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfiles } from '@/hooks/useProfiles';
+import { useAssignmentConflicts } from '@/hooks/useRoutes';
 import {
   DELIVERY_STATUS_LABELS,
   useDeliveryNoteItems,
@@ -214,6 +215,8 @@ export function DeliveriesView() {
     [notes],
   );
 
+  const { data: conflicts = [] } = useAssignmentConflicts();
+
   const drivers = useMemo(() => profiles.filter((p) => p.role === 'entregador' || p.role === 'operator'), [profiles]);
 
   return (
@@ -223,7 +226,32 @@ export function DeliveriesView() {
         description="Tentativas por rota e cliente, resultado no cliente, retornos a conferir e saldos por encomenda."
       />
 
+      {conflicts.length > 0 && (
+        <div className="rounded-lg border border-warning/50 bg-warning/10 p-3 text-sm">
+          <p className="font-medium">
+            {conflicts.length} entrega(s) com atribuição antiga por decidir
+          </p>
+          <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+            {conflicts.slice(0, 8).map((c) => (
+              <li key={c.attempt_id}>
+                {c.order_number} — {c.client_name || 'Sem cliente'}: atribuída a{' '}
+                {nameOf(c.legacy_driver_id)}{' '}
+                {c.conflict_type === 'sem_rota'
+                  ? '(sem rota associada)'
+                  : c.conflict_type === 'rota_sem_entregador'
+                    ? `(rota ${c.route_name} sem entregador)`
+                    : `(rota ${c.route_name} está com ${nameOf(c.route_driver_id)})`}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Defina o entregador na rota para regularizar. Nada foi alterado automaticamente.
+          </p>
+        </div>
+      )}
+
       <Tabs defaultValue="tentativas">
+
         <TabsList className="flex-wrap">
           <TabsTrigger value="tentativas">Tentativas</TabsTrigger>
           <TabsTrigger value="atribuir">Por atribuir ({toAssign.length})</TabsTrigger>

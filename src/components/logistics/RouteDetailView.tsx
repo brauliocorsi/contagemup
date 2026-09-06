@@ -48,6 +48,7 @@ import { OrderDocument } from './OrderDocument';
 import { GuidesDocument } from './GuidesDocument';
 import { PickingReport } from './PickingReport';
 import { AddRouteStops } from './AddRouteStops';
+import { RouteDriverCard } from './RouteDriverCard';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations } from '@/lib/logistics/pickingLocations';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
@@ -445,7 +446,15 @@ export function RouteDetailView({ routeId, onBack }: { routeId: string; onBack: 
           </Select>
         </div>
 
+        <RouteDriverCard
+          routeId={routeId}
+          driverId={route.driver_id}
+          driverAssignedAt={route.driver_assigned_at}
+          driverAssignedBy={route.driver_assigned_by}
+        />
+
         {route.status === 'pending' && <AddRouteStops routeId={routeId} stops={stops} />}
+
 
         <section className="rounded-lg border border-border bg-card">
           <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
