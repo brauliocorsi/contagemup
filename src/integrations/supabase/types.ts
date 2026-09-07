@@ -559,6 +559,53 @@ export type Database = {
           },
         ]
       }
+      delivery_note_item_colis: {
+        Row: {
+          colis_number: number
+          created_at: string
+          evidence: string
+          id: string
+          loaded_quantity: number
+          location: string | null
+          note_item_id: string
+          requested_quantity: number
+          staged_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          colis_number: number
+          created_at?: string
+          evidence?: string
+          id?: string
+          loaded_quantity?: number
+          location?: string | null
+          note_item_id: string
+          requested_quantity?: number
+          staged_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          colis_number?: number
+          created_at?: string
+          evidence?: string
+          id?: string
+          loaded_quantity?: number
+          location?: string | null
+          note_item_id?: string
+          requested_quantity?: number
+          staged_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_note_item_colis_note_item_id_fkey"
+            columns: ["note_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_note_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_note_items: {
         Row: {
           created_at: string
@@ -1344,6 +1391,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      picking_item_colis: {
+        Row: {
+          colis_number: number
+          created_at: string
+          evidence: string
+          from_location: string | null
+          id: string
+          item_id: string
+          picked_quantity: number
+          requested_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          colis_number: number
+          created_at?: string
+          evidence?: string
+          from_location?: string | null
+          id?: string
+          item_id: string
+          picked_quantity?: number
+          requested_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          colis_number?: number
+          created_at?: string
+          evidence?: string
+          from_location?: string | null
+          id?: string
+          item_id?: string
+          picked_quantity?: number
+          requested_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "picking_item_colis_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "scanner_picking_task_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       picking_items: {
         Row: {
@@ -2788,12 +2879,22 @@ export type Database = {
         Returns: Json
       }
       attempt_amount_due: { Args: { p_attempt_id: string }; Returns: Json }
+      backfill_note_item_colis_legacy: { Args: never; Returns: number }
       can_execute_attempt: {
         Args: { _attempt_id: string; _uid: string }
         Returns: boolean
       }
       cancel_delivery_note: {
         Args: { p_note_id: string; p_op_key?: string; p_reason: string }
+        Returns: Json
+      }
+      claim_operation: {
+        Args: {
+          p_hash: string
+          p_kind: string
+          p_op_key: string
+          p_resource: string
+        }
         Returns: Json
       }
       close_route_preparation: { Args: { p_route_id: string }; Returns: Json }
@@ -2847,6 +2948,11 @@ export type Database = {
         Returns: boolean
       }
       effective_total_colis: { Args: { p_product_id: string }; Returns: number }
+      ensure_note_item_colis: { Args: { p_item_id: string }; Returns: number }
+      ensure_picking_item_colis: {
+        Args: { p_item_id: string }
+        Returns: number
+      }
       ensure_route_notes_from_stops: {
         Args: { p_route_id: string }
         Returns: number
@@ -2880,6 +2986,10 @@ export type Database = {
       is_finance: { Args: { _uid: string }; Returns: boolean }
       is_quarantine_location: { Args: { p_location: string }; Returns: boolean }
       is_warehouse_operator: { Args: { _uid: string }; Returns: boolean }
+      load_notes_colis: {
+        Args: { p_lines: Json; p_op_key: string; p_vehicle_location: string }
+        Returns: Json
+      }
       load_notes_to_vehicle: {
         Args: {
           p_items?: Json
@@ -3068,6 +3178,15 @@ export type Database = {
           p_session_id: string
         }
         Returns: number
+      }
+      stage_picking_colis: {
+        Args: {
+          p_dock_location: string
+          p_lines: Json
+          p_op_key: string
+          p_task_id: string
+        }
+        Returns: Json
       }
       stage_picking_to_dock: {
         Args: { p_dock_location: string; p_lines: Json; p_task_id: string }
