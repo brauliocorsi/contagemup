@@ -120,7 +120,8 @@ const NAV: Array<{ id: View; label: string; icon: typeof Search }> = [
 ];
 
 export default function ScannerApp() {
-  const { user, loading } = useAuth();
+  const { user, loading, profile, signOut } = useAuth();
+  const { ready, isWarehouseOperator, canUseScanner } = useRoleAccess();
   const { data: myAudits = [] } = useMyLocationAudits();
   /** A contagem só existe quando há conferência aberta e atribuída a este utilizador. */
   const canCount = myAudits.length > 0;
@@ -131,13 +132,32 @@ export default function ScannerApp() {
     qtyHandlerRef.current = h;
   }, []);
 
+  /** Módulos vedados ao operador de armazém (também por comando CMD-MODE). */
+  const blockedViews = useMemo<View[]>(() => (isWarehouseOperator ? ['fornecedor'] : []), [isWarehouseOperator]);
+
+  const goTo = useCallback(
+    (next: View) => {
+      if (blockedViews.includes(next)) {
+        toast.error('Sem permissão para este módulo');
+        return;
+      }
+      setView(next);
+    },
+    [blockedViews],
+  );
+
   /** Comandos globais lidos em qualquer módulo. Devolve true se consumiu a leitura. */
   const handleCommand = useCallback((raw: string) => {
     const cmd = parseCommand(raw);
     if (!cmd) return false;
 
     if (cmd.command === 'MODE' && cmd.value) {
-      setView(cmd.value as ScannerMode);
+      const target = cmd.value as ScannerMode;
+      if (blockedViews.includes(target)) {
+        toast.error('Sem permissão para este módulo');
+        return true;
+      }
+      setView(target);
       toast.success(`Módulo: ${SCANNER_MODES.find((m) => m.id === cmd.value)?.label}`);
       return true;
     }
@@ -161,9 +181,9 @@ export default function ScannerApp() {
     }
     toast.info(`Comando ${cmd.command}`);
     return true;
-  }, []);
+  }, [blockedViews]);
 
-  if (loading) {
+  if (loading || (user && !ready)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -173,9 +193,24 @@ export default function ScannerApp() {
 
   if (!user) return <LoginForm />;
 
-  const operations = OPERATIONS.filter((o) => o.id !== 'contagem' || canCount);
-  const navItems = NAV.filter((n) => n.id !== 'contagem' || canCount);
+  if (!canUseScanner) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-sm text-muted-foreground">A sua conta não tem acesso ao scanner de armazém.</p>
+        <Button variant="outline" onClick={() => void signOut()}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Sair
+        </Button>
+      </div>
+    );
+  }
+
+  const operations = OPERATIONS.filter(
+    (o) => (o.id !== 'contagem' || canCount) && !blockedViews.includes(o.id),
+  );
+  const navItems = NAV.filter((n) => (n.id !== 'contagem' || canCount) && !blockedViews.includes(n.id));
   const current = operations.find((o) => o.id === view);
+
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">
