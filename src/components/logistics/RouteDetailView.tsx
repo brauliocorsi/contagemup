@@ -87,6 +87,8 @@ function docsToOrders(docs: GcDocument[]): SepOrder[] {
         id: d.id,
         codigo: d.codigo,
         cliente: d.cliente?.nome ?? '',
+        data: d.data ?? '',
+        entrega: d.entrega ?? '',
         produtos: d.produtos.map((p) => ({
           codigo: p.codigo,
           nome: p.nome,
