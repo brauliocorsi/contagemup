@@ -132,7 +132,11 @@ export default function Dashboard() {
                 />
               )}
               {activeTab === 'routes' && (
-                <RoutesView key={openRouteId ?? 'list'} initialRouteId={openRouteId} />
+                <RoutesView
+                  key={openRouteId ?? 'list'}
+                  initialRouteId={openRouteId}
+                  onCloseRoute={() => setOpenRouteId(null)}
+                />
               )}
               {activeTab === 'deliveries' && <DeliveriesView />}
               {activeTab === 'finance-closures' && <FinanceClosuresView />}
