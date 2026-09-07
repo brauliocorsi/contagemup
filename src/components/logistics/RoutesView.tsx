@@ -20,13 +20,28 @@ import {
 } from '@/hooks/useRoutes';
 import { RouteDetailView } from './RouteDetailView';
 
-export function RoutesView({ initialRouteId }: { initialRouteId?: string | null }) {
+export function RoutesView({
+  initialRouteId,
+  onCloseRoute,
+}: {
+  initialRouteId?: string | null;
+  onCloseRoute?: () => void;
+}) {
   const [openId, setOpenId] = useState<string | null>(initialRouteId ?? null);
   const { data: routes = [], isLoading } = useRoutes();
   const updateRoute = useUpdateRoute();
   const deleteRoute = useDeleteRoute();
 
-  if (openId) return <RouteDetailView routeId={openId} onBack={() => setOpenId(null)} />;
+  if (openId)
+    return (
+      <RouteDetailView
+        routeId={openId}
+        onBack={() => {
+          setOpenId(null);
+          onCloseRoute?.();
+        }}
+      />
+    );
 
   return (
     <div className="space-y-6">
