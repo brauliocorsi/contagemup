@@ -151,15 +151,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    // Limpar cache do React Query ANTES do logout
-    console.log('Signing out, clearing all cache...');
+    // Cache fora antes do logout; leituras de perfil em curso ficam obsoletas.
+    fetchSeq.current++;
     queryClient.clear();
-    
-    // Limpar localStorage específico do utilizador
+
+    // Rascunhos financeiros nunca transitam entre pessoas.
+    // Os rascunhos de contagem ficam guardados por utilizador e são recuperados no próximo início de sessão.
     localStorage.removeItem('counting_selected_session');
     clearAllDrafts();
-    
-    // Fazer logout
+
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
