@@ -615,6 +615,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       setResult(res);
       setStatus('gravado');
       clearOpDraft(user?.id, context);
+      // O que já foi gravado passa a "feito": evita gravar duas vezes o mesmo volume.
+      setLines((prev) =>
+        prev.map((l) => ({
+          ...l,
+          slots: l.slots.map((s) => ({ ...s, done: s.done + s.scanned, scanned: 0 })),
+        })),
+      );
       // chave nova só depois de o servidor confirmar
       opKeyRef.current = newOpKey('picking_stage_colis');
 
