@@ -111,7 +111,8 @@ const SHORTAGE_REASONS: Array<{ id: string; label: string }> = [
 const firstSuggested = (s?: string | null) =>
   (s || '')
     .split(/[,;/|]/)
-    .map((x) => x.trim())
+    // "B11 (3)" vem do resumo de stock: guardar só o código da localização.
+    .map((x) => x.trim().replace(/\s*\(\s*\d+\s*\)\s*$/, '').trim())
     .filter(Boolean)[0] ?? '';
 
 const splitOrders = (s?: string | null) =>
