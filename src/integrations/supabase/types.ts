@@ -2753,6 +2753,7 @@ export type Database = {
         Args: { p_note_id: string; p_reason: string; p_revision: number }
         Returns: Json
       }
+      assert_operational_actor: { Args: never; Returns: undefined }
       assert_valid_location: { Args: { p_location: string }; Returns: string }
       assign_count_location: {
         Args: { p_count_id: string; p_location: string }
@@ -2877,6 +2878,7 @@ export type Database = {
       is_driver_only: { Args: { _uid: string }; Returns: boolean }
       is_finance: { Args: { _uid: string }; Returns: boolean }
       is_quarantine_location: { Args: { p_location: string }; Returns: boolean }
+      is_warehouse_operator: { Args: { _uid: string }; Returns: boolean }
       load_notes_to_vehicle: {
         Args: {
           p_items?: Json
