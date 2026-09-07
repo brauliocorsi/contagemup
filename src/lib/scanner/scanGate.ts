@@ -31,9 +31,10 @@ export function evaluateScan(
   const next: ScanGateState = { code, at: now, source };
   if (source !== 'camera') return { accept: true, next };
   if (prev && prev.source === 'camera' && prev.code === code && now - prev.at < dedupeMs) {
-    // Mantém a marca temporal original: enquanto a etiqueta estiver à frente da
-    // câmara continua a ser a mesma leitura, não uma nova.
-    return { accept: false, reason: 'repetida_camara', next: prev };
+    // Janela deslizante: enquanto a etiqueta continuar à frente da câmara é
+    // sempre a MESMA leitura. Só volta a contar depois de a etiqueta sair do
+    // campo de visão durante mais tempo do que a janela.
+    return { accept: false, reason: 'repetida_camara', next };
   }
   return { accept: true, next };
 }
