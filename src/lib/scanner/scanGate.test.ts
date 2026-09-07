@@ -24,11 +24,24 @@ describe('teste 6 — leituras repetidas', () => {
     expect(counted).toBe(1);
   });
 
-  it('a câmara volta a contar depois de a janela passar', () => {
+  it('a câmara volta a contar quando a etiqueta sai do campo de visão', () => {
     const first = evaluateScan(null, 'X', 'camera', 0, 800);
+    // sem leituras entretanto: a etiqueta saiu e voltou
     const second = evaluateScan(first.next, 'X', 'camera', 900, 800);
     expect(second.accept).toBe(true);
   });
+
+  it('a câmara com a etiqueta parada nunca repete, mesmo depois de 800ms', () => {
+    let state: ScanGateState | null = null;
+    let counted = 0;
+    for (let i = 0; i < 60; i++) {
+      const d = evaluateScan(state, 'X', 'camera', i * 100, 800);
+      state = d.next;
+      if (d.accept) counted++;
+    }
+    expect(counted).toBe(1);
+  });
+
 
   it('uma leitura da pistola não é bloqueada por uma leitura anterior da câmara', () => {
     const cam = evaluateScan(null, 'X', 'camera', 0, 800);
