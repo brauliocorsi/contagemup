@@ -21,6 +21,8 @@ import {
   useTypedLocations,
 } from '@/hooks/useDeliveryNotes';
 import { supabase } from '@/integrations/supabase/client';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
+
 
 interface ScannedRoute {
   id: string;
@@ -43,6 +45,8 @@ export function LoadingModule({ onCommand }: Props) {
   const noteIds = useMemo(() => notes.map((n) => n.id), [notes]);
   const { data: items = [] } = useDeliveryNoteItems(noteIds);
   const loadNotes = useLoadNotesToVehicle();
+  const { isWarehouseOperator } = useRoleAccess();
+
 
   const [vehicle, setVehicle] = useState('');
   const [noteId, setNoteId] = useState<string | null>(null);
