@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
+
 import { LoginForm } from '@/components/auth/LoginForm';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +42,8 @@ function fmtDate(d: string | null) {
  */
 export default function DriverApp() {
   const { user, loading, signOut, profile } = useAuth();
+  const access = useRoleAccess();
+
   const { data: routes = [], isLoading: loadingRoutes, refetch: refetchRoutes } = useMyRoutes(user?.id);
   const {
     data: attempts = [],
@@ -92,7 +96,7 @@ export default function DriverApp() {
     return m;
   }, [attempts]);
 
-  if (loading) {
+  if (loading || (user && !access.ready)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -100,6 +104,18 @@ export default function DriverApp() {
     );
   }
   if (!user) return <LoginForm />;
+  if (!access.canUseDriverApp) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-sm text-muted-foreground">Esta área é exclusiva dos entregadores.</p>
+        <Button variant="outline" onClick={() => void signOut()}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Sair
+        </Button>
+      </div>
+    );
+  }
+
 
   const loose = byRoute.get('sem-rota') ?? [];
   const open: DeliveryAttempt | undefined = attempts.find((a) => a.id === openId);
