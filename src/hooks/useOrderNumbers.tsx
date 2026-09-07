@@ -188,6 +188,20 @@ export function useOrderNumbers(productId?: string, totalColis: number = 1) {
         [colisNumber.toString()]: isPresent 
       };
 
+      // Sem localização não é possível criar stock: validar ANTES de marcar o coli.
+      if (isPresent && !order.location?.trim()) {
+        const { data: existing } = await supabase
+          .from('counts')
+          .select('id')
+          .eq('product_id', order.product_id)
+          .eq('colis_number', colisNumber)
+          .limit(1);
+        if (!existing || existing.length === 0) {
+          toast.error('Defina a localização da encomenda antes de marcar colis como presentes.');
+          return false;
+        }
+      }
+
       const { error } = await supabase
         .from('stock_order_numbers')
         .update({ colis_status: newColisStatus })
