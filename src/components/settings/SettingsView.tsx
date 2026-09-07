@@ -256,10 +256,12 @@ export function SettingsView() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="operator">Operador</SelectItem>
+                    <SelectItem value="warehouse_operator">Operador de armazém</SelectItem>
                     <SelectItem value="entregador">Entregador</SelectItem>
                     <SelectItem value="financeiro">Financeiro</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
+
                 </Select>
               </div>
 
@@ -350,8 +352,10 @@ export function SettingsView() {
                               <SelectItem value="admin">Admin</SelectItem>
                               <SelectItem value="financeiro">Financeiro</SelectItem>
                               <SelectItem value="operator">Operador</SelectItem>
+                              <SelectItem value="warehouse_operator">Operador de armazém</SelectItem>
                               <SelectItem value="entregador">Entregador</SelectItem>
                             </SelectContent>
+
                           </Select>
                         ) : (
                           getRoleBadge(profile.role)
