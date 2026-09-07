@@ -2753,6 +2753,7 @@ export type Database = {
         Args: { p_note_id: string; p_reason: string; p_revision: number }
         Returns: Json
       }
+      assert_app_role: { Args: { _allowed: string[] }; Returns: undefined }
       assert_operational_actor: { Args: never; Returns: undefined }
       assert_valid_location: { Args: { p_location: string }; Returns: string }
       assign_count_location: {
