@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ScanBarcode,
@@ -15,9 +15,12 @@ import {
   ClipboardCheck,
   Truck,
   Boxes,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { LoginForm } from '@/components/auth/LoginForm';
+
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ProductInquiryModule } from '@/components/scanner/ProductInquiryModule';
@@ -229,14 +232,24 @@ export default function ScannerApp() {
               {current?.label ?? 'Operações'}
             </p>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setView('impressao')} aria-label="Imprimir códigos">
+          <div className="hidden max-w-[9rem] truncate text-right text-[11px] text-muted-foreground sm:block">
+            {profile?.name ?? user.email}
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => goTo('impressao')} aria-label="Imprimir códigos">
             <Printer className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" asChild aria-label="Voltar à aplicação">
-            <Link to="/">
-              <Home className="h-5 w-5" />
-            </Link>
-          </Button>
+          {isWarehouseOperator ? (
+            <Button variant="ghost" size="icon" onClick={() => void signOut()} aria-label="Sair">
+              <LogOut className="h-5 w-5" />
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon" asChild aria-label="Voltar à aplicação">
+              <Link to="/">
+                <Home className="h-5 w-5" />
+              </Link>
+            </Button>
+          )}
+
         </div>
       </header>
 
@@ -275,7 +288,7 @@ export default function ScannerApp() {
         {view === 'arrumacao' && <PutawayModule onCommand={handleCommand} />}
         {view === 'carregamento' && <LoadingModule onCommand={handleCommand} />}
         {view === 'contagem' && canCount && <CountingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
-        {view === 'fornecedor' && <SupplierCodeModule onCommand={handleCommand} />}
+        {view === 'fornecedor' && !isWarehouseOperator && <SupplierCodeModule onCommand={handleCommand} />}
         {view === 'impressao' && <PrintCenterModule />}
       </main>
 
