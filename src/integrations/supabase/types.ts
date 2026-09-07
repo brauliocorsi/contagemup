@@ -2992,6 +2992,14 @@ export type Database = {
       }
       load_notes_to_vehicle: {
         Args: {
+          p_items: Json
+          p_note_ids: string[]
+          p_vehicle_location: string
+        }
+        Returns: Json
+      }
+      load_notes_to_vehicle_office: {
+        Args: {
           p_items?: Json
           p_note_ids: string[]
           p_vehicle_location: string
@@ -3189,6 +3197,10 @@ export type Database = {
         Returns: Json
       }
       stage_picking_to_dock: {
+        Args: { p_dock_location: string; p_lines: Json; p_task_id: string }
+        Returns: Json
+      }
+      stage_picking_to_dock_office: {
         Args: { p_dock_location: string; p_lines: Json; p_task_id: string }
         Returns: Json
       }

@@ -1,5 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, CheckCircle2, Loader2, ClipboardList, Minus, Plus, AlertTriangle, Ban, MapPin, X, Trash2, Package, FileText, Forklift, Route } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Upload,
+  CheckCircle2,
+  Loader2,
+  ClipboardList,
+  Minus,
+  Plus,
+  AlertTriangle,
+  Ban,
+  MapPin,
+  X,
+  Trash2,
+  Package,
+  FileText,
+  Forklift,
+  Route,
+  Boxes,
+  Save,
+  CloudUpload,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,18 +28,15 @@ import { ScanInput } from './ScanInput';
 import { PrintMenu } from './PrintMenu';
 import { useProducts } from '@/hooks/useProducts';
 import { parsePickingFile, resolveRows, type ResolvedRow } from '@/lib/stock/pickingImport';
-import { supabase } from '@/integrations/supabase/client';
 import { parseScan, type QtyHandler } from '@/lib/scanner/commands';
 import { scanFeedback } from '@/lib/scanner/feedback';
 import { ScanDock, type LastScan } from './ScanDock';
 import { printOperationReceipt, type LabelItem } from '@/lib/scanner/labels';
 import { mapDatabaseError } from '@/lib/errorMessages';
-import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   useOpenPickingTasks,
   usePickingTaskItems,
-  useSavePickingProgress,
   useClosePickingTask,
   useDeletePickingTask,
   type PickingTask,
@@ -29,6 +45,32 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTypedLocations } from '@/hooks/useDeliveryNotes';
 import { useWarehouseLocations } from '@/hooks/useWarehouseConfig';
 import { usePickingStockLocations } from '@/hooks/usePickingStockLocations';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
+import {
+  usePickingItemColis,
+  useStagePickingColis,
+  type StageColiLine,
+  type StageColiResult,
+} from '@/hooks/useColisOperations';
+import {
+  addColiScan,
+  completeSets,
+  evaluateColiScan,
+  linePending,
+  setColiScan,
+  slotPending,
+  splitColisSuffix,
+  type ColiLine,
+  type ColiSlot,
+} from '@/lib/scanner/coliCounter';
+import {
+  clearOpDraft,
+  loadOpDraft,
+  newOpKey,
+  purgeForeignOpDrafts,
+  saveOpDraft,
+  type DraftStatus,
+} from '@/lib/scanner/opDraft';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -43,15 +85,19 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface PickLine extends ResolvedRow {
-  picked: number;
   /** id do artigo da tarefa (quando o picking vem das Notas de Separação) */
   itemId?: string;
   locations?: string | null;
-  /** localização de onde o operador tirou fisicamente a peça */
+  /** encomendas candidatas desta linha */
+  orderOptions: string[];
+  /** encomenda escolhida (obrigatória para gravar) */
+  orderNumber: string;
+  /** localização de onde o operador tira fisicamente as peças */
   from: string;
-  /** motivo de falta, quando conferiu menos do que o pedido */
   reason: string;
   note: string;
+  /** volumes previstos/separados */
+  slots: ColiSlot[];
 }
 
 const SHORTAGE_REASONS: Array<{ id: string; label: string }> = [
@@ -62,46 +108,72 @@ const SHORTAGE_REASONS: Array<{ id: string; label: string }> = [
   { id: 'outro', label: 'Outro' },
 ];
 
-/** Primeira localização sugerida do texto "A1, B2". */
 const firstSuggested = (s?: string | null) =>
   (s || '')
     .split(/[,;/|]/)
     .map((x) => x.trim())
     .filter(Boolean)[0] ?? '';
 
+const splitOrders = (s?: string | null) =>
+  (s || '')
+    .split(/[,;]/)
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+/** Conversão para o formato do contador de volumes. */
+const toColiLine = (l: PickLine): ColiLine => ({
+  key: l.key,
+  label: l.name,
+  orderNumber: l.orderNumber || null,
+  aliases: [l.code, l.product?.code, l.product?.supplier_code, l.name].filter(Boolean) as string[],
+  slots: l.slots,
+});
 
 interface Props {
   onCommand?: (raw: string) => boolean;
   registerQtyHandler?: (handler: QtyHandler | null) => void;
 }
 
+type Choice =
+  | { kind: 'linha'; candidates: ColiLine[]; colis?: number }
+  | { kind: 'coli'; lineKey: string; options: number[] }
+  | null;
+
 export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const { products } = useProducts();
-  const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [lines, setLines] = useState<PickLine[]>([]);
   const [reference, setReference] = useState('');
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [last, setLast] = useState<LastScan | null>(null);
-  const [step, setStep] = useState(1);
   const [lastKey, setLastKey] = useState<string | null>(null);
   const [task, setTask] = useState<PickingTask | null>(null);
   const [groupMode, setGroupMode] = useState<'rota' | 'produto' | 'nota'>('rota');
   const [dock, setDock] = useState('');
+  const [choice, setChoice] = useState<Choice>(null);
+  const [status, setStatus] = useState<DraftStatus>('gravado');
+  const [result, setResult] = useState<StageColiResult | null>(null);
   const { data: docks = [] } = useTypedLocations('pre_exit');
-
-  const stepRef = useRef(step);
-  stepRef.current = step;
 
   const { data: openTasks = [], isLoading: loadingTasks } = useOpenPickingTasks();
   const { data: taskItems } = usePickingTaskItems(task?.id ?? null);
-  const saveProgress = useSavePickingProgress();
+  const itemIds = useMemo(() => (taskItems ?? []).map((i) => i.id), [taskItems]);
+  const { data: serverColis = [] } = usePickingItemColis(itemIds);
   const closeTask = useClosePickingTask();
   const deleteTask = useDeletePickingTask();
-  const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
+  const stage = useStagePickingColis();
+  const { profile, user } = useAuth();
+  const { isWarehouseOperator } = useRoleAccess();
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'master';
   const [taskToRemove, setTaskToRemove] = useState<PickingTask | null>(null);
+
+  const context = `picking:${task?.id ?? 'adhoc'}`;
+  const opKeyRef = useRef<string>(newOpKey('picking_stage_colis'));
+
+  /** Rascunhos de outra conta não podem sobreviver à troca de operador. */
+  useEffect(() => {
+    purgeForeignOpDrafts(user?.id ?? null);
+  }, [user?.id]);
 
   const removeTask = async (t: PickingTask, mode: 'cancel' | 'delete') => {
     if (mode === 'delete') await deleteTask.mutateAsync(t.id);
@@ -113,36 +185,112 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     setTaskToRemove(null);
   };
 
-  /** Carrega os artigos da tarefa escolhida (com o progresso já gravado). */
+  /** Total de volumes de um produto (mínimo 1). */
+  const totalColisOf = useCallback(
+    (productId: string | null | undefined, itemId?: string) => {
+      const fromServer = serverColis
+        .filter((c) => c.item_id === itemId)
+        .reduce((m, c) => Math.max(m, c.colis_number), 0);
+      const p = products.find((x) => x.id === productId);
+      return Math.max(1, p?.total_colis ?? 1, fromServer);
+    },
+    [products, serverColis],
+  );
+
+  /** Carrega os artigos da tarefa com o previsto e o já separado por volume. */
   useEffect(() => {
     if (!task || !taskItems) return;
-    setLines(
-      taskItems.map((it) => ({
-        key: it.id,
-        itemId: it.id,
-        code: it.product_code,
-        name: it.product_name,
-        quantity: it.requested_quantity,
-        details: it.details,
-        orders: it.orders,
-        locations: it.locations,
-        lines: [],
-        product: products.find((p) => p.id === it.product_id) ?? null,
-        candidates: [],
-        method: null,
-        status: it.product_id ? 'ready' : 'missing',
-        available: 0,
-        picked: it.picked_quantity,
-        from: (it as any).picked_location || firstSuggested(it.locations),
-        reason: (it as any).shortage_reason || '',
-        note: (it as any).shortage_notes || '',
-      })),
+    const draft = loadOpDraft<{
+      opKey: string;
+      dock: string;
+      scanned: Record<string, Record<number, number>>;
+      from: Record<string, string>;
+      order: Record<string, string>;
+      reason: Record<string, { reason: string; note: string }>;
+    }>(user?.id, `picking:${task.id}`);
+    if (draft?.opKey) opKeyRef.current = draft.opKey;
+    if (draft?.data?.dock) setDock(draft.data.dock);
+    setStatus(draft ? draft.status : 'gravado');
 
+    setLines(
+      taskItems.map((it) => {
+        const total = totalColisOf(it.product_id, it.id);
+        const orders = splitOrders(it.orders);
+        const slots: ColiSlot[] = Array.from({ length: total }, (_, i) => {
+          const n = i + 1;
+          const row = serverColis.find((c) => c.item_id === it.id && c.colis_number === n);
+          return {
+            colis_number: n,
+            requested: row?.requested_quantity ?? it.requested_quantity,
+            done: row?.picked_quantity ?? 0,
+            scanned: draft?.data?.scanned?.[it.id]?.[n] ?? 0,
+            location: row?.from_location ?? null,
+            evidence: row?.evidence ?? null,
+          };
+        });
+        return {
+          key: it.id,
+          itemId: it.id,
+          code: it.product_code,
+          name: it.product_name,
+          quantity: it.requested_quantity,
+          details: it.details,
+          orders: it.orders,
+          locations: it.locations,
+          lines: [],
+          product: products.find((p) => p.id === it.product_id) ?? null,
+          candidates: [],
+          method: null,
+          status: it.product_id ? 'ready' : 'missing',
+          available: 0,
+          orderOptions: orders,
+          orderNumber: draft?.data?.order?.[it.id] ?? (orders.length === 1 ? orders[0] : ''),
+          from:
+            draft?.data?.from?.[it.id] ??
+            (it as any).picked_location ??
+            firstSuggested(it.locations),
+          reason: draft?.data?.reason?.[it.id]?.reason ?? (it as any).shortage_reason ?? '',
+          note: draft?.data?.reason?.[it.id]?.note ?? (it as any).shortage_notes ?? '',
+          slots,
+        } as PickLine;
+      }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.id, taskItems, products]);
+  }, [task?.id, taskItems, serverColis, products, user?.id]);
 
-  /** Bloqueio: produtos cujo stock está apenas em localizações não-stock (cais, quarentena, viaturas). */
+  /** Guarda o rascunho sempre que há trabalho por enviar. */
+  useEffect(() => {
+    if (!user?.id || lines.length === 0) return;
+    const scanned: Record<string, Record<number, number>> = {};
+    const from: Record<string, string> = {};
+    const order: Record<string, string> = {};
+    const reason: Record<string, { reason: string; note: string }> = {};
+    let pendingWork = 0;
+    for (const l of lines) {
+      const key = l.itemId ?? l.key;
+      from[key] = l.from;
+      order[key] = l.orderNumber;
+      reason[key] = { reason: l.reason, note: l.note };
+      for (const s of l.slots) {
+        if (s.scanned > 0) {
+          scanned[key] = { ...(scanned[key] ?? {}), [s.colis_number]: s.scanned };
+          pendingWork += s.scanned;
+        }
+      }
+    }
+    saveOpDraft({
+      opKey: opKeyRef.current,
+      userId: user.id,
+      context,
+      status: pendingWork > 0 ? (status === 'a_enviar' ? 'a_enviar' : status === 'erro' ? 'erro' : 'por_guardar') : 'gravado',
+      updatedAt: Date.now(),
+      data: { opKey: opKeyRef.current, dock, scanned, from, order, reason },
+    });
+    if (pendingWork === 0 && status === 'por_guardar') setStatus('gravado');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, dock, user?.id, context]);
+
+  /** Bloqueio: stock apenas em localizações não-stock (cais, quarentena, viaturas). */
   const productIds = useMemo(
     () => lines.map((l) => l.product?.id).filter((id): id is string => !!id),
     [lines],
@@ -158,12 +306,23 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   blockedForRef.current = blockedFor;
 
   const totals = useMemo(() => {
-    const requested = lines.reduce((s, l) => s + l.quantity, 0);
-    const picked = lines.reduce((s, l) => s + l.picked, 0);
-    return { requested, picked, pct: requested ? Math.round((picked / requested) * 100) : 0 };
+    const requested = lines.reduce((s, l) => s + l.slots.reduce((t, x) => t + x.requested, 0), 0);
+    const done = lines.reduce(
+      (s, l) => s + l.slots.reduce((t, x) => t + x.done + x.scanned, 0),
+      0,
+    );
+    const scanned = lines.reduce((s, l) => s + l.slots.reduce((t, x) => t + x.scanned, 0), 0);
+    const sets = lines.reduce((s, l) => s + completeSets(toColiLine(l)), 0);
+    const setsRequested = lines.reduce((s, l) => s + l.quantity, 0);
+    return {
+      requested,
+      done,
+      scanned,
+      sets,
+      setsRequested,
+      pct: requested ? Math.round((done / requested) * 100) : 0,
+    };
   }, [lines]);
-
-  /** Metadados das localizações para ordenar pela rota física do armazém. */
 
   const { locations: whLocations } = useWarehouseLocations();
   const locMeta = useMemo(() => {
@@ -188,17 +347,21 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
     [whLocations],
   );
 
-  const metaFor = (l: PickLine) => locMeta.get((l.from || firstSuggested(l.locations)).trim().toUpperCase());
+  const metaFor = (l: PickLine) =>
+    locMeta.get((l.from || firstSuggested(l.locations)).trim().toUpperCase());
   const forkliftCount = useMemo(
     () => lines.filter((l) => metaFor(l)?.forklift).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lines, locMeta],
   );
 
-  /** Agrupamento da lista: por rota física, por produto (agregado) ou por entrega/nota. */
   const groups = useMemo(() => {
+    const totalsOf = (ls: PickLine[]) => ({
+      requested: ls.reduce((s, l) => s + l.slots.reduce((t, x) => t + x.requested, 0), 0),
+      done: ls.reduce((s, l) => s + l.slots.reduce((t, x) => t + x.done + x.scanned, 0), 0),
+    });
     if (groupMode === 'produto') {
-      return [{ title: 'all', lines, requested: totals.requested, picked: totals.picked }];
+      return [{ title: 'all', lines, ...totalsOf(lines) }];
     }
     if (groupMode === 'rota') {
       const sorted = [...lines].sort((a, b) => {
@@ -216,35 +379,18 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
         const k = metaFor(l)?.aisle ?? 'Sem localização';
         map.set(k, [...(map.get(k) ?? []), l]);
       }
-      return [...map.entries()].map(([title, ls]) => ({
-        title,
-        lines: ls,
-        requested: ls.reduce((s, l) => s + l.quantity, 0),
-        picked: ls.reduce((s, l) => s + l.picked, 0),
-      }));
+      return [...map.entries()].map(([title, ls]) => ({ title, lines: ls, ...totalsOf(ls) }));
     }
     const map = new Map<string, PickLine[]>();
     for (const l of lines) {
-      const orders = (l.orders || '')
-        .split(/[,;]/)
-        .map((o) => o.trim())
-        .filter(Boolean);
-      const keys = orders.length ? orders : ['Sem nota'];
+      const keys = l.orderOptions.length ? l.orderOptions : ['Sem nota'];
       for (const k of keys) map.set(k, [...(map.get(k) ?? []), l]);
     }
     return [...map.entries()]
       .sort((a, b) => a[0].localeCompare(b[0], 'pt', { numeric: true }))
-      .map(([title, ls]) => ({
-        title,
-        lines: ls,
-        requested: ls.reduce((s, l) => s + l.quantity, 0),
-        picked: ls.reduce((s, l) => s + l.picked, 0),
-      }));
+      .map(([title, ls]) => ({ title, lines: ls, ...totalsOf(ls) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines, groupMode, totals, locMeta]);
-
-
-
+  }, [lines, groupMode, locMeta]);
 
   const handleFile = async (file: File) => {
     setLoading(true);
@@ -253,15 +399,26 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       const resolved = resolveRows(raw, products);
       setTask(null);
       setLines(
-        resolved.map((r) => ({
-          ...r,
-          picked: 0,
-          from: firstSuggested((r as any).locations),
-          reason: '',
-          note: '',
-        })),
+        resolved.map((r) => {
+          const orders = splitOrders((r as any).orders);
+          const total = Math.max(1, r.product?.total_colis ?? 1);
+          return {
+            ...r,
+            orderOptions: orders,
+            orderNumber: orders.length === 1 ? orders[0] : '',
+            from: firstSuggested((r as any).locations),
+            reason: '',
+            note: '',
+            slots: Array.from({ length: total }, (_, i) => ({
+              colis_number: i + 1,
+              requested: r.quantity,
+              done: 0,
+              scanned: 0,
+              location: null,
+            })),
+          } as PickLine;
+        }),
       );
-
       toast.success(`${resolved.length} linha(s) carregadas`);
     } catch (e: any) {
       console.error(e);
@@ -275,99 +432,112 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   const linesRef = useRef<PickLine[]>(lines);
   linesRef.current = lines;
 
-  /** Grava o progresso no servidor quando o picking veio de uma tarefa. */
+  /** Aplica uma unidade conferida a um volume (usa sempre o estado atual). */
+  const applyScan = useCallback((lineKey: string, colis: number, qty = 1) => {
+    let feedbackLine: PickLine | undefined;
+    setLines((prev) => {
+      const current = prev.find((l) => l.key === lineKey);
+      if (!current) return prev;
+      const blocked = blockedForRef.current(current);
+      if (blocked) {
+        toast.error(`${current.name}: stock apenas em ${blocked}. Transfira antes de separar.`);
+        return prev;
+      }
+      const next = addColiScan(prev.map(toColiLine) as unknown as ColiLine[], lineKey, colis, qty);
+      const merged = prev.map((l, i) => ({ ...l, slots: next[i].slots }));
+      feedbackLine = merged.find((l) => l.key === lineKey);
+      return merged;
+    });
+    setLastKey(lineKey);
+    setStatus('por_guardar');
+    window.setTimeout(() => {
+      const l = feedbackLine;
+      if (!l) return;
+      const slot = l.slots.find((s) => s.colis_number === colis);
+      const sets = completeSets(toColiLine(l));
+      scanFeedback(linePending(toColiLine(l)) === 0 ? 'done' : 'ok');
+      setLast({
+        kind: 'produto',
+        title: `${l.name} — volume ${colis}/${l.slots.length}`,
+        detail: `${l.product?.code || l.code} • origem ${l.from || 'por indicar'} • enc. ${l.orderNumber || '—'}`,
+        quantity: `${(slot?.done ?? 0) + (slot?.scanned ?? 0)}/${slot?.requested ?? 0}`,
+        remaining:
+          linePending(toColiLine(l)) === 0
+            ? `${sets} conjunto(s) completo(s)`
+            : `faltam ${linePending(toColiLine(l))} volume(s)`,
+      });
+    }, 0);
+  }, []);
 
-  const persist = (line: PickLine | undefined, picked: number) => {
-    if (!task || !line?.itemId) return;
-    saveProgress.mutate({ taskId: task.id, itemId: line.itemId, picked });
-  };
-
-  const setPicked = (key: string, value: number) => {
-    const current = linesRef.current.find((l) => l.key === key);
-    if (!current) return;
-    const blocked = blockedForRef.current(current);
-    if (blocked && value > current.picked) {
-      toast.error(
-        `${current.name}: stock apenas em ${blocked}. Transfira para uma localização de stock antes de fazer picking.`,
-      );
-      return;
-    }
-    const next = Math.max(0, Math.min(current.quantity, value));
-    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, picked: next } : l)));
-    setLastKey(key);
-    persist(current, next);
-  };
-
-  const bump = (key: string, delta: number) => {
-    const current = linesRef.current.find((l) => l.key === key);
-    if (!current) return;
-    setPicked(key, current.picked + delta);
-  };
-
-
-
-  /** Comandos CMD-QTY sobre a última linha conferida. */
+  /** Comandos CMD-QTY sobre o último volume conferido. */
   useEffect(() => {
     if (!registerQtyHandler) return;
     const handler: QtyHandler = ({ delta, set }) => {
-      if (!lastKey) {
-        toast.error('Leia primeiro um produto da lista');
+      const key = lastKey;
+      if (!key) {
+        toast.error('Leia primeiro um volume da lista');
         return;
       }
-      if (typeof set === 'number') setPicked(lastKey, set);
-      else if (delta) bump(lastKey, delta);
+      const line = linesRef.current.find((l) => l.key === key);
+      const slot = line?.slots.find((s) => s.scanned > 0) ?? line?.slots[0];
+      if (!line || !slot) return;
+      if (typeof set === 'number') {
+        setLines((prev) => {
+          const conv = addColiScan(prev.map(toColiLine), key, slot.colis_number, 0);
+          const upd = setColiScan(conv, key, slot.colis_number, set);
+          return prev.map((l, i) => ({ ...l, slots: upd[i].slots }));
+        });
+        setStatus('por_guardar');
+      } else if (delta && delta > 0) applyScan(key, slot.colis_number, delta);
+      else if (delta) {
+        setLines((prev) => {
+          const conv = prev.map(toColiLine);
+          const upd = setColiScan(conv, key, slot.colis_number, Math.max(0, slot.scanned + delta));
+          return prev.map((l, i) => ({ ...l, slots: upd[i].slots }));
+        });
+      }
     };
     registerQtyHandler(handler);
     return () => registerQtyHandler(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registerQtyHandler, lastKey]);
+  }, [registerQtyHandler, lastKey, applyScan]);
 
   const handleScan = (raw: string) => {
     if (onCommand?.(raw)) return;
     const parsed = parseScan(raw);
-    const code = parsed.value.trim().toLowerCase();
+    const { base, colis } = splitColisSuffix(parsed.value);
     const fail = (title: string, detail?: string) => {
       scanFeedback('error');
       setLast({ kind: 'erro', title, detail });
+      toast.error(detail ? `${title}: ${detail}` : title);
     };
-    const match = lines.find(
-      (l) =>
-        l.code.trim().toLowerCase() === code ||
-        l.product?.code.trim().toLowerCase() === code ||
-        (l.product?.supplier_code || '').trim().toLowerCase() === code ||
-        l.name.trim().toLowerCase() === code
-    );
 
-    if (!match) {
-      fail(`"${parsed.value}" não está nesta lista de picking`);
-      toast.error(`"${parsed.value}" não está nesta lista de picking`);
-      return;
+    const current = linesRef.current;
+    const outcome = evaluateColiScan(current.map(toColiLine), base, colis);
+    switch (outcome.status) {
+      case 'desconhecido':
+        fail(`"${base}" não está nesta lista de picking`);
+        return;
+      case 'completo':
+        fail(
+          current.find((l) => l.key === outcome.lineKey)?.name ?? base,
+          colis ? `volume ${colis} já está completo` : 'já está tudo conferido',
+        );
+        return;
+      case 'escolher_linha':
+        scanFeedback('error');
+        setChoice({ kind: 'linha', candidates: outcome.candidates, colis });
+        toast.info('Este artigo está em mais do que uma linha — escolha a encomenda.');
+        return;
+      case 'escolher_coli':
+        scanFeedback('error');
+        setChoice({ kind: 'coli', lineKey: outcome.lineKey, options: outcome.options });
+        toast.info('Produto de vários volumes — indique qual está a ler.');
+        return;
+      case 'ok':
+        applyScan(outcome.lineKey, outcome.colis);
+        return;
     }
-    if (match.picked >= match.quantity) {
-      fail(match.name, `Já está completo (${match.picked}/${match.quantity})`);
-      toast.warning(`${match.name} já está completo (${match.picked}/${match.quantity})`);
-      return;
-    }
-    const blocked = blockedFor(match);
-    if (blocked) {
-      fail(match.name, `Stock apenas em ${blocked}`);
-      toast.error(
-        `${match.product?.code || match.code}: stock apenas em ${blocked}. Transfira para uma localização de stock antes de fazer picking.`,
-      );
-      return;
-    }
-    const inc = Math.max(1, stepRef.current);
-    const next = Math.min(match.quantity, match.picked + inc);
-    setPicked(match.key, next);
-    const complete = next >= match.quantity;
-    scanFeedback(complete ? 'done' : 'ok');
-    setLast({
-      kind: 'produto',
-      title: match.name,
-      detail: `${match.product?.code || match.code} • ${match.from || 'sem origem'}`,
-      quantity: `${next}/${match.quantity}`,
-      remaining: complete ? 'completo' : `faltam ${match.quantity - next}`,
-    });
   };
 
   const labels = (): LabelItem[] =>
@@ -379,109 +549,165 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       copies: l.quantity,
     }));
 
-  const finalize = async () => {
-    const picking = lines.filter((l) => l.picked > 0 && !blockedFor(l));
-    const missingReason = picking.find((l) => l.picked < l.quantity && !l.reason);
-    if (missingReason) {
-      toast.error(`Indique o motivo da falta em "${missingReason.name}"`);
-      return;
-    }
-    const lineItems = picking.map((l) => ({
-      product_id: l.product?.id ?? null,
-      product_code: l.product?.code || l.code || '',
-      product_name: l.name,
-      details: l.details ?? null,
-      order_number: (l.orders || '').split(',')[0]?.trim() || null,
-      quantity: l.picked,
-      from_location: l.from.trim() || null,
-      item_id: l.itemId ?? null,
-      shortage_reason: l.picked < l.quantity ? l.reason || null : null,
-      shortage_notes: l.picked < l.quantity ? l.note || null : null,
-    }));
+  /** Resumo do que vai ser gravado. */
+  const commitLines = useMemo((): StageColiLine[] => {
+    return lines
+      .filter((l) => !blockedFor(l))
+      .map((l) => ({
+        item_id: l.itemId ?? null,
+        product_id: l.product?.id ?? null,
+        product_code: l.product?.code || l.code || '',
+        product_name: l.name,
+        details: l.details ?? null,
+        order_number: l.orderNumber,
+        quantity: l.quantity,
+        shortage_reason: l.reason || null,
+        shortage_notes: l.note || null,
+        colis: l.slots
+          .filter((s) => s.scanned > 0)
+          .map((s) => ({
+            colis_number: s.colis_number,
+            quantity: s.scanned,
+            from_location: (l.from || '').trim().toUpperCase(),
+          })),
+      }))
+      .filter((l) => l.colis.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, placements]);
 
-    if (lineItems.length === 0) {
-      toast.error(
-        lines.some((l) => blockedFor(l))
-          ? 'Todos os artigos conferidos têm stock apenas fora de localizações de stock. Faça a transferência primeiro.'
-          : 'Nenhuma linha conferida',
-      );
-      return;
-    }
+  const finalize = async () => {
     if (!dock) {
       toast.error('Escolha a localização de pré-saída (cais)');
       return;
     }
+    if (commitLines.length === 0) {
+      toast.error('Nenhum volume conferido');
+      return;
+    }
+    const noOrder = commitLines.find((l) => !l.order_number);
+    if (noOrder) {
+      toast.error(`Indique a encomenda de "${noOrder.product_name}"`);
+      return;
+    }
+    const noOrigin = commitLines.find((l) => l.colis.some((c) => !c.from_location));
+    if (noOrigin) {
+      toast.error(`Indique a localização de origem de "${noOrigin.product_name}"`);
+      return;
+    }
+    const missingReason = lines.find((l) => {
+      const cl = toColiLine(l);
+      const hasWork = l.slots.some((s) => s.scanned > 0);
+      return hasWork && completeSets(cl) < l.quantity && !l.reason;
+    });
+    if (missingReason) {
+      toast.error(`Indique o motivo da falta em "${missingReason.name}"`);
+      return;
+    }
 
-    setSaving(true);
+    setStatus('a_enviar');
     try {
-      const { data: result, error } = await supabase.rpc('stage_picking_to_dock', {
-        p_task_id: task?.id ?? null,
-        p_dock_location: dock,
-        p_lines: lineItems as unknown as never,
+      const res = await stage.mutateAsync({
+        taskId: task?.id ?? null,
+        dock,
+        lines: commitLines,
+        opKey: opKeyRef.current,
       });
-      if (error) throw error;
+      setResult(res);
+      setStatus('gravado');
+      clearOpDraft(user?.id, context);
+      // chave nova só depois de o servidor confirmar
+      opKeyRef.current = newOpKey('picking_stage_colis');
 
-      const res = (result ?? {}) as { lines?: any[]; partial_lines?: number };
-      const shortLines = (res.lines ?? []).filter((l) => (l.missing ?? 0) > 0);
-      if (shortLines.length > 0) {
+      const short = (res.lines ?? []).filter((l) =>
+        (l.pending ?? []).some((p) => (p.pending ?? 0) > 0),
+      );
+      if (short.length > 0) {
         toast.warning(
-          `Picking parcial em ${shortLines.length} artigo(s): ` +
-            shortLines
-              .map((l) => `${l.product_code || l.product_name} faltam ${l.missing}`)
+          `Ficou pendente em ${short.length} artigo(s): ` +
+            short
+              .map(
+                (l) =>
+                  `${l.product_code || l.order_number} faltam ${(l.pending ?? [])
+                    .filter((p) => p.pending > 0)
+                    .map((p) => `C${p.colis_number}×${p.pending}`)
+                    .join(' ')}`,
+              )
               .slice(0, 4)
               .join('; '),
         );
       }
+      toast.success(
+        `${res.volumes_moved} volume(s) movidos para ${res.dock}. A saída só acontece na entrega.`,
+      );
 
-
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['counts'] });
-      queryClient.invalidateQueries({ queryKey: ['delivery-notes'] });
-
-      await printOperationReceipt({
-        title: 'Picking para o cais',
-        operationCode: `PICK-${Date.now().toString().slice(-8)}`,
-        meta: [
-          ['Referência', reference || '—'],
-          ['Cais', dock],
-          ['Data', new Date().toLocaleString('pt-PT')],
-          ['Linhas', String(lineItems.length)],
-          ['Unidades', String(totals.picked)],
-        ],
-        columns: ['Código', 'Produto', 'Origem', 'Nota', 'Conferido'],
-        rows: lineItems.map((l) => [
-          l.product_code,
-          l.product_name,
-          l.from_location || '—',
-          l.order_number || '—',
-          l.quantity,
-        ]),
-
-      });
-
-      if (task) {
-        await closeTask.mutateAsync({ taskId: task.id, status: 'completed' });
-        setTask(null);
+      // A impressão usa o resultado confirmado. Falhar a impressão não desfaz o registo.
+      try {
+        await printOperationReceipt({
+          title: 'Picking para o cais (conferência por volume)',
+          operationCode: `PICK-${Date.now().toString().slice(-8)}`,
+          meta: [
+            ['Referência', reference || '—'],
+            ['Cais', res.dock],
+            ['Data', new Date().toLocaleString('pt-PT')],
+            ['Linhas', String((res.lines ?? []).length)],
+            ['Volumes', String(res.volumes_moved)],
+          ],
+          columns: ['Encomenda', 'Código', 'Volumes movidos', 'Conjuntos', 'Pendente'],
+          rows: (res.lines ?? []).map((l) => [
+            l.order_number,
+            l.product_code || '—',
+            (l.colis ?? []).map((c) => `C${c.colis_number}×${c.moved} (${c.from_location})`).join(' '),
+            `${l.complete_sets}/${l.requested_sets}`,
+            (l.pending ?? [])
+              .filter((p) => p.pending > 0)
+              .map((p) => `C${p.colis_number}×${p.pending}`)
+              .join(' ') || '—',
+          ]),
+        });
+      } catch (printErr) {
+        console.error(printErr);
+        toast.warning('O registo ficou gravado, mas a impressão falhou. Pode reimprimir.');
       }
-
-      toast.success(`Artigos movidos para ${dock}. A saída só acontece na confirmação de entrega.`);
-      setLines([]);
-      setReference('');
     } catch (e: any) {
       console.error(e);
-      toast.error('Erro ao enviar para o cais: ' + mapDatabaseError(e));
-    } finally {
-      setSaving(false);
+      setStatus('erro');
+      toast.error('Erro ao enviar para o cais: ' + mapDatabaseError(e), {
+        description: 'O trabalho ficou guardado. Volte a confirmar para reenviar a mesma operação.',
+      });
     }
   };
 
+  const statusBadge = () => {
+    const map: Record<DraftStatus, { label: string; cls: string; icon: typeof Save }> = {
+      por_guardar: { label: 'Por guardar', cls: 'border-amber-400 text-amber-700', icon: Save },
+      a_enviar: { label: 'A enviar…', cls: 'border-primary text-primary', icon: CloudUpload },
+      gravado: { label: 'Gravado', cls: 'border-emerald-400 text-emerald-700', icon: CheckCircle2 },
+      erro: { label: 'Erro — reenviar', cls: 'border-destructive text-destructive', icon: AlertTriangle },
+    };
+    const s = map[status];
+    const Icon = s.icon;
+    return (
+      <Badge variant="outline" className={`gap-1 text-[10px] ${s.cls}`}>
+        <Icon className="h-3 w-3" /> {s.label}
+      </Badge>
+    );
+  };
+
   const renderLine = (l: PickLine) => {
-    const done = l.picked >= l.quantity;
+    const cl = toColiLine(l);
+    const sets = completeSets(cl);
+    const done = linePending(cl) === 0;
     const blocked = blockedFor(l);
     const meta = metaFor(l);
-    const short = l.picked > 0 && l.picked < l.quantity;
+    const short = l.slots.some((s) => s.scanned > 0) && sets < l.quantity;
     const update = (patch: Partial<PickLine>) =>
       setLines((prev) => prev.map((x) => (x.key === l.key ? { ...x, ...patch } : x)));
+    const changeSlot = (colis: number, value: number) =>
+      setLines((prev) => {
+        const upd = setColiScan(prev.map(toColiLine), l.key, colis, value);
+        return prev.map((x, i) => ({ ...x, slots: upd[i].slots }));
+      });
+
     return (
       <div
         key={l.key}
@@ -493,7 +719,6 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
               : ''
         }`}
       >
-
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium">{l.name}</p>
@@ -501,11 +726,6 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
               {l.product?.code || l.code || 'sem código'}
               {l.details ? ` • ${l.details}` : ''}
             </p>
-            {l.orders && (
-              <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-                <FileText className="h-3 w-3" /> {l.orders}
-              </p>
-            )}
             {l.locations && (
               <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
                 <MapPin className="h-3 w-3" /> Sugerido: {l.locations}
@@ -516,7 +736,6 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 <Forklift className="h-3 w-3" /> Empilhador
               </Badge>
             )}
-
             {blocked && (
               <Badge variant="destructive" className="mt-1 max-w-full gap-1 whitespace-normal text-left text-[10px]">
                 <Ban className="h-3 w-3 shrink-0" /> Bloqueado — stock só em {blocked}
@@ -528,41 +747,38 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={!!blocked}
-              onClick={() => bump(l.key, -1)}
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-            <div className="flex items-center gap-1">
-              <Input
-                type="number"
-                min={0}
-                max={l.quantity}
-                className="h-8 w-16 text-center"
-                value={l.picked}
-                disabled={!!blocked}
-                onFocus={() => setLastKey(l.key)}
-                onChange={(e) => setPicked(l.key, Number(e.target.value) || 0)}
-              />
-              <Badge variant={done ? 'default' : 'secondary'} className="min-w-10 justify-center">
-                /{l.quantity}
-              </Badge>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={!!blocked}
-              onClick={() => bump(l.key, 1)}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
+          <div className="shrink-0 text-right">
+            <p className="text-[10px] uppercase text-muted-foreground">Conjuntos</p>
+            <Badge variant={sets >= l.quantity ? 'default' : 'secondary'} className="min-w-12 justify-center">
+              {sets}/{l.quantity}
+            </Badge>
           </div>
+        </div>
+
+        {/* Encomenda: nunca se escolhe a primeira automaticamente */}
+        <div className="mt-2 flex items-center gap-2">
+          <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+          {l.orderOptions.length > 1 ? (
+            <Select value={l.orderNumber} onValueChange={(v) => update({ orderNumber: v })}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Escolher encomenda (obrigatório)" />
+              </SelectTrigger>
+              <SelectContent>
+                {l.orderOptions.map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              className="h-8 flex-1 text-xs"
+              placeholder="Nº da encomenda (obrigatório)"
+              value={l.orderNumber}
+              onChange={(e) => update({ orderNumber: e.target.value.trim() })}
+            />
+          )}
         </div>
 
         {!blocked && (
@@ -577,6 +793,49 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 onChange={(e) => update({ from: e.target.value.toUpperCase() })}
               />
             </div>
+
+            <div className="space-y-1">
+              <p className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground">
+                <Boxes className="h-3 w-3" /> Caixas por volume
+              </p>
+              {l.slots.map((s) => (
+                <div key={s.colis_number} className="flex items-center gap-2">
+                  <Badge variant="outline" className="w-14 justify-center text-[10px]">
+                    C{s.colis_number}/{l.slots.length}
+                  </Badge>
+                  <span className="flex-1 text-[11px] text-muted-foreground">
+                    {s.done} gravado{s.scanned ? ` + ${s.scanned} por guardar` : ''} · faltam{' '}
+                    {slotPending(s)}
+                    {s.evidence && s.evidence !== 'scan' ? ' · sem prova de leitura' : ''}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => changeSlot(s.colis_number, s.scanned - 1)}
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="h-7 w-14 text-center text-xs"
+                    value={s.scanned}
+                    onFocus={() => setLastKey(l.key)}
+                    onChange={(e) => changeSlot(s.colis_number, Number(e.target.value) || 0)}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => applyScan(l.key, s.colis_number, 1)}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
             {short && (
               <div className="space-y-1">
                 <Select value={l.reason} onValueChange={(v) => update({ reason: v })}>
@@ -609,36 +868,69 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
   };
 
   return (
-
     <div className="space-y-4">
       <ScanDock
         last={last}
         progress={{
-          done: lines.filter((l) => l.picked >= l.quantity).length,
+          done: lines.filter((l) => linePending(toColiLine(l)) === 0).length,
           total: lines.length,
-          label: 'Linhas conferidas',
+          label: 'Linhas completas',
         }}
       >
-        <ScanInput onScan={handleScan} feedback={false} label="Conferir produto da lista" />
+        <ScanInput onScan={handleScan} feedback={false} label="Ler etiqueta do volume (CÓDIGO-C1)" />
       </ScanDock>
 
-      <div className="flex items-center gap-2 rounded-lg border bg-card p-2">
-        <span className="text-xs text-muted-foreground">Cada leitura conta</span>
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setStep((s) => Math.max(1, s - 1))}>
-          <Minus className="h-3.5 w-3.5" />
-        </Button>
-        <Input
-          type="number"
-          min={1}
-          className="h-8 w-16 text-center"
-          value={step}
-          onChange={(e) => setStep(Math.max(1, Number(e.target.value) || 1))}
-        />
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setStep((s) => s + 1)}>
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
-        <span className="text-xs text-muted-foreground">un.</span>
-      </div>
+      {choice && (
+        <Card className="border-primary">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">
+              {choice.kind === 'linha' ? 'Qual a encomenda?' : 'Qual o volume?'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {choice.kind === 'linha'
+              ? choice.candidates.map((c) => (
+                  <Button
+                    key={c.key}
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => {
+                      const line = linesRef.current.find((l) => l.key === c.key);
+                      setChoice(null);
+                      if (!line) return;
+                      if (choice.colis) applyScan(c.key, choice.colis);
+                      else if (line.slots.length === 1) applyScan(c.key, 1);
+                      else
+                        setChoice({
+                          kind: 'coli',
+                          lineKey: c.key,
+                          options: line.slots.filter((s) => slotPending(s) > 0).map((s) => s.colis_number),
+                        });
+                    }}
+                  >
+                    <span className="truncate">{c.label}</span>
+                    <Badge variant="secondary">{c.orderNumber || 'sem encomenda'}</Badge>
+                  </Button>
+                ))
+              : choice.options.map((n) => (
+                  <Button
+                    key={n}
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      applyScan(choice.lineKey, n);
+                      setChoice(null);
+                    }}
+                  >
+                    Volume C{n}
+                  </Button>
+                ))}
+            <Button variant="ghost" className="w-full" onClick={() => setChoice(null)}>
+              Cancelar leitura
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-2">
@@ -664,12 +956,20 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                   <button
                     className="flex min-w-0 flex-1 items-center gap-2 text-left"
                     onClick={() => {
+                      if (totals.scanned > 0 && !active) {
+                        toast.error('Há conferências por guardar nesta tarefa', {
+                          description: 'Grave ou limpe o trabalho antes de trocar de tarefa.',
+                        });
+                        return;
+                      }
                       if (active) {
                         setTask(null);
                         setLines([]);
+                        setResult(null);
                         return;
                       }
                       setTask(t);
+                      setResult(null);
                       setReference(t.reference || t.name);
                     }}
                   >
@@ -704,7 +1004,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
-            <ClipboardList className="h-4 w-4" /> Lista de picking
+            <ClipboardList className="h-4 w-4" /> Lista de picking {statusBadge()}
           </CardTitle>
           <div className="flex gap-2">
             <input
@@ -727,12 +1027,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
               Escolha uma lista pendente acima ou carregue um ficheiro de picking (.xlsx).
             </p>
           ) : (
-
             <>
               <div className="space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Conferido</span>
-                  <span>{totals.picked}/{totals.requested} un.</span>
+                  <span>Volumes conferidos</span>
+                  <span>
+                    {totals.done}/{totals.requested} · {totals.sets}/{totals.setsRequested} conjuntos
+                  </span>
                 </div>
                 <Progress value={totals.pct} />
               </div>
@@ -806,7 +1107,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                           {groupMode === 'nota' ? `Entrega ${g.title}` : g.title}
                         </p>
                         <Badge variant="secondary" className="text-[10px]">
-                          {g.picked}/{g.requested} un.
+                          {g.done}/{g.requested} volumes
                         </Badge>
                       </div>
                     )}
@@ -815,12 +1116,72 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
                 ))}
               </div>
 
+              {commitLines.length > 0 && (
+                <div className="space-y-1 rounded-lg border bg-muted/40 p-2">
+                  <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+                    Vai gravar (cais {dock || '—'})
+                  </p>
+                  {commitLines.map((l, i) => (
+                    <p key={i} className="text-[11px]">
+                      <strong>{l.order_number || 'sem encomenda'}</strong> · {l.product_code || l.product_name} ·{' '}
+                      {l.colis.map((c) => `C${c.colis_number}×${c.quantity} de ${c.from_location || '?'}`).join(' · ')}
+                    </p>
+                  ))}
+                </div>
+              )}
 
-
-              <Button className="w-full" disabled={saving || totals.picked === 0 || !dock} onClick={finalize}>
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                Concluir picking e enviar para o cais
+              <Button
+                className="w-full"
+                disabled={stage.isPending || totals.scanned === 0 || !dock}
+                onClick={() => void finalize()}
+              >
+                {stage.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                )}
+                Gravar conferência e enviar para o cais
               </Button>
+
+              {result && (
+                <div className="space-y-1 rounded-lg border border-emerald-300 bg-emerald-50/60 p-2 dark:bg-emerald-950/20">
+                  <p className="text-[11px] font-semibold">
+                    Gravado: {result.volumes_moved} volume(s) em {result.dock}
+                  </p>
+                  {(result.lines ?? []).map((l) => (
+                    <p key={l.note_item_id} className="text-[11px] text-muted-foreground">
+                      {l.order_number} · {l.product_code} · conjuntos {l.complete_sets}/{l.requested_sets} ·{' '}
+                      {(l.pending ?? []).filter((p) => p.pending > 0).length
+                        ? `pendente ${(l.pending ?? [])
+                            .filter((p) => p.pending > 0)
+                            .map((p) => `C${p.colis_number}×${p.pending}`)
+                            .join(' ')}`
+                        : 'completo'}
+                    </p>
+                  ))}
+                  {task && !isWarehouseOperator && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-1 w-full"
+                      onClick={async () => {
+                        await closeTask.mutateAsync({ taskId: task.id, status: 'completed' });
+                        setTask(null);
+                        setLines([]);
+                        setResult(null);
+                      }}
+                    >
+                      Concluir tarefa
+                    </Button>
+                  )}
+                  {task && isWarehouseOperator && (
+                    <p className="text-[11px] text-muted-foreground">
+                      A tarefa fica em curso: o fecho é feito pelo responsável.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {docks.length === 0 && (
                 <p className="text-center text-[11px] text-muted-foreground">
                   Nenhuma localização de pré-saída configurada (Armazém › Configurar › Localizações).

@@ -54,26 +54,41 @@ export function ScanInput({
   }, []);
 
   /**
+   * O handler da câmara é criado uma única vez quando a câmara liga. Para que
+   * a leitura seja sempre aplicada ao estado ATUAL do módulo, as dependências
+   * ficam em referências vivas.
+   */
+  const onScanRef = useRef(onScan);
+  onScanRef.current = onScan;
+  const dedupeRef = useRef(dedupeMs);
+  dedupeRef.current = dedupeMs;
+  const feedbackRef = useRef(feedback);
+  feedbackRef.current = feedback;
+
+  /**
    * @param fromCamera leituras da câmara repetem-se dezenas de vezes por segundo,
    * por isso só essas passam pelo filtro anti-duplicado. Pistola/teclado conta sempre,
    * mesmo que seja a mesma etiqueta seguidas vezes — é assim que se conta caixa a caixa.
    */
-  const emit = (code: string, fromCamera = false) => {
-    const clean = (code || '').trim();
-    if (!clean) return;
-    const decision = evaluateScan(
-      lastRef.current,
-      clean,
-      fromCamera ? 'camera' : 'wedge',
-      Date.now(),
-      dedupeMs,
-    );
-    lastRef.current = decision.next;
-    if (!decision.accept) return;
-    if (feedback) scanFeedback('ok');
-    onScan(clean);
-    focusField();
-  };
+  const emit = useCallback(
+    (code: string, fromCamera = false) => {
+      const clean = (code || '').trim();
+      if (!clean) return;
+      const decision = evaluateScan(
+        lastRef.current,
+        clean,
+        fromCamera ? 'camera' : 'wedge',
+        Date.now(),
+        dedupeRef.current,
+      );
+      lastRef.current = decision.next;
+      if (!decision.accept) return;
+      if (feedbackRef.current) scanFeedback('ok');
+      onScanRef.current(clean);
+      focusField();
+    },
+    [focusField],
+  );
 
 
   /**

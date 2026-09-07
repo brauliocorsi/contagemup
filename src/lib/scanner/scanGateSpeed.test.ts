@@ -24,8 +24,8 @@ describe('leituras rápidas da pistola e da câmara', () => {
     expect(contadas).toBe(1);
   });
 
-  it('a câmara volta a contar depois da janela e ao trocar de etiqueta', () => {
-    let d = evaluateScan(null, 'A', 'camera', 0, 800);
+  it('a câmara volta a contar quando a etiqueta sai e ao trocar de etiqueta', () => {
+    const d = evaluateScan(null, 'A', 'camera', 0, 800);
     expect(d.accept).toBe(true);
     const depois = evaluateScan(d.next, 'A', 'camera', 900, 800);
     expect(depois.accept).toBe(true);
