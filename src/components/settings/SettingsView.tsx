@@ -158,10 +158,13 @@ export function SettingsView() {
         return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Financeiro</Badge>;
       case 'entregador':
         return <Badge className="bg-info-soft text-info border-info/20">Entregador</Badge>;
+      case 'warehouse_operator':
+        return <Badge className="bg-warning-soft text-warning border-warning/20">Operador de armazém</Badge>;
       default:
         return <Badge variant="outline">Operador</Badge>;
     }
   };
+
 
   return (
     <div className="space-y-6">
