@@ -111,7 +111,8 @@ const SHORTAGE_REASONS: Array<{ id: string; label: string }> = [
 const firstSuggested = (s?: string | null) =>
   (s || '')
     .split(/[,;/|]/)
-    .map((x) => x.trim())
+    // "B11 (3)" vem do resumo de stock: guardar só o código da localização.
+    .map((x) => x.trim().replace(/\s*\(\s*\d+\s*\)\s*$/, '').trim())
     .filter(Boolean)[0] ?? '';
 
 const splitOrders = (s?: string | null) =>
@@ -615,6 +616,13 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       setResult(res);
       setStatus('gravado');
       clearOpDraft(user?.id, context);
+      // O que já foi gravado passa a "feito": evita gravar duas vezes o mesmo volume.
+      setLines((prev) =>
+        prev.map((l) => ({
+          ...l,
+          slots: l.slots.map((s) => ({ ...s, done: s.done + s.scanned, scanned: 0 })),
+        })),
+      );
       // chave nova só depois de o servidor confirmar
       opKeyRef.current = newOpKey('picking_stage_colis');
 

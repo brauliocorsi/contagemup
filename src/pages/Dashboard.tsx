@@ -57,7 +57,12 @@ function ViewLoader() {
 export default function Dashboard() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTabState] = useState('home');
+  /** Sair das Rotas esquece a rota aberta: voltar ao menu mostra sempre a lista. */
+  const setActiveTab = (tab: string) => {
+    if (tab !== 'routes') setOpenRouteId(null);
+    setActiveTabState(tab);
+  };
   const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
   const [openRouteId, setOpenRouteId] = useState<string | null>(null);
 
@@ -132,7 +137,11 @@ export default function Dashboard() {
                 />
               )}
               {activeTab === 'routes' && (
-                <RoutesView key={openRouteId ?? 'list'} initialRouteId={openRouteId} />
+                <RoutesView
+                  key={openRouteId ?? 'list'}
+                  initialRouteId={openRouteId}
+                  onCloseRoute={() => setOpenRouteId(null)}
+                />
               )}
               {activeTab === 'deliveries' && <DeliveriesView />}
               {activeTab === 'finance-closures' && <FinanceClosuresView />}

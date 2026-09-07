@@ -637,8 +637,11 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
             <BulkLabelPrintButton
               getProducts={() =>
                 pickingKept
-                  .map((l) => labelProducts.get(l.key))
-                  .filter((p): p is BulkLabelProduct => Boolean(p))
+                  .flatMap((l) => {
+                    const p = labelProducts.get(l.key);
+                    // Uma etiqueta por unidade a separar, não pelo stock em armazém.
+                    return p ? [{ ...p, current_stock: Math.max(1, l.quantidade) }] : [];
+                  })
               }
               label="Etiquetas"
               variant="outline"

@@ -244,7 +244,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
             label="Colis órfãos"
             value={action?.orphanUnits ?? 0}
             hint={`${action?.orphanProducts ?? 0} produtos incompletos`}
-            onClick={() => onNavigate('orphan-colis')}
+            onClick={() => onNavigate('orphans')}
           />
           <ActionTile
             label="Avarias por resolver"
@@ -282,7 +282,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
           hint="partes sem conjunto"
           icon={<AlertTriangle className="h-5 w-5" />}
           tone="warning"
-          onClick={() => onNavigate('orphan-colis')}
+          onClick={() => onNavigate('orphans')}
         />
         <StatCard
           label="Em quarentena"
