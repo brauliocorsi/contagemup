@@ -84,6 +84,25 @@ export function clearDraft(userId: string, auditId: string, storage?: StorageLik
   }
 }
 
+/**
+ * Remove os rascunhos de contagem que não pertencem a este utilizador.
+ * Chamado na troca de conta para que ninguém veja nem reenvie o trabalho do anterior.
+ */
+export function purgeForeignCountingDrafts(userId: string | null | undefined) {
+  if (typeof window === 'undefined') return;
+  try {
+    const remove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key || !key.startsWith(`${PREFIX}:`)) continue;
+      if (!userId || !key.startsWith(`${PREFIX}:${userId}:`)) remove.push(key);
+    }
+    remove.forEach((k) => window.localStorage.removeItem(k));
+  } catch {
+    /* ignorado */
+  }
+}
+
 /** Cria uma chave de operação estável (reenvio conta uma vez). */
 export function newOpKey(auditId: string, itemId: string) {
   const rnd =
