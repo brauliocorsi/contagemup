@@ -24,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const prevUserId = useRef<string | null>(null);
+  const prevRole = useRef<string | null>(null);
 
   // Detectar mudança de utilizador e limpar cache
   useEffect(() => {
@@ -37,8 +38,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearAllDrafts();
       }
       prevUserId.current = user?.id ?? null;
+      prevRole.current = null;
     }
   }, [user?.id, queryClient]);
+
+  // Mudança de função: o que estava em cache já não corresponde às permissões
+  useEffect(() => {
+    const role = profile?.role ?? null;
+    if (prevRole.current !== null && role !== prevRole.current) {
+      console.log('Role changed, clearing cache...');
+      queryClient.clear();
+    }
+    prevRole.current = role;
+  }, [profile?.role, queryClient]);
+
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

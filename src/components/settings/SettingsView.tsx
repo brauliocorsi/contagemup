@@ -158,10 +158,13 @@ export function SettingsView() {
         return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Financeiro</Badge>;
       case 'entregador':
         return <Badge className="bg-info-soft text-info border-info/20">Entregador</Badge>;
+      case 'warehouse_operator':
+        return <Badge className="bg-warning-soft text-warning border-warning/20">Operador de armazém</Badge>;
       default:
         return <Badge variant="outline">Operador</Badge>;
     }
   };
+
 
   return (
     <div className="space-y-6">
@@ -253,10 +256,12 @@ export function SettingsView() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="operator">Operador</SelectItem>
+                    <SelectItem value="warehouse_operator">Operador de armazém</SelectItem>
                     <SelectItem value="entregador">Entregador</SelectItem>
                     <SelectItem value="financeiro">Financeiro</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
+
                 </Select>
               </div>
 
@@ -347,8 +352,10 @@ export function SettingsView() {
                               <SelectItem value="admin">Admin</SelectItem>
                               <SelectItem value="financeiro">Financeiro</SelectItem>
                               <SelectItem value="operator">Operador</SelectItem>
+                              <SelectItem value="warehouse_operator">Operador de armazém</SelectItem>
                               <SelectItem value="entregador">Entregador</SelectItem>
                             </SelectContent>
+
                           </Select>
                         ) : (
                           getRoleBadge(profile.role)

@@ -21,6 +21,8 @@ import {
   useTypedLocations,
 } from '@/hooks/useDeliveryNotes';
 import { supabase } from '@/integrations/supabase/client';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
+
 
 interface ScannedRoute {
   id: string;
@@ -43,6 +45,8 @@ export function LoadingModule({ onCommand }: Props) {
   const noteIds = useMemo(() => notes.map((n) => n.id), [notes]);
   const { data: items = [] } = useDeliveryNoteItems(noteIds);
   const loadNotes = useLoadNotesToVehicle();
+  const { isWarehouseOperator } = useRoleAccess();
+
 
   const [vehicle, setVehicle] = useState('');
   const [noteId, setNoteId] = useState<string | null>(null);
@@ -292,18 +296,25 @@ export function LoadingModule({ onCommand }: Props) {
               </p>
             )}
 
-            <Button
-              className="w-full"
-              disabled={loadNotes.isPending || !vehicle || visibleNotes.length === 0}
-              onClick={() => void loadWholeRoute()}
-            >
-              {loadNotes.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Truck className="mr-2 h-4 w-4" />
-              )}
-              Carregar rota completa
-            </Button>
+            {isWarehouseOperator ? (
+              <p className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                Confira nota a nota: o carregamento da rota completa é feito pelo responsável.
+              </p>
+            ) : (
+              <Button
+                className="w-full"
+                disabled={loadNotes.isPending || !vehicle || visibleNotes.length === 0}
+                onClick={() => void loadWholeRoute()}
+              >
+                {loadNotes.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Truck className="mr-2 h-4 w-4" />
+                )}
+                Carregar rota completa
+              </Button>
+            )}
+
           </CardContent>
         </Card>
       )}

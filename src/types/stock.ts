@@ -100,7 +100,7 @@ export interface Profile {
   id: string;
   user_id: string;
   name: string;
-  role: 'master' | 'admin' | 'financeiro' | 'operator' | 'entregador';
+  role: 'master' | 'admin' | 'financeiro' | 'operator' | 'entregador' | 'warehouse_operator';
   avatar_url?: string | null;
   created_at: string;
   updated_at: string;

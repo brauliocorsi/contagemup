@@ -12,7 +12,7 @@ const BodySchema = z.discriminatedUnion('action', [
     email: z.string().email(),
     password: z.string().min(6).max(72),
     name: z.string().min(1).max(120),
-    role: z.enum(['admin', 'financeiro', 'operator', 'entregador']).optional(),
+    role: z.enum(['admin', 'financeiro', 'operator', 'entregador', 'warehouse_operator']).optional(),
   }),
   z.object({
     action: z.literal('delete'),
