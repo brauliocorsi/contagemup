@@ -209,7 +209,7 @@ export function PickingModule({ onCommand, registerQtyHandler }: Props) {
       reason: Record<string, { reason: string; note: string }>;
     }>(user?.id, `picking:${task.id}`);
     if (draft?.opKey) opKeyRef.current = draft.opKey;
-    if (draft?.dock) setDock(draft.dock);
+    if (draft?.data?.dock) setDock(draft.data.dock);
     setStatus(draft ? draft.status : 'gravado');
 
     setLines(
