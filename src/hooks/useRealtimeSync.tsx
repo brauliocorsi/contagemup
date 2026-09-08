@@ -16,6 +16,10 @@ const TABLE_QUERY_KEYS: Record<string, string[][]> = {
   stock_order_numbers: [['stock-order-numbers'], ['order-numbers']],
 };
 
+/** Uma operação de stock dispara dezenas de eventos (um por linha/trigger).
+ *  Agrupamos as invalidações numa só, senão a app refaz as listas todas N vezes. */
+const DEBOUNCE_MS = 600;
+
 /**
  * Mount ONCE at the app root. Subscribes to all realtime-enabled tables and
  * invalidates the relevant React Query caches on any change (insert/update/delete).
@@ -28,22 +32,36 @@ export function RealtimeSyncProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     const channel = supabase.channel('app-realtime-sync');
+    const pending = new Map<string, string[]>();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const flush = () => {
+      timer = null;
+      const keys = [...pending.values()];
+      pending.clear();
+      for (const key of keys) {
+        queryClient.invalidateQueries({ queryKey: key });
+      }
+    };
+
+    const schedule = (keys: string[][]) => {
+      for (const key of keys) pending.set(key.join('|'), key);
+      if (timer) return;
+      timer = setTimeout(flush, DEBOUNCE_MS);
+    };
 
     for (const [table, keys] of Object.entries(TABLE_QUERY_KEYS)) {
       channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table },
-        () => {
-          for (const key of keys) {
-            queryClient.invalidateQueries({ queryKey: key });
-          }
-        }
+        () => schedule(keys)
       );
     }
 
     channel.subscribe();
 
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, [queryClient]);

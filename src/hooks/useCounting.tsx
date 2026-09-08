@@ -85,7 +85,7 @@ export function useCounting(sessionId: string | null) {
       return allCounts;
     },
     enabled: !!sessionId,
-    staleTime: 5000, // Cache for 5 seconds
+    staleTime: 60 * 1000, // atualização vem por tempo real; evita refazer a lista toda
   });
 
   const loading = sessionLoading || countsLoading;

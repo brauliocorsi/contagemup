@@ -49,25 +49,41 @@ interface SessionRow {
   name: string;
 }
 
+const PAGE = 1000;
+
 const fetchCountsAndSessions = async () => {
-  const [countsResult, sessionsResult] = await Promise.all([
-    supabase
-      .from('counts')
-      .select('id, product_id, session_id, colis_number, quantity, location, counted_at')
-      .order('counted_at', { ascending: false }),
-    supabase
-      .from('counting_sessions')
-      .select('id, name')
+  const countsQuery = async () => {
+    const rows: CountRow[] = [];
+    let offset = 0;
+    for (;;) {
+      const { data, error } = await supabase
+        .from('counts')
+        .select('id, product_id, session_id, colis_number, quantity, location, counted_at')
+        .order('counted_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(offset, offset + PAGE - 1);
+      if (error) throw error;
+      const page = (data as CountRow[]) ?? [];
+      rows.push(...page);
+      if (page.length < PAGE) break;
+      offset += PAGE;
+    }
+    return rows;
+  };
+
+  const [counts, sessionsResult] = await Promise.all([
+    countsQuery(),
+    supabase.from('counting_sessions').select('id, name'),
   ]);
 
-  if (countsResult.error) throw countsResult.error;
   if (sessionsResult.error) throw sessionsResult.error;
 
   return {
-    counts: (countsResult.data as CountRow[]) || [],
+    counts,
     sessions: (sessionsResult.data as SessionRow[]) || []
   };
 };
+
 
 const processLastCounts = (counts: CountRow[], sessions: SessionRow[]): Record<string, LastCountInfo> => {
   const sessionMap: Record<string, string> = {};
@@ -194,8 +210,11 @@ export function useLastCounts() {
   const { data: rawData, isLoading: loading } = useQuery({
     queryKey: ['last-counts'],
     queryFn: fetchCountsAndSessions,
-    staleTime: 5000, // 5 segundos - sincronizado com counts e products
-    gcTime: 30000, // 30 segundos
+    staleTime: 60 * 1000, // tempo real trata das atualizações
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+
   });
 
   // Memoize the processing - only recalculate when raw data changes
