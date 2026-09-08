@@ -13,19 +13,38 @@ export function useProducts() {
   const { data: products = [], isLoading: loading, refetch: fetchProducts } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      const allProducts: Product[] = [];
-      let from = 0;
       const pageSize = 1000;
-      let hasMore = true;
 
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('name')
-          .order('id')
-          .range(from, from + pageSize - 1);
+      // Quantas linhas existem? Assim as páginas seguintes vão em paralelo.
+      const { count, error: countError } = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true });
 
+      if (countError) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível carregar os produtos',
+          variant: 'destructive'
+        });
+        throw countError;
+      }
+
+      const total = count ?? 0;
+      const pages = Math.max(1, Math.ceil(total / pageSize));
+
+      const results = await Promise.all(
+        Array.from({ length: pages }, (_, i) =>
+          supabase
+            .from('products')
+            .select('*')
+            .order('name')
+            .order('id')
+            .range(i * pageSize, i * pageSize + pageSize - 1)
+        )
+      );
+
+      const allProducts: Product[] = [];
+      for (const { data, error } of results) {
         if (error) {
           toast({
             title: 'Erro',
@@ -34,21 +53,17 @@ export function useProducts() {
           });
           throw error;
         }
-
-        if (data && data.length > 0) {
-          allProducts.push(...(data as Product[]));
-          from += pageSize;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
+        allProducts.push(...((data ?? []) as Product[]));
       }
 
       return allProducts;
     },
-    staleTime: 2000, // Consider data fresh for 2 seconds
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    staleTime: 60 * 1000, // lista grande: só refaz ao fim de 1 min (ou em tempo real)
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
+
 
   // Realtime invalidation handled by RealtimeSyncProvider.
 

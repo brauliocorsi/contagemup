@@ -60,8 +60,11 @@ export function useDamages() {
 
       return (data as unknown as ProductDamageWithProduct[]) || [];
     },
-    staleTime: 2000,
-    refetchOnWindowFocus: true,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+
   });
 
   // Realtime invalidation handled by RealtimeSyncProvider.
