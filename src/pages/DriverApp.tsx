@@ -110,6 +110,12 @@ export default function DriverApp() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
         <p className="text-sm text-muted-foreground">Esta área é exclusiva dos entregadores.</p>
+        <Button asChild>
+          <Link to="/">
+            <Home className="mr-2 h-4 w-4" />
+            Ir para a aplicação
+          </Link>
+        </Button>
         <Button variant="outline" onClick={() => void signOut()}>
           <LogOut className="mr-2 h-4 w-4" />
           Sair
