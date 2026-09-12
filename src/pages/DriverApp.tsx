@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  Home,
   Truck,
   Loader2,
   LogOut,
@@ -108,6 +110,12 @@ export default function DriverApp() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
         <p className="text-sm text-muted-foreground">Esta área é exclusiva dos entregadores.</p>
+        <Button asChild>
+          <Link to="/">
+            <Home className="mr-2 h-4 w-4" />
+            Ir para a aplicação
+          </Link>
+        </Button>
         <Button variant="outline" onClick={() => void signOut()}>
           <LogOut className="mr-2 h-4 w-4" />
           Sair
@@ -174,6 +182,13 @@ export default function DriverApp() {
           <Button variant="ghost" size="icon" aria-label="Atualizar" onClick={refreshAll}>
             <RefreshCw className={isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
           </Button>
+          {!access.isDriver && (
+            <Button variant="ghost" size="icon" asChild aria-label="Voltar à aplicação">
+              <Link to="/">
+                <Home className="h-4 w-4" />
+              </Link>
+            </Button>
+          )}
           <Button variant="ghost" size="icon" aria-label="Sair" onClick={() => void handleSignOut()}>
             <LogOut className="h-4 w-4" />
           </Button>
