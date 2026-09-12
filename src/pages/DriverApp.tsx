@@ -182,6 +182,13 @@ export default function DriverApp() {
           <Button variant="ghost" size="icon" aria-label="Atualizar" onClick={refreshAll}>
             <RefreshCw className={isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
           </Button>
+          {!access.isDriver && (
+            <Button variant="ghost" size="icon" asChild aria-label="Voltar à aplicação">
+              <Link to="/">
+                <Home className="h-4 w-4" />
+              </Link>
+            </Button>
+          )}
           <Button variant="ghost" size="icon" aria-label="Sair" onClick={() => void handleSignOut()}>
             <LogOut className="h-4 w-4" />
           </Button>
