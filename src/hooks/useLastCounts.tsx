@@ -213,7 +213,7 @@ export function useLastCounts() {
     staleTime: 60 * 1000, // tempo real trata das atualizações
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true, // reabrir o ecrã revalida se os dados já estiverem velhos
 
   });
 
