@@ -16,6 +16,7 @@ import {
   Truck,
   Boxes,
   LogOut,
+  ShoppingCart,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
@@ -28,6 +29,7 @@ import { TransferModule } from '@/components/scanner/TransferModule';
 import { PickingModule } from '@/components/scanner/PickingModule';
 import { EntryModule } from '@/components/scanner/EntryModule';
 import { PrintCenterModule } from '@/components/scanner/PrintCenterModule';
+import { PurchaseLabelsModule } from '@/components/scanner/PurchaseLabelsModule';
 import { SupplierCodeModule } from '@/components/scanner/SupplierCodeModule';
 import { CountingModule } from '@/components/scanner/CountingModule';
 import { useMyLocationAudits } from '@/hooks/useLocationAudits';
@@ -37,7 +39,7 @@ import { parseCommand, SCANNER_MODES, type QtyHandler, type ScannerMode } from '
 import { printCommandSheet } from '@/lib/scanner/labels';
 import { toast } from 'sonner';
 
-type View = 'home' | ScannerMode | 'impressao' | 'fornecedor' | 'contagem' | 'carregamento' | 'arrumacao';
+type View = 'home' | ScannerMode | 'impressao' | 'fornecedor' | 'contagem' | 'carregamento' | 'arrumacao' | 'compras';
 
 const OPERATIONS: Array<{
   id: View;
@@ -101,6 +103,13 @@ const OPERATIONS: Array<{
     description: 'Associar códigos de barras do fornecedor',
     icon: Tags,
     accent: 'bg-warning-soft text-warning',
+  },
+  {
+    id: 'compras',
+    label: 'Compras',
+    description: 'Puxar compra do GestãoClick e imprimir etiquetas',
+    icon: ShoppingCart,
+    accent: 'bg-primary-soft text-primary',
   },
   {
     id: 'impressao',
@@ -289,6 +298,7 @@ export default function ScannerApp() {
         {view === 'carregamento' && <LoadingModule onCommand={handleCommand} />}
         {view === 'contagem' && canCount && <CountingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'fornecedor' && !isWarehouseOperator && <SupplierCodeModule onCommand={handleCommand} />}
+        {view === 'compras' && <PurchaseLabelsModule onCommand={handleCommand} />}
         {view === 'impressao' && <PrintCenterModule />}
       </main>
 
