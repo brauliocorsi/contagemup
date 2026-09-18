@@ -178,6 +178,12 @@ export function PurchaseLabelsModule({ onCommand }: { onCommand?: (raw: string) 
 
   const selectedLines = useMemo(() => lines.filter((l) => selected[l.key]), [lines, selected]);
 
+  /** Linhas selecionadas sem código — não geram etiqueta, mas o utilizador deve ser avisado. */
+  const skippedCount = useMemo(
+    () => selectedLines.filter((l) => !clean(l.code)).length,
+    [selectedLines],
+  );
+
   const items = (): LabelItem[] => {
     const out: LabelItem[] = [];
     selectedLines.forEach((l) => {
@@ -199,7 +205,16 @@ export function PurchaseLabelsModule({ onCommand }: { onCommand?: (raw: string) 
         });
       }
     });
-    return out;
+    // Linhas repetidas com o mesmo código: soma as quantidades antes do printLabels,
+    // que colapsa códigos duplicados ficando apenas com o maior número de cópias.
+    const merged = new Map<string, LabelItem>();
+    out.forEach((i) => {
+      const key = i.code.trim();
+      const prev = merged.get(key);
+      if (!prev) merged.set(key, { ...i });
+      else prev.copies = (prev.copies || 1) + (i.copies || 1);
+    });
+    return Array.from(merged.values());
   };
 
   const run = async (mode: 'print' | 'download' | 'preview') => {
@@ -207,6 +222,11 @@ export function PurchaseLabelsModule({ onCommand }: { onCommand?: (raw: string) 
     if (!list.length) {
       toast.info('Seleciona pelo menos um produto com código');
       return;
+    }
+    if (skippedCount > 0) {
+      toast.warning(
+        `${skippedCount} produto(s) selecionado(s) sem código não vão gerar etiquetas. Corrige o código na linha antes de imprimir.`,
+      );
     }
     setBusy(true);
     try {
