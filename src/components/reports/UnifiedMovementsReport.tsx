@@ -326,6 +326,8 @@ export function UnifiedMovementsReport() {
         return { icon: Plus, color: 'text-blue-600', bg: 'bg-blue-100', label: 'Adição' };
       case 'remocao':
         return { icon: Minus, color: 'text-orange-600', bg: 'bg-orange-100', label: 'Remoção' };
+      default:
+        return { icon: Package, color: 'text-muted-foreground', bg: 'bg-muted', label: String(type ?? 'Outro') };
     }
   };
 
