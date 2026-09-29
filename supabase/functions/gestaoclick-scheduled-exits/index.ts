@@ -161,13 +161,9 @@ Deno.serve(async (req) => {
       for (const venda of vendas) {
         if (!includedIds.has(String(venda.situacao_id))) continue;
 
+        // Apenas a data de entrega do GestãoClick conta — nunca a data da venda
         const deliveryDate = venda.prazo_entrega || venda.data_entrega || venda.data_previsao || '';
-        const vendaDate = venda.data || '';
-
-        const deliveryInRange = deliveryDate ? isDateInRange(deliveryDate, dateFrom, dateTo) : false;
-        const vendaInRange = vendaDate ? isDateInRange(vendaDate, dateFrom, dateTo) : false;
-
-        if (deliveryInRange || vendaInRange) {
+        if (deliveryDate && isDateInRange(deliveryDate, dateFrom, dateTo)) {
           matchingVendas.push(venda);
         }
       }
