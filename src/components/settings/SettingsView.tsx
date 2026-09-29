@@ -17,6 +17,7 @@ import { ProfileSettings } from './ProfileSettings';
 import { Separator } from '@/components/ui/separator';
 import { ResetStockDialog } from './ResetStockDialog';
 import { ChangeUserPasswordDialog } from './ChangeUserPasswordDialog';
+import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
@@ -92,7 +93,17 @@ export function SettingsView() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        let message = error.message || 'A função recusou o pedido';
+        const context = (error as { context?: unknown }).context;
+        if (context instanceof Response) {
+          try {
+            const payload = await context.clone().json() as { error?: string };
+            if (payload.error) message = payload.error;
+          } catch { /* sem JSON */ }
+        }
+        throw new Error(message);
+      }
       if (data?.error) throw new Error(data.error);
 
       toast({
@@ -246,6 +257,10 @@ export function SettingsView() {
                   minLength={6}
                   required
                 />
+                <PasswordStrengthMeter password={newUserPassword} />
+                <p className="text-xs text-muted-foreground">
+                  Senhas comuns ou que aparecem em fugas de dados (ex.: "123456", nome da empresa) são recusadas.
+                </p>
               </div>
 
               <div className="space-y-2">
