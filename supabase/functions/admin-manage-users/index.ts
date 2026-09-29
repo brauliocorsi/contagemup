@@ -76,7 +76,13 @@ Deno.serve(async (req) => {
         email_confirm: true,
         user_metadata: { name: body.name },
       });
-      if (createError) return json({ error: createError.message }, 400);
+      if (createError) {
+        const msg = createError.message || '';
+        let pt = msg;
+        if (/weak|easy to guess|pwned/i.test(msg)) pt = 'Senha demasiado fraca ou conhecida em fugas de dados. Escolha outra senha (misture letras, números e símbolos).';
+        else if (/already.*registered|already exists/i.test(msg)) pt = 'Já existe um utilizador com este email.';
+        return json({ error: pt }, 400);
+      }
 
       if (body.role && created.user) {
         // Atribuir função inicial (service role é permitido no trigger de proteção)
