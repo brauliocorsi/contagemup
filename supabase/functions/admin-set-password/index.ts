@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: userData, error: userError } = await userClient.auth.getUser();
+    const { data: userData, error: userError } = await userClient.auth.getUser(authHeader.replace(/^Bearer\s+/i, ""));
     if (userError || !userData?.user) return json({ error: 'Não autenticado' }, 401);
 
     const admin = createClient(supabaseUrl, serviceKey, {
