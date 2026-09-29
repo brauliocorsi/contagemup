@@ -50,8 +50,15 @@ export function ChangeUserPasswordDialog({ open, onOpenChange, userId, userName 
 
     setSaving(true);
     try {
+      // A sessão guardada pode ter sido terminada noutro separador/dispositivo.
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      const token = refreshed.session?.access_token;
+      if (refreshError || !token) {
+        throw new Error('A sua sessão expirou. Saia e volte a entrar para alterar a senha.');
+      }
       const { data, error } = await supabase.functions.invoke('admin-set-password', {
         body: { user_id: userId, new_password: password },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (error) {
         let message = error.message || 'A função recusou o pedido';
