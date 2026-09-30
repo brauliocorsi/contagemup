@@ -35,17 +35,6 @@ export function Header({ onNavigateToProducts }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {!isInstalled && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={canInstall ? install : () => navigate('/install')}
-              className="hidden md:flex h-9"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              Instalar
-            </Button>
-          )}
           <GlobalProductSearch />
           <Button
             asChild

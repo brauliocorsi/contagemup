@@ -7,6 +7,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -96,16 +97,19 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
   const allGroups = [...visibleGroups, mobileGroup];
 
-  // Grupo aberto: o que contém o separador ativo; senão o último clicado.
+  // Acordeão: só uma categoria aberta de cada vez. A ativa abre automaticamente;
+  // clicar numa categoria abre-a (e fecha as outras) ou fecha-a se já estiver aberta.
   const activeGroupLabel = visibleGroups.find((g) => g.items.some((i) => i.id === activeTab))?.label;
-  const openLabel = activeGroupLabel ?? openFallbackLabel ?? visibleGroups[0]?.label;
-  const effectiveOpenLabel = collapsed ? null : (manualOpenLabel ?? openLabel);
+  const [manualOpenLabel, setManualOpenLabel] = useState<string | null>(null);
+  const effectiveOpenLabel = collapsed
+    ? null
+    : manualOpenLabel === '__closed__'
+      ? null
+      : manualOpenLabel ?? activeGroupLabel ?? visibleGroups[0]?.label;
 
   const toggleGroup = (label: string) => {
-    setManualOpenLabel((prev) => {
-      const current = prev ?? openLabel;
-      return current === label ? '__closed__' : label;
-    });
+    const current = manualOpenLabel === '__closed__' ? null : manualOpenLabel ?? activeGroupLabel ?? visibleGroups[0]?.label;
+    setManualOpenLabel(current === label ? '__closed__' : label);
   };
 
   return (
