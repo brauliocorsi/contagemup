@@ -306,14 +306,6 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
           tone="warning"
           onClick={() => onNavigate('orphans')}
         />
-        <StatCard
-          label="Em quarentena"
-          value={locationUnits ? zoneUnits.quarantine.toLocaleString('pt-PT') : '—'}
-          hint="fora do stock disponível"
-          icon={<AlertOctagon className="h-5 w-5" />}
-          tone="danger"
-          onClick={() => onNavigate('damages')}
-        />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
