@@ -45,6 +45,44 @@ interface DashboardHomeProps {
 export function DashboardHome({ onNavigate }: DashboardHomeProps) {
   const { products } = useProducts();
   const { alerts, outOfStockCount, lowStockCount, totalAlerts } = useStockAlerts();
+  const { locations } = useWarehouseLocations();
+  const [movementsOpen, setMovementsOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+
+  const { data: locationUnits } = useQuery({
+    queryKey: ['dashboard-location-units'],
+    queryFn: async () => {
+      const totals: Record<string, number> = {};
+      const pageSize = 1000;
+      for (let from = 0;; from += pageSize) {
+        const { data, error } = await supabase.from('counts')
+          .select('id, location, quantity')
+          .gt('quantity', 0)
+          .order('id')
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        for (const row of data ?? []) {
+          const code = row.location?.trim().toUpperCase() ?? '';
+          totals[code] = (totals[code] ?? 0) + row.quantity;
+        }
+        if (!data || data.length < pageSize) break;
+      }
+      return totals;
+    },
+    staleTime: 60000,
+  });
+
+  const zoneUnits = useMemo(() => {
+    const sums = { quarantine: 0, conf: 0, dock: 0 };
+    const types = new Map(locations.map(l => [l.code.trim().toUpperCase(), l.location_type]));
+    for (const [code, quantity] of Object.entries(locationUnits ?? {})) {
+      const type = types.get(code);
+      if (type === 'quarantine' || code.includes('QUARENTENA')) sums.quarantine += quantity;
+      else if (type === 'conferencia' || code === 'CONF') sums.conf += quantity;
+      else if (type === 'pre_exit') sums.dock += quantity;
+    }
+    return sums;
+  }, [locations, locationUnits]);
 
   // Indicador permanente: stock sem localização
   const { data: unlocated } = useQuery({
@@ -78,12 +116,11 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
   const { data: action } = useQuery({
     queryKey: ['dashboard-action-zone'],
     queryFn: async () => {
-      const [damages, staged, tasks, orphans, quarantine] = await Promise.all([
+      const [damages, staged, tasks, orphans] = await Promise.all([
         supabase.from('product_damages').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('delivery_notes').select('id', { count: 'exact', head: true }).in('status', ['staged', 'loaded']),
         supabase.from('scanner_picking_tasks').select('id', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
         supabase.from('products').select('colis_orfaos').gt('colis_orfaos', 0),
-        supabase.from('counts').select('quantity').ilike('location', '%QUARENTENA%').gt('quantity', 0),
       ]);
       return {
         damages: damages.count ?? 0,
@@ -91,7 +128,6 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
         tasks: tasks.count ?? 0,
         orphanProducts: (orphans.data || []).length,
         orphanUnits: (orphans.data || []).reduce((s: number, r: any) => s + (r.colis_orfaos || 0), 0),
-        quarantineUnits: (quarantine.data || []).reduce((s: number, r: any) => s + (r.quantity || 0), 0),
       };
     },
     staleTime: 60000,
@@ -115,26 +151,14 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
   const { data: movementStats } = useQuery({
     queryKey: ['dashboard-movement-stats'],
     queryFn: async () => {
-      const today = startOfDay(new Date()).toISOString();
       const weekAgo = subDays(new Date(), 7).toISOString();
-
-      const [todayRes, weekRes] = await Promise.all([
-        supabase.from('stock_movements').select('movement_type, quantity').gte('created_at', today),
-        supabase.from('stock_movements').select('movement_type, quantity').gte('created_at', weekAgo),
+      const [entries, exits] = await Promise.all([
+        supabase.from('stock_movements').select('id', { count: 'exact', head: true }).eq('movement_type', 'entrada').gte('created_at', weekAgo),
+        supabase.from('stock_movements').select('id', { count: 'exact', head: true }).eq('movement_type', 'saida').gte('created_at', weekAgo),
       ]);
-
-      const calcStats = (data: any[] | null) => {
-        const entries = (data || []).filter(m => m.movement_type === 'entrada');
-        const exits = (data || []).filter(m => m.movement_type === 'saida');
-        return {
-          entriesCount: entries.length,
-          entriesQty: entries.reduce((s, m) => s + m.quantity, 0),
-          exitsCount: exits.length,
-          exitsQty: exits.reduce((s, m) => s + m.quantity, 0),
-        };
-      };
-
-      return { today: calcStats(todayRes.data), week: calcStats(weekRes.data) };
+      if (entries.error) throw entries.error;
+      if (exits.error) throw exits.error;
+      return { entries: entries.count ?? 0, exits: exits.count ?? 0 };
     },
     staleTime: 30000,
   });
@@ -159,21 +183,18 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
     [products],
   );
 
-  const todayStats = movementStats?.today;
-  const weekStats = movementStats?.week;
-
   return (
     <PageContainer>
       <PageHeader
         icon={<LayoutDashboard className="h-5 w-5" />}
         title="Dashboard"
-        description="Visão geral do inventário"
+        description="Estado do armazém e atividade dos últimos 7 dias"
       />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
-          label="Unidades em stock"
+          label="Sets completos no sistema"
           value={totalStock.toLocaleString('pt-PT')}
           hint={`${totalProducts} produtos`}
           icon={<Package className="h-5 w-5" />}
@@ -182,25 +203,24 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
         />
         <StatCard
           label="Entradas (7 dias)"
-          value={weekStats?.entriesQty ?? 0}
-          badge={`${todayStats?.entriesCount ?? 0} hoje`}
+          value={movementStats?.entries.toLocaleString('pt-PT') ?? '—'}
+          hint="registos nos últimos 7 dias"
           icon={<TrendingUp className="h-5 w-5" />}
           tone="success"
           onClick={() => onNavigate('entries')}
         />
         <StatCard
           label="Saídas (7 dias)"
-          value={weekStats?.exitsQty ?? 0}
-          badge={`${todayStats?.exitsCount ?? 0} hoje`}
+          value={movementStats?.exits.toLocaleString('pt-PT') ?? '—'}
+          hint="registos nos últimos 7 dias"
           icon={<TrendingDown className="h-5 w-5" />}
           tone="warning"
           onClick={() => onNavigate('exits')}
         />
         <StatCard
           label="Alertas de stock"
-          value={outOfStockCount}
-          hint={`${lowStockCount} com stock baixo`}
-          badge={totalAlerts > 0 ? totalAlerts : undefined}
+          value={totalAlerts.toLocaleString('pt-PT')}
+          hint={`${outOfStockCount} esgotados ou negativos · ${lowStockCount} baixos`}
           icon={<AlertTriangle className="h-5 w-5" />}
           tone="danger"
           onClick={() => onNavigate('alerts')}
