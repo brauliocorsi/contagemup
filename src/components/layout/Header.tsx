@@ -16,8 +16,6 @@ interface HeaderProps {
 
 export function Header({ onNavigateToProducts }: HeaderProps) {
   const { profile, signOut } = useAuth();
-  const { canInstall, isInstalled, install } = usePWAInstall();
-  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
 
   const toggleTheme = () => {
