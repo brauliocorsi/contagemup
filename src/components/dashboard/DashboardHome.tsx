@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProducts } from '@/hooks/useProducts';
@@ -6,9 +6,11 @@ import { useStockAlerts } from '@/hooks/useStockAlerts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useWarehouseLocations } from '@/hooks/useWarehouseConfig';
 import {
   TrendingUp, TrendingDown, AlertTriangle, Package,
-  ArrowRight, Clock, AlertOctagon, BarChart3, LayoutDashboard, PackageSearch
+  ArrowRight, Clock, AlertOctagon, BarChart3, LayoutDashboard, PackageSearch, ChevronDown, MapPin, Truck
 } from 'lucide-react';
 import { format, subDays, startOfDay } from 'date-fns';
 import { pt } from 'date-fns/locale';
