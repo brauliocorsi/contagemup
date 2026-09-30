@@ -41,8 +41,8 @@ export function PickingReport({
       <table className="gc-table">
         <thead>
           <tr>
-            <th className="gc-left">Código</th>
-            <th className="gc-left">Produto</th>
+            <th className="gc-left gc-w-cod">Código</th>
+            <th className="gc-left">Produto / cadastro</th>
             <th className="gc-left">Detalhes</th>
             <th className="gc-left">Localização</th>
             <th className="gc-left">Encomendas</th>
@@ -65,9 +65,9 @@ export function PickingReport({
               )}
               {g.lines.map((l) => (
                 <tr key={l.key}>
-                  <td className="gc-left">{l.codigo}</td>
-                  <td className="gc-left">{l.nome}</td>
-                  <td className="gc-left">{l.detalhes}</td>
+                  <td className="gc-left gc-code">{l.codigo || '—'}</td>
+                  <td className="gc-left"><strong>{l.nome}</strong>{l.registered === false && <div className="gc-detail"><strong>NÃO CADASTRADO NO CONTAGEM</strong></div>}</td>
+                  <td className="gc-left">{l.detalhes || '—'}</td>
                   <td className="gc-left">{l.localizacoes ?? "—"}</td>
                   <td className="gc-left">{l.encomendas.join(", ")}</td>
                   <td className="gc-left">{l.saidas.join(", ") || "—"}</td>

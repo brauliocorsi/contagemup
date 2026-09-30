@@ -58,19 +58,20 @@ export async function attachPickingLocations(lines: PickingLine[]): Promise<Pick
   }
 
   const ids = [...new Set(idByLine.values())];
-  if (ids.length === 0) return lines.map((l) => ({ ...l, localizacoes: '—', stock: undefined }));
+  if (ids.length === 0) return lines.map((l) => ({ ...l, localizacoes: '—', stock: undefined, registered: false }));
 
   const counts: { product_id: string; location: string | null; quantity: number }[] = [];
   for (let i = 0; i < ids.length; i += 200) {
     const chunk = ids.slice(i, i + 200);
     let offset = 0;
     for (;;) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('counts')
         .select('product_id, location, quantity')
         .in('product_id', chunk)
         .order('id', { ascending: true })
         .range(offset, offset + PAGE - 1);
+      if (error) throw error;
       const rows = (data ?? []) as typeof counts;
       counts.push(...rows);
       if (rows.length < PAGE) break;
@@ -90,12 +91,12 @@ export async function attachPickingLocations(lines: PickingLine[]): Promise<Pick
   return lines.map((line) => {
     const id = idByLine.get(line.key);
     const map = id ? byProduct.get(id) : undefined;
-    if (!map || map.size === 0) return { ...line, localizacoes: '—', stock: id ? 0 : undefined };
+    if (!map || map.size === 0) return { ...line, localizacoes: '—', stock: id ? 0 : undefined, registered: Boolean(id) };
     const stock = [...map.values()].reduce((s, q) => s + q, 0);
     const localizacoes = [...map.entries()]
       .sort((a, b) => a[0].localeCompare(b[0], 'pt', { numeric: true }))
       .map(([loc, qty]) => `${loc} (${qty})`)
       .join(', ');
-    return { ...line, localizacoes, stock };
+    return { ...line, localizacoes, stock, registered: true };
   });
 }

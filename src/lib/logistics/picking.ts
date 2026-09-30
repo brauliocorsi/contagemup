@@ -14,6 +14,8 @@ export type PickingLine = {
   /** Datas de saída (entrega) das vendas associadas, ordenadas. */
   saidas: string[];
   localizacoes?: string;
+  /** Resultado da correspondência com o catálogo do Contagem. */
+  registered?: boolean;
   /** Stock positivo disponível no Contagem (undefined = ainda não calculado). */
   stock?: number;
 };
@@ -123,6 +125,7 @@ export async function exportPickingXlsx(
     Produto: l.nome,
     Detalhes: l.detalhes,
     Localizacao: l.localizacoes ?? '—',
+    Cadastro: l.registered === false ? 'Não cadastrado' : l.registered === true ? 'Cadastrado' : 'Não verificado',
     Saida: l.saidas.join(', '),
     Stock: l.stock ?? '',
     Quantidade: l.quantidade,
@@ -134,6 +137,7 @@ export async function exportPickingXlsx(
     { wch: 16 },
     { wch: 46 },
     { wch: 30 },
+    { wch: 20 },
     { wch: 30 },
     { wch: 22 },
     { wch: 10 },
