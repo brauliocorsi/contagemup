@@ -36,7 +36,7 @@ import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } fr
 import { attachPickingLocations, resolvePickingLabelProducts } from '@/lib/logistics/pickingLocations';
 import { buildBulkLabels, type BulkLabelProduct } from '@/components/products/BulkLabelPrintButton';
 import { fetchLastEntryDatesByCode } from '@/lib/scanner/entryDates';
-import { printLabels, type LabelFormat } from '@/lib/scanner/labels';
+import { printCommandSheet, printLabels, type LabelFormat } from '@/lib/scanner/labels';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
 
 import {
@@ -719,6 +719,8 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                     <DropdownMenuItem onSelect={() => void printPickingLabels('orders', 'thermal')}>Térmica · 100×50 mm</DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => void printCommandSheet('ql700').catch(() => toast.error('Não foi possível imprimir a folha de comandos'))}>Folha de comandos</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
