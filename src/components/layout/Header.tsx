@@ -1,9 +1,7 @@
 import { useAuth } from '@/hooks/useAuth';
-import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { useTheme } from 'next-themes';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { LogOut, User, Moon, Sun, Download, ScanBarcode } from 'lucide-react';
+import { LogOut, User, Moon, Sun, ScanBarcode } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { StockAlertsBell } from '@/components/stock/StockAlertsBell';
@@ -18,8 +16,6 @@ interface HeaderProps {
 
 export function Header({ onNavigateToProducts }: HeaderProps) {
   const { profile, signOut } = useAuth();
-  const { canInstall, isInstalled, install } = usePWAInstall();
-  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
 
   const toggleTheme = () => {
@@ -35,17 +31,6 @@ export function Header({ onNavigateToProducts }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {!isInstalled && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={canInstall ? install : () => navigate('/install')}
-              className="hidden md:flex h-9"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              Instalar
-            </Button>
-          )}
           <GlobalProductSearch />
           <Button
             asChild
