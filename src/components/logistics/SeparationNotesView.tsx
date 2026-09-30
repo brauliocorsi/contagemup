@@ -2,7 +2,7 @@ import { useVehicles, vehiclePlate } from '@/hooks/useVehicles';
 import { findTasksForOrders } from '@/hooks/useRoutePicking';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { ChevronDown, FileSpreadsheet, ListChecks, MapPin, Printer, Route as RouteIcon, ScanBarcode, Search, Truck } from 'lucide-react';
+import { ChevronDown, FileSpreadsheet, ListChecks, Loader2, MapPin, Printer, Route as RouteIcon, ScanBarcode, Search, Tag, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -33,8 +34,9 @@ import { PickingReport } from './PickingReport';
 import { CreateRouteDialog } from './CreateRouteDialog';
 import { buildPicking, exportPickingXlsx, groupByCategory, type PickingLine } from '@/lib/logistics/picking';
 import { attachPickingLocations, resolvePickingLabelProducts } from '@/lib/logistics/pickingLocations';
-import { BulkLabelPrintButton, type BulkLabelProduct } from '@/components/products/BulkLabelPrintButton';
-import { PrintMenu } from '@/components/scanner/PrintMenu';
+import { buildBulkLabels, type BulkLabelProduct } from '@/components/products/BulkLabelPrintButton';
+import { fetchLastEntryDatesByCode } from '@/lib/scanner/entryDates';
+import { printLabels, type LabelFormat } from '@/lib/scanner/labels';
 import { useCreatePickingTask } from '@/hooks/useScannerPickingTasks';
 
 import {
@@ -69,6 +71,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
   const [picking, setPicking] = useState<PickingLine[] | null>(null);
   const [excluded, setExcluded] = useState<Record<string, boolean>>({});
   const [labelProducts, setLabelProducts] = useState<Map<string, BulkLabelProduct>>(new Map());
+  const [labelsBusy, setLabelsBusy] = useState(false);
   const [printMode, setPrintMode] = useState<'docs' | 'picking' | 'guides'>('docs');
   const [byCategory, setByCategory] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({ period: true, orders: true, guides: false, picking: true });
@@ -290,6 +293,40 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
     toast.success('Ficheiro Excel gerado');
   }
 
+  async function printPickingLabels(kind: 'products' | 'orders', format: LabelFormat, byColi = true) {
+    setLabelsBusy(true);
+    try {
+      if (kind === 'orders') {
+        if (!chosen.length) return;
+        await printLabels(chosen.map((o) => ({
+          code: o.codigo,
+          title: o.cliente,
+          subtitle: `Encomenda: ${o.codigo}`,
+          extra: [o.entrega ? `Saída: ${o.entrega}` : ''].filter(Boolean),
+        })), format);
+      } else {
+        const missing = pickingKept.filter((l) => !labelProducts.has(l.key));
+        if (missing.length) {
+          toast.warning(`${missing.length} artigo(s) sem cadastro/etiqueta no Contagem não serão impressos.`, { duration: 6000 });
+        }
+        const products = pickingKept.flatMap((l) => {
+          const p = labelProducts.get(l.key);
+          return p ? [{ ...p, current_stock: Math.max(1, l.quantidade) }] : [];
+        });
+        if (!products.length) {
+          toast.info('Nenhum produto cadastrado com código para imprimir');
+          return;
+        }
+        const dates = await fetchLastEntryDatesByCode(products.map((p) => p.code));
+        await printLabels(buildBulkLabels(products, byColi, dates), format, 'etiquetas-produtos.pdf');
+      }
+    } catch {
+      toast.error('Não foi possível gerar as etiquetas');
+    } finally {
+      setLabelsBusy(false);
+    }
+  }
+
   async function sendToScanner() {
     if (pickingKept.length === 0) {
       toast.error('Nenhum artigo no picking');
@@ -383,10 +420,6 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               Gestão Click · impressão A4 por data de entrega
             </p>
           </div>
-          <Button onClick={handlePrint} disabled={printJob.isPending}>
-            <Printer className="mr-2 h-4 w-4" />
-            {printJob.isPending ? 'A obter notas…' : `Imprimir ${totalPages > 0 ? `(${totalPages})` : ''}`}
-          </Button>
         </div>
 
         <Collapsible open={openSections.period} onOpenChange={() => toggleSection('period')} className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
@@ -407,18 +440,17 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               <Search className="mr-2 h-4 w-4" />
               {query.isPending ? 'A carregar…' : 'Carregar encomendas'}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => routeJob.mutate()}
-              disabled={routeJob.isPending || chosen.length === 0}
-            >
-              <MapPin className="mr-2 h-4 w-4" />
-              {routeJob.isPending ? 'A calcular rota…' : `Rota no Google Maps (${chosen.length})`}
-            </Button>
-            <Button onClick={() => setRouteDialog(true)} disabled={chosen.length === 0}>
-              <RouteIcon className="mr-2 h-4 w-4" />
-              Criar rota ({chosen.length})
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={chosen.length === 0 || routeJob.isPending}>
+                  <RouteIcon className="h-4 w-4" /> Rotas <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onSelect={() => setRouteDialog(true)}><RouteIcon className="mr-2 h-4 w-4" />Criar rota ({chosen.length})</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => routeJob.mutate()}><MapPin className="mr-2 h-4 w-4" />{routeJob.isPending ? 'A calcular…' : 'Abrir no Google Maps'}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           {routeLinks.length > 0 && (
             <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/40 p-4">
@@ -464,6 +496,9 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
             <span className="text-sm text-muted-foreground">
               {orders.length} encomenda(s) · {totalPages} nota(s) para imprimir
             </span>
+            <Button className="ml-auto" size="sm" onClick={handlePrint} disabled={printJob.isPending || chosen.length === 0}>
+              <Printer className="h-4 w-4" /> {printJob.isPending ? 'A obter notas…' : 'Imprimir notas'}
+            </Button>
           </div>
           {orders.length === 0 ? (
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">
@@ -581,16 +616,17 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                 onChange={(e) => setLoadTime(e.target.value)}
               />
             </div>
-            <Button onClick={handleGuides} disabled={guidesJob.isPending}>
+            <Button size="sm" onClick={handleGuides} disabled={guidesJob.isPending}>
               <Truck className="mr-2 h-4 w-4" />
-              {guidesJob.isPending ? 'A emitir…' : `Emitir guias (${chosen.length})`}
+              {guidesJob.isPending ? 'A emitir…' : 'Emitir guias'}
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={printGuidesDocument}
               disabled={guides.filter((g) => g.ok).length === 0}
             >
-              <Printer className="mr-2 h-4 w-4" /> Documento de guias
+              <Printer className="h-4 w-4" /> Imprimir
             </Button>
           </div>
           {guides.length === 0 ? (
@@ -639,51 +675,52 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               <Checkbox checked={byCategory} onCheckedChange={(v) => setByCategory(Boolean(v))} />
               Separar por categoria
             </label>
-            <Button onClick={() => void generatePicking()}>
+            <Button size="sm" onClick={() => void generatePicking()}>
               <ListChecks className="mr-2 h-4 w-4" /> Gerar picking
             </Button>
-            <Button variant="outline" onClick={() => void exportPicking()} disabled={pickingKept.length === 0}>
-              <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
+            <Button size="sm" variant="outline" onClick={() => void exportPicking()} disabled={pickingKept.length === 0}>
+              <FileSpreadsheet className="h-4 w-4" /> Excel
             </Button>
             <Button
+              size="sm"
               variant="outline"
               onClick={() => void sendToScanner()}
               disabled={pickingKept.length === 0 || createTask.isPending}
             >
-              <ScanBarcode className="mr-2 h-4 w-4" />
-              {createTask.isPending ? 'A enviar…' : 'Enviar para o Scanner'}
+              <ScanBarcode className="h-4 w-4" />
+              {createTask.isPending ? 'A enviar…' : 'Scanner'}
             </Button>
-            <Button onClick={printPickingReport} disabled={pickingKept.length === 0}>
-              <Printer className="mr-2 h-4 w-4" /> Imprimir picking
+            <Button size="sm" variant="outline" onClick={printPickingReport} disabled={pickingKept.length === 0}>
+              <Printer className="h-4 w-4" /> Imprimir
             </Button>
-            <BulkLabelPrintButton
-              getProducts={() =>
-                pickingKept
-                  .flatMap((l) => {
-                    const p = labelProducts.get(l.key);
-                    // Uma etiqueta por unidade a separar, não pelo stock em armazém.
-                    return p ? [{ ...p, current_stock: Math.max(1, l.quantidade) }] : [];
-                  })
-              }
-              label="Etiquetas"
-              variant="outline"
-            />
-            <PrintMenu
-              label="Etiquetas encomendas"
-              variant="outline"
-              disabled={chosen.length === 0}
-              getItems={() =>
-                chosen.map((o) => ({
-                  code: o.codigo,
-                  title: o.cliente,
-                  subtitle: `Encomenda: ${o.codigo}`,
-                  extra: [o.entrega ? `Saída: ${o.entrega}` : ''].filter(Boolean),
-                }))
-              }
-            />
-
-
-
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" disabled={labelsBusy || (pickingKept.length === 0 && chosen.length === 0)}>
+                  {labelsBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tag className="h-4 w-4" />} Etiquetas <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-52">
+                <DropdownMenuLabel>Escolher etiquetas</DropdownMenuLabel>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={pickingKept.length === 0}>Produtos do picking</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onSelect={() => void printPickingLabels('products', 'ql700', true)}>Por coli · QL-700</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void printPickingLabels('products', 'ql700', false)}>Por produto · QL-700</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void printPickingLabels('products', 'a4')}>Por coli · A4</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void printPickingLabels('products', 'thermal')}>Por coli · Térmica</DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={chosen.length === 0}>Encomendas</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onSelect={() => void printPickingLabels('orders', 'ql700')}>QL-700 · 62×29 mm</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void printPickingLabels('orders', 'a4')}>Folha A4</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void printPickingLabels('orders', 'thermal')}>Térmica · 100×50 mm</DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           {picking === null ? (
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">
