@@ -284,14 +284,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
       </Card>
 
       {/* Estado do armazém */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatCard
-          label="Conjuntos completos"
-          value={totalStock.toLocaleString('pt-PT')}
-          hint="prontos a vender"
-          icon={<Package className="h-5 w-5" />}
-          tone="success"
-        />
+      <div className="grid grid-cols-2 gap-4">
         <StatCard
           label="Unidades físicas"
           value={physicalUnits.toLocaleString('pt-PT')}
