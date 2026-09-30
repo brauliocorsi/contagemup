@@ -25,12 +25,13 @@ export async function loadProductResolver(): Promise<ProductResolver> {
   const products: ResolverProduct[] = [];
   let offset = 0;
   for (;;) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('products')
       .select('id, code, name, supplier_code')
       .order('code', { ascending: true })
       .order('id', { ascending: true })
       .range(offset, offset + PAGE - 1);
+    if (error) throw error;
     const rows = (data ?? []) as ResolverProduct[];
     products.push(...rows);
     if (rows.length < PAGE) break;

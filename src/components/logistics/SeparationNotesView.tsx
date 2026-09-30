@@ -2,13 +2,14 @@ import { useVehicles, vehiclePlate } from '@/hooks/useVehicles';
 import { findTasksForOrders } from '@/hooks/useRoutePicking';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { FileSpreadsheet, ListChecks, MapPin, Printer, Route as RouteIcon, ScanBarcode, Search, Truck } from 'lucide-react';
+import { ChevronDown, FileSpreadsheet, ListChecks, MapPin, Printer, Route as RouteIcon, ScanBarcode, Search, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
   SelectContent,
@@ -70,6 +71,8 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
   const [labelProducts, setLabelProducts] = useState<Map<string, BulkLabelProduct>>(new Map());
   const [printMode, setPrintMode] = useState<'docs' | 'picking' | 'guides'>('docs');
   const [byCategory, setByCategory] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ period: true, orders: true, guides: false, picking: true });
+  const toggleSection = (key: string) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   const [addressFrom, setAddressFrom] = useState(DEFAULT_ADDRESS_FROM);
   const { data: vehicles = [] } = useVehicles();
   const [vehicleId, setVehicleId] = useState<string>('');
@@ -114,6 +117,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
       setPicking(null);
       setExcluded({});
       setGuides([]);
+      setOpenSections((prev) => ({ ...prev, orders: true }));
       void refreshHistory(res.orders.map((o) => o.id));
       toast.success(`${res.orders.length} encomenda(s) com entrega neste período`);
       if (res.truncated) toast.warning('Muitos registos: alguns podem faltar. Reduza o período.');
@@ -249,6 +253,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
       return;
     }
     const lines = buildPicking(chosen);
+    setOpenSections((prev) => ({ ...prev, picking: true }));
     setPicking(lines);
     setExcluded({});
     setLabelProducts(new Map());
@@ -257,7 +262,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
       const withLocations = await attachPickingLocations(lines);
       setPicking(withLocations);
     } catch {
-      toast.error('Não foi possível carregar as localizações');
+      toast.error('Não foi possível verificar o cadastro e as localizações. Tente gerar o picking novamente.');
     }
     try {
       setLabelProducts(await resolvePickingLabelProducts(lines));
@@ -384,7 +389,11 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
           </Button>
         </div>
 
-        <section className="rounded-lg border border-border bg-card p-5">
+        <Collapsible open={openSections.period} onOpenChange={() => toggleSection('period')} className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
+          <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-5 py-3">
+            <CollapsibleTrigger asChild><Button variant="ghost" className="min-w-0 flex-1 justify-between px-1 text-left font-heading font-semibold">Período e rotas <ChevronDown className={`h-4 w-4 transition-transform ${openSections.period ? 'rotate-180' : ''}`} /></Button></CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="p-5">
           <div className="flex flex-wrap items-end gap-4">
             <div className="grid gap-1.5">
               <Label htmlFor="de">Entrega de</Label>
@@ -437,9 +446,14 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               </div>
             </div>
           )}
-        </section>
+          </CollapsibleContent>
+        </Collapsible>
 
-        <section className="rounded-lg border border-border bg-card">
+        <Collapsible open={openSections.orders} onOpenChange={() => toggleSection('orders')} className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
+          <div className="flex items-center border-b border-border bg-muted/30 px-5 py-3">
+            <CollapsibleTrigger asChild><Button variant="ghost" className="min-w-0 flex-1 justify-between px-1 text-left font-heading font-semibold">Encomendas <ChevronDown className={`h-4 w-4 transition-transform ${openSections.orders ? 'rotate-180' : ''}`} /></Button></CollapsibleTrigger>
+          </div>
+          <CollapsibleContent>
           <div className="flex items-center gap-3 border-b border-border px-5 py-3">
             <Checkbox
               checked={allChecked}
@@ -513,11 +527,15 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               </table>
             </div>
           )}
-        </section>
+          </CollapsibleContent>
+        </Collapsible>
 
-        <section className="rounded-lg border border-border bg-card">
+        <Collapsible open={openSections.guides} onOpenChange={() => toggleSection('guides')} className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
+          <div className="flex items-center border-b border-border bg-muted/30 px-5 py-3">
+            <CollapsibleTrigger asChild><Button variant="ghost" className="min-w-0 flex-1 justify-between px-1 text-left font-heading font-semibold">Guias de Transporte · InvoiceXpress <ChevronDown className={`h-4 w-4 transition-transform ${openSections.guides ? 'rotate-180' : ''}`} /></Button></CollapsibleTrigger>
+          </div>
+          <CollapsibleContent>
           <div className="flex flex-wrap items-end gap-4 border-b border-border px-5 py-3">
-            <h2 className="mr-auto text-sm font-semibold">Guias de Transporte (InvoiceXpress)</h2>
             <div className="grid gap-1.5">
               <Label htmlFor="origem">Local de carga</Label>
               <Input
@@ -608,16 +626,20 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               ))}
             </ul>
           )}
-        </section>
+          </CollapsibleContent>
+        </Collapsible>
 
-        <section className="rounded-lg border border-border bg-card">
-          <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
-            <h2 className="text-sm font-semibold">Relatório de Picking</h2>
+        <Collapsible open={openSections.picking} onOpenChange={() => toggleSection('picking')} className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
+          <div className="flex items-center border-b border-border bg-muted/30 px-5 py-3">
+            <CollapsibleTrigger asChild><Button variant="ghost" className="min-w-0 flex-1 justify-between px-1 text-left font-heading font-semibold">Relatório de Picking {picking ? `· ${picking.length} artigos` : ''} <ChevronDown className={`h-4 w-4 transition-transform ${openSections.picking ? 'rotate-180' : ''}`} /></Button></CollapsibleTrigger>
+          </div>
+          <CollapsibleContent>
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">
             <label className="mr-auto flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               <Checkbox checked={byCategory} onCheckedChange={(v) => setByCategory(Boolean(v))} />
               Separar por categoria
             </label>
-            <Button variant="outline" onClick={() => void generatePicking()}>
+            <Button onClick={() => void generatePicking()}>
               <ListChecks className="mr-2 h-4 w-4" /> Gerar picking
             </Button>
             <Button variant="outline" onClick={() => void exportPicking()} disabled={pickingKept.length === 0}>
@@ -669,18 +691,23 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              {picking.some((l) => l.registered === false) && (
+                <p className="border-b border-warning/30 bg-warning-soft px-5 py-3 text-sm font-medium text-foreground" role="status">
+                  {picking.filter((l) => l.registered === false).length} artigo(s) da lista de picking não cadastrado(s) no Contagem. Continuam incluídos no relatório e na exportação.
+                </p>
+              )}
+              <table className="w-full min-w-[1080px] table-fixed text-sm">
                 <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="w-10 px-5 py-2" />
-                    <th className="px-3 py-2">Código</th>
-                    <th className="px-3 py-2">Produto</th>
-                    <th className="px-3 py-2">Detalhes</th>
-                    <th className="px-3 py-2">Localização</th>
-                    <th className="px-3 py-2">Encomendas</th>
-                    <th className="px-3 py-2">Saída</th>
-                    <th className="px-3 py-2">Stock</th>
-                    <th className="px-3 py-2">Qtd. total</th>
+                    <th className="w-10 px-3 py-3" />
+                    <th className="w-[11%] px-3 py-3">Código</th>
+                    <th className="w-[25%] px-3 py-3">Produto / cadastro</th>
+                    <th className="w-[12%] px-3 py-3">Detalhes</th>
+                    <th className="w-[14%] px-3 py-3">Localização</th>
+                    <th className="w-[13%] px-3 py-3">Encomendas</th>
+                    <th className="w-[11%] px-3 py-3">Saída</th>
+                    <th className="w-[7%] px-3 py-3">Stock</th>
+                    <th className="w-[7%] px-3 py-3">Qtd.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -698,7 +725,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                             }
                           />
                         </td>
-                        <td className="px-3 py-2 text-xs font-bold uppercase tracking-wide" colSpan={7}>
+                        <td className="px-3 py-2 text-xs font-bold uppercase" colSpan={7}>
                           {row.categoria}
                         </td>
                         <td className="px-3 py-2 font-semibold">{row.quantidade}</td>
@@ -714,11 +741,11 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                             onCheckedChange={(v) => setExcluded((prev) => ({ ...prev, [row.line.key]: !v }))}
                           />
                         </td>
-                        <td className="px-3 py-2 text-muted-foreground">{row.line.codigo}</td>
-                        <td className="px-3 py-2 font-medium">{row.line.nome}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{row.line.detalhes}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{row.line.localizacoes ?? '—'}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{row.line.encomendas.join(', ')}</td>
+                        <td className="break-all px-3 py-3 font-mono text-xs font-semibold">{row.line.codigo || '—'}</td>
+                        <td className="break-words px-3 py-3 align-top"><span className="font-semibold leading-relaxed">{row.line.nome}</span>{row.line.registered === false && <span className="mt-1 block w-fit rounded-sm bg-warning-soft px-1.5 py-0.5 text-xs font-semibold text-foreground">Não cadastrado</span>}</td>
+                        <td className="break-words px-3 py-3 align-top text-muted-foreground">{row.line.detalhes || '—'}</td>
+                        <td className="break-words px-3 py-3 align-top text-muted-foreground">{row.line.localizacoes ?? '—'}</td>
+                        <td className="break-words px-3 py-3 align-top text-muted-foreground">{row.line.encomendas.join(', ')}</td>
                         <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                           {row.line.saidas.join(', ') || '—'}
                         </td>
@@ -739,7 +766,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-2 font-semibold">{row.line.quantidade}</td>
+                        <td className="px-3 py-3 text-right font-bold">{row.line.quantidade}</td>
                       </tr>
                     ),
                   )}
@@ -751,7 +778,8 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               </p>
             </div>
           )}
-        </section>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <CreateRouteDialog
