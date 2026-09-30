@@ -4,8 +4,8 @@ import {
   LayoutDashboard, ClipboardList, TrendingUp, TrendingDown, AlertTriangle,
   AlertOctagon, Package, Tags, History,
   Search, BarChart3, Warehouse, Settings, ScanBarcode, FileText, Route as RouteIcon, ClipboardCheck, FlaskConical, PackageSearch, PackageX,
+  ChevronDown,
 } from 'lucide-react';
-
 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -83,6 +83,8 @@ const groups: { label: string; items: NavItem[] }[] = [
 
 ];
 
+const mobileGroup = { label: 'Mobile', items: [] as NavItem[] };
+
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
@@ -91,6 +93,20 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const visibleGroups = groups
     .map((g) => ({ ...g, items: g.items.filter((i) => !i.adminOnly || isAdmin) }))
     .filter((g) => g.items.length > 0);
+
+  const allGroups = [...visibleGroups, mobileGroup];
+
+  // Grupo aberto: o que contém o separador ativo; senão o último clicado.
+  const activeGroupLabel = visibleGroups.find((g) => g.items.some((i) => i.id === activeTab))?.label;
+  const openLabel = activeGroupLabel ?? openFallbackLabel ?? visibleGroups[0]?.label;
+  const effectiveOpenLabel = collapsed ? null : (manualOpenLabel ?? openLabel);
+
+  const toggleGroup = (label: string) => {
+    setManualOpenLabel((prev) => {
+      const current = prev ?? openLabel;
+      return current === label ? '__closed__' : label;
+    });
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -113,70 +129,86 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent className="bg-gradient-sidebar px-1.5 py-3">
-        {visibleGroups.map((group) => (
-          <SidebarGroup key={group.label} className="mb-1">
-            {!collapsed && (
-              <SidebarGroupLabel className="text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 px-2 mb-1">
-                {group.label}
-              </SidebarGroupLabel>
-            )}
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => {
-                  const isActive = activeTab === item.id;
-                  return (
-                    <SidebarMenuItem key={item.id}>
-                      <SidebarMenuButton
-                        onClick={() => onTabChange(item.id)}
-                        isActive={isActive}
-                        tooltip={collapsed ? item.label : undefined}
-                        className={cn(
-                          'group/item h-9 rounded-lg gap-2.5 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors',
-                          isActive &&
-                            'bg-sidebar-primary/15 text-sidebar-primary-foreground hover:bg-sidebar-primary/20 font-semibold shadow-sm',
-                        )}
-                      >
-                        <item.icon
-                          className={cn(
-                            'h-4 w-4 shrink-0 transition-colors',
-                            isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/55 group-hover/item:text-sidebar-foreground',
-                          )}
-                        />
-                        <span className="truncate">{item.label}</span>
-                        {isActive && !collapsed && (
-                          <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary" />
-                        )}
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
-        <SidebarGroup className="mb-1">
-          {!collapsed && (
-            <SidebarGroupLabel className="text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 px-2 mb-1">
-              Mobile
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={collapsed ? 'Scanner' : undefined}
-                  className="group/item h-9 rounded-lg gap-2.5 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+        {allGroups.map((group) => {
+          const isOpen = collapsed || effectiveOpenLabel === group.label;
+          const hasActive = visibleGroups.some(
+            (g) => g.label === group.label && g.items.some((i) => i.id === activeTab),
+          );
+          return (
+            <SidebarGroup key={group.label} className="mb-1">
+              {!collapsed && (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label)}
+                  aria-expanded={isOpen}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-md px-2 mb-1 py-1.5 text-left',
+                    'text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/45',
+                    'hover:text-sidebar-foreground/80 hover:bg-sidebar-accent/50 transition-colors',
+                  )}
                 >
-                  <a href="/scanner" target="_blank" rel="noreferrer">
-                    <ScanBarcode className="h-4 w-4 shrink-0 text-sidebar-foreground/55 group-hover/item:text-sidebar-foreground" />
-                    <span className="truncate">Scanner</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                  <span>{group.label}</span>
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 transition-transform duration-200',
+                      isOpen ? 'rotate-0' : '-rotate-90',
+                      hasActive && 'text-sidebar-primary/70',
+                    )}
+                  />
+                </button>
+              )}
+              {isOpen && (
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.label === 'Mobile' ? (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={collapsed ? 'Scanner' : undefined}
+                          className="group/item h-9 rounded-lg gap-2.5 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                        >
+                          <a href="/scanner" target="_blank" rel="noreferrer">
+                            <ScanBarcode className="h-4 w-4 shrink-0 text-sidebar-foreground/55 group-hover/item:text-sidebar-foreground" />
+                            <span className="truncate">Scanner</span>
+                          </a>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ) : (
+                      group.items.map((item) => {
+                        const isActive = activeTab === item.id;
+                        return (
+                          <SidebarMenuItem key={item.id}>
+                            <SidebarMenuButton
+                              onClick={() => onTabChange(item.id)}
+                              isActive={isActive}
+                              tooltip={collapsed ? item.label : undefined}
+                              className={cn(
+                                'group/item h-9 rounded-lg gap-2.5 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors',
+                                isActive &&
+                                  'bg-sidebar-primary/15 text-sidebar-primary-foreground hover:bg-sidebar-primary/20 font-semibold shadow-sm',
+                              )}
+                            >
+                              <item.icon
+                                className={cn(
+                                  'h-4 w-4 shrink-0 transition-colors',
+                                  isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/55 group-hover/item:text-sidebar-foreground',
+                                )}
+                              />
+                              <span className="truncate">{item.label}</span>
+                              {isActive && !collapsed && (
+                                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary" />
+                              )}
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })
+                    )}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              )}
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
     </Sidebar>
   );
