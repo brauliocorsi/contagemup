@@ -1,0 +1,1 @@
+Picking membership in Contagem is resolved through `loadProductResolver` and carried as `PickingLine.registered`; this keeps the on-screen, printed, and exported status consistent without removing unmatched ERP lines.
