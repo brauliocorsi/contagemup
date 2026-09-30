@@ -1,0 +1,5 @@
+ALTER TABLE public.counting_sessions DROP CONSTRAINT counting_sessions_created_by_fkey, ADD CONSTRAINT counting_sessions_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public.counts DROP CONSTRAINT counts_counted_by_fkey, ADD CONSTRAINT counts_counted_by_fkey FOREIGN KEY (counted_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public.reconciliations DROP CONSTRAINT reconciliations_created_by_fkey, ADD CONSTRAINT reconciliations_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public.reconciliations DROP CONSTRAINT reconciliations_validated_by_fkey, ADD CONSTRAINT reconciliations_validated_by_fkey FOREIGN KEY (validated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public.product_changes DROP CONSTRAINT product_changes_changed_by_fkey, ADD CONSTRAINT product_changes_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES auth.users(id) ON DELETE SET NULL;
