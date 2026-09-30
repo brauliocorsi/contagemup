@@ -284,7 +284,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
       </Card>
 
       {/* Estado do armazém */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatCard
           label="Conjuntos completos"
           value={totalStock.toLocaleString('pt-PT')}
