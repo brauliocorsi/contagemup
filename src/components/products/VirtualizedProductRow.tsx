@@ -91,16 +91,8 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
 
   const status = getStockStatus(product.current_stock, product.min_stock);
   
-  // Calculate incomplete units if we have distribution data
-  let incompleteUnits = 0;
-  let totalUnits = 0;
-  const colisDistribution = lastCount?.colisLocations?.map(c => ({ colisNumber: c.colisNumber, quantity: c.quantity }));
-  
-  if (colisDistribution && colisDistribution.length > 0 && product.total_colis > 1) {
-    totalUnits = colisDistribution.reduce((sum, c) => sum + c.quantity, 0);
-    const unitsInCompleteSets = product.current_stock * product.total_colis;
-    incompleteUnits = totalUnits - unitsInCompleteSets;
-  }
+  // Current inventory is maintained by stock triggers, not the latest session.
+  const incompleteUnits = Math.max(product.colis_orfaos ?? 0, 0);
   
   const hasIncomplete = incompleteUnits > 0;
 
@@ -125,13 +117,13 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
   return (
     <div 
       className={cn(
-        "flex items-center border-b transition-colors hover:bg-muted/50",
+        "flex items-center border-b transition-colors hover:bg-muted/50 [&>div]:shrink-0",
         isSelected && "bg-primary/5"
       )}
       style={{ minHeight: '60px' }}
     >
       {/* Checkbox */}
-      <div className="flex-shrink-0 p-2" style={{ width: '48px' }}>
+      <div className="flex-shrink-0 p-2" style={getColWidth('checkbox')}>
         <Checkbox
           checked={isSelected}
           onCheckedChange={() => onToggleSelection(product.id)}
@@ -224,7 +216,7 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
       {isColumnVisible('totalUnits') && (
         <div className="p-2" style={getColWidth('totalUnits')}>
           <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-xs">
-            {lastCount?.totalQuantity ?? 0} un.
+            {product.unidades_fisicas ?? 0} un.
           </Badge>
         </div>
       )}
@@ -364,7 +356,7 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
       )}
 
       {/* Actions */}
-      <div className="flex-shrink-0 flex items-center justify-end gap-1 px-2" style={{ width: '212px' }}>
+      <div className="flex-shrink-0 flex items-center justify-end gap-1 px-2" style={getColWidth('actions')}>
         <Button 
           variant="ghost" 
           size="icon"
