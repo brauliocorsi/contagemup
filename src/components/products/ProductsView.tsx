@@ -1,3 +1,5 @@
+import { DamageReportDialog } from '@/components/damages/DamageReportDialog';
+import { useDamages } from '@/hooks/useDamages';
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useProducts } from '@/hooks/useProducts';
@@ -80,6 +82,9 @@ export function ProductsView() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterCountStatus, setFilterCountStatus] = useState<'all' | 'with_count' | 'without_count'>('all');
   const [filterStockStatus, setFilterStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock' | 'negative_stock'>('all');
+  const [filterDamage, setFilterDamage] = useState<'all' | 'with_damage' | 'without_damage'>('all');
+  const [damageProduct, setDamageProduct] = useState<Product | null>(null);
+  const { reportDamage } = useDamages();
   const [filterOrderStatus, setFilterOrderStatus] = useState<'all' | 'with_orders' | 'without_orders'>('all');
   const [onlyMissingSupplierCode, setOnlyMissingSupplierCode] = useState(false);
   const [sortColumn, setSortColumn] = useState<'code' | 'name' | 'category' | 'stock' | 'lastCount' | null>(null);
@@ -173,8 +178,10 @@ export function ProductsView() {
       const matchesSupplierCode = !onlyMissingSupplierCode || !product.supplier_code;
 
       const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
+      const dmg = (product.damaged_stock || 0) > 0;
+      const matchesDamage = filterDamage === 'all' || (filterDamage === 'with_damage' ? dmg : !dmg);
 
-      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus && matchesSupplierCode && matchesCategory;
+      return matchesSearch && matchesCountStatus && matchesStockStatus && matchesOrderStatus && matchesSupplierCode && matchesCategory && matchesDamage;
     });
 
 
@@ -208,7 +215,7 @@ export function ProductsView() {
     }
     
     return result;
-  }, [products, searchTerm, filterCategory, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
+  }, [products, searchTerm, filterCategory, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode, filterDamage, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
 
   // Virtualizer for products table
   const rowVirtualizer = useVirtualizer({
@@ -249,15 +256,17 @@ export function ProductsView() {
     if (filterCountStatus !== 'all') n++;
     if (filterStockStatus !== 'all') n++;
     if (filterOrderStatus !== 'all') n++;
+    if (filterDamage !== 'all') n++;
     if (onlyMissingSupplierCode) n++;
     return n;
-  }, [filterCategory, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode]);
+  }, [filterCategory, filterCountStatus, filterStockStatus, filterOrderStatus, filterDamage, onlyMissingSupplierCode]);
 
   const clearAllFilters = useCallback(() => {
     setFilterCategory('all');
     setFilterCountStatus('all');
     setFilterStockStatus('all');
     setFilterOrderStatus('all');
+    setFilterDamage('all');
     setOnlyMissingSupplierCode(false);
   }, []);
 
@@ -487,7 +496,7 @@ export function ProductsView() {
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 bg-background border shadow-lg z-50" align="start">
+          <PopoverContent className="w-[22rem] bg-background border shadow-lg z-50" align="start">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Filtros</p>
@@ -575,6 +584,20 @@ export function ProductsView() {
                     <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="with_orders">Com encomendas ({orderStats.withOrders})</SelectItem>
                     <SelectItem value="without_orders">Sem encomendas ({orderStats.withoutOrders})</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Avarias</label>
+                <Select value={filterDamage} onValueChange={(v) => setFilterDamage(v as typeof filterDamage)}>
+                  <SelectTrigger className={filterDamage !== 'all' ? 'border-primary bg-primary/10' : ''}>
+                    <SelectValue placeholder="Avarias" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="with_damage">Com avariados ({products.filter(p => (p.damaged_stock || 0) > 0).length})</SelectItem>
+                    <SelectItem value="without_damage">Sem avariados ({products.filter(p => !(p.damaged_stock || 0)).length})</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -887,7 +910,7 @@ export function ProductsView() {
                     </span>
                   </div>
                 )}
-                <div className="flex-shrink-0 p-2 font-medium text-muted-foreground text-sm text-right" style={{ width: '176px' }}>
+                <div className="flex-shrink-0 p-2 font-medium text-muted-foreground text-sm text-right" style={{ width: '212px' }}>
                   Ações
                 </div>
               </div>
@@ -933,6 +956,7 @@ export function ProductsView() {
                           columnWidths={DEFAULT_COLUMN_WIDTHS}
                           onToggleSelection={toggleProductSelection}
                           onEdit={setEditingProduct}
+                          onReportDamage={setDamageProduct}
                           onViewDetails={setDetailsProduct}
                           onViewHistory={setHistoryProduct}
                           onViewMovements={setMovementHistoryProduct}
@@ -1002,6 +1026,17 @@ export function ProductsView() {
         selectedProductIds={Array.from(selectedProducts)}
         onSuccess={handleBulkMinStockSuccess}
       />
+      {damageProduct && (
+        <DamageReportDialog
+          open={!!damageProduct}
+          onOpenChange={(o) => !o && setDamageProduct(null)}
+          product={damageProduct}
+          onSubmit={async (data) => {
+            await reportDamage(data);
+            setDamageProduct(null);
+          }}
+        />
+      )}
     </div>
   );
 }

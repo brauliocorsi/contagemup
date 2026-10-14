@@ -1,3 +1,4 @@
+import { AlertOctagon } from 'lucide-react';
 import { memo } from 'react';
 import { Product } from '@/types/stock';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -52,6 +53,7 @@ interface VirtualizedProductRowProps {
   onViewDetails: (product: Product) => void;
   onViewHistory: (product: Product) => void;
   onViewMovements: (product: Product) => void;
+  onReportDamage: (product: Product) => void;
   onDelete: (id: string) => void;
 }
 
@@ -77,6 +79,7 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
   onViewDetails,
   onViewHistory,
   onViewMovements,
+  onReportDamage,
   onDelete,
 }: VirtualizedProductRowProps) {
   const isColumnVisible = (col: string) => visibleColumns.has(col);
@@ -361,7 +364,7 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
       )}
 
       {/* Actions */}
-      <div className="flex-shrink-0 flex items-center justify-end gap-1 px-2" style={{ width: '176px' }}>
+      <div className="flex-shrink-0 flex items-center justify-end gap-1 px-2" style={{ width: '212px' }}>
         <Button 
           variant="ghost" 
           size="icon"
@@ -389,6 +392,15 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
           className="h-8 w-8"
         >
           <History className="h-4 w-4" />
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={() => onReportDamage(product)}
+          title="Enviar para avarias"
+          className="h-8 w-8 text-destructive hover:text-destructive"
+        >
+          <AlertOctagon className="h-4 w-4" />
         </Button>
         <Button 
           variant="ghost" 
