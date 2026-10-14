@@ -125,7 +125,7 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
         "flex items-center border-b transition-colors hover:bg-muted/50",
         isSelected && "bg-primary/5"
       )}
-      style={{ height: '60px' }}
+      style={{ minHeight: '60px' }}
     >
       {/* Checkbox */}
       <div className="flex-shrink-0 p-2" style={{ width: '48px' }}>
@@ -150,9 +150,9 @@ export const VirtualizedProductRow = memo(function VirtualizedProductRow({
 
       {/* Name */}
       {isColumnVisible('name') && (
-        <div className="p-2 truncate font-medium text-sm" style={getColWidth('name')} title={product.name}>
+        <div className="p-2 font-medium text-sm" style={getColWidth('name')} title={product.name}>
           <div className="flex flex-col gap-0.5">
-            <span className="truncate">{product.name}</span>
+            <span className="whitespace-normal break-words leading-snug">{product.name}</span>
             {hasOrders && (
               <Badge variant="outline" className="text-[10px] w-fit bg-amber-50 text-amber-700 border-amber-300 gap-0.5">
                 <ClipboardList className="h-2.5 w-2.5" />
