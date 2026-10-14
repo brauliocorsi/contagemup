@@ -117,8 +117,10 @@ const processLastCounts = (counts: CountRow[], sessions: SessionRow[]): Record<s
   }> = {};
 
   counts.forEach(count => {
+    // Stock is unified across sessions (WMS): include every positive row so the
+    // details view matches the product lookup instead of only the latest session.
     const recentSession = productRecentSession[count.product_id];
-    if (recentSession && count.session_id === recentSession.sessionId && count.quantity > 0) {
+    if (recentSession && count.quantity > 0) {
       const key = count.product_id;
       if (!productDataMap[key]) {
         productDataMap[key] = {
