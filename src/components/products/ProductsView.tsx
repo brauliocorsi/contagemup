@@ -36,7 +36,7 @@ import { loadXLSX } from '@/lib/lazyXlsx';
 const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   checkbox: 48,
   code: 120,
-  name: 200,
+  name: 320,
   category: 120,
   colis: 80,
   stock: 100,
@@ -145,12 +145,12 @@ export function ProductsView() {
   const existingCategoryNames = categories.map(c => c.name);
 
   const filteredProducts = useMemo(() => {
+    const norm = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/(\d)\s*[x×*]\s*(\d)/g, '$1x$2');
+    const tokens = norm(searchTerm).split(/[\s,;/]+/).filter(Boolean);
     let result = products.filter(product => {
-      const matchesSearch = 
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (product.supplier_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.location?.toLowerCase().includes(searchTerm.toLowerCase());
+      const haystack = norm(`${product.name} ${product.code} ${product.supplier_code || ''} ${product.location || ''} ${product.category || ''}`);
+      // Pesquisa por palavras: todas têm de existir, por qualquer ordem
+      const matchesSearch = tokens.length === 0 || tokens.every(t => haystack.includes(t));
       
       const hasCount = !!lastCounts[product.id];
       const matchesCountStatus = 
@@ -214,8 +214,9 @@ export function ProductsView() {
   const rowVirtualizer = useVirtualizer({
     count: filteredProducts.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 60,
-    overscan: 5,
+    estimateSize: () => 64,
+    measureElement: (el) => el.getBoundingClientRect().height,
+    overscan: 8,
   });
 
   // Count stats for filter
@@ -465,7 +466,7 @@ export function ProductsView() {
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Pesquisar por nome, código, código de fornecedor ou localização..."
+            placeholder="Pesquisar por palavras (ex.: cama gomos 195x150), código, fornecedor ou localização..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 h-11 text-base"
@@ -910,12 +911,13 @@ export function ProductsView() {
                     return (
                       <div
                         key={product.id}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
                         style={{
                           position: 'absolute',
                           top: 0,
                           left: 0,
                           width: '100%',
-                          height: `${virtualRow.size}px`,
                           transform: `translateY(${virtualRow.start}px)`,
                         }}
                       >
