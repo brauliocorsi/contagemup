@@ -48,7 +48,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   colisLocations: 180,
   location: 120,
   sales: 100,
-  actions: 120,
+  actions: 292,
 };
 
 type ColumnKey = 'code' | 'name' | 'category' | 'colis' | 'stock' | 'damages' | 'totalUnits' | 'lastCount' | 'colisLocations' | 'location' | 'sales';
@@ -116,6 +116,9 @@ export function ProductsView() {
   };
 
   const isColumnVisible = (column: ColumnKey) => visibleColumns.has(column);
+
+  const tableWidth = DEFAULT_COLUMN_WIDTHS.checkbox + DEFAULT_COLUMN_WIDTHS.actions
+    + DEFAULT_VISIBLE_COLUMNS.reduce((sum, column) => sum + (visibleColumns.has(column) ? DEFAULT_COLUMN_WIDTHS[column] : 0), 0);
 
   const handleSort = (column: 'code' | 'name' | 'category' | 'stock' | 'lastCount') => {
     if (sortColumn === column) {
@@ -781,9 +784,15 @@ export function ProductsView() {
         <Card>
           <CardContent className="p-0">
             {/* Virtualized Table */}
-            <div className="overflow-x-auto">
+            <div
+              ref={parentRef}
+              className="overflow-auto relative isolate"
+              data-testid="products-scroll"
+              style={{ height: 'calc(100vh - 400px)', minHeight: '400px', maxHeight: '700px' }}
+            >
+              <div style={{ width: tableWidth, minWidth: '100%' }}>
               {/* Header */}
-              <div className="flex items-center border-b bg-muted/50 sticky top-0 z-10">
+              <div data-testid="products-header" className="flex items-center border-b bg-muted sticky top-0 z-10 [&>div]:shrink-0">
                 <div className="flex-shrink-0 p-2" style={{ width: '48px' }}>
                   <Checkbox
                     checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
@@ -910,17 +919,13 @@ export function ProductsView() {
                     </span>
                   </div>
                 )}
-                <div className="flex-shrink-0 p-2 font-medium text-muted-foreground text-sm text-right" style={{ width: '212px' }}>
+                <div className="flex-shrink-0 p-2 font-medium text-muted-foreground text-sm text-right" style={{ width: DEFAULT_COLUMN_WIDTHS.actions }}>
                   Ações
                 </div>
               </div>
 
               {/* Virtualized Body */}
-              <div
-                ref={parentRef}
-                className="overflow-y-auto"
-                style={{ height: 'calc(100vh - 400px)', minHeight: '400px', maxHeight: '700px' }}
-              >
+              <div>
                 <div
                   style={{
                     height: `${rowVirtualizer.getTotalSize()}px`,
@@ -966,6 +971,7 @@ export function ProductsView() {
                     );
                   })}
                 </div>
+              </div>
               </div>
             </div>
           </CardContent>

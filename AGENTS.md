@@ -1,1 +1,3 @@
 Picking membership in Contagem is resolved through `loadProductResolver` and carried as `PickingLine.registered`; this keeps the on-screen, printed, and exported status consistent without removing unmatched ERP lines.
+Product list headers and virtual rows share one scroll container and the same column widths, including fixed controls, to prevent alignment drift when columns are hidden.
+Product orphan badges use the trigger-maintained `colis_orfaos` value rather than deriving stock from the latest counting session, which may contain only part of current inventory.
