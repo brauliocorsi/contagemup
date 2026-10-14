@@ -499,9 +499,9 @@ export function ProductsView() {
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[22rem] bg-background border shadow-lg z-50" align="start">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+          <PopoverContent className="w-[min(36rem,calc(100vw-2rem))] bg-background border shadow-lg z-50 p-0" align="start">
+            <div className="space-y-4 p-4">
+              <div className="flex items-center justify-between border-b pb-3">
                 <p className="text-sm font-medium">Filtros</p>
                 {activeFilterCount > 0 && (
                   <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearAllFilters}>
@@ -510,7 +510,8 @@ export function ProductsView() {
                 )}
               </div>
 
-              <div className="space-y-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+              <div className="space-y-1.5 sm:col-span-2">
                 <label className="text-xs font-medium text-muted-foreground">Categoria</label>
                 <Select value={filterCategory} onValueChange={setFilterCategory}>
                   <SelectTrigger className={filterCategory !== 'all' ? 'border-primary bg-primary/10' : ''}>
@@ -605,7 +606,9 @@ export function ProductsView() {
                 </Select>
               </div>
 
-              <div className="flex items-center space-x-2 pt-1">
+              </div>
+
+              <div className="flex items-center space-x-2 rounded-md border bg-muted/40 px-3 py-2.5">
                 <Checkbox
                   id="missing-supplier-code"
                   checked={onlyMissingSupplierCode}
