@@ -67,6 +67,21 @@ async function fetchAllCounts() {
   return rows;
 }
 
+async function fetchAllProducts() {
+  const rows: { id: string; code: string; name: string; category: string; total_colis: number }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, code, name, category, total_colis')
+      .order('id', { ascending: true })
+      .range(from, from + 999);
+    if (error) return { data: null, error };
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return { data: rows, error: null };
+}
+
 export function useOrphanColis() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -89,7 +104,7 @@ export function useOrphanColis() {
     queryFn: async (): Promise<OrphanProduct[]> => {
       const [countsRows, productsRes, categoriesRes] = await Promise.all([
         fetchAllCounts(),
-        supabase.from('products').select('id, code, name, category, total_colis, current_stock, unidades_fisicas, colis_orfaos'),
+        fetchAllProducts(),
         supabase.from('categories').select('name, colis_names'),
       ]);
       if (productsRes.error) throw productsRes.error;
