@@ -469,7 +469,7 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
                 {draft && draft.exceptions.length > 0 && (
                   <div className="rounded-lg border border-dashed p-2 text-[11px] text-muted-foreground">
                     <p className="font-medium text-foreground">
-                      {draft.exceptions.length} leitura(s) de artigos não previstos
+                      {draft.exceptions.length} produto(s) no local errado
                     </p>
                     {draft.exceptions.slice(-4).map((e, idx) => (
                       <p key={idx} className="truncate font-mono">
@@ -477,7 +477,7 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
                         {e.colis ? `-C${e.colis}` : ''} • {e.location}
                       </p>
                     ))}
-                    <p>Avise o responsável — não entram na contagem.</p>
+                    <p>Só corrigir localização — não entram no ajuste de stock.</p>
                   </div>
                 )}
 
