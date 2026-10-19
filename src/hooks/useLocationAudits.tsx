@@ -416,7 +416,8 @@ export function useMyLocationAudits() {
 
         .order('created_at', { ascending: false });
       if (!uid) return [];
-      query = query.eq('assigned_to', uid);
+      // Atribuídas a mim ou sem responsável ("Qualquer utilizador").
+      query = query.or(`assigned_to.eq.${uid},assigned_to.is.null`);
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as LocationAudit[];
