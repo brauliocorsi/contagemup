@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { 
   CheckCircle2, 
@@ -34,6 +36,19 @@ interface AuditResultsDialogProps {
 }
 
 export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDialogProps) {
+  const { data: misplaced = [] } = useQuery({
+    queryKey: ['audit-misplaced', audit.id],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('location_audit_misplaced')
+        .select('*')
+        .eq('audit_id', audit.id)
+        .order('created_at');
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   // Stats
   const stats = useMemo(() => {
     const items = audit.items;
@@ -206,6 +221,20 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
             </TableBody>
           </Table>
         </div>
+
+        {misplaced.length > 0 && (
+          <div className="rounded-lg border border-dashed p-3 text-xs space-y-1">
+            <p className="font-medium flex items-center gap-1">
+              <MapPin className="h-3.5 w-3.5" /> {misplaced.length} produto(s) no local errado — corrigir localização, sem ajuste de stock
+            </p>
+            {misplaced.map((m) => (
+              <p key={m.id} className="font-mono text-muted-foreground">
+                {m.product_code}{m.colis_number ? `-C${m.colis_number}` : ''} lido em {m.scanned_location}
+                {' → '}no sistema: {m.system_locations.length ? m.system_locations.join(', ') : 'sem localização'}
+              </p>
+            ))}
+          </div>
+        )}
 
         {/* Footer info */}
         <div className="text-xs text-muted-foreground text-center">
