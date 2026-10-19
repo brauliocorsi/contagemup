@@ -15,6 +15,13 @@
       "when": 1792414182173,
       "tag": "0001_fix_audit_access_code_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792415120869,
+      "tag": "0002_deliver_unassigned_audit",
+      "breakpoints": true
     }
   ]
 }
