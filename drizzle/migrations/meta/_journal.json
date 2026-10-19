@@ -22,6 +22,13 @@
       "when": 1792415120869,
       "tag": "0002_deliver_unassigned_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792416018951,
+      "tag": "0003_location_audit_misplaced",
+      "breakpoints": true
     }
   ]
 }

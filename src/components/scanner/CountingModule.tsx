@@ -46,6 +46,7 @@ import {
 import { ScanDock, type LastScan } from './ScanDock';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   onCommand?: (raw: string) => boolean;
@@ -207,7 +208,8 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
       return;
     }
 
-    // Artigo não previsto nesta localização: fica registado como exceção.
+    // Artigo não previsto nesta localização: alerta de local errado.
+    // Não entra na contagem nem no ajuste de stock.
     if (auditId) {
       updateDraft((d) => ({
         ...d,
@@ -216,8 +218,46 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
           { code: result.baseCode, colis: result.colis, location, quantity: 1 },
         ],
       }));
+      void reportMisplaced(result.baseCode, result.colis ?? null, location);
     }
-    fail(result.message, 'Registado como exceção para o responsável');
+  };
+
+  /** Descobre onde o sistema tem o produto, avisa o operador e regista o alerta. */
+  const reportMisplaced = async (rawCode: string, colis: number | null, scannedAt: string) => {
+    const code = rawCode.trim();
+    const { data: prods } = await supabase
+      .from('products')
+      .select('id, code, name')
+      .or(`code.ilike.${code},barcode.eq.${code},supplier_code.eq.${code}`)
+      .limit(1);
+    const prod = prods?.[0];
+    let systemLocs: string[] = [];
+    if (prod) {
+      let q = supabase.from('counts').select('location').eq('product_id', prod.id).gt('quantity', 0);
+      if (colis) q = q.eq('colis_number', colis);
+      const { data: c } = await q;
+      systemLocs = Array.from(new Set((c ?? []).map((r) => r.location).filter(Boolean) as string[]))
+        .filter((l) => norm(l) !== norm(scannedAt));
+    }
+    const label = `${(prod?.code ?? code).toUpperCase()}${colis ? `-C${colis}` : ''}`;
+    const detail = systemLocs.length
+      ? `Local errado: no sistema está em ${systemLocs.join(', ')}. Corrigir localização — não ajusta stock.`
+      : prod
+        ? 'Local errado: sem localização no sistema. Corrigir localização — não ajusta stock.'
+        : 'Produto desconhecido neste local. Avise o responsável — não ajusta stock.';
+    scanFeedback('error');
+    setLast({ kind: 'erro', title: `${label} fora do sítio`, detail });
+    toast.warning(`${label} fora do sítio — ${detail}`);
+    if (!auditId) return;
+    await supabase.from('location_audit_misplaced').insert({
+      audit_id: auditId,
+      product_id: prod?.id ?? null,
+      product_code: prod?.code ?? code,
+      product_name: prod?.name ?? null,
+      colis_number: colis,
+      scanned_location: scannedAt,
+      system_locations: systemLocs,
+    });
   };
 
   const confirmItem = async (item: LocationAuditItem) => {
@@ -429,7 +469,7 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
                 {draft && draft.exceptions.length > 0 && (
                   <div className="rounded-lg border border-dashed p-2 text-[11px] text-muted-foreground">
                     <p className="font-medium text-foreground">
-                      {draft.exceptions.length} leitura(s) de artigos não previstos
+                      {draft.exceptions.length} produto(s) no local errado
                     </p>
                     {draft.exceptions.slice(-4).map((e, idx) => (
                       <p key={idx} className="truncate font-mono">
@@ -437,7 +477,7 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
                         {e.colis ? `-C${e.colis}` : ''} • {e.location}
                       </p>
                     ))}
-                    <p>Avise o responsável — não entram na contagem.</p>
+                    <p>Só corrigir localização — não entram no ajuste de stock.</p>
                   </div>
                 )}
 

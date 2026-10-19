@@ -1252,6 +1252,53 @@ export type Database = {
           },
         ]
       }
+      location_audit_misplaced: {
+        Row: {
+          audit_id: string
+          colis_number: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          product_code: string
+          product_id: string | null
+          product_name: string | null
+          scanned_location: string
+          system_locations: string[]
+        }
+        Insert: {
+          audit_id: string
+          colis_number?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_code: string
+          product_id?: string | null
+          product_name?: string | null
+          scanned_location: string
+          system_locations?: string[]
+        }
+        Update: {
+          audit_id?: string
+          colis_number?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_code?: string
+          product_id?: string | null
+          product_name?: string | null
+          scanned_location?: string
+          system_locations?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_audit_misplaced_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "location_audits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       location_audits: {
         Row: {
           access_code: string | null
