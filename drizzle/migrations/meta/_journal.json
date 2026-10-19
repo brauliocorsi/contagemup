@@ -8,6 +8,13 @@
       "when": 1790789024014,
       "tag": "0000_user_delete_set_null",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792414182173,
+      "tag": "0001_fix_audit_access_code_trigger",
+      "breakpoints": true
     }
   ]
 }
