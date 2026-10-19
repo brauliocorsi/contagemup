@@ -37,7 +37,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { X, Filter } from 'lucide-react';
+import { X, Filter, PackageCheck } from 'lucide-react';
 import { useLocationAudits, LocationAudit, type AuditDriftLine } from '@/hooks/useLocationAudits';
 import { AuditResultsDialog } from '@/components/audit/AuditResultsDialog';
 import { AuditDriftDialog } from '@/components/audit/AuditDriftDialog';
@@ -117,7 +117,10 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
   const { data: selectedAudit } = useAuditWithItems(selectedAuditId);
 
 
-  const getStatusConfig = (status: LocationAudit['status']) => {
+  const getStatusConfig = (status: LocationAudit['status'], deliveredAt?: string | null) => {
+    if (status === 'in_progress' && deliveredAt) {
+      return { icon: PackageCheck, color: 'text-orange-600', bg: 'bg-orange-100', label: 'Entregue · por fechar' };
+    }
     switch (status) {
       case 'pending':
         return { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Pendente' };
@@ -332,7 +335,7 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                   </TableRow>
                 ) : (
                   filteredAudits.map(audit => {
-                    const statusConfig = getStatusConfig(audit.status);
+                    const statusConfig = getStatusConfig(audit.status, audit.delivered_at);
                     const StatusIcon = statusConfig.icon;
 
                     return (
@@ -386,7 +389,17 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                                 Fechar e ajustar
                               </Button>
                             )}
-                            {audit.status === 'in_progress' && onStartAudit && (
+                            {audit.status === 'in_progress' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewResults(audit.id)}
+                              >
+                                <Eye className="h-3.5 w-3.5 mr-1" />
+                                Ver
+                              </Button>
+                            )}
+                            {audit.status === 'in_progress' && !audit.delivered_at && onStartAudit && (
                               <Button
                                 size="sm"
                                 onClick={() => onStartAudit(audit.id)}
