@@ -92,8 +92,8 @@ const OPERATIONS: Array<{
   },
   {
     id: 'contagem',
-    label: 'Contagem',
-    description: 'Conferir localizações atribuídas',
+    label: 'Conferências',
+    description: 'Conferir localizações (só conferências)',
     icon: ClipboardCheck,
     accent: 'bg-success-soft text-success',
   },
@@ -128,7 +128,7 @@ const NAV: Array<{ id: View; label: string; icon: typeof Search }> = [
   { id: 'carregamento', label: 'Carga', icon: Truck },
   { id: 'entradas', label: 'Entradas', icon: PackagePlus },
   { id: 'arrumacao', label: 'Arrumação', icon: Boxes },
-  { id: 'contagem', label: 'Contagem', icon: ClipboardCheck },
+  { id: 'contagem', label: 'Conferências', icon: ClipboardCheck },
 ];
 
 export default function ScannerApp() {
@@ -218,9 +218,9 @@ export default function ScannerApp() {
   }
 
   const operations = OPERATIONS.filter(
-    (o) => (o.id !== 'contagem' || canCount) && !blockedViews.includes(o.id),
+    (o) => !blockedViews.includes(o.id),
   );
-  const navItems = NAV.filter((n) => (n.id !== 'contagem' || canCount) && !blockedViews.includes(n.id));
+  const navItems = NAV.filter((n) => !blockedViews.includes(n.id));
   const current = operations.find((o) => o.id === view);
 
 
@@ -296,7 +296,12 @@ export default function ScannerApp() {
         {view === 'entradas' && <EntryModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
         {view === 'arrumacao' && <PutawayModule onCommand={handleCommand} />}
         {view === 'carregamento' && <LoadingModule onCommand={handleCommand} />}
-        {view === 'contagem' && canCount && <CountingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} />}
+        {view === 'contagem' && (canCount ? <CountingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} /> : (
+          <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
+            <ClipboardCheck className="mx-auto mb-2 h-8 w-8 opacity-50" />
+            Não há conferências abertas para si. Crie uma no painel e atribua-a, ou deixe "Qualquer utilizador".
+          </div>
+        ))}
         {view === 'fornecedor' && !isWarehouseOperator && <SupplierCodeModule onCommand={handleCommand} />}
         {view === 'compras' && <PurchaseLabelsModule onCommand={handleCommand} />}
         {view === 'impressao' && <PrintCenterModule />}
