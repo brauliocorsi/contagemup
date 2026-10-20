@@ -43,6 +43,19 @@ export function LocationAuditView({ onStartAudit }: LocationAuditViewProps) {
       }
     });
 
+    // Zonas sem rua (ex.: Zona S, CONF, cais, quarentena) — mostradas mesmo sem stock
+    const aisleIds = new Set(aisles.map(a => a.id));
+    const others = locations
+      .filter(l => !l.aisle_id || !aisleIds.has(l.aisle_id))
+      .filter(l => l.code)
+      .sort((a, b) => a.code.localeCompare(b.code, 'pt', { numeric: true }));
+    if (others.length > 0) {
+      groups['__others__'] = {
+        aisle: { id: '__others__', name: 'Outras zonas', color: '' } as typeof aisles[0],
+        locations: others,
+      };
+    }
+
     return groups;
   }, [aisles, locations]);
 
