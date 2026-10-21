@@ -63,7 +63,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
 
   // Situações (statuses)
   const [availableSituacoes, setAvailableSituacoes] = useState<ERPSituacao[]>([]);
-  const [selectedSituacoes, setSelectedSituacoes] = useState<string[]>(['agendado entrega', 'agendado levantamento']);
+  const [selectedSituacoes, setSelectedSituacoes] = useState<string[]>(['agendado entrega', 'levantamento agendado', 'disponível para entrega', 'pré agendado', 'reagendamento']);
   const [situacoesOpen, setSituacoesOpen] = useState(false);
 
   // Removed products from list
@@ -323,7 +323,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
                     ))
                   ) : (
                     <>
-                      {['agendado entrega', 'agendado levantamento'].map(s => (
+                      {['agendado entrega', 'levantamento agendado', 'disponível para entrega', 'pré agendado', 'reagendamento'].map(s => (
                         <label key={s} className="flex items-center gap-2 cursor-pointer text-sm hover:bg-muted/50 rounded px-2 py-1">
                           <Checkbox checked={selectedSituacoes.includes(s)} onCheckedChange={() => toggleSituacao(s)} />
                           <span className="capitalize">{s}</span>

@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
     const situacoes = situacoesData?.data || [];
 
     // Build lookup and filter by selected statuses (or default)
-    const DEFAULT_STATUSES = ['agendado entrega', 'agendado levantamento'];
+    const DEFAULT_STATUSES = ['agendado entrega', 'levantamento agendado', 'agendado levantamento', 'disponível para entrega', 'pré agendado', 'reagendamento'];
     const filterStatuses = (selectedStatuses && selectedStatuses.length > 0)
       ? selectedStatuses.map(s => s.toLowerCase().trim())
       : DEFAULT_STATUSES;
@@ -273,10 +273,10 @@ Deno.serve(async (req) => {
           || (refs.variationId ? productCodeByVariationId[refs.variationId] : '')
           || (refs.productId ? productCodeByProductId[refs.productId] : '');
 
-        if (!resolvedCode) continue;
+        const finalCode = resolvedCode || 'SEM_CODIGO';
 
         saleItems.push({
-          productCode: resolvedCode,
+          productCode: finalCode,
           productName: item.nome || item.produto_nome || item.produto?.nome_produto || '',
           quantity: parseInt(String(item.quantidade || item.produto?.quantidade || '1'), 10) || 1,
         });
@@ -286,7 +286,7 @@ Deno.serve(async (req) => {
         salesExits.push({
           venda_id: String(venda.id),
           codigo: String(venda.codigo || ''),
-          cliente_nome: venda.cliente_nome || venda.cliente?.nome || 'N/A',
+          cliente_nome: venda.nome_cliente || venda.cliente_nome || venda.cliente?.nome || 'N/A',
           situacao: situacaoLookup[String(venda.situacao_id)] || 'Desconhecida',
           data: venda.data || '',
           prazo_entrega: venda.prazo_entrega || venda.data_entrega || venda.data_previsao || '',
