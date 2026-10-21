@@ -81,7 +81,10 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
   const localProductMap = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
     for (const p of products) {
-      map.set(p.code.toLowerCase(), { id: p.id, code: p.code, name: p.name, current_stock: p.current_stock });
+      const entry = { id: p.id, code: p.code, name: p.name, current_stock: p.current_stock };
+      map.set(p.code.toLowerCase(), entry);
+      const bc = (p as { barcode?: string | null }).barcode;
+      if (bc && !map.has(bc.toLowerCase())) map.set(bc.toLowerCase(), entry);
     }
     return map;
   }, [products]);
