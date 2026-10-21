@@ -209,10 +209,9 @@ Deno.serve(async (req) => {
       const items = venda.produtos || venda.itens || [];
       for (const item of items) {
         const refs = extractProductReferences(item);
-        if (!refs.productCode) {
-          if (refs.productId) requiredProductIds.add(refs.productId);
-          if (refs.variationId) requiredVariationIds.add(refs.variationId);
-        }
+        // Sempre resolver pelo código interno do produto no GestãoClick
+        if (refs.productId) requiredProductIds.add(refs.productId);
+        if (refs.variationId) requiredVariationIds.add(refs.variationId);
       }
     }
 
@@ -235,7 +234,7 @@ Deno.serve(async (req) => {
           for (const vw of variacoes) {
             const v = vw?.variacao || vw || {};
             const vid = normalizeIdentifier(v?.id || v?.variacao_id);
-            const vc = normalizeCode(v?.codigo || v?.codigo_interno || code);
+            const vc = normalizeCode(v?.codigo_interno || code || v?.codigo);
             if (vid && vc) { productCodeByVariationId[vid] = vc; pendingVariationIds.delete(vid); }
           }
         }
@@ -269,9 +268,9 @@ Deno.serve(async (req) => {
 
       for (const item of items) {
         const refs = extractProductReferences(item);
-        const resolvedCode = refs.productCode
+        const resolvedCode = (refs.productId ? productCodeByProductId[refs.productId] : '')
           || (refs.variationId ? productCodeByVariationId[refs.variationId] : '')
-          || (refs.productId ? productCodeByProductId[refs.productId] : '');
+          || refs.productCode;
 
         const finalCode = resolvedCode || 'SEM_CODIGO';
 
