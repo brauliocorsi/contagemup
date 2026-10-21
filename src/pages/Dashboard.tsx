@@ -57,11 +57,17 @@ function ViewLoader() {
 export default function Dashboard() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
-  const [activeTab, setActiveTabState] = useState('home');
+  // A página atual fica no endereço (?tab=) para sobreviver a um refresh.
+  const [activeTab, setActiveTabState] = useState(
+    () => new URLSearchParams(window.location.search).get('tab') || 'home'
+  );
   /** Sair das Rotas esquece a rota aberta: voltar ao menu mostra sempre a lista. */
   const setActiveTab = (tab: string) => {
     if (tab !== 'routes') setOpenRouteId(null);
     setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'home') url.searchParams.delete('tab'); else url.searchParams.set('tab', tab);
+    window.history.replaceState(window.history.state, '', url.toString());
   };
   const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
   const [openRouteId, setOpenRouteId] = useState<string | null>(null);
