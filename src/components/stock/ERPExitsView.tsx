@@ -63,7 +63,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
 
   // Situações (statuses)
   const [availableSituacoes, setAvailableSituacoes] = useState<ERPSituacao[]>([]);
-  const [selectedSituacoes, setSelectedSituacoes] = useState<string[]>(['agendado entrega', 'agendado levantamento']);
+  const [selectedSituacoes, setSelectedSituacoes] = useState<string[]>(['agendado entrega', 'levantamento agendado', 'disponível para entrega', 'pré agendado', 'reagendamento']);
   const [situacoesOpen, setSituacoesOpen] = useState(false);
 
   // Removed products from list
@@ -81,7 +81,10 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
   const localProductMap = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string; current_stock: number }>();
     for (const p of products) {
-      map.set(p.code.toLowerCase(), { id: p.id, code: p.code, name: p.name, current_stock: p.current_stock });
+      const entry = { id: p.id, code: p.code, name: p.name, current_stock: p.current_stock };
+      map.set(p.code.toLowerCase(), entry);
+      const bc = (p as { barcode?: string | null }).barcode;
+      if (bc && !map.has(bc.toLowerCase())) map.set(bc.toLowerCase(), entry);
     }
     return map;
   }, [products]);
@@ -323,7 +326,7 @@ export function ERPExitsView({ onSendToCart }: ERPExitsViewProps) {
                     ))
                   ) : (
                     <>
-                      {['agendado entrega', 'agendado levantamento'].map(s => (
+                      {['agendado entrega', 'levantamento agendado', 'disponível para entrega', 'pré agendado', 'reagendamento'].map(s => (
                         <label key={s} className="flex items-center gap-2 cursor-pointer text-sm hover:bg-muted/50 rounded px-2 py-1">
                           <Checkbox checked={selectedSituacoes.includes(s)} onCheckedChange={() => toggleSituacao(s)} />
                           <span className="capitalize">{s}</span>
