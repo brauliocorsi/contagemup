@@ -5,7 +5,8 @@ import {
   Square, 
   ClipboardCheck,
   Play,
-  X
+  X,
+  Tags
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ export function LocationAuditView({ onStartAudit }: LocationAuditViewProps) {
   const [selectedLocations, setSelectedLocations] = useState<Set<string>>(new Set());
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [showSelector, setShowSelector] = useState(false);
+  const [globalOpen, setGlobalOpen] = useState(false);
 
   // Group locations by aisle
   const locationsByAisle = useMemo(() => {
@@ -141,13 +143,17 @@ export function LocationAuditView({ onStartAudit }: LocationAuditViewProps) {
             Seleccione localizações para criar uma conferência de stock
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {activeAudit && onStartAudit && (
             <Button onClick={() => onStartAudit(activeAudit.id)}>
               <Play className="h-4 w-4 mr-2" />
               Continuar "{activeAudit.name}"
             </Button>
           )}
+          <Button variant="outline" onClick={() => setGlobalOpen(true)}>
+            <Tags className="h-4 w-4 mr-2" />
+            Por categoria / palavra
+          </Button>
           {!showSelector ? (
             <Button variant="outline" onClick={() => setShowSelector(true)}>
               <MapPin className="h-4 w-4 mr-2" />
@@ -275,6 +281,13 @@ export function LocationAuditView({ onStartAudit }: LocationAuditViewProps) {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         selectedLocations={Array.from(selectedLocations)}
+        onSuccess={handleAuditCreated}
+      />
+      <CreateAuditDialog
+        open={globalOpen}
+        onOpenChange={setGlobalOpen}
+        selectedLocations={[]}
+        mode="global"
         onSuccess={handleAuditCreated}
       />
     </div>

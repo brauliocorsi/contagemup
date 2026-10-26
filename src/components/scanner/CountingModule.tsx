@@ -112,6 +112,12 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
     return Array.from(set).sort();
   }, [items, audit]);
 
+  const isGlobal = audit?.scope === 'global';
+  // Conferência global: não se lê localização, pica-se só o produto.
+  useEffect(() => {
+    if (isGlobal && location !== 'TODAS') setLocation('TODAS');
+  }, [isGlobal, location]);
+
   const locationItems = useMemo(
     () => items.filter((i) => norm(i.location) === norm(location)),
     [items, location],
@@ -205,6 +211,11 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
 
     if (result.status === 'coli_inexistente') {
       fail(result.message, 'Nada foi somado a outro coli');
+      return;
+    }
+
+    if (isGlobal) {
+      fail(`${result.baseCode.toUpperCase()} não faz parte desta conferência`, 'Nada foi contado');
       return;
     }
 
