@@ -352,7 +352,7 @@ export function CountingModule({ onCommand, registerQtyHandler }: Props) {
         <ScanInput
           onScan={handleScan}
           feedback={false}
-          label={location ? `A contar em ${location}` : 'Leia a localização (LOC-…)'}
+          label={isGlobal ? 'Pique os produtos (qualquer localização)' : location ? `A contar em ${location}` : 'Leia a localização (LOC-…)'}
         />
       </ScanDock>
 
