@@ -30,13 +30,57 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AuditWithItems } from '@/hooks/useLocationAudits';
 import { cn } from '@/lib/utils';
 import { loadXLSX } from '@/lib/lazyXlsx';
+import { DivergenceResolutionTable } from '@/components/audit/DivergenceResolutionTable';
 interface AuditResultsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   audit: AuditWithItems;
+  /** Fecha a conferência aplicando só as divergências marcadas "ajustar". */
+  onCloseAudit?: () => void;
+  closing?: boolean;
 }
 
-export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDialogProps) {
+export function AuditResultsDialog({ open, onOpenChange, audit, onCloseAudit, closing }: AuditResultsDialogProps) {
+  const isGlobal = audit.scope === 'global';
+  const productIds = useMemo(
+    () => Array.from(new Set(audit.items.filter(i => isGlobal || (i.difference ?? 0) !== 0).map(i => i.product_id).filter(Boolean) as string[])),
+    [audit.items, isGlobal],
+  );
+  /** Onde o sistema tem cada produto/volume: "produto|coli" → "B11 ×2, CONF ×1". */
+  const { data: locMap = new Map<string, string>() } = useQuery({
+    queryKey: ['audit-system-locations', audit.id, productIds.length],
+    enabled: open && productIds.length > 0,
+    queryFn: async () => {
+      const acc = new Map<string, Map<string, number>>();
+      for (let i = 0; i < productIds.length; i += 200) {
+        const chunk = productIds.slice(i, i + 200);
+        for (let from = 0; ; from += 1000) {
+          const { data, error } = await supabase
+            .from('counts')
+            .select('product_id, colis_number, location, quantity')
+            .in('product_id', chunk)
+            .gt('quantity', 0)
+            .order('id')
+            .range(from, from + 999);
+          if (error) throw error;
+          (data ?? []).forEach(c => {
+            const k = `${c.product_id}|${c.colis_number}`;
+            const m = acc.get(k) ?? new Map<string, number>();
+            const l = c.location || 'sem localização';
+            m.set(l, (m.get(l) ?? 0) + c.quantity);
+            acc.set(k, m);
+          });
+          if (!data || data.length < 1000) break;
+        }
+      }
+      const out = new Map<string, string>();
+      acc.forEach((m, k) => out.set(k, Array.from(m.entries()).sort().map(([l, q]) => `${l} ×${q}`).join(', ')));
+      return out;
+    },
+  });
+  const locationsOf = (i: { product_id: string | null; colis_number: number | null }) =>
+    locMap.get(`${i.product_id}|${i.colis_number}`) ?? '';
+  const editable = audit.status !== 'completed' && !!onCloseAudit;
   const { data: misplaced = [] } = useQuery({
     queryKey: ['audit-misplaced', audit.id],
     enabled: open,
@@ -74,7 +118,9 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
   const exportToExcel = async () => {
       const XLSX = await loadXLSX();
     const data = audit.items.map(item => ({
-      'Localização': item.location,
+      'Localização': isGlobal ? locationsOf(item) : item.location,
+      'Causa': item.notes ?? '',
+      'Decisão': item.applied_at ? 'Ajustado' : item.resolution === 'ajustar' ? 'Ajustar' : item.resolution === 'sem_ajuste' ? 'Sem ajuste' : '',
       'Código': item.product_code,
       'Produto': item.product_name,
       'Coli': item.colis_number || '-',
@@ -110,7 +156,7 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-muted">
           <TableRow>
-            <TableHead className="w-[110px]">Localização</TableHead>
+            <TableHead className={isGlobal ? 'w-[200px]' : 'w-[110px]'}>{isGlobal ? 'No sistema em' : 'Localização'}</TableHead>
             <TableHead className="w-[160px]">Código</TableHead>
             <TableHead>Produto</TableHead>
             <TableHead className="w-[70px] text-center">Volume</TableHead>
@@ -129,7 +175,7 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
             <TableRow key={item.id}>
               <TableCell>
                 <span className="inline-flex items-center gap-1 font-mono text-sm font-semibold">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />{item.location}
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />{isGlobal ? (locationsOf(item) || '—') : item.location}
                 </span>
               </TableCell>
               <TableCell className="font-mono text-xs break-all">{item.product_code}</TableCell>
@@ -161,7 +207,9 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
             Resultados: {audit.name}
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
-            {audit.locations.length} localização(ões) · Concluída em{' '}
+            {isGlobal
+              ? `Por categoria/palavra${audit.scope_filter?.category ? ` · ${audit.scope_filter.category}` : ''}${audit.scope_filter?.keyword ? ` · "${audit.scope_filter.keyword}"` : ''}`
+              : `${audit.locations.length} localização(ões)`} · Concluída em{' '}
             {audit.completed_at ? format(new Date(audit.completed_at), 'dd/MM/yyyy HH:mm') : '-'}
           </p>
         </DialogHeader>
@@ -203,8 +251,13 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
               <Badge variant="destructive">Faltas: {missing.length}</Badge>
               <Badge variant="default">Excessos: {excess.length}</Badge>
             </div>
+            {editable && (
+              <p className="text-xs text-muted-foreground">
+                Para cada divergência escolha o que aconteceu e decida: ajustar o stock ou deixar sem ajuste. Só as marcadas "Ajustar stock" mexem no stock ao fechar.
+              </p>
+            )}
             <div className="flex-1 min-h-0">
-              <ItemsTable items={[...missing, ...excess]} empty="Nenhuma divergência — tudo bate certo." />
+              <DivergenceResolutionTable items={[...missing, ...excess]} editable={editable} isGlobal={isGlobal} locationsOf={locationsOf} />
             </div>
           </TabsContent>
 
@@ -248,6 +301,20 @@ export function AuditResultsDialog({ open, onOpenChange, audit }: AuditResultsDi
             </div>
           </TabsContent>
         </Tabs>
+        {editable && (
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t pt-3">
+            <span className="text-xs text-muted-foreground">
+              {stats.items.filter(i => !i.resolution && !i.applied_at).length} divergência(s) por tratar
+              {pendingItems.length > 0 ? ` · ${pendingItems.length} por contar` : ''}
+            </span>
+            <Button
+              onClick={onCloseAudit}
+              disabled={closing || pendingItems.length > 0 || stats.items.some(i => !i.resolution && !i.applied_at)}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />Fechar conferência
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

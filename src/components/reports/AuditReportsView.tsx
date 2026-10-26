@@ -383,10 +383,9 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => closeAudit(audit.id).catch(() => undefined)}
-                                disabled={completeAudit.isPending}
+                                onClick={() => handleViewResults(audit.id)}
                               >
-                                Fechar e ajustar
+                                Tratar e fechar
                               </Button>
                             )}
                             {audit.status === 'in_progress' && (
