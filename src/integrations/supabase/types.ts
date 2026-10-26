@@ -1191,6 +1191,9 @@ export type Database = {
           product_name: string
           quantity_after: number | null
           quantity_before: number | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
           status: string
         }
         Insert: {
@@ -1212,6 +1215,9 @@ export type Database = {
           product_name: string
           quantity_after?: number | null
           quantity_before?: number | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
         }
         Update: {
@@ -1233,6 +1239,9 @@ export type Database = {
           product_name?: string
           quantity_after?: number | null
           quantity_before?: number | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
         }
         Relationships: [
@@ -1313,6 +1322,8 @@ export type Database = {
           locations: string[]
           name: string
           notes: string | null
+          scope: string
+          scope_filter: Json | null
           started_at: string | null
           status: string
           updated_at: string
@@ -1330,6 +1341,8 @@ export type Database = {
           locations: string[]
           name: string
           notes?: string | null
+          scope?: string
+          scope_filter?: Json | null
           started_at?: string | null
           status?: string
           updated_at?: string
@@ -1347,6 +1360,8 @@ export type Database = {
           locations?: string[]
           name?: string
           notes?: string | null
+          scope?: string
+          scope_filter?: Json | null
           started_at?: string | null
           status?: string
           updated_at?: string
@@ -3186,6 +3201,10 @@ export type Database = {
           p_op_key?: string
           p_scheduled_date: string
         }
+        Returns: Json
+      }
+      resolve_audit_item: {
+        Args: { p_item_id: string; p_reason: string; p_resolution: string }
         Returns: Json
       }
       resolve_damage: {

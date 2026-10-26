@@ -352,7 +352,7 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                         <TableCell>
                           <div className="flex items-center gap-1 text-xs">
                             <MapPin className="h-3 w-3 text-muted-foreground" />
-                            {audit.locations.length} localização(ões)
+                            {audit.scope === 'global' ? 'Por categoria/palavra' : `${audit.locations.length} localização(ões)`}
                           </div>
                         </TableCell>
                         <TableCell className="text-xs">
@@ -383,10 +383,9 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => closeAudit(audit.id).catch(() => undefined)}
-                                disabled={completeAudit.isPending}
+                                onClick={() => handleViewResults(audit.id)}
                               >
-                                Fechar e ajustar
+                                Tratar e fechar
                               </Button>
                             )}
                             {audit.status === 'in_progress' && (
@@ -460,6 +459,12 @@ export function AuditReportsView({ onStartAudit }: AuditReportsViewProps) {
           open={resultsDialogOpen}
           onOpenChange={setResultsDialogOpen}
           audit={selectedAudit}
+          closing={completeAudit.isPending}
+          onCloseAudit={
+            selectedAudit.status === 'in_progress'
+              ? () => closeAudit(selectedAudit.id).then(() => setResultsDialogOpen(false)).catch(() => undefined)
+              : undefined
+          }
         />
       )}
 

@@ -11,6 +11,9 @@ export interface LocationAudit {
   created_by: string | null;
   assigned_to: string | null;
   blind_mode: boolean;
+  /** 'global' = conferência por categoria/palavra, sem localização. */
+  scope?: 'location' | 'global';
+  scope_filter?: { category?: string | null; keyword?: string | null } | null;
   started_at: string | null;
   completed_at: string | null;
   /** Momento em que o operador entregou a contagem ao responsável. */
@@ -43,7 +46,13 @@ export interface LocationAuditItem {
   movement_id?: string | null;
   quantity_before?: number | null;
   quantity_after?: number | null;
+  /** Decisão do responsável sobre a divergência. */
+  resolution?: 'ajustar' | 'sem_ajuste' | null;
+  resolved_at?: string | null;
 }
+
+/** Localização usada nas linhas de uma conferência global. */
+export const GLOBAL_AUDIT_LOCATION = 'TODAS';
 
 /** Linha cujo saldo mudou entre a contagem e o fecho. */
 export interface AuditDriftLine {
@@ -72,6 +81,30 @@ export interface CreateAuditInput {
   notes?: string;
   assignedTo?: string | null;
   blindMode?: boolean;
+  /** Conferência global por categoria e/ou palavra-chave. */
+  global?: { category?: string | null; keyword?: string | null };
+}
+
+const normTxt = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Produtos que correspondem ao filtro (categoria e todas as palavras no nome/código). */
+export async function fetchGlobalAuditProducts(filter: { category?: string | null; keyword?: string | null }) {
+  const out: { id: string; code: string; name: string; total_colis: number; category: string }[] = [];
+  for (let from = 0; ; from += 1000) {
+    let q = supabase.from('products').select('id, code, name, total_colis, category').order('id').range(from, from + 999);
+    if (filter.category) q = q.eq('category', filter.category);
+    const { data, error } = await q;
+    if (error) throw error;
+    out.push(...((data ?? []) as typeof out));
+    if (!data || data.length < 1000) break;
+  }
+  const words = normTxt(filter.keyword ?? '').split(/\s+/).filter(Boolean);
+  if (words.length === 0) return out;
+  return out.filter((p) => {
+    const hay = normTxt(`${p.name} ${p.code}`);
+    return words.every((w) => hay.includes(w));
+  });
 }
 
 
@@ -149,12 +182,64 @@ export function useLocationAudits() {
           created_by: user?.id || null,
           assigned_to: input.assignedTo || null,
           blind_mode: input.blindMode ?? false,
+          scope: input.global ? 'global' : 'location',
+          scope_filter: input.global ?? null,
           status: 'pending',
         })
         .select()
         .single();
 
       if (auditError) throw auditError;
+
+      if (input.global) {
+        const prods = await fetchGlobalAuditProducts(input.global);
+        const ids = prods.map((p) => p.id);
+        const sums = new Map<string, number>();
+        for (let i = 0; i < ids.length; i += 200) {
+          const chunk = ids.slice(i, i + 200);
+          for (let from = 0; ; from += 1000) {
+            const { data, error } = await supabase
+              .from('counts')
+              .select('product_id, colis_number, quantity')
+              .in('product_id', chunk)
+              .gt('quantity', 0)
+              .order('id')
+              .range(from, from + 999);
+            if (error) throw error;
+            (data ?? []).forEach((c) => {
+              const k = `${c.product_id}|${c.colis_number}`;
+              sums.set(k, (sums.get(k) ?? 0) + c.quantity);
+            });
+            if (!data || data.length < 1000) break;
+          }
+        }
+        const rows: Record<string, unknown>[] = [];
+        prods.forEach((p) => {
+          const colis = new Set<number>();
+          for (let c = 1; c <= Math.max(1, p.total_colis || 1); c++) colis.add(c);
+          sums.forEach((_, k) => {
+            const [pid, c] = k.split('|');
+            if (pid === p.id) colis.add(Number(c));
+          });
+          Array.from(colis).sort((a, b) => a - b).forEach((c) => {
+            rows.push({
+              audit_id: audit.id,
+              product_id: p.id,
+              product_code: p.code,
+              product_name: p.name,
+              location: GLOBAL_AUDIT_LOCATION,
+              colis_number: c,
+              expected_quantity: sums.get(`${p.id}|${c}`) ?? 0,
+              status: 'pending',
+            });
+          });
+        });
+        for (let i = 0; i < rows.length; i += 500) {
+          const { error } = await supabase.from('location_audit_items').insert(rows.slice(i, i + 500) as never);
+          if (error) throw error;
+        }
+        return audit;
+      }
 
       // Fetch products in these locations from counts
       const { data: counts, error: countsError } = await supabase
@@ -346,6 +431,21 @@ export function useLocationAudits() {
   });
 
 
+  /** Regista a causa e a decisão (ajustar / sem ajuste) de uma divergência. */
+  const resolveItem = useMutation({
+    mutationFn: async (v: { itemId: string; resolution: 'ajustar' | 'sem_ajuste' | null; reason: string }) => {
+      const { error } = await supabase.rpc('resolve_audit_item', {
+        p_item_id: v.itemId,
+        p_resolution: v.resolution as string,
+        p_reason: v.reason,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['location-audit'] }),
+    onError: (error: Error) =>
+      toast({ title: 'Não foi possível guardar', description: mapDatabaseError(error, error.message), variant: 'destructive' }),
+  });
+
   // Delete audit
   const deleteAudit = useMutation({
     mutationFn: async (auditId: string) => {
@@ -395,7 +495,7 @@ export function useLocationAudits() {
     updateAuditItem,
     deliverAudit,
     completeAudit,
-
+    resolveItem,
     deleteAudit,
   };
 }

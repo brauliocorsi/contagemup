@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { MapPin, Plus, EyeOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useCategories } from '@/hooks/useCategories';
+import { fetchGlobalAuditProducts } from '@/hooks/useLocationAudits';
+import { MapPin, Plus, EyeOff, Tags } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +31,8 @@ interface CreateAuditDialogProps {
   onOpenChange: (open: boolean) => void;
   selectedLocations: string[];
   onSuccess?: (auditId: string) => void;
+  /** 'global' = por categoria/palavra, sem localizações. */
+  mode?: 'location' | 'global';
 }
 
 export function CreateAuditDialog({
@@ -36,7 +40,26 @@ export function CreateAuditDialog({
   onOpenChange,
   selectedLocations,
   onSuccess,
+  mode = 'location',
 }: CreateAuditDialogProps) {
+  const isGlobal = mode === 'global';
+  const { categories } = useCategories();
+  const [category, setCategory] = useState<string>('all');
+  const [keyword, setKeyword] = useState('');
+  const [preview, setPreview] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!open || !isGlobal) return;
+    if (category === 'all' && !keyword.trim()) { setPreview(null); return; }
+    let cancel = false;
+    const t = setTimeout(async () => {
+      const list = await fetchGlobalAuditProducts({ category: category === 'all' ? null : category, keyword });
+      if (!cancel) setPreview(list.length);
+    }, 400);
+    return () => { cancel = true; clearTimeout(t); };
+  }, [open, isGlobal, category, keyword]);
+
+  const canSubmit = isGlobal ? (category !== 'all' || !!keyword.trim()) && (preview ?? 0) > 0 : selectedLocations.length > 0;
   const { createAudit } = useLocationAudits();
   const { profiles } = useProfiles();
   const [name, setName] = useState('');
@@ -47,11 +70,12 @@ export function CreateAuditDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name.trim() || selectedLocations.length === 0) return;
+    if (!name.trim() || !canSubmit) return;
 
     const result = await createAudit.mutateAsync({
       name: name.trim(),
-      locations: selectedLocations,
+      locations: isGlobal ? ['TODAS'] : selectedLocations,
+      global: isGlobal ? { category: category === 'all' ? null : category, keyword: keyword.trim() || null } : undefined,
       notes: notes.trim() || undefined,
       assignedTo: assignedTo === 'none' ? null : assignedTo,
       blindMode,
@@ -61,6 +85,8 @@ export function CreateAuditDialog({
     setNotes('');
     setAssignedTo('none');
     setBlindMode(false);
+    setCategory('all');
+    setKeyword('');
     onOpenChange(false);
     
     if (onSuccess && result) {
@@ -74,11 +100,13 @@ export function CreateAuditDialog({
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Nova Conferência
+              {isGlobal ? <Tags className="h-5 w-5" /> : <MapPin className="h-5 w-5" />}
+              {isGlobal ? 'Conferência por categoria / palavra' : 'Nova Conferência'}
             </DialogTitle>
             <DialogDescription>
-              Crie uma conferência para verificar o stock nas localizações seleccionadas.
+              {isGlobal
+                ? 'O operador pica só os produtos, em qualquer localização. No fim vê o total contado contra o stock total e onde o sistema tem cada produto.'
+                : 'Crie uma conferência para verificar o stock nas localizações seleccionadas.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -94,16 +122,40 @@ export function CreateAuditDialog({
               />
             </div>
 
+            {isGlobal ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Categoria</Label>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as categorias</SelectItem>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="kw">Palavra no nome (opcional)</Label>
+                  <Input id="kw" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Ex: cama" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {preview === null ? 'Escolha uma categoria ou escreva uma palavra.' : `${preview} produto(s) a contar.`}
+                </p>
+              </>
+            ) : (
             <div className="space-y-2">
-              <Label>Localizações Seleccionadas ({selectedLocations.length})</Label>
-              <div className="flex flex-wrap gap-1 p-2 bg-muted rounded-md max-h-24 overflow-auto">
-                {selectedLocations.map(loc => (
-                  <Badge key={loc} variant="secondary" className="text-xs">
-                    {loc}
-                  </Badge>
-                ))}
+                <Label>Localizações Seleccionadas ({selectedLocations.length})</Label>
+                <div className="flex flex-wrap gap-1 p-2 bg-muted rounded-md max-h-24 overflow-auto">
+                  {selectedLocations.map(loc => (
+                    <Badge key={loc} variant="secondary" className="text-xs">
+                      {loc}
+                    </Badge>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label>Responsável no scanner (opcional)</Label>
@@ -155,7 +207,7 @@ export function CreateAuditDialog({
             </Button>
             <Button 
               type="submit" 
-              disabled={!name.trim() || selectedLocations.length === 0 || createAudit.isPending}
+              disabled={!name.trim() || !canSubmit || createAudit.isPending}
             >
               <Plus className="h-4 w-4 mr-2" />
               {createAudit.isPending ? 'A criar...' : 'Criar Conferência'}
