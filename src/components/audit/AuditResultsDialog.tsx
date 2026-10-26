@@ -304,12 +304,12 @@ export function AuditResultsDialog({ open, onOpenChange, audit, onCloseAudit, cl
         {editable && (
           <div className="flex flex-wrap items-center justify-end gap-3 border-t pt-3">
             <span className="text-xs text-muted-foreground">
-              {stats.items.filter(i => !i.resolution && !i.applied_at).length} divergência(s) por tratar
+              {stats.items.filter(i => !i.resolution && !i.applied_at && (isGlobal || !i.notes)).length} divergência(s) por tratar
               {pendingItems.length > 0 ? ` · ${pendingItems.length} por contar` : ''}
             </span>
             <Button
               onClick={onCloseAudit}
-              disabled={closing || pendingItems.length > 0 || stats.items.some(i => !i.resolution && !i.applied_at)}
+              disabled={closing || pendingItems.length > 0 || stats.items.some(i => !i.resolution && !i.applied_at && (isGlobal || !i.notes))}
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />Fechar conferência
             </Button>
