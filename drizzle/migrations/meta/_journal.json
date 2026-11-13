@@ -43,6 +43,13 @@
       "when": 1793030482153,
       "tag": "0005_global_audits_and_resolution",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794528975248,
+      "tag": "0006_restrict_misplaced_select",
+      "breakpoints": true
     }
   ]
 }
