@@ -18,7 +18,7 @@ export default defineTool({
     const supabase = supabaseForUser(ctx);
     const { data: product, error: productError } = await supabase
       .from("products")
-      .select("id,code,name,category,total_colis,current_stock,damaged_stock")
+      .select("id,code,name,description,category,total_colis,current_stock,damaged_stock,colis_orfaos,updated_at")
       .eq("code", code)
       .maybeSingle();
 
@@ -27,16 +27,20 @@ export default defineTool({
       return { content: [{ type: "text", text: `Produto ${code} não encontrado.` }], isError: true };
     }
 
-    const { data: counts, error: countsError } = await supabase
-      .from("counts")
-      .select("location,colis_number,quantity,updated_at")
-      .eq("product_id", product.id)
-      .order("location", { nullsFirst: true })
-      .order("colis_number");
-
-    if (countsError) return { content: [{ type: "text", text: countsError.message }], isError: true };
-
-    const payload = { product, locations: counts ?? [] };
+    const totals = new Map<string, { location: string | null; colis_number: number; quantity: number }>();
+    for (let offset = 0; ; offset += 1000) {
+      const { data: counts, error } = await supabase.from("counts")
+        .select("id,location,colis_number,quantity").eq("product_id", product.id)
+        .order("id").range(offset, offset + 999);
+      if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+      for (const row of counts ?? []) {
+        const key = JSON.stringify([row.location, row.colis_number]);
+        const previous = totals.get(key);
+        totals.set(key, { location: row.location, colis_number: row.colis_number, quantity: (previous?.quantity ?? 0) + row.quantity });
+      }
+      if ((counts?.length ?? 0) < 1000) break;
+    }
+    const payload = { product, locations: Array.from(totals.values()) };
     return {
       content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       structuredContent: payload,

@@ -3068,6 +3068,16 @@ export type Database = {
         }
         Returns: Json
       }
+      mcp_edit_product_metadata: {
+        Args: {
+          p_code: string
+          p_confirm?: boolean
+          p_description?: string
+          p_expected_updated_at: string
+          p_name?: string
+        }
+        Returns: Json
+      }
       merge_colis_counts: {
         Args: {
           p_colis_number: number

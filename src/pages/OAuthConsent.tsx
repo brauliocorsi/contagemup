@@ -18,12 +18,14 @@ const oauth = () => (supabase.auth as unknown as { oauth: OAuthApi }).oauth;
 export default function OAuthConsent() {
   const [params] = useSearchParams();
   const authorizationId = params.get("authorization_id") ?? "";
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [details, setDetails] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    setDetails(null);
+    setError(null);
     if (authLoading || !user) return;
     let active = true;
     (async () => {
@@ -31,6 +33,7 @@ export default function OAuthConsent() {
         setError("Pedido inválido: falta o identificador de autorização.");
         return;
       }
+      try {
       const { data, error } = await oauth().getAuthorizationDetails(authorizationId);
       if (!active) return;
       if (error) {
@@ -43,6 +46,10 @@ export default function OAuthConsent() {
         return;
       }
       setDetails(data);
+      if (!data?.client) setError('Pedido inválido ou expirado. Inicie novamente a ligação no agente.');
+      } catch {
+        if (active) setError('Não foi possível consultar o pedido. Inicie novamente a ligação no agente.');
+      }
     })();
     return () => {
       active = false;
@@ -50,7 +57,9 @@ export default function OAuthConsent() {
   }, [authorizationId, user, authLoading]);
 
   async function decide(approve: boolean) {
+    if (busy) return;
     setBusy(true);
+    try {
     const api = oauth();
     const { data, error } = approve
       ? await api.approveAuthorization(authorizationId)
@@ -67,6 +76,11 @@ export default function OAuthConsent() {
       return;
     }
     window.location.href = target;
+    } catch {
+      setError('Não foi possível guardar a decisão. Tente novamente a ligação no agente.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (authLoading) {
@@ -100,14 +114,23 @@ export default function OAuthConsent() {
                 Ligar {details.client?.name ?? "uma aplicação"} à sua conta
               </CardTitle>
               <CardDescription>
-                Esta ligação permite que {details.client?.name ?? "a aplicação"} consulte o
-                Contagem Stock UP com as suas permissões.
+                Esta ligação permite que {details.client?.name ?? "a aplicação"} consulte dados
+                e edite nomes e descrições de produtos com as suas permissões.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex gap-3">
+            <CardContent className="space-y-4">
+              <div className="space-y-2 text-sm break-words">
+                <p>Conta: {user.email}</p>
+                <p>Destino: {details.redirect_uri ?? details.client?.redirect_uri ?? 'Indicado pela aplicação'}</p>
+                <p>Permissões de identidade: {String(details.scope ?? details.scopes ?? 'Perfil e email')}</p>
+                <p>As permissões do Contagem continuam a limitar o acesso. Esta ligação não permite alterar stock, pagamentos ou contas.</p>
+                <Button variant="link" className="px-0" onClick={() => void signOut()}>Trocar de conta</Button>
+              </div>
+              <div className="flex gap-3">
               <Button className="flex-1" disabled={busy} onClick={() => decide(true)}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Autorizar"}
               </Button>
+              </div>
               <Button className="flex-1" variant="outline" disabled={busy} onClick={() => decide(false)}>
                 Recusar
               </Button>

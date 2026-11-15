@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "contagem-stock-up",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "title": "Contagem Stock UP"
     },
     "tools": [
@@ -130,6 +130,98 @@
               "description": "Número máximo de movimentos."
             }
           },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_warehouse_records",
+        "title": "Consultar dados do armazém",
+        "description": "Consulta produtos, localizações, conferências, avarias, picking, notas de entrega ou rotas em páginas, respeitando as permissões da conta.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "products",
+                "locations",
+                "audits",
+                "damages",
+                "picking",
+                "deliveries",
+                "routes"
+              ],
+              "description": "Tipo de informação."
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Início da página; use next_offset para continuar."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "Registos por página."
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "edit_product_metadata",
+        "title": "Editar nome e descrição do produto",
+        "description": "Edita apenas nome e descrição, com histórico e permissões da conta. Consulte primeiro updated_at e peça confirmação ao utilizador; nunca altera stock, volumes ou códigos.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Código exato do produto."
+            },
+            "expected_updated_at": {
+              "type": "string",
+              "description": "updated_at obtido na consulta mais recente."
+            },
+            "name": {
+              "type": "string",
+              "description": "Novo nome, se pretendido."
+            },
+            "description": {
+              "type": "string",
+              "description": "Nova descrição; texto vazio limpa a descrição."
+            },
+            "confirm": {
+              "type": "boolean",
+              "description": "true apenas após confirmação explícita do utilizador."
+            }
+          },
+          "required": [
+            "code",
+            "expected_updated_at",
+            "confirm"
+          ],
           "additionalProperties": false,
           "$schema": "http://json-schema.org/draft-07/schema#"
         },

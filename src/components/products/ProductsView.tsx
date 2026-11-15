@@ -35,6 +35,8 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
 import { loadXLSX } from '@/lib/lazyXlsx';
+import { useWebMCP } from 'use-webmcp-tool';
+import { runWebMCPTool } from '@/lib/webmcp-telemetry';
 const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   checkbox: 48,
   code: 120,
@@ -219,6 +221,18 @@ export function ProductsView() {
     
     return result;
   }, [products, searchTerm, filterCategory, filterCountStatus, filterStockStatus, filterOrderStatus, onlyMissingSupplierCode, filterDamage, lastCounts, productIdsWithOrders, sortColumn, sortDirection]);
+
+  useWebMCP({
+    name: 'read_visible_products',
+    description: 'Lê até 100 produtos da lista filtrada no ecrã, sem alterar filtros ou stock.',
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    enabled: !loading,
+    execute: () => runWebMCPTool('read_visible_products', () => {
+      if (loading) throw new Error('Produtos a carregar.');
+      return `${filteredProducts.length} produtos na lista.\n` + filteredProducts.slice(0, 100)
+        .map(p => `${p.code}: ${p.name}; conjuntos ${p.current_stock}; avariados ${p.damaged_stock}`).join('\n');
+    }),
+  });
 
   // Virtualizer for products table
   const rowVirtualizer = useVirtualizer({
