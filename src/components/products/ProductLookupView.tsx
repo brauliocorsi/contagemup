@@ -12,6 +12,8 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useProductResolver, useProductStockDetail } from '@/hooks/useScannerData';
 import type { Product } from '@/types/stock';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ColisEntryDates } from './ColisEntryDates';
 
 interface Props {
   onNavigate?: (tab: string) => void;
@@ -210,6 +212,19 @@ export function ProductLookupView({ onNavigate }: Props) {
             </CardContent>
           </Card>
 
+          <Tabs defaultValue="where">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="where">Onde está</TabsTrigger>
+              <TabsTrigger value="dates">Detalhes · datas de entrada</TabsTrigger>
+            </TabsList>
+            <TabsContent value="dates">
+              <Card className="border-border-subtle">
+                <CardContent className="py-4">
+                  <ColisEntryDates productId={p.id} totalColis={p.total_colis || 1} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="where">
           <Card className="border-border-subtle">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
@@ -270,6 +285,8 @@ export function ProductLookupView({ onNavigate }: Props) {
               )}
             </CardContent>
           </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       )}
     </PageContainer>
