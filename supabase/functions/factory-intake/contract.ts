@@ -14,6 +14,7 @@ export const batchSchema = z.object({
     color: z.string().trim().max(255),
     quantity: z.number().int().positive().max(2147483647),
     dispatched_at: z.string().datetime({ offset: true }),
+    total_colis: z.number().int().min(1).max(9999).optional(),
   }).strict()).min(1),
 }).strict();
 

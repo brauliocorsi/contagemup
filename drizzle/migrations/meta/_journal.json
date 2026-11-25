@@ -64,6 +64,13 @@
       "when": 1795568115809,
       "tag": "0008_factory_intake_atomic_batches",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795572206908,
+      "tag": "0009_factory_intake_auto_create_products",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { createHandler } from '../../supabase/functions/factory-intake/handler';
 
+const FACTORY_AUTO_CREATE_SQL = process.env.FACTORY_AUTO_CREATE_SQL ?? 'drizzle/migrations/0009_factory_intake_auto_create_products.sql';
 const PRODUCT = '00000000-0000-0000-0000-000000000001';
 const TEST_TOKEN = 'isolated-test-value-not-a-project-secret';
 const item = {
@@ -31,17 +32,18 @@ beforeAll(async () => {
     CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
     CREATE SCHEMA auth;
     CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql AS $$ SELECT current_setting('test.role',true) $$;
-    CREATE TABLE products(id uuid PRIMARY KEY,code text UNIQUE,barcode text,total_colis int);
+    CREATE TABLE products(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),code text UNIQUE,name text,description text,barcode text,total_colis int);
     CREATE TABLE product_barcodes(product_id uuid,barcode text);
     CREATE TABLE warehouse_locations(code text,location_type text);
     CREATE TABLE counts(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),product_id uuid,colis_number int,quantity int,session_id uuid,location text,counted_by uuid,updated_at timestamptz);
     CREATE TABLE stock_movements(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),product_id uuid,movement_type text,quantity int,reason text,reference text,notes text,supplier_name text);
     CREATE TABLE stock_movement_lines(movement_id uuid,product_id uuid,colis_number int,quantity int,location text);
     CREATE FUNCTION effective_total_colis(p uuid) RETURNS int LANGUAGE sql AS $$ SELECT total_colis FROM products WHERE id=p $$;
-    INSERT INTO products VALUES('${PRODUCT}','TEST-BED','TEST-BARCODE',3);
+    INSERT INTO products(id,code,barcode,total_colis) VALUES('${PRODUCT}','TEST-BED','TEST-BARCODE',3);
     INSERT INTO warehouse_locations VALUES('CONF','conferencia');
   `);
   await db.exec(readFileSync('drizzle/migrations/0008_factory_intake_atomic_batches.sql', 'utf8'));
+  await db.exec(readFileSync(FACTORY_AUTO_CREATE_SQL, 'utf8'));
   handler = createHandler({}, {
     expectedToken: () => TEST_TOKEN,
     processBatch: async (payload) => {
@@ -55,7 +57,7 @@ beforeAll(async () => {
   });
 }, 30000);
 beforeEach(async () => {
-  await db.exec(`TRUNCATE factory_intake_items,factory_intake_batches,stock_movements,stock_movement_lines,counts; SET test.role='service_role';`);
+  await db.exec(`TRUNCATE factory_intake_items,factory_intake_batches,stock_movements,stock_movement_lines,counts; DELETE FROM products WHERE code<>'TEST-BED'; SET test.role='service_role';`);
 });
 afterAll(async () => { await db.close(); });
 
@@ -124,17 +126,24 @@ describe('factory intake: real SQL in isolated database and HTTP handler', () =>
     await handler(request({ batch_id: 'retry', items: [{ ...item, quantity: 20 }] }));
     expect((await db.query('SELECT sum(quantity)::int AS total FROM counts')).rows[0]).toEqual({ total: 3 });
   });
-  it('rolls back earlier valid items if another item has an unknown code', async () => {
-    const response = await handler(request({ batch_id: 'bad', items: [item, { ...item, product_code: 'UNKNOWN' }] }));
-    expect(response.status).toBe(400);
-    expect((await response.json()).error).toContain('UNKNOWN');
-    expect(await queryCount('counts')).toBe(0);
-    expect(await queryCount('stock_movements')).toBe(0);
-    expect(await queryCount('factory_intake_batches')).toBe(0);
+  it('creates an unknown product with the factory name and given colis, then enters it in CONF', async () => {
+    const response = await handler(request({ batch_id: 'new', items: [{ ...item, product_code: 'NEW-BED', barcode: '', product_description: 'Cama Nova 190x140', total_colis: 2, quantity: 3 }] }));
+    expect(response.status).toBe(200);
+    const p = (await db.query<any>("SELECT name,total_colis,description FROM products WHERE code='NEW-BED'")).rows;
+    expect(p).toEqual([{ name: 'Cama Nova 190x140', total_colis: 2, description: 'Criado automaticamente via receção UP Fábrica' }]);
+    const c = (await db.query<any>("SELECT colis_number,quantity,location FROM counts ORDER BY colis_number")).rows;
+    expect(c).toEqual([{ colis_number: 1, quantity: 3, location: 'CONF' }, { colis_number: 2, quantity: 3, location: 'CONF' }]);
   });
-  it('allows corrected resubmission after a fully rolled back batch', async () => {
-    await handler(request({ batch_id: 'bad', items: [{ ...item, product_code: 'UNKNOWN' }] }));
-    expect((await handler(request({ batch_id: 'bad', items: [item] }))).status).toBe(200);
+  it('defaults total_colis to 1 for an auto-created product', async () => {
+    await handler(request({ batch_id: 'one', items: [{ ...item, product_code: 'NEW-ONE', barcode: '' }] }));
+    expect((await db.query<any>("SELECT total_colis FROM products WHERE code='NEW-ONE'")).rows[0].total_colis).toBe(1);
+  });
+  it('does not duplicate an existing product even if total_colis differs', async () => {
+    await handler(request({ batch_id: 'ex', items: [{ ...item, total_colis: 1 }] }));
+    expect((await db.query<any>("SELECT count(*)::int n, max(total_colis) t FROM products WHERE code='TEST-BED'")).rows[0]).toEqual({ n: 1, t: 3 });
+  });
+  it('rejects total_colis below 1', async () => {
+    expect((await handler(request({ batch_id: 'z', items: [{ ...item, total_colis: 0 }] }))).status).toBe(400);
   });
   it('accumulates repeated product lines instead of dropping items', async () => {
     const response = await handler(request({ batch_id: 'b', items: [item, { ...item, quantity: 2 }] }));
