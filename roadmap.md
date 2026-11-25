@@ -1,4 +1,6 @@
 # Tasks
+- [ ] Add authenticated factory lot reception into CONF with atomic stock entries and persistent batch idempotency.
+- [ ] Test factory reception without real stock, request the shared token, and verify deployed access.
 - [x] Activate protected OAuth access; verify login preservation, readable errors and denied delivery-account edits without publishing.
 - [x] Add bounded reads and safe product metadata editing, preserving stock and role restrictions.
 - [x] Add browser-local product reading, run five validation tests and extract the six-tool MCP catalog.

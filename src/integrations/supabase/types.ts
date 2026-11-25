@@ -1171,6 +1171,109 @@ export type Database = {
         }
         Relationships: []
       }
+      factory_intake_batches: {
+        Row: {
+          batch_id: string
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          result: Json | null
+        }
+        Insert: {
+          batch_id: string
+          payload: Json
+          processed_at?: string | null
+          received_at?: string
+          result?: Json | null
+        }
+        Update: {
+          batch_id?: string
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          result?: Json | null
+        }
+        Relationships: []
+      }
+      factory_intake_items: {
+        Row: {
+          barcode: string
+          batch_id: string
+          color: string
+          dispatched_at: string
+          fabric_ref: string
+          fabric_type: string
+          id: string
+          item_index: number
+          location: string
+          measure: string
+          movement_id: string
+          order_number: string
+          product_code: string
+          product_description: string
+          product_id: string
+          quantity: number
+        }
+        Insert: {
+          barcode: string
+          batch_id: string
+          color: string
+          dispatched_at: string
+          fabric_ref: string
+          fabric_type: string
+          id?: string
+          item_index: number
+          location?: string
+          measure: string
+          movement_id: string
+          order_number: string
+          product_code: string
+          product_description: string
+          product_id: string
+          quantity: number
+        }
+        Update: {
+          barcode?: string
+          batch_id?: string
+          color?: string
+          dispatched_at?: string
+          fabric_ref?: string
+          fabric_type?: string
+          id?: string
+          item_index?: number
+          location?: string
+          measure?: string
+          movement_id?: string
+          order_number?: string
+          product_code?: string
+          product_description?: string
+          product_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "factory_intake_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "factory_intake_batches"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "factory_intake_items_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "stock_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_intake_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       location_audit_items: {
         Row: {
           applied_at: string | null
@@ -3126,6 +3229,7 @@ export type Database = {
         }
         Returns: Json
       }
+      receive_factory_batch: { Args: { p_payload: Json }; Returns: Json }
       register_damage: {
         Args: {
           p_colis_number: number

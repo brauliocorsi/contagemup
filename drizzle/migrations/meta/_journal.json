@@ -57,6 +57,13 @@
       "when": 1794736865869,
       "tag": "0007_mcp_edit_product_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795568115809,
+      "tag": "0008_factory_intake_atomic_batches",
+      "breakpoints": true
     }
   ]
 }

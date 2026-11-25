@@ -1,4 +1,5 @@
 Picking membership in Contagem is resolved through `loadProductResolver` and carried as `PickingLine.registered`; this keeps the on-screen, printed, and exported status consistent without removing unmatched ERP lines.
+Factory intake uses a service-role-only atomic RPC with a unique batch ledger; quantities represent complete products across effective colis, and per-item order metadata stays in the intake ledger because boolean order checklists cannot represent multiple units.
 MCP uses verified OAuth and caller-scoped RLS; metadata edits use an invoker RPC with confirmation, optimistic concurrency and atomic audit logging to keep agents away from stock and account management.
 Browser-local product tools live in ProductsView and read only its filtered collection with shared telemetry to preserve page permissions and unmount cleanup.
 Product list headers and virtual rows share one scroll container and the same column widths, including fixed controls, to prevent alignment drift when columns are hidden.
