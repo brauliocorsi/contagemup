@@ -215,7 +215,7 @@ export function ProductLookupView({ onNavigate }: Props) {
           <Tabs defaultValue="where">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="where">Onde está</TabsTrigger>
-              <TabsTrigger value="dates">Detalhes · datas de entrada</TabsTrigger>
+              <TabsTrigger value="dates">Em stock · data de entrada</TabsTrigger>
             </TabsList>
             <TabsContent value="dates">
               <Card className="border-border-subtle">
