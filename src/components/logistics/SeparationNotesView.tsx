@@ -442,13 +442,13 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
           </div>
           <CollapsibleContent className="pb-5 pt-3">
           <div className="flex flex-wrap items-end gap-4">
-            <div className="grid min-w-0 flex-1 gap-1.5 sm:flex-none">
+            <div className="grid w-full min-w-0 gap-1.5 min-[400px]:w-auto">
               <Label htmlFor="de">Entrega de</Label>
-              <Input id="de" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <Input id="de" type="date" className="w-full min-w-0" value={from} onChange={(e) => setFrom(e.target.value)} />
             </div>
-            <div className="grid min-w-0 flex-1 gap-1.5 sm:flex-none">
+            <div className="grid w-full min-w-0 gap-1.5 min-[400px]:w-auto">
               <Label htmlFor="ate">Entrega até</Label>
-              <Input id="ate" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              <Input id="ate" type="date" className="w-full min-w-0" value={to} onChange={(e) => setTo(e.target.value)} />
             </div>
             <Button variant="ghost" size="sm" onClick={() => { setFrom(today()); setTo(today()); }}>Hoje</Button>
             <Button variant="ghost" size="sm" onClick={() => { setFrom(today()); setTo(today(7)); }}>7 dias</Button>
@@ -498,10 +498,10 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
         </Collapsible>
 
         <Tabs value={workspace} onValueChange={setWorkspace}>
-          <TabsList className="mb-5 h-auto w-full justify-start gap-2 rounded-none border-b border-border bg-transparent px-0 pb-3">
-            <TabsTrigger value="orders" className="gap-2"><ListChecks className="h-4 w-4" />Encomendas<Badge variant="secondary">{orders.length}</Badge></TabsTrigger>
-            <TabsTrigger value="picking" className="gap-2"><ScanBarcode className="h-4 w-4" />Picking</TabsTrigger>
-            <TabsTrigger value="guides" className="gap-2"><Truck className="h-4 w-4" />Guias</TabsTrigger>
+          <TabsList className="mb-5 grid h-auto w-full grid-cols-3 gap-1 rounded-none border-b border-border bg-transparent px-0 pb-3 sm:flex sm:justify-start sm:gap-2">
+            <TabsTrigger value="orders" className="min-w-0 gap-1 px-1 text-xs sm:gap-2 sm:px-3 sm:text-sm"><ListChecks className="hidden h-4 w-4 sm:block" />Encomendas<Badge variant="secondary" className="hidden sm:inline-flex">{orders.length}</Badge></TabsTrigger>
+            <TabsTrigger value="picking" className="min-w-0 gap-1 px-1 text-xs sm:gap-2 sm:px-3 sm:text-sm"><ScanBarcode className="h-4 w-4" />Picking</TabsTrigger>
+            <TabsTrigger value="guides" className="min-w-0 gap-1 px-1 text-xs sm:gap-2 sm:px-3 sm:text-sm"><Truck className="h-4 w-4" />Guias</TabsTrigger>
           </TabsList>
           <TabsContent value="orders" className="space-y-4">
             <div className="relative max-w-md"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Pesquisar encomendas" placeholder="N.º, cliente ou morada…" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} className="pl-9" /></div>

@@ -186,7 +186,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
         <h1 className="font-heading text-3xl font-semibold">Visão geral</h1>
         <p className="mt-1 text-sm text-muted-foreground">{profile?.name ? `Olá, ${profile.name.split(' ')[0]}.` : 'Armazém UP Móveis'}</p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex max-w-full flex-wrap items-center gap-2">
         <Button variant="outline" size="icon" aria-label="Atualizar indicadores" title="Atualizar indicadores" onClick={() => void refresh()} disabled={refreshing}><RefreshCw className={cn(refreshing && 'animate-spin')} /></Button>
         {canUseScanner && <Button asChild variant="outline"><Link to="/scanner"><ScanBarcode /> Scanner</Link></Button>}
         <Button onClick={() => onNavigate('separation-notes')}><ClipboardList /> Notas de Separação</Button>

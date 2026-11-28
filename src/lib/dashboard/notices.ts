@@ -23,7 +23,7 @@ export interface DashboardSignals {
 
 /** Unknown signals are omitted, never represented as a resolved warning. */
 export function buildDashboardNotices(signals: DashboardSignals): DashboardNotice[] {
-  const definitions: Array<DashboardNotice & { count: number | undefined }> = [];
+  const definitions: DashboardNotice[] = [];
   const add = (count: number | undefined, notice: Omit<DashboardNotice, 'count'>) => {
     if (count !== undefined && count > 0) definitions.push({ ...notice, count });
   };
@@ -35,5 +35,5 @@ export function buildDashboardNotices(signals: DashboardSignals): DashboardNotic
   add(signals.conf, { id: 'conf', title: 'Colis em conferência', detail: 'Na localização CONF', action: 'Arrumar', destination: 'putaway', tone: 'info', group: 'warehouse' });
   add(signals.picking, { id: 'picking', title: 'Pickings por concluir', detail: 'Tarefas pendentes ou em curso', action: 'Abrir picking', destination: 'scanner-picking', tone: 'info', group: 'dispatch' });
   add(signals.deliveries, { id: 'deliveries', title: 'Notas por entregar', detail: 'No cais ou na viatura', action: 'Ver entregas', destination: 'deliveries', tone: 'info', group: 'dispatch' });
-  return definitions as DashboardNotice[];
+  return definitions;
 }
