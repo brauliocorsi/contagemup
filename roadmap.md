@@ -1,4 +1,8 @@
 # Tasks
+- [ ] Redesign the home dashboard as an actionable operational noticeboard.
+- [x] Reset existing positive product minimums to zero without changing inventory.
+- [ ] Simplify separation notes presentation and scanner navigation, preserving operational logic.
+- [ ] Verify updated screens, tests and build diagnostics without mutating real operations or publishing.
 - [x] Add authenticated factory lot reception into CONF with atomic stock entries and persistent batch idempotency.
 - [x] Test factory reception without real stock, request the shared token, and verify deployed access (successful batches isolated; live token/rollback verified).
 - [x] Activate protected OAuth access; verify login preservation, readable errors and denied delivery-account edits without publishing.

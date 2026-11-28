@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -65,6 +67,8 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
   const [from, setFrom] = useState(today());
   const [to, setTo] = useState(today(7));
   const [orders, setOrders] = useState<SepOrder[]>([]);
+  const [orderSearch, setOrderSearch] = useState('');
+  const [workspace, setWorkspace] = useState('orders');
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [copies, setCopies] = useState<Record<string, number>>({});
   const [docs, setDocs] = useState<GcDocument[]>([]);
@@ -114,6 +118,8 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
     mutationFn: () => fetchSeparationOrders(from, to),
     onSuccess: (res) => {
       setOrders(res.orders);
+      setWorkspace('orders');
+      setOrderSearch('');
       setSelected(Object.fromEntries(res.orders.map((o) => [o.id, true])));
       setCopies({});
       setDocs([]);
@@ -155,7 +161,11 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
     () => chosen.reduce((sum, o) => sum + Math.max(1, copies[o.id] ?? 1), 0),
     [chosen, copies],
   );
-  const allChecked = orders.length > 0 && orders.every((o) => selected[o.id]);
+  const visibleOrders = useMemo(() => {
+    const term = orderSearch.trim().toLocaleLowerCase('pt-PT');
+    return orders.filter(o => !term || [o.codigo, o.cliente, o.morada, o.situacao].some(value => value?.toLocaleLowerCase('pt-PT').includes(term)));
+  }, [orders, orderSearch]);
+  const allChecked = visibleOrders.length > 0 && visibleOrders.every((o) => selected[o.id]);
 
   const routeJob = useMutation({
     mutationFn: () =>
@@ -171,7 +181,8 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
         return;
       }
       const links = plan.legs.map((leg) => {
-        const origin = leg[0]!;
+        const origin = leg[0];
+        if (!origin) return ''; 
         const rest = leg.slice(1);
         const destination = rest[rest.length - 1] ?? origin;
         const waypoints = rest.slice(0, -1);
@@ -179,7 +190,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
         if (waypoints.length > 0) params.set('waypoints', waypoints.join('|'));
         return `https://maps.google.com/maps/dir/?${params.toString()}`;
       });
-      setRouteLinks(links);
+      setRouteLinks(links.filter(Boolean));
       if (links.length > 1) toast.info(`Rota dividida em ${links.length} troços (limite do Google Maps).`);
       else toast.success('Rota pronta — abre no Google Maps');
     },
@@ -255,6 +266,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
       toast.error('Selecione pelo menos uma encomenda');
       return;
     }
+    setWorkspace('picking');
     const lines = buildPicking(chosen);
     setOpenSections((prev) => ({ ...prev, picking: true }));
     setPicking(lines);
@@ -415,27 +427,31 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
       <div className="no-print space-y-6">
         <div className="flex flex-wrap items-center gap-3">
           <div className="mr-auto">
-            <h1 className="font-heading text-xl font-bold tracking-tight">Notas de Separação</h1>
+            <h1 className="font-heading text-3xl font-semibold">Notas de Separação</h1>
             <p className="text-sm text-muted-foreground">
-              Gestão Click · impressão A4 por data de entrega
+              GestãoClick · Encomendas por data de entrega
             </p>
           </div>
+          <Badge variant="secondary" className="px-3 py-1">{chosen.length} selecionadas</Badge>
+          <Button onClick={() => void generatePicking()} disabled={chosen.length === 0}><ListChecks /> Preparar picking</Button>
         </div>
 
-        <Collapsible open={openSections.period} onOpenChange={() => toggleSection('period')} className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
-          <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-5 py-3">
+        <Collapsible open={openSections.period} onOpenChange={() => toggleSection('period')} className="border-b border-border-subtle">
+          <div className="flex items-center gap-3 border-b border-border px-0 py-3">
             <CollapsibleTrigger asChild><Button variant="ghost" className="min-w-0 flex-1 justify-between px-1 text-left font-heading font-semibold">Período e rotas <ChevronDown className={`h-4 w-4 transition-transform ${openSections.period ? 'rotate-180' : ''}`} /></Button></CollapsibleTrigger>
           </div>
-          <CollapsibleContent className="p-5">
+          <CollapsibleContent className="pb-5 pt-3">
           <div className="flex flex-wrap items-end gap-4">
-            <div className="grid gap-1.5">
+            <div className="grid min-w-0 flex-1 gap-1.5 sm:flex-none">
               <Label htmlFor="de">Entrega de</Label>
               <Input id="de" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
             </div>
-            <div className="grid gap-1.5">
+            <div className="grid min-w-0 flex-1 gap-1.5 sm:flex-none">
               <Label htmlFor="ate">Entrega até</Label>
               <Input id="ate" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
             </div>
+            <Button variant="ghost" size="sm" onClick={() => { setFrom(today()); setTo(today()); }}>Hoje</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setFrom(today()); setTo(today(7)); }}>7 dias</Button>
             <Button onClick={() => query.mutate()} disabled={query.isPending}>
               <Search className="mr-2 h-4 w-4" />
               {query.isPending ? 'A carregar…' : 'Carregar encomendas'}
@@ -481,32 +497,34 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
           </CollapsibleContent>
         </Collapsible>
 
-        <Collapsible open={openSections.orders} onOpenChange={() => toggleSection('orders')} className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
-          <div className="flex items-center border-b border-border bg-muted/30 px-5 py-3">
-            <CollapsibleTrigger asChild><Button variant="ghost" className="min-w-0 flex-1 justify-between px-1 text-left font-heading font-semibold">Encomendas <ChevronDown className={`h-4 w-4 transition-transform ${openSections.orders ? 'rotate-180' : ''}`} /></Button></CollapsibleTrigger>
-          </div>
-          <CollapsibleContent>
-          <div className="flex items-center gap-3 border-b border-border px-5 py-3">
+        <Tabs value={workspace} onValueChange={setWorkspace}>
+          <TabsList className="mb-5 h-auto w-full justify-start gap-2 rounded-none border-b border-border bg-transparent px-0 pb-3">
+            <TabsTrigger value="orders" className="gap-2"><ListChecks className="h-4 w-4" />Encomendas<Badge variant="secondary">{orders.length}</Badge></TabsTrigger>
+            <TabsTrigger value="picking" className="gap-2"><ScanBarcode className="h-4 w-4" />Picking</TabsTrigger>
+            <TabsTrigger value="guides" className="gap-2"><Truck className="h-4 w-4" />Guias</TabsTrigger>
+          </TabsList>
+          <TabsContent value="orders" className="space-y-4">
+            <div className="relative max-w-md"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Pesquisar encomendas" placeholder="N.º, cliente ou morada…" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} className="pl-9" /></div>
+          <div className="flex flex-wrap items-center gap-3 border-b border-border py-3">
             <Checkbox
+              aria-label="Selecionar encomendas visíveis"
               checked={allChecked}
               onCheckedChange={(v) =>
-                setSelected(Object.fromEntries(orders.map((o) => [o.id, Boolean(v)])))
+                setSelected(prev => ({ ...prev, ...Object.fromEntries(visibleOrders.map((o) => [o.id, Boolean(v)])) }))
               }
             />
             <span className="text-sm text-muted-foreground">
-              {orders.length} encomenda(s) · {totalPages} nota(s) para imprimir
+              {visibleOrders.length} encomenda(s) · {chosen.length} selecionadas · {totalPages} cópias
             </span>
             <Button className="ml-auto" size="sm" onClick={handlePrint} disabled={printJob.isPending || chosen.length === 0}>
               <Printer className="h-4 w-4" /> {printJob.isPending ? 'A obter notas…' : 'Imprimir notas'}
             </Button>
           </div>
-          {orders.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-              Escolha um período de entrega e carregue as encomendas.
-            </p>
+          {query.isPending ? <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />A carregar encomendas…</div> : visibleOrders.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-16 text-center"><ListChecks className="h-8 w-8 text-muted-foreground" /><p className="text-sm font-medium">{orderSearch ? 'Nenhuma encomenda encontrada' : query.isSuccess ? 'Sem encomendas neste período' : 'Encomendas por carregar'}</p></div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[860px] text-sm">
                 <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="w-10 px-5 py-2" />
@@ -520,10 +538,11 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((o) => (
-                    <tr key={o.id} className="border-t border-border">
+                  {visibleOrders.map((o) => (
+                    <tr key={o.id} className={`border-t border-border-subtle transition-colors hover:bg-surface-muted ${selected[o.id] ? 'bg-primary-soft/40' : ''}`}>
                       <td className="px-5 py-2">
                         <Checkbox
+                          aria-label={`Selecionar encomenda ${o.codigo}`}
                           checked={Boolean(selected[o.id])}
                           onCheckedChange={(v) => setSelected((prev) => ({ ...prev, [o.id]: Boolean(v) }))}
                         />
@@ -535,7 +554,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                       <td className="px-3 py-2">{o.produtos.length}</td>
                       <td className="px-3 py-2">
                         {history[o.id] ? (
-                          <span className="text-amber-600">
+                          <span className="text-warning">
                             Guia {history[o.id]?.guide_number || '—'} ({history[o.id]?.version}.ª via)
                           </span>
                         ) : (
@@ -544,6 +563,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                       </td>
                       <td className="px-3 py-2">
                         <Input
+                          aria-label={`Cópias da encomenda ${o.codigo}`}
                           type="number"
                           min={1}
                           className="h-8 w-20"
@@ -562,20 +582,15 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               </table>
             </div>
           )}
-          </CollapsibleContent>
-        </Collapsible>
-
-        <Collapsible open={openSections.guides} onOpenChange={() => toggleSection('guides')} className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
-          <div className="flex items-center border-b border-border bg-muted/30 px-5 py-3">
-            <CollapsibleTrigger asChild><Button variant="ghost" className="min-w-0 flex-1 justify-between px-1 text-left font-heading font-semibold">Guias de Transporte · InvoiceXpress <ChevronDown className={`h-4 w-4 transition-transform ${openSections.guides ? 'rotate-180' : ''}`} /></Button></CollapsibleTrigger>
-          </div>
-          <CollapsibleContent>
-          <div className="flex flex-wrap items-end gap-4 border-b border-border px-5 py-3">
+          </TabsContent>
+          <TabsContent value="guides">
+            <h2 className="mb-4 font-heading text-lg font-semibold">Guias de Transporte <span className="text-sm font-normal text-muted-foreground">· InvoiceXpress</span></h2>
+          <div className="flex flex-wrap items-end gap-4 border-b border-border-subtle px-0 py-3">
             <div className="grid gap-1.5">
               <Label htmlFor="origem">Local de carga</Label>
               <Input
                 id="origem"
-                className="h-9 w-80"
+                className="h-9 w-full sm:w-80"
                 placeholder={DEFAULT_ADDRESS_FROM}
                 value={addressFrom}
                 onChange={(e) => setAddressFrom(e.target.value)}
@@ -616,7 +631,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                 onChange={(e) => setLoadTime(e.target.value)}
               />
             </div>
-            <Button size="sm" onClick={handleGuides} disabled={guidesJob.isPending}>
+            <Button size="sm" onClick={handleGuides} disabled={guidesJob.isPending || chosen.length === 0}>
               <Truck className="mr-2 h-4 w-4" />
               {guidesJob.isPending ? 'A emitir…' : 'Emitir guias'}
             </Button>
@@ -631,7 +646,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
           </div>
           {guides.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-              Seleciona as encomendas acima e emite as guias de transporte em rascunho na InvoiceXpress.
+              Nenhuma guia emitida nesta seleção.
             </p>
           ) : (
             <ul className="divide-y divide-border text-sm">
@@ -662,20 +677,15 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               ))}
             </ul>
           )}
-          </CollapsibleContent>
-        </Collapsible>
-
-        <Collapsible open={openSections.picking} onOpenChange={() => toggleSection('picking')} className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
-          <div className="flex items-center border-b border-border bg-muted/30 px-5 py-3">
-            <CollapsibleTrigger asChild><Button variant="ghost" className="min-w-0 flex-1 justify-between px-1 text-left font-heading font-semibold">Relatório de Picking {picking ? `· ${picking.length} artigos` : ''} <ChevronDown className={`h-4 w-4 transition-transform ${openSections.picking ? 'rotate-180' : ''}`} /></Button></CollapsibleTrigger>
-          </div>
-          <CollapsibleContent>
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">
+          </TabsContent>
+          <TabsContent value="picking">
+            <h2 className="mb-4 font-heading text-lg font-semibold">Lista de picking {picking && <span className="text-sm font-normal text-muted-foreground">· {pickingKept.length} artigos</span>}</h2>
+          <div className="flex flex-wrap items-center gap-2 border-b border-border-subtle px-0 py-4">
             <label className="mr-auto flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               <Checkbox checked={byCategory} onCheckedChange={(v) => setByCategory(Boolean(v))} />
               Separar por categoria
             </label>
-            <Button size="sm" onClick={() => void generatePicking()}>
+            <Button size="sm" onClick={() => void generatePicking()} disabled={chosen.length === 0}>
               <ListChecks className="mr-2 h-4 w-4" /> Gerar picking
             </Button>
             <Button size="sm" variant="outline" onClick={() => void exportPicking()} disabled={pickingKept.length === 0}>
@@ -726,7 +736,7 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
           </div>
           {picking === null ? (
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-              Selecione as encomendas e clique em "Gerar picking" para agrupar os artigos.
+              Nenhuma lista de picking preparada.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -795,9 +805,9 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
                             <span
                               className={
                                 row.line.stock >= row.line.quantidade
-                                  ? 'font-semibold text-emerald-600'
+                                  ? 'font-semibold text-success'
                                   : row.line.stock > 0
-                                    ? 'font-semibold text-amber-600'
+                                    ? 'font-semibold text-warning'
                                     : 'font-semibold text-destructive'
                               }
                             >
@@ -817,8 +827,8 @@ export function SeparationNotesView({ onOpenRoute }: { onOpenRoute?: (routeId: s
               </p>
             </div>
           )}
-          </CollapsibleContent>
-        </Collapsible>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <CreateRouteDialog

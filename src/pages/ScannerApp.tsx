@@ -17,6 +17,8 @@ import {
   Boxes,
   LogOut,
   ShoppingCart,
+  ArrowRight,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
@@ -24,6 +26,8 @@ import { LoginForm } from '@/components/auth/LoginForm';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
 import { ProductInquiryModule } from '@/components/scanner/ProductInquiryModule';
 import { TransferModule } from '@/components/scanner/TransferModule';
 import { PickingModule } from '@/components/scanner/PickingModule';
@@ -123,12 +127,9 @@ const OPERATIONS: Array<{
 const NAV: Array<{ id: View; label: string; icon: typeof Search }> = [
   { id: 'home', label: 'Início', icon: LayoutGrid },
   { id: 'consulta', label: 'Consulta', icon: Search },
-  { id: 'transferencia', label: 'Transf.', icon: ArrowRightLeft },
   { id: 'picking', label: 'Picking', icon: ClipboardList },
+  { id: 'arrumacao', label: 'Arrumar', icon: Boxes },
   { id: 'carregamento', label: 'Carga', icon: Truck },
-  { id: 'entradas', label: 'Entradas', icon: PackagePlus },
-  { id: 'arrumacao', label: 'Arrumação', icon: Boxes },
-  { id: 'contagem', label: 'Conferências', icon: ClipboardCheck },
 ];
 
 export default function ScannerApp() {
@@ -138,6 +139,7 @@ export default function ScannerApp() {
   /** A contagem só existe quando há conferência aberta e atribuída a este utilizador. */
   const canCount = myAudits.length > 0;
   const [view, setView] = useState<View>('home');
+  const [toolsOpen, setToolsOpen] = useState(false);
   /** O módulo ativo regista aqui o seu handler de quantidade. */
   const qtyHandlerRef = useRef<QtyHandler | null>(null);
   const registerQtyHandler = useCallback((h: QtyHandler | null) => {
@@ -225,7 +227,7 @@ export default function ScannerApp() {
 
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/30">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3">
           {view === 'home' ? (
@@ -236,9 +238,9 @@ export default function ScannerApp() {
             </Button>
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-semibold leading-tight">Scanner de Armazém</h1>
+            <h1 className="truncate font-heading text-lg font-semibold leading-tight">{current?.label ?? 'Scanner de Armazém'}</h1>
             <p className="truncate text-[11px] text-muted-foreground">
-              {current?.label ?? 'Operações'}
+              {view === 'home' ? 'UP Móveis' : 'Scanner de Armazém'}
             </p>
           </div>
           <div className="hidden max-w-[9rem] truncate text-right text-[11px] text-muted-foreground sm:block">
@@ -264,30 +266,39 @@ export default function ScannerApp() {
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-28 pt-4">
         {view === 'home' && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Escolhe a operação:</p>
-            <div className="grid grid-cols-2 gap-3">
-              {operations.map((op) => {
-                const Icon = op.icon;
-                return (
-                  <button
-                    key={op.id}
-                    onClick={() => setView(op.id)}
-                    className="flex flex-col items-start gap-2 rounded-xl border bg-card p-4 text-left shadow-sm transition-all active:scale-[0.98] hover:border-primary/40 hover:shadow-md"
-                  >
-                    <span className={cn('rounded-lg p-2.5', op.accent)}>
-                      <Icon className="h-6 w-6" />
-                    </span>
-                    <span className="text-sm font-semibold leading-tight">{op.label}</span>
-                    <span className="text-[11px] leading-snug text-muted-foreground">{op.description}</span>
-                  </button>
-                );
-              })}
+          <div className="space-y-7">
+            <div className="border-b border-border-subtle pb-5 pt-2">
+              <p className="text-xs text-muted-foreground">{profile?.name ?? 'Armazém UP Móveis'}</p>
+              <h2 className="mt-1 font-heading text-2xl font-semibold">Operações do armazém</h2>
             </div>
-            <Button variant="outline" className="w-full" onClick={() => printCommandSheet('a4')}>
-              <Printer className="mr-2 h-4 w-4" />
-              Folha de comandos (códigos de barras)
-            </Button>
+            <section aria-labelledby="scanner-dispatch">
+              <h3 id="scanner-dispatch" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Expedição</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {operations.filter(op => ['picking', 'carregamento'].includes(op.id)).map(op => <Button key={op.id} variant="outline" onClick={() => goTo(op.id)} className="group h-36 min-w-0 flex-col items-start justify-between whitespace-normal rounded-lg border-border-subtle bg-card p-4 text-left hover:border-primary/40 hover:bg-surface-muted">
+                  <span className="flex w-full items-center justify-between"><span className={cn('flex h-10 w-10 items-center justify-center rounded-md', op.accent)}><op.icon className="h-5 w-5" /></span><ArrowRight className="text-muted-foreground" /></span>
+                  <span className="block text-base font-semibold">{op.label}</span>
+                </Button>)}
+              </div>
+            </section>
+            <section aria-labelledby="scanner-receiving">
+              <h3 id="scanner-receiving" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Receber e arrumar</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {operations.filter(op => ['entradas', 'arrumacao', 'transferencia'].includes(op.id)).map(op => <Button key={op.id} variant="outline" onClick={() => goTo(op.id)} className="h-24 min-w-0 flex-col gap-3 whitespace-normal rounded-lg border-border-subtle bg-card px-2 text-center hover:bg-surface-muted"><op.icon className="h-5 w-5 text-primary" /><span className="text-xs sm:text-sm">{op.label}</span></Button>)}
+              </div>
+            </section>
+            <section aria-labelledby="scanner-stock">
+              <h3 id="scanner-stock" className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Stock e conferência</h3>
+              <div className="divide-y divide-border-subtle border-y border-border-subtle">
+                {operations.filter(op => ['consulta', 'contagem'].includes(op.id)).map(op => <Button key={op.id} variant="ghost" onClick={() => goTo(op.id)} className="h-16 w-full justify-start gap-3 rounded-none px-2"><op.icon className="text-primary" /><span className="flex-1 text-left">{op.id === 'consulta' ? 'Consultar stock' : op.label}</span>{op.id === 'contagem' && myAudits.length > 0 && <Badge variant="secondary">{myAudits.length}</Badge>}<ArrowRight className="text-muted-foreground" /></Button>)}
+              </div>
+            </section>
+            <Collapsible open={toolsOpen} onOpenChange={setToolsOpen}>
+              <CollapsibleTrigger asChild><Button variant="ghost" className="h-12 w-full justify-between px-2 text-muted-foreground">Ferramentas e etiquetas<ChevronDown className={cn('transition-transform', toolsOpen && 'rotate-180')} /></Button></CollapsibleTrigger>
+              <CollapsibleContent className="divide-y divide-border-subtle">
+                {operations.filter(op => ['impressao', 'compras', 'fornecedor'].includes(op.id)).map(op => <Button key={op.id} variant="ghost" onClick={() => goTo(op.id)} className="h-14 w-full justify-start gap-3 rounded-none px-2"><op.icon /><span className="flex-1 text-left">{op.label}</span><ArrowRight className="text-muted-foreground" /></Button>)}
+                <Button variant="ghost" className="h-14 w-full justify-start gap-3 rounded-none px-2" onClick={() => printCommandSheet('a4')}><Printer />Folha de comandos</Button>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         )}
         {view === 'consulta' && <ProductInquiryModule onCommand={handleCommand} />}
@@ -299,7 +310,7 @@ export default function ScannerApp() {
         {view === 'contagem' && (canCount ? <CountingModule onCommand={handleCommand} registerQtyHandler={registerQtyHandler} /> : (
           <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
             <ClipboardCheck className="mx-auto mb-2 h-8 w-8 opacity-50" />
-            Não há conferências abertas para si. Crie uma no painel e atribua-a, ou deixe "Qualquer utilizador".
+            Sem conferências abertas atribuídas a si.
           </div>
         ))}
         {view === 'fornecedor' && !isWarehouseOperator && <SupplierCodeModule onCommand={handleCommand} />}
@@ -308,22 +319,24 @@ export default function ScannerApp() {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur">
-        <div className="mx-auto grid max-w-3xl grid-cols-7">
+        <div className="mx-auto grid max-w-3xl grid-cols-5">
           {navItems.map((m) => {
             const Icon = m.icon;
             const active = view === m.id;
             return (
-              <button
+              <Button
+                variant="ghost"
                 key={m.id}
-                onClick={() => setView(m.id)}
+                onClick={() => goTo(m.id)}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors',
+                  'h-16 min-w-0 flex-col items-center gap-1 rounded-none px-1 py-2 text-[11px] font-medium transition-colors',
                   active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 <Icon className={cn('h-5 w-5', active && 'scale-110')} />
                 {m.label}
-              </button>
+              </Button>
             );
           })}
         </div>
